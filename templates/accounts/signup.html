@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="min-h-screen bg-[#f5f5f7]">
+
+    <div class="flex min-h-screen items-center justify-center px-6 py-20">
+
+        <div class="w-full max-w-[560px]">
+
+            <!-- title -->
+            <div class="mb-16 text-center">
+
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">
+                    MJGALLERY
+                </p>
+
+                <h1 class="apple-display mt-5 text-[64px] font-semibold leading-[1.05] tracking-[-0.04em] text-[#1d1d1f]">
+                    Create your account.
+                </h1>
+
+                <p class="mt-5 text-[19px] leading-[1.5] tracking-[-0.022em] text-[#6e6e73]">
+                    Portfolio management system for MinJae Seo.
+                </p>
+
+            </div>
+
+            <!-- form card -->
+            <div class="rounded-[28px] border border-black/[0.06] bg-white p-12">
+
+                <form method="post"
+                      action="{% url 'accounts:signup' %}"
+                      class="space-y-7">
+
+                    {% csrf_token %}
+
+                    {% if form.errors %}
+                    <div class="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-500">
+
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <p>{{ error }}</p>
+                            {% endfor %}
+                        {% endfor %}
+
+                    </div>
+                    {% endif %}
+
+                    <!-- username -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            Username
+                        </label>
+
+                        <input
+                            type="text"
+                            name="username"
+                            id="username"
+                            value="{{ form.username.value|default_if_none:'' }}"
+                            placeholder="username"
+                            class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >
+
+                    </div>
+
+                    <!-- email -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            Email
+                        </label>
+
+                        <input
+                            type="email"
+                            name="email"
+                            id="email"
+                            value="{{ form.email.value|default_if_none:'' }}"
+                            placeholder="you@example.com"
+                            class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >
+
+                    </div>
+
+                    <!-- password -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            Password
+                        </label>
+
+                        <input
+                            type="password"
+                            name="password1"
+                            id="password1"
+                            placeholder="Password"
+                            class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >
+
+                    </div>
+
+                    <!-- password confirm -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            Confirm Password
+                        </label>
+
+                        <input
+                            type="password"
+                            name="password2"
+                            id="password2"
+                            placeholder="Confirm Password"
+                            class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >
+
+                    </div>
+
+                    <!-- submit -->
+                    <button
+                        type="submit"
+                        class="mt-2 h-[54px] w-full rounded-full bg-[#0066cc] text-[17px] font-normal tracking-[-0.022em] text-white transition active:scale-[0.97]"
+                    >
+                        Create Account
+                    </button>
+
+                </form>
+
+                <!-- login -->
+                <p class="mt-10 text-center text-[15px] text-[#6e6e73]">
+
+                    Already have an account?
+
+                    <a href="{% url 'accounts:login' %}"
+                       class="ml-1 text-[#0066cc]">
+                        Sign in
+                    </a>
+
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
