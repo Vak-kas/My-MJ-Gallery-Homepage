@@ -34,6 +34,10 @@ def login_view(request):
         )
         if user is not None:
             login(request, user)
+            
+            # superuser면 studio로
+            if user.is_superuser:
+                return redirect('studio:index')
             return redirect('accounts:index')
         else:
             return render(request, 'accounts/login.html', {
