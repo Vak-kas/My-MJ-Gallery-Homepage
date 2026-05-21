@@ -40,3 +40,8 @@ def login_view(request):
                 'error': '아이디 또는 비밀번호가 올바르지 않습니다.'
             })
     return render(request, 'accounts/login.html')
+
+
+def logout_view(request):
+    logout(request)
+    return redirect('accounts:login')
