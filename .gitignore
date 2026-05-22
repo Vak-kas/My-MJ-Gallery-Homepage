@@ -161,3 +161,6 @@ cython_debug/
 .idea/
 design.md
 memo.txt
+media/
+.env
+.DS_Store
