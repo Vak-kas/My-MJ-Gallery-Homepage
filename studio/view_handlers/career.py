@@ -21,11 +21,85 @@ def career(request):
     researches = Research.objects.all()
     teachings = Teaching.objects.all()
 
+    edit_type = request.GET.get("edit_type", "").strip()
+    edit_id_raw = request.GET.get("edit_id", "").strip()
+    edit_id = int(edit_id_raw) if edit_id_raw.isdigit() else None
+
+    model_map = {
+        "education": Education,
+        "internship": Internship,
+        "research": Research,
+        "teaching": Teaching,
+    }
+
+    editing_type = edit_type if edit_type in model_map else None
+    editing_item = None
+    if editing_type and edit_id:
+        editing_item = model_map[editing_type].objects.filter(id=edit_id).first()
+        if editing_item is None:
+            editing_type = None
+
+    def month_or_empty(value):
+        return value.strftime("%Y-%m") if value else ""
+
+    editing_data = {}
+    if editing_type and editing_item:
+        editing_data = {
+            "is_editing": True,
+            "type": editing_type,
+            "id": editing_item.id,
+            "is_visible": bool(getattr(editing_item, "is_visible", True)),
+            "description": getattr(editing_item, "description", "") or "",
+        }
+
+        if editing_type == "education":
+            editing_data.update({
+                "school_name": editing_item.school_name,
+                "major": editing_item.major,
+                "degree": editing_item.degree,
+                "status": editing_item.status,
+                "start_date": month_or_empty(editing_item.start_date),
+                "end_date": month_or_empty(editing_item.end_date),
+                "gpa": editing_item.gpa or "",
+            })
+        elif editing_type == "internship":
+            editing_data.update({
+                "country": editing_item.country or "",
+                "company_name": editing_item.company_name,
+                "department": editing_item.department or "",
+                "position": editing_item.position or "",
+                "start_date": month_or_empty(editing_item.start_date),
+                "end_date": month_or_empty(editing_item.end_date),
+                "is_current": bool(editing_item.is_current),
+            })
+        elif editing_type == "research":
+            editing_data.update({
+                "lab_name": editing_item.lab_name or "",
+                "project_name": editing_item.project_name,
+                "role": editing_item.role or "",
+                "start_date": month_or_empty(editing_item.start_date),
+                "end_date": month_or_empty(editing_item.end_date),
+                "is_current": bool(editing_item.is_current),
+                "output": editing_item.output or "",
+            })
+        elif editing_type == "teaching":
+            editing_data.update({
+                "course_name": editing_item.course_name,
+                "institution": editing_item.institution,
+                "role": editing_item.role,
+                "start_date": month_or_empty(editing_item.start_date),
+                "end_date": month_or_empty(editing_item.end_date),
+                "is_current": bool(editing_item.is_current),
+            })
+
     context = {
         "educations": educations,
         "internships": internships,
         "researches": researches,
         "teachings": teachings,
+        "editing_type": editing_type,
+        "editing_id": editing_item.id if editing_item else None,
+        "editing_data": editing_data,
     }
 
     return render(request, "studio/career.html", context)

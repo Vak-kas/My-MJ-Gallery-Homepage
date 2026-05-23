@@ -71,6 +71,57 @@
     [data-item-id].is-drop-after::after {
         bottom: -2px;
     }
+
+    .career-edit-panel {
+        transform-style: preserve-3d;
+        backface-visibility: hidden;
+    }
+
+    .career-edit-panel.is-flip-in {
+        animation: careerCardFlipIn 560ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform-origin: center;
+    }
+
+    .career-edit-panel.is-flip-out {
+        animation: careerCardFlipOut 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform-origin: center;
+    }
+
+    @keyframes careerCardFlipIn {
+        0% {
+            opacity: 0;
+            transform: perspective(1200px) rotateY(-76deg) translateY(8px) scale(0.98);
+            filter: blur(1.5px);
+        }
+        65% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(10deg) translateY(0) scale(1.01);
+            filter: blur(0);
+        }
+        100% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(0deg) translateY(0) scale(1);
+            filter: blur(0);
+        }
+    }
+
+    @keyframes careerCardFlipOut {
+        0% {
+            opacity: 0;
+            transform: perspective(1200px) rotateY(72deg) translateY(8px) scale(0.98);
+            filter: blur(1.5px);
+        }
+        65% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(-8deg) translateY(0) scale(1.01);
+            filter: blur(0);
+        }
+        100% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(0deg) translateY(0) scale(1);
+            filter: blur(0);
+        }
+    }
 </style>
 
 <div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
@@ -112,20 +163,20 @@
 
             <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
                 <!-- LEFT: ONE DYNAMIC FORM -->
-                <aside class="h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
-                    <h2 class="text-[34px] font-semibold tracking-[-0.03em]">Add Career</h2>
+                <aside id="career-edit-panel" class="career-edit-panel h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_type %}Edit Career{% else %}Add Career{% endif %}</h2>
                     <p class="mt-3 text-[14px] leading-[1.6] text-[#6e6e73]">타입에 따라 필요한 입력칸이 바뀝니다.</p>
 
-                    <form id="career-dynamic-form" method="POST" action="{% url 'studio:education_create' %}" class="mt-7 space-y-4">
+                    <form id="career-dynamic-form" method="POST" action="{% if editing_type == 'education' %}{% url 'studio:education_update' editing_id %}{% elif editing_type == 'internship' %}{% url 'studio:internship_update' editing_id %}{% elif editing_type == 'research' %}{% url 'studio:research_update' editing_id %}{% elif editing_type == 'teaching' %}{% url 'studio:teaching_update' editing_id %}{% else %}{% url 'studio:education_create' %}{% endif %}" class="mt-7 space-y-4" data-is-editing="{% if editing_type %}true{% else %}false{% endif %}">
                         {% csrf_token %}
 
                         <div>
                             <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">타입</label>
-                            <select id="career-type-selector" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/15">
-                                <option value="education" selected>학력 (Education)</option>
-                                <option value="internship">경력 (Internship)</option>
-                                <option value="research">소속/역할 (Affiliation)</option>
-                                <option value="teaching">멘토링 (Mentoring)</option>
+                            <select id="career-type-selector" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/15" {% if editing_type %}disabled{% endif %}>
+                                <option value="education" {% if editing_type == 'education' %}selected{% elif not editing_type %}selected{% endif %}>학력 (Education)</option>
+                                <option value="internship" {% if editing_type == 'internship' %}selected{% endif %}>경력 (Internship)</option>
+                                <option value="research" {% if editing_type == 'research' %}selected{% endif %}>소속/역할 (Affiliation)</option>
+                                <option value="teaching" {% if editing_type == 'teaching' %}selected{% endif %}>멘토링 (Mentoring)</option>
                             </select>
                         </div>
 
@@ -269,7 +320,11 @@
                             </label>
                         </div>
 
-                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">추가</button>
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_type %}수정 저장{% else %}추가{% endif %}</button>
+
+                        {% if editing_type %}
+                        <a id="career-edit-cancel" href="{% url 'studio:career' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
+                        {% endif %}
                     </form>
                 </aside>
 
@@ -282,13 +337,20 @@
                             <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ education.id }}">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
-                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ education.school_name }} {{ education.major }}{% if education.degree != 'none' %} {{ education.get_degree_display }}{% endif %}</p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ education.school_name }} {{ education.major }}{% if education.degree != 'none' %} {{ education.get_degree_display }}{% endif %}</p>
+                                            {% if education.is_visible %}
+                                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                            {% else %}
+                                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                            {% endif %}
+                                        </div>
                                         <p class="mt-1 text-[12px] text-[#8e8e93]">{{ education.get_status_display }} · {{ education.start_date|date:"Y.m"|default:"-" }} ~ {% if education.status == 'graduated' and education.end_date %}{{ education.end_date|date:"Y.m" }}{% endif %}</p>
                                         {% if education.gpa %}<p class="mt-1 text-[12px] text-[#8e8e93]">학점 {{ education.gpa }}</p>{% endif %}
                                         {% if education.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ education.description }}</p>{% endif %}
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="education-edit-{{ education.id }}">Edit</button>
+                                        <a href="{% url 'studio:career' %}?edit_type=education&edit_id={{ education.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-link>Edit</a>
                                         <form method="POST" action="{% url 'studio:education_delete' education.id %}" onsubmit="return confirm('이 학력 항목을 삭제할까요?');">
                                             {% csrf_token %}
                                             <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
@@ -352,6 +414,11 @@
                                                 {% if internship.department %} · {{ internship.department }}{% endif %}
                                                 {% if internship.position and internship.position != '-' %} · {{ internship.position }}{% endif %}
                                             </p>
+                                            {% if internship.is_visible %}
+                                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                            {% else %}
+                                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                            {% endif %}
                                             {% if internship.country %}
                                             <span class="inline-flex items-center justify-center text-[14px]" title="{{ internship.country }}">
                                                 {% if '말레이시아' in internship.country or 'malaysia' in internship.country|lower %}🇲🇾
@@ -370,7 +437,7 @@
                                         {% if internship.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ internship.description }}</p>{% endif %}
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="internship-edit-{{ internship.id }}">Edit</button>
+                                        <a href="{% url 'studio:career' %}?edit_type=internship&edit_id={{ internship.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-link>Edit</a>
                                         <form method="POST" action="{% url 'studio:internship_delete' internship.id %}" onsubmit="return confirm('이 경력 항목을 삭제할까요?');">
                                             {% csrf_token %}
                                             <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
@@ -422,7 +489,14 @@
                             <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ research.id }}">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
-                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{% if research.lab_name %}{{ research.lab_name }} {% endif %}{{ research.project_name }}{% if research.role %} {{ research.role }}{% endif %}</p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-[15px] font-semibold text-[#1d1d1f]">{% if research.lab_name %}{{ research.lab_name }} {% endif %}{{ research.project_name }}{% if research.role %} {{ research.role }}{% endif %}</p>
+                                            {% if research.is_visible %}
+                                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                            {% else %}
+                                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                            {% endif %}
+                                        </div>
                                         <p class="mt-1 text-[12px] text-[#8e8e93]">
                                             {{ research.start_date|date:"Y.m"|default:"-" }} ~
                                             {% if research.is_current %}현재 진행중{% else %}{{ research.end_date|date:"Y.m"|default:"-" }}{% endif %}
@@ -431,7 +505,7 @@
                                         {% if research.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ research.description }}</p>{% endif %}
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="research-edit-{{ research.id }}">Edit</button>
+                                        <a href="{% url 'studio:career' %}?edit_type=research&edit_id={{ research.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-link>Edit</a>
                                         <form method="POST" action="{% url 'studio:research_delete' research.id %}" onsubmit="return confirm('이 소속/역할 항목을 삭제할까요?');">
                                             {% csrf_token %}
                                             <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
@@ -481,7 +555,14 @@
                             <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ teaching.id }}">
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
-                                        <p class="text-[15px] font-semibold">{{ teaching.course_name }}</p>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-[15px] font-semibold">{{ teaching.course_name }}</p>
+                                            {% if teaching.is_visible %}
+                                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                            {% else %}
+                                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                            {% endif %}
+                                        </div>
                                         <p class="mt-1 text-[14px] text-[#6e6e73]">{{ teaching.institution }} · {{ teaching.get_role_display }}</p>
                                         <p class="mt-1 text-[12px] text-[#8e8e93]">
                                             {% if teaching.start_date or teaching.end_date or teaching.is_current %}
@@ -493,7 +574,7 @@
                                         {% if teaching.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ teaching.description }}</p>{% endif %}
                                     </div>
                                     <div class="flex items-center gap-2">
-                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="teaching-edit-{{ teaching.id }}">Edit</button>
+                                        <a href="{% url 'studio:career' %}?edit_type=teaching&edit_id={{ teaching.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-link>Edit</a>
                                         <form method="POST" action="{% url 'studio:teaching_delete' teaching.id %}" onsubmit="return confirm('이 멘토링 항목을 삭제할까요?');">
                                             {% csrf_token %}
                                             <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
@@ -545,7 +626,12 @@
     </div>
 </div>
 
+{{ editing_data|json_script:"career-editing-data" }}
+
 <script>
+    const CAREER_SCROLL_KEY = 'studio_career_scroll_y';
+    const CAREER_PANEL_MODE_KEY = 'studio_career_panel_mode';
+
     setTimeout(() => {
         document.querySelectorAll('.toast-message').forEach((toast) => {
             toast.style.transition = 'all 0.35s ease';
@@ -556,9 +642,14 @@
 
     const typeSelector = document.getElementById('career-type-selector');
     const form = document.getElementById('career-dynamic-form');
+    const editPanel = document.getElementById('career-edit-panel');
+    const cancelLink = document.getElementById('career-edit-cancel');
     const typeBlocks = document.querySelectorAll('.type-fields');
     const requiredInputs = document.querySelectorAll('[data-required-for]');
     const CAREER_TYPE_STORAGE_KEY = 'studio.career.selectedType';
+    const editingDataEl = document.getElementById('career-editing-data');
+    const editingData = editingDataEl ? JSON.parse(editingDataEl.textContent || '{}') : {};
+    const searchParams = new URLSearchParams(window.location.search);
 
     const actionMap = {
         education: "{% url 'studio:education_create' %}",
@@ -569,7 +660,9 @@
 
     function syncTypeForm() {
         const currentType = typeSelector.value;
-        form.action = actionMap[currentType];
+        if (!isEditing) {
+            form.action = actionMap[currentType];
+        }
 
         typeBlocks.forEach((block) => {
             const isMatch = block.getAttribute('data-type-fields') === currentType;
@@ -589,21 +682,129 @@
         });
     }
 
-    const savedType = localStorage.getItem(CAREER_TYPE_STORAGE_KEY);
-    if (savedType && actionMap[savedType]) {
-        typeSelector.value = savedType;
+    const isEditing = Boolean(editingData && editingData.is_editing);
+
+    const savedY = sessionStorage.getItem(CAREER_SCROLL_KEY);
+    if (savedY !== null) {
+        const y = Number(savedY);
+        requestAnimationFrame(() => {
+            window.scrollTo({ top: Number.isFinite(y) ? y : 0, behavior: 'auto' });
+        });
+        sessionStorage.removeItem(CAREER_SCROLL_KEY);
+    }
+
+    const pendingPanelMode = sessionStorage.getItem(CAREER_PANEL_MODE_KEY);
+    if (editPanel && pendingPanelMode) {
+        if (pendingPanelMode === 'to-edit' && searchParams.get('edit_type')) {
+            editPanel.classList.add('is-flip-in');
+        }
+        if (pendingPanelMode === 'to-add' && !searchParams.get('edit_type')) {
+            editPanel.classList.add('is-flip-out');
+        }
+        sessionStorage.removeItem(CAREER_PANEL_MODE_KEY);
+    } else if (editPanel && searchParams.get('edit_type')) {
+        editPanel.classList.add('is-flip-in');
+    }
+
+    function persistCareerViewState(mode) {
+        sessionStorage.setItem(CAREER_SCROLL_KEY, String(window.scrollY));
+        sessionStorage.setItem(CAREER_PANEL_MODE_KEY, mode);
+    }
+
+    document.querySelectorAll('[data-edit-link]').forEach((link) => {
+        link.addEventListener('click', () => {
+            persistCareerViewState('to-edit');
+        });
+    });
+
+    if (isEditing && editingData.type && actionMap[editingData.type]) {
+        typeSelector.value = editingData.type;
+    } else {
+        const savedType = localStorage.getItem(CAREER_TYPE_STORAGE_KEY);
+        if (savedType && actionMap[savedType]) {
+            typeSelector.value = savedType;
+        }
     }
 
     typeSelector.addEventListener('change', () => {
-        localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+        if (!isEditing) {
+            localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+        }
         syncTypeForm();
     });
 
     form.addEventListener('submit', () => {
-        localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+        if (!isEditing) {
+            localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+        } else {
+            persistCareerViewState('to-add');
+        }
     });
 
+    if (cancelLink) {
+        cancelLink.addEventListener('click', () => {
+            persistCareerViewState('to-add');
+        });
+    }
+
     syncTypeForm();
+
+    function setValue(name, value) {
+        form.querySelectorAll(`[name="${name}"]`).forEach((field) => {
+            if (field.type === 'checkbox') {
+                field.checked = Boolean(value);
+            } else if (value !== undefined && value !== null) {
+                field.value = value;
+            }
+        });
+    }
+
+    if (isEditing) {
+        setValue('description', editingData.description || '');
+        setValue('is_visible', Boolean(editingData.is_visible));
+
+        if (editingData.type === 'education') {
+            setValue('school_name', editingData.school_name || '');
+            setValue('major', editingData.major || '');
+            setValue('degree', editingData.degree || 'none');
+            setValue('status', editingData.status || 'graduated');
+            setValue('start_date', editingData.start_date || '');
+            setValue('end_date', editingData.end_date || '');
+            setValue('gpa_score', editingData.gpa || '');
+            setValue('gpa_scale', '');
+        }
+
+        if (editingData.type === 'internship') {
+            setValue('country', editingData.country || '');
+            setValue('company_name', editingData.company_name || '');
+            setValue('department', editingData.department || '');
+            setValue('position', editingData.position || '');
+            setValue('start_date', editingData.start_date || '');
+            setValue('end_date', editingData.end_date || '');
+            setValue('is_current', Boolean(editingData.is_current));
+        }
+
+        if (editingData.type === 'research') {
+            setValue('lab_name', editingData.lab_name || '');
+            setValue('project_name', editingData.project_name || '');
+            setValue('role', editingData.role || '');
+            setValue('start_date', editingData.start_date || '');
+            setValue('end_date', editingData.end_date || '');
+            setValue('is_current', Boolean(editingData.is_current));
+            setValue('output', editingData.output || '');
+        }
+
+        if (editingData.type === 'teaching') {
+            setValue('course_name', editingData.course_name || '');
+            setValue('institution', editingData.institution || '');
+            setValue('role', editingData.role || 'ta');
+            setValue('start_date', editingData.start_date || '');
+            setValue('end_date', editingData.end_date || '');
+            setValue('is_current', Boolean(editingData.is_current));
+        }
+
+        syncTypeForm();
+    }
 
     ['internship', 'research', 'teaching'].forEach((typeKey) => {
         const currentEl = document.getElementById(typeKey + '-current');
@@ -629,16 +830,6 @@
         educationStatus.addEventListener('change', syncEducationEndDate);
         syncEducationEndDate();
     }
-
-    document.querySelectorAll('[data-edit-toggle]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const targetId = btn.dataset.target;
-            const panel = document.getElementById(targetId);
-            if (!panel) return;
-            panel.classList.toggle('hidden');
-            btn.textContent = panel.classList.contains('hidden') ? 'Edit' : 'Close';
-        });
-    });
 
     function getCookie(name) {
         const value = `; ${document.cookie}`;
