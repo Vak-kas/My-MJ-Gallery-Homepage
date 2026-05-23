@@ -1,0 +1,748 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+    .career-section {
+        border: 1px solid #ddddE3;
+        background: #fbfbfd;
+    }
+
+    .career-section-title {
+        border-bottom: 1px solid #e1e1e6;
+        background: #f3f3f6;
+        color: #0f172a;
+        letter-spacing: -0.01em;
+    }
+
+    .career-section-title-icon {
+        display: inline-flex;
+        width: 18px;
+        justify-content: center;
+        margin-right: 6px;
+    }
+
+    [data-item-id] {
+        cursor: grab;
+        position: relative;
+        background: #ffffff;
+        border-color: #e3e3e8 !important;
+        transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+    }
+
+    [data-sortable-list] {
+        position: relative;
+    }
+
+    .career-section .border-dashed {
+        border-color: #d7d7dd !important;
+        background: #fdfdfe !important;
+    }
+
+    [data-item-id].is-dragging {
+        cursor: grabbing;
+        opacity: 0.72;
+        transform: scale(0.985);
+        box-shadow: 0 16px 30px rgba(0, 102, 204, 0.12);
+    }
+
+    [data-item-id].is-drop-target {
+        border-color: rgba(0, 102, 204, 0.5) !important;
+        background: rgba(0, 102, 204, 0.035);
+        box-shadow: inset 0 0 0 1px rgba(0, 102, 204, 0.2);
+    }
+
+    [data-item-id].is-drop-before::before,
+    [data-item-id].is-drop-after::after {
+        content: "";
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        height: 3px;
+        border-radius: 9999px;
+        background: #0066cc;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    }
+
+    [data-item-id].is-drop-before::before {
+        top: -2px;
+    }
+
+    [data-item-id].is-drop-after::after {
+        bottom: -2px;
+    }
+</style>
+
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+            {% if messages %}
+            <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">Saved</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-10">
+                <a href="{% url 'studio:index' %}"
+                   class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">CAREER</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Career.</h1>
+                <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">
+                    Contact처럼 왼쪽에서 타입을 선택해 입력하고, 오른쪽에서 저장 목록을 관리합니다.
+                </p>
+            </section>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
+                <!-- LEFT: ONE DYNAMIC FORM -->
+                <aside class="h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <h2 class="text-[34px] font-semibold tracking-[-0.03em]">Add Career</h2>
+                    <p class="mt-3 text-[14px] leading-[1.6] text-[#6e6e73]">타입에 따라 필요한 입력칸이 바뀝니다.</p>
+
+                    <form id="career-dynamic-form" method="POST" action="{% url 'studio:education_create' %}" class="mt-7 space-y-4">
+                        {% csrf_token %}
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">타입</label>
+                            <select id="career-type-selector" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/15">
+                                <option value="education" selected>학력 (Education)</option>
+                                <option value="internship">경력 (Internship)</option>
+                                <option value="research">소속/역할 (Affiliation)</option>
+                                <option value="teaching">멘토링 (Mentoring)</option>
+                            </select>
+                        </div>
+
+                        <!-- EDUCATION FIELDS -->
+                        <div data-type-fields="education" class="type-fields space-y-4">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">학교명 *</label>
+                                <input type="text" name="school_name" data-required-for="education" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="한밭대학교">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">전공 *</label>
+                                <input type="text" name="major" data-required-for="education" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="컴퓨터공학과">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">학위 구분</label>
+                                <select name="degree" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                    <option value="none">해당없음</option>
+                                    <option value="bachelor">학부</option>
+                                    <option value="master">석사</option>
+                                    <option value="phd">박사</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">상태</label>
+                                <select id="education-status" name="status" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                    <option value="graduated">졸업</option>
+                                    <option value="enrolled">재학중</option>
+                                    <option value="admitted">입학예정</option>
+                                </select>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="month" name="start_date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <input type="month" name="end_date" id="education-end-date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">학점 (GPA)</label>
+                                <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                    <input type="text" name="gpa_score" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="3.8">
+                                    <span class="text-[13px] text-[#8e8e93]">/</span>
+                                    <input type="text" name="gpa_scale" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="4.5">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- INTERNSHIP FIELDS -->
+                        <div data-type-fields="internship" class="type-fields hidden space-y-4">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">국가</label>
+                                <input type="text" name="country" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="말레이시아 / 베트남">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">기관/회사명 *</label>
+                                <input type="text" name="company_name" data-required-for="internship" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="AhnLab">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">부서</label>
+                                <input type="text" name="department" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="Security Team">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">직책 (선택)</label>
+                                <input type="text" name="position" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="Security Intern (없으면 비워두세요)">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="month" name="start_date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <input type="month" name="end_date" id="internship-end-date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] font-semibold text-[#6e6e73]">현재 진행중</span>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="checkbox" id="internship-current" name="is_current" value="true" class="peer sr-only">
+                                    <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0a84ff] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                    <span class="text-[11px] font-semibold text-[#0a84ff]">ON</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- AFFILIATION FIELDS (Research model) -->
+                        <div data-type-fields="research" class="type-fields hidden space-y-4">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">소속명 (선택)</label>
+                                <input type="text" name="lab_name" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: ICIS LAB, 멋쟁이사자처럼">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">활동/직책명 *</label>
+                                <input type="text" name="project_name" data-required-for="research" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 랩장, 해외 인턴십, 운영진">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">세부역할 (선택)</label>
+                                <input type="text" name="role" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 백엔드, 팀장, 멘토">
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="month" name="start_date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <input type="month" name="end_date" id="research-end-date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] font-semibold text-[#6e6e73]">현재 진행중</span>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="checkbox" id="research-current" name="is_current" value="true" class="peer sr-only">
+                                    <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0a84ff] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                    <span class="text-[11px] font-semibold text-[#0a84ff]">ON</span>
+                                </label>
+                            </div>
+                            <textarea name="output" rows="2" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]" placeholder="주요 성과/결과물"></textarea>
+                        </div>
+
+                        <!-- TEACHING FIELDS -->
+                        <div data-type-fields="teaching" class="type-fields hidden space-y-4">
+                            <input type="text" name="course_name" data-required-for="teaching" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="멘토링/강의명 *">
+                            <input type="text" name="institution" data-required-for="teaching" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="기관/프로그램 *">
+                            <select name="role" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <option value="ta">TA / Assistant</option>
+                                <option value="instructor">강사</option>
+                                <option value="professor">멘토</option>
+                                <option value="curriculum">교재개발</option>
+                            </select>
+                            <div class="grid grid-cols-2 gap-3">
+                                <input type="month" name="start_date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <input type="month" name="end_date" id="teaching-end-date" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-[13px] font-semibold text-[#6e6e73]">현재 진행중</span>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="checkbox" id="teaching-current" name="is_current" value="true" class="peer sr-only">
+                                    <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0a84ff] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                    <span class="text-[11px] font-semibold text-[#0a84ff]">ON</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">설명</label>
+                            <textarea name="description" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]" placeholder="활동/성과 요약"></textarea>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="checkbox" name="is_visible" value="true" checked class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">추가</button>
+                    </form>
+                </aside>
+
+                <!-- RIGHT: LISTS -->
+                <div class="space-y-6">
+                    <section class="career-section overflow-hidden rounded-[22px]">
+                        <div class="career-section-title px-6 py-4 text-[15px] font-semibold"><span class="career-section-title-icon">🎓</span>학력 (Education) · 드래그로 순서 변경</div>
+                        <div class="space-y-3 p-4" data-sortable-list data-reorder-url="{% url 'studio:education_reorder' %}">
+                            {% for education in educations %}
+                            <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ education.id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ education.school_name }} {{ education.major }}{% if education.degree != 'none' %} {{ education.get_degree_display }}{% endif %}</p>
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">{{ education.get_status_display }} · {{ education.start_date|date:"Y.m"|default:"-" }} ~ {% if education.status == 'graduated' and education.end_date %}{{ education.end_date|date:"Y.m" }}{% endif %}</p>
+                                        {% if education.gpa %}<p class="mt-1 text-[12px] text-[#8e8e93]">학점 {{ education.gpa }}</p>{% endif %}
+                                        {% if education.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ education.description }}</p>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="education-edit-{{ education.id }}">Edit</button>
+                                        <form method="POST" action="{% url 'studio:education_delete' education.id %}" onsubmit="return confirm('이 학력 항목을 삭제할까요?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                        </form>
+                                        <div class="ml-1 text-[12px] text-[#8e8e93] select-none">↕︎ 드래그</div>
+                                    </div>
+                                </div>
+
+                                <div id="education-edit-{{ education.id }}" class="mt-3 hidden rounded-[12px] border border-black/[0.06] bg-[#fbfbfd] p-3">
+                                    <form method="POST" action="{% url 'studio:education_update' education.id %}" class="space-y-2">
+                                        {% csrf_token %}
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" name="school_name" value="{{ education.school_name }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="학교명">
+                                            <input type="text" name="major" value="{{ education.major }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="전공">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <select name="degree" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                                <option value="none" {% if education.degree == 'none' %}selected{% endif %}>해당없음</option>
+                                                <option value="bachelor" {% if education.degree == 'bachelor' %}selected{% endif %}>학부</option>
+                                                <option value="master" {% if education.degree == 'master' %}selected{% endif %}>석사</option>
+                                                <option value="phd" {% if education.degree == 'phd' %}selected{% endif %}>박사</option>
+                                            </select>
+                                            <select name="status" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                                <option value="graduated" {% if education.status == 'graduated' %}selected{% endif %}>졸업</option>
+                                                <option value="enrolled" {% if education.status == 'enrolled' %}selected{% endif %}>재학중</option>
+                                                <option value="admitted" {% if education.status == 'admitted' %}selected{% endif %}>입학예정</option>
+                                            </select>
+                                        </div>
+                                        <input type="text" name="gpa" value="{{ education.gpa }}" class="h-[36px] w-full rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="학점 예: 3.8 / 4.5">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="month" name="start_date" value="{{ education.start_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                            <input type="month" name="end_date" value="{{ education.end_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                        </div>
+                                        <textarea name="description" rows="2" class="w-full rounded-[12px] border border-black/[0.08] px-3 py-2 text-[12px]" placeholder="설명">{{ education.description }}</textarea>
+                                        <div class="flex items-center justify-between pt-1">
+                                            <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                                <input type="checkbox" name="is_visible" value="true" {% if education.is_visible %}checked{% endif %}>
+                                                공개
+                                            </label>
+                                            <button type="submit" class="rounded-full bg-[#0066cc] px-3 py-1.5 text-[11px] font-semibold text-white">수정 저장</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 학력 항목이 없습니다.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="career-section overflow-hidden rounded-[22px]">
+                        <div class="career-section-title px-6 py-4 text-[15px] font-semibold"><span class="career-section-title-icon">💼</span>경력 (Internship) · 드래그로 순서 변경</div>
+                        <div class="space-y-3 p-4" data-sortable-list data-reorder-url="{% url 'studio:internship_reorder' %}">
+                            {% for internship in internships %}
+                            <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ internship.id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2">
+                                            <p class="text-[15px] font-semibold text-[#1d1d1f]">
+                                                {{ internship.company_name }}
+                                                {% if internship.department %} · {{ internship.department }}{% endif %}
+                                                {% if internship.position and internship.position != '-' %} · {{ internship.position }}{% endif %}
+                                            </p>
+                                            {% if internship.country %}
+                                            <span class="inline-flex items-center justify-center text-[14px]" title="{{ internship.country }}">
+                                                {% if '말레이시아' in internship.country or 'malaysia' in internship.country|lower %}🇲🇾
+                                                {% elif '베트남' in internship.country or 'vietnam' in internship.country|lower %}🇻🇳
+                                                {% elif '한국' in internship.country or 'korea' in internship.country|lower %}🇰🇷
+                                                {% elif '일본' in internship.country or 'japan' in internship.country|lower %}🇯🇵
+                                                {% elif '미국' in internship.country or 'usa' in internship.country|lower or 'united states' in internship.country|lower %}🇺🇸
+                                                {% else %}🌍{% endif %}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                            {{ internship.start_date|date:"Y.m"|default:"-" }} ~
+                                            {% if internship.is_current %}현재 진행중{% else %}{{ internship.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                        </p>
+                                        {% if internship.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ internship.description }}</p>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="internship-edit-{{ internship.id }}">Edit</button>
+                                        <form method="POST" action="{% url 'studio:internship_delete' internship.id %}" onsubmit="return confirm('이 경력 항목을 삭제할까요?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                        </form>
+                                        <div class="ml-1 text-[12px] text-[#8e8e93]">↕︎ 드래그</div>
+                                    </div>
+                                </div>
+
+                                <div id="internship-edit-{{ internship.id }}" class="mt-3 hidden rounded-[12px] border border-black/[0.06] bg-[#fbfbfd] p-3">
+                                    <form method="POST" action="{% url 'studio:internship_update' internship.id %}" class="space-y-2">
+                                        {% csrf_token %}
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" name="country" value="{{ internship.country }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="국가">
+                                            <input type="text" name="company_name" value="{{ internship.company_name }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="기관/회사명">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" name="department" value="{{ internship.department }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="부서">
+                                            <input type="text" name="position" value="{{ internship.position }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="직책(선택)">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="month" name="start_date" value="{{ internship.start_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                            <input type="month" name="end_date" value="{{ internship.end_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                        </div>
+                                        <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                            <input type="checkbox" name="is_current" value="true" {% if internship.is_current %}checked{% endif %}>
+                                            현재 진행중
+                                        </label>
+                                        <textarea name="description" rows="2" class="w-full rounded-[12px] border border-black/[0.08] px-3 py-2 text-[12px]" placeholder="설명">{{ internship.description }}</textarea>
+                                        <div class="flex items-center justify-between pt-1">
+                                            <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                                <input type="checkbox" name="is_visible" value="true" {% if internship.is_visible %}checked{% endif %}>
+                                                공개
+                                            </label>
+                                            <button type="submit" class="rounded-full bg-[#0066cc] px-3 py-1.5 text-[11px] font-semibold text-white">수정 저장</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 경력 항목이 없습니다.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="career-section overflow-hidden rounded-[22px]">
+                        <div class="career-section-title px-6 py-4 text-[15px] font-semibold"><span class="career-section-title-icon">🔬</span>소속/역할 (Affiliation) · 드래그로 순서 변경</div>
+                        <div class="space-y-3 p-4" data-sortable-list data-reorder-url="{% url 'studio:research_reorder' %}">
+                            {% for research in researches %}
+                            <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ research.id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{% if research.lab_name %}{{ research.lab_name }} {% endif %}{{ research.project_name }}{% if research.role %} {{ research.role }}{% endif %}</p>
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                            {{ research.start_date|date:"Y.m"|default:"-" }} ~
+                                            {% if research.is_current %}현재 진행중{% else %}{{ research.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                        </p>
+                                        {% if research.output %}<p class="mt-1 text-[12px] text-[#8e8e93]">성과: {{ research.output }}</p>{% endif %}
+                                        {% if research.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ research.description }}</p>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="research-edit-{{ research.id }}">Edit</button>
+                                        <form method="POST" action="{% url 'studio:research_delete' research.id %}" onsubmit="return confirm('이 소속/역할 항목을 삭제할까요?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                        </form>
+                                        <div class="ml-1 text-[12px] text-[#8e8e93]">↕︎ 드래그</div>
+                                    </div>
+                                </div>
+
+                                <div id="research-edit-{{ research.id }}" class="mt-3 hidden rounded-[12px] border border-black/[0.06] bg-[#fbfbfd] p-3">
+                                    <form method="POST" action="{% url 'studio:research_update' research.id %}" class="space-y-2">
+                                        {% csrf_token %}
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" name="lab_name" value="{{ research.lab_name }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="소속명(선택)">
+                                            <input type="text" name="project_name" value="{{ research.project_name }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="활동/직책명">
+                                        </div>
+                                        <input type="text" name="role" value="{{ research.role }}" class="h-[36px] w-full rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="세부역할(선택)">
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="month" name="start_date" value="{{ research.start_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                            <input type="month" name="end_date" value="{{ research.end_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                        </div>
+                                        <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                            <input type="checkbox" name="is_current" value="true" {% if research.is_current %}checked{% endif %}>
+                                            현재 진행중
+                                        </label>
+                                        <textarea name="output" rows="2" class="w-full rounded-[12px] border border-black/[0.08] px-3 py-2 text-[12px]" placeholder="주요 성과">{{ research.output }}</textarea>
+                                        <textarea name="description" rows="2" class="w-full rounded-[12px] border border-black/[0.08] px-3 py-2 text-[12px]" placeholder="설명">{{ research.description }}</textarea>
+                                        <div class="flex items-center justify-between pt-1">
+                                            <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                                <input type="checkbox" name="is_visible" value="true" {% if research.is_visible %}checked{% endif %}>
+                                                공개
+                                            </label>
+                                            <button type="submit" class="rounded-full bg-[#0066cc] px-3 py-1.5 text-[11px] font-semibold text-white">수정 저장</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 소속/역할 항목이 없습니다.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+
+                    <section class="career-section overflow-hidden rounded-[22px]">
+                        <div class="career-section-title px-6 py-4 text-[15px] font-semibold"><span class="career-section-title-icon">📚</span>멘토링 (Mentoring) · 드래그로 순서 변경</div>
+                        <div class="space-y-3 p-4" data-sortable-list data-reorder-url="{% url 'studio:teaching_reorder' %}">
+                            {% for teaching in teachings %}
+                            <div class="rounded-[16px] border border-black/[0.06] p-4" draggable="true" data-item-id="{{ teaching.id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-[15px] font-semibold">{{ teaching.course_name }}</p>
+                                        <p class="mt-1 text-[14px] text-[#6e6e73]">{{ teaching.institution }} · {{ teaching.get_role_display }}</p>
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                            {% if teaching.start_date or teaching.end_date or teaching.is_current %}
+                                                {{ teaching.start_date|date:"Y.m"|default:"-" }} ~ {% if teaching.is_current %}현재 진행중{% else %}{{ teaching.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                            {% else %}
+                                                {{ teaching.year|default:"-" }} {{ teaching.semester|default:"" }}
+                                            {% endif %}
+                                        </p>
+                                        {% if teaching.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ teaching.description }}</p>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button type="button" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]" data-edit-toggle data-target="teaching-edit-{{ teaching.id }}">Edit</button>
+                                        <form method="POST" action="{% url 'studio:teaching_delete' teaching.id %}" onsubmit="return confirm('이 멘토링 항목을 삭제할까요?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                        </form>
+                                        <div class="ml-1 text-[12px] text-[#8e8e93]">↕︎ 드래그</div>
+                                    </div>
+                                </div>
+
+                                <div id="teaching-edit-{{ teaching.id }}" class="mt-3 hidden rounded-[12px] border border-black/[0.06] bg-[#fbfbfd] p-3">
+                                    <form method="POST" action="{% url 'studio:teaching_update' teaching.id %}" class="space-y-2">
+                                        {% csrf_token %}
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="text" name="course_name" value="{{ teaching.course_name }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="멘토링/강의명">
+                                            <input type="text" name="institution" value="{{ teaching.institution }}" required class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]" placeholder="기관/프로그램">
+                                        </div>
+                                        <select name="role" class="h-[36px] w-full rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                            <option value="ta" {% if teaching.role == 'ta' %}selected{% endif %}>TA / Assistant</option>
+                                            <option value="instructor" {% if teaching.role == 'instructor' %}selected{% endif %}>강사</option>
+                                            <option value="professor" {% if teaching.role == 'professor' %}selected{% endif %}>멘토</option>
+                                            <option value="curriculum" {% if teaching.role == 'curriculum' %}selected{% endif %}>교재개발</option>
+                                        </select>
+                                        <div class="grid grid-cols-2 gap-2">
+                                            <input type="month" name="start_date" value="{{ teaching.start_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                            <input type="month" name="end_date" value="{{ teaching.end_date|date:'Y-m' }}" class="h-[36px] rounded-full border border-black/[0.08] px-3 text-[12px]">
+                                        </div>
+                                        <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                            <input type="checkbox" name="is_current" value="true" {% if teaching.is_current %}checked{% endif %}>
+                                            현재 진행중
+                                        </label>
+                                        <textarea name="description" rows="2" class="w-full rounded-[12px] border border-black/[0.08] px-3 py-2 text-[12px]" placeholder="설명">{{ teaching.description }}</textarea>
+                                        <div class="flex items-center justify-between pt-1">
+                                            <label class="inline-flex items-center gap-2 text-[11px] text-[#6e6e73]">
+                                                <input type="checkbox" name="is_visible" value="true" {% if teaching.is_visible %}checked{% endif %}>
+                                                공개
+                                            </label>
+                                            <button type="submit" class="rounded-full bg-[#0066cc] px-3 py-1.5 text-[11px] font-semibold text-white">수정 저장</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 멘토링 항목이 없습니다.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+    setTimeout(() => {
+        document.querySelectorAll('.toast-message').forEach((toast) => {
+            toast.style.transition = 'all 0.35s ease';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+        });
+    }, 2200);
+
+    const typeSelector = document.getElementById('career-type-selector');
+    const form = document.getElementById('career-dynamic-form');
+    const typeBlocks = document.querySelectorAll('.type-fields');
+    const requiredInputs = document.querySelectorAll('[data-required-for]');
+    const CAREER_TYPE_STORAGE_KEY = 'studio.career.selectedType';
+
+    const actionMap = {
+        education: "{% url 'studio:education_create' %}",
+        internship: "{% url 'studio:internship_create' %}",
+        research: "{% url 'studio:research_create' %}",
+        teaching: "{% url 'studio:teaching_create' %}",
+    };
+
+    function syncTypeForm() {
+        const currentType = typeSelector.value;
+        form.action = actionMap[currentType];
+
+        typeBlocks.forEach((block) => {
+            const isMatch = block.getAttribute('data-type-fields') === currentType;
+            block.classList.toggle('hidden', !isMatch);
+
+            block.querySelectorAll('input, select, textarea').forEach((field) => {
+                field.disabled = !isMatch;
+            });
+        });
+
+        requiredInputs.forEach((input) => {
+            const isCurrentRequired = input.getAttribute('data-required-for') === currentType;
+            input.required = isCurrentRequired;
+            if (!isCurrentRequired && input.type !== 'hidden') {
+                input.value = '';
+            }
+        });
+    }
+
+    const savedType = localStorage.getItem(CAREER_TYPE_STORAGE_KEY);
+    if (savedType && actionMap[savedType]) {
+        typeSelector.value = savedType;
+    }
+
+    typeSelector.addEventListener('change', () => {
+        localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+        syncTypeForm();
+    });
+
+    form.addEventListener('submit', () => {
+        localStorage.setItem(CAREER_TYPE_STORAGE_KEY, typeSelector.value);
+    });
+
+    syncTypeForm();
+
+    ['internship', 'research', 'teaching'].forEach((typeKey) => {
+        const currentEl = document.getElementById(typeKey + '-current');
+        const endEl = document.getElementById(typeKey + '-end-date');
+        if (!currentEl || !endEl) return;
+
+        const sync = () => {
+            endEl.disabled = currentEl.checked;
+            if (currentEl.checked) endEl.value = '';
+        };
+        currentEl.addEventListener('change', sync);
+        sync();
+    });
+
+    const educationStatus = document.getElementById('education-status');
+    const educationEndDate = document.getElementById('education-end-date');
+    if (educationStatus && educationEndDate) {
+        const syncEducationEndDate = () => {
+            const locked = educationStatus.value === 'enrolled';
+            educationEndDate.disabled = locked;
+            if (locked) educationEndDate.value = '';
+        };
+        educationStatus.addEventListener('change', syncEducationEndDate);
+        syncEducationEndDate();
+    }
+
+    document.querySelectorAll('[data-edit-toggle]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const targetId = btn.dataset.target;
+            const panel = document.getElementById(targetId);
+            if (!panel) return;
+            panel.classList.toggle('hidden');
+            btn.textContent = panel.classList.contains('hidden') ? 'Edit' : 'Close';
+        });
+    });
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function initSortableList(listEl) {
+        let dragged = null;
+
+        const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
+
+        const clearDropMarkers = () => {
+            getItems().forEach((it) => it.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
+        };
+
+        const saveOrder = async () => {
+            const orderedIds = getItems().map((item) => Number(item.dataset.itemId));
+            const url = listEl.dataset.reorderUrl;
+            if (!url || orderedIds.length === 0) return;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ ordered_ids: orderedIds }),
+            });
+
+            if (!response.ok) {
+                throw new Error('order-save-failed');
+            }
+        };
+
+        getItems().forEach((item) => {
+            item.addEventListener('mousedown', (e) => {
+                const interactive = e.target.closest('input, textarea, select, button, summary, details, label, a');
+                item.draggable = !interactive;
+            });
+
+            item.addEventListener('mouseup', () => {
+                item.draggable = true;
+            });
+
+            item.addEventListener('dragstart', () => {
+                dragged = item;
+                listEl.classList.add('is-list-dragging');
+                item.classList.add('is-dragging');
+            });
+
+            item.addEventListener('dragend', async () => {
+                item.classList.remove('is-dragging');
+                listEl.classList.remove('is-list-dragging');
+                clearDropMarkers();
+                dragged = null;
+                try {
+                    await saveOrder();
+                } catch {
+                    window.location.reload();
+                }
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+
+                if (!dragged || dragged === item) return;
+
+                clearDropMarkers();
+                item.classList.add('is-drop-target');
+
+                const rect = item.getBoundingClientRect();
+                const isBefore = (e.clientY - rect.top) < rect.height / 2;
+                item.classList.add(isBefore ? 'is-drop-before' : 'is-drop-after');
+            });
+
+            item.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                if (!dragged || dragged === item) return;
+                item.classList.add('is-drop-target');
+            });
+
+            item.addEventListener('dragleave', () => {
+                item.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after');
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!dragged || dragged === item) return;
+
+                const dropBefore = item.classList.contains('is-drop-before');
+                clearDropMarkers();
+
+                if (dropBefore) {
+                    item.before(dragged);
+                } else {
+                    item.after(dragged);
+                }
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
+</script>
+
+{% endblock %}

@@ -97,3 +97,143 @@ class Link(models.Model):
 
     def __str__(self):
         return f"{self.get_platform_display()} - {self.url}"
+
+
+class Education(models.Model):
+    STATUS_CHOICES = [
+        ("enrolled", "재학중"),
+        ("graduated", "졸업"),
+        ("admitted", "입학예정"),
+    ]
+
+    DEGREE_CHOICES = [
+        ("none", "해당없음"),
+        ("bachelor", "학부"),
+        ("master", "석사"),
+        ("phd", "박사"),
+    ]
+
+    school_name = models.CharField(max_length=200)
+    major = models.CharField(max_length=200)
+    degree = models.CharField(max_length=20, choices=DEGREE_CHOICES, default="none")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="graduated")
+    
+    start_date = models.DateField(blank=True, null=True)  # 입학일
+    end_date = models.DateField(blank=True, null=True)    # 졸업일
+    
+    gpa = models.CharField(max_length=10, blank=True)      # 학점
+    description = models.TextField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-start_date", "id"]
+
+    def __str__(self):
+        return f"{self.school_name} - {self.major}"
+
+
+class Internship(models.Model):
+    country = models.CharField(max_length=100, blank=True)
+    company_name = models.CharField(max_length=200)
+    department = models.CharField(max_length=200, blank=True)
+    position = models.CharField(max_length=200, blank=True)
+    
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+    
+    description = models.TextField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-start_date", "id"]
+
+    def __str__(self):
+        return f"{self.company_name} - {self.country}" if self.country else self.company_name
+
+
+class Research(models.Model):
+    lab_name = models.CharField(max_length=200, blank=True)
+    project_name = models.CharField(max_length=200)
+    role = models.CharField(max_length=200, blank=True)  # 학부연구생, 대학원생 등
+    
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+    
+    output = models.TextField(blank=True)  # 논문, 특허 등
+    description = models.TextField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-start_date", "id"]
+
+    def __str__(self):
+        return f"{self.lab_name} - {self.project_name}"
+
+
+class Leadership(models.Model):
+    organization_name = models.CharField(max_length=200)
+    position = models.CharField(max_length=200)
+    
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+    
+    description = models.TextField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-start_date", "id"]
+
+    def __str__(self):
+        return f"{self.organization_name} - {self.position}"
+
+
+class Teaching(models.Model):
+    ROLE_CHOICES = [
+        ("ta", "TA / Assistant"),
+        ("instructor", "강사"),
+        ("professor", "멘토"),
+        ("curriculum", "교재개발"),
+    ]
+
+    course_name = models.CharField(max_length=200)
+    institution = models.CharField(max_length=200)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="ta")
+
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+    
+    year = models.IntegerField(blank=True, null=True)  # 연도
+    semester = models.CharField(max_length=10, blank=True)  # 1학기, 2학기
+    
+    description = models.TextField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-year", "id"]
+
+    def __str__(self):
+        return f"{self.course_name} - {self.get_role_display()}"
