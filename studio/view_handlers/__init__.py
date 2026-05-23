@@ -41,3 +41,11 @@ from .career import (
     teaching_toggle_visibility,
     teaching_reorder,
 )
+from .activity import (
+    activity,
+    activity_create,
+    activity_update,
+    activity_delete,
+    activity_toggle_visibility,
+    activity_reorder,
+)

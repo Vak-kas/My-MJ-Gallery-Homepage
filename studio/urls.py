@@ -9,6 +9,13 @@ urlpatterns = [
     path('profile/basic/', views.profile_basic, name='profile_basic'),
 
     path('career/', views.career, name='career'),
+
+    path('activity/', views.activity, name='activity'),
+    path('activity/create/', views.activity_create, name='activity_create'),
+    path('activity/<int:id>/update/', views.activity_update, name='activity_update'),
+    path('activity/<int:id>/delete/', views.activity_delete, name='activity_delete'),
+    path('activity/<int:id>/toggle-visibility/', views.activity_toggle_visibility, name='activity_toggle_visibility'),
+    path('activity/reorder/', views.activity_reorder, name='activity_reorder'),
     
     # Education
     path('career/education/create/', views.education_create, name='education_create'),

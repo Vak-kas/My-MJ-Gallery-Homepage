@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .activity-section {
+        border: 1px solid #dddde3;
+        background: #fbfbfd;
+    }
+
+    .activity-section-title {
+        border-bottom: 1px solid #e1e1e6;
+        background: #f3f3f6;
+        color: #0f172a;
+        letter-spacing: -0.01em;
+    }
+
+    .activity-section-title-icon {
+        display: inline-flex;
+        width: 18px;
+        justify-content: center;
+        margin-right: 6px;
+    }
+
+    .activity-item-card {
+        background: #ffffff;
+        border-color: #e3e3e8 !important;
+        transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    [data-item-id] {
+        cursor: grab;
+        position: relative;
+    }
+
+    [data-sortable-list] {
+        position: relative;
+    }
+
+    .activity-item-card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+        border-color: rgba(0, 102, 204, 0.18) !important;
+    }
+
+    [data-item-id].is-dragging {
+        cursor: grabbing;
+        opacity: 0.72;
+        transform: scale(0.985);
+        box-shadow: 0 16px 30px rgba(0, 102, 204, 0.12);
+    }
+
+    [data-item-id].is-drop-target {
+        border-color: rgba(0, 102, 204, 0.5) !important;
+        background: rgba(0, 102, 204, 0.035);
+        box-shadow: inset 0 0 0 1px rgba(0, 102, 204, 0.2);
+    }
+
+    [data-item-id].is-drop-before::before,
+    [data-item-id].is-drop-after::after {
+        content: "";
+        position: absolute;
+        left: 10px;
+        right: 10px;
+        height: 3px;
+        border-radius: 9999px;
+        background: #0066cc;
+        box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.9);
+    }
+
+    [data-item-id].is-drop-before::before {
+        top: -2px;
+    }
+
+    [data-item-id].is-drop-after::after {
+        bottom: -2px;
+    }
+
+    .activity-edit-panel {
+        transform-style: preserve-3d;
+        backface-visibility: hidden;
+    }
+
+    .activity-edit-panel.is-flip-in {
+        animation: activityCardFlipIn 560ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform-origin: center;
+    }
+
+    .activity-edit-panel.is-flip-out {
+        animation: activityCardFlipOut 520ms cubic-bezier(0.22, 1, 0.36, 1);
+        transform-origin: center;
+    }
+
+    @keyframes activityCardFlipIn {
+        0% {
+            opacity: 0;
+            transform: perspective(1200px) rotateY(-76deg) translateY(8px) scale(0.98);
+            filter: blur(1.5px);
+        }
+        65% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(10deg) translateY(0) scale(1.01);
+            filter: blur(0);
+        }
+        100% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(0deg) translateY(0) scale(1);
+            filter: blur(0);
+        }
+    }
+
+    @keyframes activityCardFlipOut {
+        0% {
+            opacity: 0;
+            transform: perspective(1200px) rotateY(72deg) translateY(8px) scale(0.98);
+            filter: blur(1.5px);
+        }
+        65% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(-8deg) translateY(0) scale(1.01);
+            filter: blur(0);
+        }
+        100% {
+            opacity: 1;
+            transform: perspective(1200px) rotateY(0deg) translateY(0) scale(1);
+            filter: blur(0);
+        }
+    }
+
+    .toast-message {
+        animation: toastIn 280ms ease-out;
+    }
+
+    @keyframes toastIn {
+        from {
+            opacity: 0;
+            transform: translateY(-6px) scale(0.98);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+</style>
+
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+            {% if messages %}
+            <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">완료</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-8">
+                <a href="{% url 'studio:index' %}"
+                   class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">ACTIVITY</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Activity.</h1>
+                <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">
+                    Career처럼 왼쪽에서 활동을 추가하고, 오른쪽에서 유형별로 정리된 목록을 관리합니다.
+                </p>
+            </section>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
+                <aside id="activity-edit-panel" class="activity-edit-panel h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_activity %}Edit Activity{% else %}Add Activity{% endif %}</h2>
+                    <p class="mt-3 text-[14px] leading-[1.6] text-[#6e6e73]">타입에 맞는 활동을 빠르게 추가하고 관리할 수 있습니다.</p>
+
+                    <form id="activity-main-form" method="post" action="{% if editing_activity %}{% url 'studio:activity_update' editing_activity.id %}{% else %}{% url 'studio:activity_create' %}{% endif %}" class="mt-7 space-y-4" data-is-editing="{% if editing_activity %}true{% else %}false{% endif %}">
+                        {% csrf_token %}
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">타입</label>
+                            <select name="activity_type" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-2 focus:ring-[#0066cc]/15">
+                                {% for value, label in activity_types %}
+                                <option value="{{ value }}"{% if editing_activity %}{% if editing_activity.activity_type == value %} selected{% endif %}{% else %}{% if value == 'external_program' %} selected{% endif %}{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">활동명 *</label>
+                            <input type="text" name="title" value="{{ editing_activity.title|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 글로벌 연수 프로그램, 커뮤니티 운영진">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">기관 / 프로그램</label>
+                            <input type="text" name="organization_name" value="{{ editing_activity.organization_name|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 학교, 기업, 커뮤니티, 대회 주최기관">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">비고</label>
+                            <input type="text" name="role" value="{{ editing_activity.role|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 참가자 / 운영진 / 수상 / 발표 / 담당 파트">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <input type="month" name="start_date" value="{{ editing_activity.start_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            <input type="month" name="end_date" value="{{ editing_activity.end_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">현재 진행중</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="hidden" name="is_current" value="false">
+                                <input type="checkbox" name="is_current" value="true" {% if editing_activity and editing_activity.is_current %}checked{% endif %} class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0a84ff] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#0a84ff]">ON</span>
+                            </label>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">관련 링크</label>
+                            <input type="url" name="url" value="{{ editing_activity.url|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="https://...">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">설명</label>
+                            <textarea name="description" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]" placeholder="활동 내용 / 역할 / 성과 요약">{{ editing_activity.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="hidden" name="is_visible" value="false">
+                                <input type="checkbox" name="is_visible" value="true" {% if not editing_activity or editing_activity.is_visible %}checked{% endif %} class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_activity %}수정 저장{% else %}추가{% endif %}</button>
+
+                        {% if editing_activity %}
+                        <a id="activity-edit-cancel" href="{% url 'studio:activity' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
+                        {% endif %}
+                    </form>
+                </aside>
+
+                <div class="space-y-6">
+                    {% for section in activity_sections %}
+                    <section class="activity-section overflow-hidden rounded-[22px]">
+                        <div class="activity-section-title px-6 py-4 text-[15px] font-semibold">
+                            <span class="activity-section-title-icon">{{ section.icon }}</span>{{ section.title }} · 저장 목록 {{ section.count }}개 · 드래그로 순서 변경
+                        </div>
+                        <div class="space-y-3 p-4" data-sortable-list data-reorder-url="{% url 'studio:activity_reorder' %}">
+                            {% for activity_item in section.items %}
+                            <div id="activity-{{ activity_item.id }}" class="activity-item-card rounded-[16px] border border-black/[0.06] p-4 {% if editing_activity_id == activity_item.id %}ring-2 ring-[#0066cc]/20{% endif %}" draggable="true" data-item-id="{{ activity_item.id }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            <p class="text-[15px] font-semibold text-[#1d1d1f]">
+                                                {{ activity_item.title }}
+                                            </p>
+                                            {% if activity_item.is_visible %}
+                                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                            {% else %}
+                                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if activity_item.role %}
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">비고 · {{ activity_item.role }}</p>
+                                        {% endif %}
+                                        {% if activity_item.organization_name %}
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">{{ activity_item.organization_name }}</p>
+                                        {% endif %}
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                            {{ activity_item.start_date|date:"Y.m"|default:"-" }} ~
+                                            {% if activity_item.is_current %}현재 진행중{% else %}{{ activity_item.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                        </p>
+                                        {% if activity_item.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ activity_item.description }}</p>{% endif %}
+                                        {% if activity_item.url %}<a href="{{ activity_item.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0066cc] hover:underline">{{ activity_item.url }}</a>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <form method="GET" action="{% url 'studio:activity' %}" data-edit-trigger-form>
+                                            <input type="hidden" name="edit" value="{{ activity_item.id }}">
+                                            <button type="submit" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]">Edit</button>
+                                        </form>
+                                        <form method="POST" action="{% url 'studio:activity_delete' activity_item.id %}" onsubmit="return confirm('이 활동을 삭제할까요?');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                        </form>
+                                        <div class="ml-1 text-[12px] text-[#8e8e93] select-none">↕︎ 드래그</div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 {{ section.title }} 항목이 없습니다.</div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+    const SCROLL_KEY = 'studio_activity_scroll_y';
+    const PANEL_MODE_KEY = 'studio_activity_panel_mode';
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function initSortableList(listEl) {
+        let dragged = null;
+
+        const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
+
+        const clearDropMarkers = () => {
+            getItems().forEach((it) => it.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
+        };
+
+        const saveOrder = async () => {
+            const orderedIds = getItems().map((item) => Number(item.dataset.itemId));
+            const url = listEl.dataset.reorderUrl;
+            if (!url || orderedIds.length === 0) return;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ ordered_ids: orderedIds }),
+            });
+
+            if (!response.ok) {
+                throw new Error('order-save-failed');
+            }
+        };
+
+        getItems().forEach((item) => {
+            item.addEventListener('mousedown', (e) => {
+                const interactive = e.target.closest('input, textarea, select, button, summary, details, label, a');
+                item.draggable = !interactive;
+            });
+
+            item.addEventListener('mouseup', () => {
+                item.draggable = true;
+            });
+
+            item.addEventListener('dragstart', () => {
+                dragged = item;
+                item.classList.add('is-dragging');
+            });
+
+            item.addEventListener('dragend', async () => {
+                item.classList.remove('is-dragging');
+                clearDropMarkers();
+                dragged = null;
+                try {
+                    await saveOrder();
+                } catch {
+                    window.location.reload();
+                }
+            });
+
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault();
+
+                if (!dragged || dragged === item) return;
+
+                clearDropMarkers();
+                item.classList.add('is-drop-target');
+
+                const rect = item.getBoundingClientRect();
+                const isBefore = (e.clientY - rect.top) < rect.height / 2;
+                item.classList.add(isBefore ? 'is-drop-before' : 'is-drop-after');
+            });
+
+            item.addEventListener('dragenter', (e) => {
+                e.preventDefault();
+                if (!dragged || dragged === item) return;
+                item.classList.add('is-drop-target');
+            });
+
+            item.addEventListener('dragleave', () => {
+                item.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after');
+            });
+
+            item.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (!dragged || dragged === item) return;
+
+                const dropBefore = item.classList.contains('is-drop-before');
+                clearDropMarkers();
+
+                if (dropBefore) {
+                    item.before(dragged);
+                } else {
+                    item.after(dragged);
+                }
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
+
+    const editPanel = document.getElementById('activity-edit-panel');
+    const mainForm = document.getElementById('activity-main-form');
+    const cancelLink = document.getElementById('activity-edit-cancel');
+    const searchParams = new URLSearchParams(window.location.search);
+    const hasEditQuery = Boolean(searchParams.get('edit'));
+
+    const savedY = sessionStorage.getItem(SCROLL_KEY);
+    if (savedY !== null) {
+        const y = Number(savedY);
+        requestAnimationFrame(() => {
+            window.scrollTo({ top: Number.isFinite(y) ? y : 0, behavior: 'auto' });
+        });
+        sessionStorage.removeItem(SCROLL_KEY);
+    }
+
+    const pendingPanelMode = sessionStorage.getItem(PANEL_MODE_KEY);
+    if (editPanel && pendingPanelMode) {
+        if (pendingPanelMode === 'to-edit' && hasEditQuery) {
+            editPanel.classList.add('is-flip-in');
+        }
+        if (pendingPanelMode === 'to-add' && !hasEditQuery) {
+            editPanel.classList.add('is-flip-out');
+        }
+        sessionStorage.removeItem(PANEL_MODE_KEY);
+    } else if (editPanel && hasEditQuery) {
+        editPanel.classList.add('is-flip-in');
+    }
+
+    function persistViewState(mode) {
+        sessionStorage.setItem(SCROLL_KEY, String(window.scrollY));
+        sessionStorage.setItem(PANEL_MODE_KEY, mode);
+    }
+
+    document.querySelectorAll('[data-edit-trigger-form]').forEach((form) => {
+        form.addEventListener('submit', () => persistViewState('to-edit'));
+    });
+
+    if (mainForm) {
+        mainForm.addEventListener('submit', () => {
+            const isEditing = mainForm.dataset.isEditing === 'true';
+            if (isEditing) {
+                persistViewState('to-add');
+            }
+        });
+    }
+
+    if (cancelLink) {
+        cancelLink.addEventListener('click', () => {
+            persistViewState('to-add');
+        });
+    }
+
+    const toastContainer = document.getElementById('toast-container');
+    if (toastContainer) {
+        setTimeout(() => {
+            toastContainer.querySelectorAll('.toast-message').forEach((toast) => {
+                toast.style.transition = 'opacity 260ms ease, transform 260ms ease';
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-4px) scale(0.98)';
+                setTimeout(() => toast.remove(), 280);
+            });
+        }, 2200);
+    }
+</script>
+{% endblock %}

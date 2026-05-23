@@ -237,3 +237,36 @@ class Teaching(models.Model):
 
     def __str__(self):
         return f"{self.course_name} - {self.get_role_display()}"
+
+
+class Activity(models.Model):
+    ACTIVITY_TYPE_CHOICES = [
+        ("external_program", "External Program"),
+        ("community", "Community"),
+        ("seminar", "Seminar"),
+        ("volunteer", "Volunteer"),
+        ("other", "Other"),
+    ]
+
+    activity_type = models.CharField(max_length=20, choices=ACTIVITY_TYPE_CHOICES, default="external_program")
+    title = models.CharField(max_length=200)
+    organization_name = models.CharField(max_length=200, blank=True)
+    role = models.CharField(max_length=200, blank=True)
+
+    start_date = models.DateField(blank=True, null=True)
+    end_date = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+
+    description = models.TextField(blank=True)
+    url = models.URLField(blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-start_date", "id"]
+
+    def __str__(self):
+        return f"{self.get_activity_type_display()} - {self.title}"
