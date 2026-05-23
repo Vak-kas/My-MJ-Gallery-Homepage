@@ -17,6 +17,13 @@ urlpatterns = [
     path('activity/<int:id>/toggle-visibility/', views.activity_toggle_visibility, name='activity_toggle_visibility'),
     path('activity/reorder/', views.activity_reorder, name='activity_reorder'),
     
+    path('award/', views.award, name='award'),
+    path('award/create/', views.award_create, name='award_create'),
+    path('award/<int:id>/update/', views.award_update, name='award_update'),
+    path('award/<int:id>/delete/', views.award_delete, name='award_delete'),
+    path('award/<int:id>/toggle-visibility/', views.award_toggle_visibility, name='award_toggle_visibility'),
+    path('award/reorder/', views.award_reorder, name='award_reorder'),
+    
     # Education
     path('career/education/create/', views.education_create, name='education_create'),
     path('career/education/<int:id>/update/', views.education_update, name='education_update'),

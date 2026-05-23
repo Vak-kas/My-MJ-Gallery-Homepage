@@ -1,6 +1,6 @@
 from django.shortcuts import render
 
-from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity
+from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity, Award
 
 
 def home(request):
@@ -43,4 +43,5 @@ def home(request):
         "links": links,
         "career_sections": career_sections,
         "activity_sections": activity_sections,
+        "awards": Award.objects.filter(is_visible=True),
     })

@@ -273,3 +273,26 @@ class Activity(models.Model):
 
     def __str__(self):
         return f"{self.get_activity_type_display()} - {self.title}"
+
+
+class Award(models.Model):
+    title = models.CharField(max_length=200)
+    organizer = models.CharField(max_length=200, blank=True)
+    award_name = models.CharField(max_length=200, blank=True)
+    date = models.DateField(blank=True, null=True)
+
+    description = models.TextField(blank=True)
+    url = models.URLField(blank=True)
+    attachment = models.FileField(upload_to="award/", max_length=255, blank=True, null=True)
+    preview_image = models.ImageField(upload_to="award/previews/", max_length=255, blank=True, null=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-date", "id"]
+
+    def __str__(self):
+        return self.title

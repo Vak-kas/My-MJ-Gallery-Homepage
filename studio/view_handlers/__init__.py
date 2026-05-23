@@ -49,3 +49,11 @@ from .activity import (
     activity_toggle_visibility,
     activity_reorder,
 )
+from .award import (
+    award,
+    award_create,
+    award_update,
+    award_delete,
+    award_toggle_visibility,
+    award_reorder,
+)

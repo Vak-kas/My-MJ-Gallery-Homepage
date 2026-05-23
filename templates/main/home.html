@@ -13,6 +13,7 @@
     {% include "main/sections/profile.html" %}
     {% include "main/sections/career.html" %}
     {% include "main/sections/activity.html" %}
+    {% include "main/sections/award.html" %}
     
 
 
@@ -31,6 +32,7 @@
     :root {
         --career-progress: 0;
         --activity-progress: 0;
+        --award-progress: 0;
     }
 
     .section-flash {
@@ -73,9 +75,21 @@
     }
 
     .activity-section {
-        opacity: calc(0.18 + (var(--activity-progress) * 0.82));
-        filter: blur(calc((1 - var(--activity-progress)) * 10px));
-        transform: translateY(calc((1 - var(--activity-progress)) * 56px)) scale(calc(0.965 + (var(--activity-progress) * 0.035)));
+        opacity: calc((0.18 + (var(--activity-progress) * 0.82)) * (1 - (var(--award-progress) * 0.82)));
+        filter: blur(calc(((1 - var(--activity-progress)) * 10px) + (var(--award-progress) * 8px)));
+        transform: translateY(calc(((1 - var(--activity-progress)) * 56px) + (var(--award-progress) * -36px))) scale(calc((0.965 + (var(--activity-progress) * 0.035)) - (var(--award-progress) * 0.03)));
+    }
+
+    .award-section {
+        opacity: calc(0.18 + (var(--award-progress) * 0.82));
+        filter: blur(calc((1 - var(--award-progress)) * 10px));
+        transform: translateY(calc((1 - var(--award-progress)) * 56px)) scale(calc(0.965 + (var(--award-progress) * 0.035)));
+    }
+
+    .page-section.is-last-section {
+        opacity: 1 !important;
+        filter: blur(0) !important;
+        transform: translateY(0) scale(1) !important;
     }
 
     html.focus-career .profile-section {
@@ -98,6 +112,11 @@
         opacity: 1;
         filter: blur(0);
         transform: translateY(0) scale(1);
+    }
+
+    html.focus-award .activity-section {
+        filter: blur(10px);
+        transform: translateY(-64px) scale(.96);
     }
 
     .reveal {
@@ -141,6 +160,7 @@
         profile: document.querySelector('.profile-section'),
         career: document.querySelector('.career-section'),
         activity: document.querySelector('.activity-section'),
+        award: document.querySelector('.award-section'),
     };
 
     const transitionConfig = {
@@ -150,6 +170,19 @@
     };
 
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+    const getOrderedSections = () => {
+        return Array.from(document.querySelectorAll('.page-section[data-section]'));
+    };
+
+    const updateLastSectionMarker = () => {
+        const ordered = getOrderedSections();
+        ordered.forEach((sectionEl) => sectionEl.classList.remove('is-last-section'));
+        const lastSection = ordered[ordered.length - 1];
+        if (lastSection) {
+            lastSection.classList.add('is-last-section');
+        }
+    };
 
     const calculateSectionProgress = (sectionEl) => {
         if (!sectionEl) return 0;
@@ -169,24 +202,32 @@
 
     let prevFocusCareer = false;
     let prevFocusActivity = false;
+    let prevFocusAward = false;
 
     const updateSectionTransitions = () => {
+        updateLastSectionMarker();
+
         const careerProgress = calculateSectionProgress(sections.career);
         const activityProgress = calculateSectionProgress(sections.activity);
+        const awardProgress = calculateSectionProgress(sections.award);
 
         rootEl.style.setProperty('--career-progress', careerProgress.toFixed(3));
         rootEl.style.setProperty('--activity-progress', activityProgress.toFixed(3));
+        rootEl.style.setProperty('--award-progress', awardProgress.toFixed(3));
 
-        const focusActivity = activityProgress > transitionConfig.focusThreshold;
+        const focusAward = awardProgress > transitionConfig.focusThreshold;
+        const focusActivity = activityProgress > transitionConfig.focusThreshold && awardProgress < 0.55;
         const focusCareer = careerProgress > transitionConfig.focusThreshold && activityProgress < 0.55;
 
         rootEl.classList.toggle('focus-career', focusCareer);
         rootEl.classList.toggle('focus-activity', focusActivity);
+        rootEl.classList.toggle('focus-award', focusAward);
 
-        if (prevFocusCareer !== focusCareer || prevFocusActivity !== focusActivity) {
+        if (prevFocusCareer !== focusCareer || prevFocusActivity !== focusActivity || prevFocusAward !== focusAward) {
             playFlash();
             prevFocusCareer = focusCareer;
             prevFocusActivity = focusActivity;
+            prevFocusAward = focusAward;
         }
     };
 
