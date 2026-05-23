@@ -1,6 +1,6 @@
 from django.shortcuts import render
 
-from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching
+from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity
 
 
 def home(request):
@@ -27,9 +27,19 @@ def home(request):
         {"key": "mentoring", "title": "Mentoring", "subtitle": "멘토링", "icon": "📚", "items": mentorings[:4], "total": mentorings.count()},
     ]
 
+    activities = Activity.objects.filter(is_visible=True)
+    activity_sections = [
+        {"key": "external_program", "title": "External Program", "subtitle": "대외활동", "icon": "🌍", "items": activities.filter(activity_type="external_program")[:4], "total": activities.filter(activity_type="external_program").count()},
+        {"key": "seminar", "title": "Seminar", "subtitle": "세미나", "icon": "🎤", "items": activities.filter(activity_type="seminar")[:4], "total": activities.filter(activity_type="seminar").count()},
+        {"key": "community", "title": "Community", "subtitle": "커뮤니티", "icon": "🤝", "items": activities.filter(activity_type="community")[:4], "total": activities.filter(activity_type="community").count()},
+        {"key": "volunteer", "title": "Volunteer", "subtitle": "봉사", "icon": "🌿", "items": activities.filter(activity_type="volunteer")[:4], "total": activities.filter(activity_type="volunteer").count()},
+        {"key": "other", "title": "Other", "subtitle": "기타", "icon": "🗂", "items": activities.filter(activity_type="other")[:4], "total": activities.filter(activity_type="other").count()},
+    ]
+
     return render(request, "main/home.html", {
         "info": info,
         "contact_sections": contact_sections,
         "links": links,
         "career_sections": career_sections,
+        "activity_sections": activity_sections,
     })
