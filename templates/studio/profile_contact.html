@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12">
+
+            {% if messages %}
+            <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">Saved</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-10">
+                <a href="{% url 'studio:index' %}"
+                   class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">
+                    PROFILE / CONTACT
+                </p>
+
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">
+                    Contact.
+                </h1>
+
+                <p class="mt-5 text-[18px] leading-[1.5] text-[#6e6e73]">
+                    이메일, 전화번호, 주소 등 연락 가능한 정보를 관리합니다.
+                </p>
+            </section>
+
+            <div class="mt-14 flex gap-10 border-b border-black/[0.06]">
+                <a href="{% url 'studio:profile_basic' %}"
+                   class="pb-4 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    Basic Info
+                </a>
+
+                <a href="{% url 'studio:profile_contact' %}"
+                   class="border-b-2 border-[#1d1d1f] pb-4 text-[15px] font-medium">
+                    Contact
+                </a>
+
+                <a href="{% url 'studio:profile_links' %}"
+                   class="pb-4 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    Links
+                </a>
+
+                <a href="{% url 'studio:profile_resume' %}"
+                   class="pb-4 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    Resume
+                </a>
+            </div>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[420px_1fr]">
+
+                <!-- Add Form -->
+                <form method="post"
+                      action="{% url 'studio:profile_contact' %}"
+                        id="add_contact_form"
+                      class="h-fit rounded-[30px] border border-black/[0.05] bg-white p-8">
+
+                    {% csrf_token %}
+
+                    <h2 class="text-[28px] font-semibold tracking-[-0.03em]">
+                        Add Contact
+                    </h2>
+
+                    <p class="mt-3 text-[15px] leading-[1.5] text-[#6e6e73]">
+                        공개할 연락처 정보를 추가합니다.
+                    </p>
+
+                    <div class="mt-8 space-y-6">
+
+                        <div>
+                            <label class="mb-3 block text-[14px] font-semibold">Type</label>
+                            <select name="contact_type"
+                                    class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                <option value="email">Email</option>
+                                <option value="phone">Phone</option>
+                                <option value="address">Address</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-3 block text-[14px] font-semibold">Label</label>
+                            <input type="text"
+                                   id="contact_label"
+                                   name="label"
+                                   placeholder="Main, School, Lab, Home"
+                                   class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                            <p id="label_hint" class="mt-2 text-[13px] text-[#86868b]">
+                                라벨은 선택 입력입니다.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label class="mb-3 block text-[14px] font-semibold">Value</label>
+
+                            <div id="email_value_group">
+                                <div class="flex items-center gap-2">
+                                <input type="text"
+                                       id="email_local"
+                                       name="email_local"
+                                       placeholder="your.id"
+                                       class="h-[52px] min-w-0 flex-1 rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+
+                                <span class="text-[18px] text-[#6e6e73]">@</span>
+
+                                <select id="email_domain"
+                                        name="email_domain"
+                                        class="h-[52px] w-[180px] rounded-full border border-black/[0.07] bg-white px-4 text-[15px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                    <option value="gmail.com">gmail.com</option>
+                                    <option value="naver.com">naver.com</option>
+                                    <option value="edu.hanbat.ac.kr">edu.hanbat.ac.kr</option>
+                                    <option value="custom">직접 입력</option>
+                                </select>
+                                    </div>
+
+                                <input type="text"
+                                       id="email_domain_custom"
+                                       name="email_domain_custom"
+                                       placeholder="custom-domain.com"
+                                        class="hidden mt-2 h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                            </div>
+
+                            <div id="generic_value_group" class="hidden">
+                                <input type="text"
+                                       id="generic_value"
+                                       name="generic_value"
+                                       placeholder=""
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                            </div>
+
+                            <input type="hidden" id="contact_value" name="value" value="">
+                            <p id="value_hint" class="mt-2 text-[13px] text-[#86868b]"></p>
+                        </div>
+
+                        <div>
+                            <label class="mb-3 block text-[14px] font-semibold">공개 여부</label>
+                            <label for="is_visible_toggle" class="inline-flex cursor-pointer items-center gap-3">
+                                <input type="hidden" name="is_visible" value="false">
+                                <input id="is_visible_toggle"
+                                       type="checkbox"
+                                       name="is_visible"
+                                       value="true"
+                                       checked
+                                       class="peer sr-only">
+                                <span class="relative h-7 w-12 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] peer-focus:ring-4 peer-focus:ring-[#34c759]/20 after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span id="is_visible_text" class="text-[14px] font-medium text-[#6e6e73]">ON</span>
+                            </label>
+                        </div>
+
+                    </div>
+
+                    <button type="submit"
+                            class="mt-8 h-[46px] rounded-full bg-[#0066cc] px-7 text-[14px] text-white transition active:scale-[0.97]">
+                        Add Contact
+                    </button>
+
+                </form>
+
+                <!-- List -->
+                <div class="space-y-6">
+                    {% for section in contact_sections %}
+                    <div class="overflow-hidden rounded-[30px] border border-black/[0.05] bg-white">
+                        <div class="border-b border-black/[0.06] bg-[#fbfbfd] px-7 py-4">
+                            <h3 class="text-[15px] font-semibold text-[#1d1d1f]">{{ section.title }}</h3>
+                        </div>
+
+                        <div class="grid grid-cols-10 border-b border-black/[0.06] bg-[#fbfbfd] px-7 py-4 text-[12px] uppercase tracking-[0.18em] text-[#6e6e73]">
+                            <div class="col-span-2">Label</div>
+                            <div class="col-span-5">Value</div>
+                            <div class="col-span-1">Visible</div>
+                            <div class="col-span-2 text-right">Actions</div>
+                        </div>
+
+                        {% for contact in section.items %}
+                        {% if editing_contact_id == contact.id %}
+                        <form method="post"
+                              action="{% url 'studio:profile_contact_update' contact.id %}"
+                              id="contact-{{ contact.id }}"
+                              class="grid grid-cols-10 items-center gap-2 border-b border-black/[0.04] bg-[#fafafa] px-7 py-4">
+                            {% csrf_token %}
+
+                            <div class="col-span-2">
+                                <input type="text"
+                                       name="label"
+                                       value="{{ contact.label }}"
+                                       placeholder="Label"
+                                       class="h-[42px] w-full rounded-full border border-black/[0.07] bg-white px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                            </div>
+
+                            <div class="col-span-5">
+                                <input type="text"
+                                       name="value"
+                                       value="{{ contact.value }}"
+                                       placeholder="Value"
+                                       class="h-[42px] w-full rounded-full border border-black/[0.07] bg-white px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                            </div>
+
+                            <div class="col-span-1">
+                                <input type="hidden" name="is_visible" value="false">
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="checkbox"
+                                           name="is_visible"
+                                           value="true"
+                                           {% if contact.is_visible %}checked{% endif %}
+                                           class="peer sr-only">
+                                    <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                </label>
+                            </div>
+
+                            <div class="col-span-2 flex justify-end gap-2">
+                                <button type="submit"
+                                        class="rounded-full bg-[#0066cc] px-4 py-2 text-[13px] text-white transition active:scale-[0.97]">
+                                    Save
+                                </button>
+                                <a href="{% url 'studio:profile_contact' %}"
+                                   class="rounded-full border border-black/[0.08] px-4 py-2 text-[13px] text-[#1d1d1f]">
+                                    Cancel
+                                </a>
+                            </div>
+                        </form>
+                        {% else %}
+                        <div id="contact-{{ contact.id }}" class="grid grid-cols-10 items-center border-b border-black/[0.04] px-7 py-5 transition hover:bg-[#fafafa]">
+                            <div class="col-span-2 text-[15px] font-medium">
+                                {{ contact.label|default:"-" }}
+                            </div>
+
+                            <div class="col-span-5 truncate text-[15px] text-[#6e6e73]">
+                                {{ contact.value }}
+                            </div>
+
+                            <div class="col-span-1">
+                                <form method="post"
+                                      action="{% url 'studio:profile_contact_toggle_visibility' contact.id %}"
+                                      class="inline-flex items-center">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="is_visible" value="false">
+                                    <label class="inline-flex cursor-pointer items-center gap-2">
+                                        <input type="checkbox"
+                                               name="is_visible"
+                                               value="true"
+                                               {% if contact.is_visible %}checked{% endif %}
+                                               onchange="this.form.submit()"
+                                               class="peer sr-only">
+                                        <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                        <span class="text-[11px] font-medium {% if contact.is_visible %}text-green-700{% else %}text-[#8e8e93]{% endif %}">
+                                            {% if contact.is_visible %}ON{% else %}OFF{% endif %}
+                                        </span>
+                                    </label>
+                                </form>
+                            </div>
+
+                            <div class="col-span-2 flex justify-end gap-2">
+                                <a href="{% url 'studio:profile_contact' %}?edit={{ contact.id }}#contact-{{ contact.id }}"
+                                   class="rounded-full border border-black/[0.06] px-4 py-2 text-[13px] text-[#1d1d1f]">
+                                    Edit
+                                </a>
+
+                                <form method="post"
+                                      action="{% url 'studio:profile_contact_delete' contact.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit"
+                                            class="rounded-full border border-red-200 px-4 py-2 text-[13px] text-red-500 transition hover:bg-red-50">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endif %}
+                        {% empty %}
+                        <div class="px-8 py-10 text-center text-[15px] text-[#86868b]">
+                            등록된 항목이 없습니다.
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+</div>
+
+<script>
+    setTimeout(() => {
+        const toasts = document.querySelectorAll(".toast-message");
+
+        toasts.forEach((toast) => {
+            toast.style.transition = "all 0.4s ease";
+            toast.style.opacity = "0";
+            toast.style.transform = "translateY(-10px)";
+        });
+    }, 2200);
+
+    const contactType = document.querySelector('select[name="contact_type"]');
+    const labelInput = document.getElementById("contact_label");
+    const labelHint = document.getElementById("label_hint");
+    const valueHint = document.getElementById("value_hint");
+
+    const emailGroup = document.getElementById("email_value_group");
+    const emailLocal = document.getElementById("email_local");
+    const emailDomain = document.getElementById("email_domain");
+    const emailDomainCustom = document.getElementById("email_domain_custom");
+
+    const genericGroup = document.getElementById("generic_value_group");
+    const genericValue = document.getElementById("generic_value");
+    const contactValue = document.getElementById("contact_value");
+    const isVisibleToggle = document.getElementById("is_visible_toggle");
+    const isVisibleText = document.getElementById("is_visible_text");
+    const contactTypeStorageKey = "studio_profile_contact_selected_type";
+
+    const addForm = document.getElementById("add_contact_form");
+
+    function toggleCustomDomainInput() {
+        if (emailDomain.value === "custom") {
+            emailDomainCustom.classList.remove("hidden");
+        } else {
+            emailDomainCustom.classList.add("hidden");
+            emailDomainCustom.value = "";
+        }
+    }
+
+    function syncByType() {
+        const type = contactType.value;
+
+        if (type === "email") {
+            emailGroup.classList.remove("hidden");
+            genericGroup.classList.add("hidden");
+
+            labelInput.placeholder = "예: Main, School";
+            labelHint.textContent = "라벨은 선택 입력입니다. 비우면 도메인 기준으로 자동 설정됩니다.";
+            valueHint.textContent = "아이디 + 도메인을 선택해 이메일을 만듭니다.";
+
+            genericValue.value = "";
+            toggleCustomDomainInput();
+            return;
+        }
+
+        emailGroup.classList.add("hidden");
+        genericGroup.classList.remove("hidden");
+        emailDomainCustom.classList.add("hidden");
+
+        if (type === "phone") {
+            labelInput.placeholder = "예: Mobile, Work (비워도 됨)";
+            labelHint.textContent = "보통 1개면 라벨 없이도 괜찮습니다. 비우면 Mobile로 저장됩니다.";
+            valueHint.textContent = "전화번호를 입력하세요. 예: 010-1234-5678";
+            genericValue.placeholder = "010-1234-5678";
+            genericValue.inputMode = "tel";
+        } else {
+            labelInput.placeholder = "예: Home, Office";
+            labelHint.textContent = "주소는 구분용 라벨을 권장합니다. 비우면 Home으로 저장됩니다.";
+            valueHint.textContent = "상세 주소를 입력하세요.";
+            genericValue.placeholder = "예: 대전광역시 유성구 ...";
+            genericValue.inputMode = "text";
+        }
+
+        emailLocal.value = "";
+        emailDomainCustom.value = "";
+    }
+
+    contactType.addEventListener("change", () => {
+        sessionStorage.setItem(contactTypeStorageKey, contactType.value);
+        syncByType();
+    });
+    emailDomain.addEventListener("change", toggleCustomDomainInput);
+
+    addForm.addEventListener("submit", () => {
+        const type = contactType.value;
+        sessionStorage.setItem(contactTypeStorageKey, type);
+
+        if (type === "email") {
+            const local = emailLocal.value.trim();
+            const domain = emailDomain.value === "custom"
+                ? emailDomainCustom.value.trim()
+                : emailDomain.value;
+
+            contactValue.value = local && domain ? `${local}@${domain}` : "";
+            return;
+        }
+
+        contactValue.value = genericValue.value.trim();
+    });
+
+    isVisibleToggle.addEventListener("change", () => {
+        isVisibleText.textContent = isVisibleToggle.checked ? "ON" : "OFF";
+    });
+
+    const savedType = sessionStorage.getItem(contactTypeStorageKey);
+    if (savedType && ["email", "phone", "address"].includes(savedType)) {
+        contactType.value = savedType;
+    }
+
+    syncByType();
+</script>
+
+{% endblock %}

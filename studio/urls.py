@@ -8,6 +8,9 @@ urlpatterns = [
     path('profile/', views.profile, name='profile'),
     path('profile/basic/', views.profile_basic, name='profile_basic'),
     path('profile/contact/', views.profile_contact, name='profile_contact'),
+    path('profile/contact/<int:contact_id>/update/', views.profile_contact_update, name='profile_contact_update'),
+    path('profile/contact/<int:contact_id>/visibility/', views.profile_contact_toggle_visibility, name='profile_contact_toggle_visibility'),
+    path('profile/contact/<int:contact_id>/delete/', views.profile_contact_delete, name='profile_contact_delete'),
     path('profile/links/', views.profile_links, name='profile_links'),
     path('profile/resume/', views.profile_resume, name='profile_resume'),
 ]

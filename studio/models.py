@@ -20,7 +20,7 @@ class BasicInfo(models.Model):
     interests = models.TextField(blank=True)
     keywords = models.TextField(blank=True)
 
-    location = models.CharField(max_length=100, blank=True)
+    # location = models.CharField(max_length=100, blank=True)
 
     is_visible = models.BooleanField(default=True)
 
@@ -35,3 +35,32 @@ class BasicInfo(models.Model):
 
     def __str__(self):
         return self.korean_name
+    
+
+
+class Contact(models.Model):
+    CONTACT_TYPE_CHOICES = [
+        ("email", "Email"),
+        ("phone", "Phone"),
+        ("address", "Address"),
+    ]
+
+    contact_type = models.CharField(
+        max_length=20,
+        choices=CONTACT_TYPE_CHOICES
+    )
+
+    label = models.CharField(max_length=100, blank=True)
+    value = models.TextField()
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.label} - {self.value}"

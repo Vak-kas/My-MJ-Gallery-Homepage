@@ -8,46 +8,21 @@
         {% include "components/studio_sidebar.html" %}
 
         <main class="ml-[260px] flex-1 px-14 py-12">
+
             {% if messages %}
-
             <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
-
                 {% for message in messages %}
-
                 <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
-
                     <div class="flex items-start gap-3">
-
-                        <div class="mt-[2px] text-[#0066cc]">
-
-                            ✓
-
-                        </div>
-
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
                         <div>
-
-                            <p class="text-[15px] font-semibold text-[#1d1d1f]">
-
-                                Saved
-
-                            </p>
-
-                            <p class="mt-1 text-[14px] text-[#6e6e73]">
-
-                                {{ message }}
-
-                            </p>
-
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">Saved</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
                         </div>
-
                     </div>
-
                 </div>
-
                 {% endfor %}
-
             </div>
-
             {% endif %}
 
             <div class="mb-10">
@@ -95,9 +70,9 @@
             </div>
 
             <form method="post"
-                action="{% url 'studio:profile_basic' %}"
-                enctype="multipart/form-data"
-                class="mt-10 rounded-[30px] border border-black/[0.06] bg-white p-10">
+                  action="{% url 'studio:profile_basic' %}"
+                  enctype="multipart/form-data"
+                  class="mt-10 rounded-[30px] border border-black/[0.05] bg-white p-10">
 
                 {% csrf_token %}
 
@@ -105,9 +80,9 @@
                 <input type="hidden" id="interests_input" name="interests" value="{{ info.interests|default_if_none:'' }}">
                 <input type="hidden" id="keywords_input" name="keywords" value="{{ info.keywords|default_if_none:'' }}">
 
-                <div class="grid gap-10 lg:grid-cols-[320px_1fr]">
+                <div class="grid gap-10 lg:grid-cols-[280px_1fr]">
 
-                    <aside class="rounded-[26px] bg-[#f5f5f7] p-8">
+                    <aside class="h-fit rounded-[26px] bg-[#f5f5f7] p-7">
 
                         <p class="text-[12px] uppercase tracking-[0.22em] text-[#0066cc]">
                             Photo
@@ -115,15 +90,14 @@
 
                         <div class="mt-6 flex flex-col items-center">
 
-                            <div class="group relative h-[220px] w-[180px] overflow-hidden rounded-[24px] border border-black/[0.08] bg-white">
-
+                            <div class="group relative h-[200px] w-[160px] overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
                                 <img id="profilePreview"
                                      src="{% if info.profile_image %}{{ info.profile_image.url }}{% endif %}"
                                      alt="Profile Preview"
                                      class="{% if not info.profile_image %}hidden{% endif %} h-full w-full object-cover">
 
                                 <div id="profilePlaceholder"
-                                     class="{% if info.profile_image %}hidden{% endif %} flex h-full w-full items-center justify-center text-center text-[15px] leading-[1.5] text-[#86868b]">
+                                     class="{% if info.profile_image %}hidden{% endif %} flex h-full w-full items-center justify-center text-center text-[14px] leading-[1.5] text-[#86868b]">
                                     프로필 사진<br>미리보기
                                 </div>
 
@@ -132,11 +106,10 @@
                                         class="absolute right-3 top-3 {% if info.profile_image %}flex{% else %}hidden{% endif %} h-8 w-8 items-center justify-center rounded-full bg-black/70 text-[18px] leading-none text-white opacity-0 transition duration-200 hover:bg-black group-hover:opacity-100">
                                     ×
                                 </button>
-
                             </div>
 
                             <label for="profile_image"
-                                   class="mt-6 inline-flex h-[44px] cursor-pointer items-center rounded-full bg-[#0066cc] px-6 text-[15px] text-white transition active:scale-[0.97]">
+                                   class="mt-6 inline-flex h-[42px] cursor-pointer items-center rounded-full bg-[#0066cc] px-5 text-[14px] text-white transition active:scale-[0.97]">
                                 Upload Photo
                             </label>
 
@@ -146,17 +119,14 @@
                                    accept="image/*"
                                    class="hidden">
 
-                            <p class="mt-4 text-center text-[13px] leading-[1.5] text-[#86868b]">
+                            <p class="mt-4 text-center text-[12px] leading-[1.5] text-[#86868b]">
                                 JPG, PNG 파일을 권장합니다.<br>
                                 정방형 또는 증명사진 비율이 좋습니다.
                             </p>
-
                         </div>
-
                     </aside>
 
                     <section>
-
                         <div class="mb-10">
                             <h2 class="text-[32px] font-semibold tracking-[-0.03em]">
                                 Personal Information
@@ -175,7 +145,7 @@
                                        name="korean_name"
                                        value="{{ info.korean_name|default_if_none:'' }}"
                                        placeholder="서민재"
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div>
@@ -184,7 +154,7 @@
                                        name="english_name"
                                        value="{{ info.english_name|default_if_none:'' }}"
                                        placeholder="MinJae Seo"
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div>
@@ -193,7 +163,7 @@
                                        name="profile_badge"
                                        value="{{ info.profile_badge|default_if_none:'' }}"
                                        placeholder="BoB 14th · WhiteHat School 2nd · ICIS LAB"
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div>
@@ -202,7 +172,7 @@
                                        name="affiliation"
                                        value="{{ info.affiliation|default_if_none:'' }}"
                                        placeholder="ICIS LAB"
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div class="md:col-span-2">
@@ -211,27 +181,27 @@
                                        name="headline"
                                        value="{{ info.headline|default_if_none:'' }}"
                                        placeholder="지구를 정복하러 왔다."
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                       class="h-[52px] w-full rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div class="md:col-span-2">
                                 <label class="mb-3 block text-[14px] font-semibold">자기소개</label>
                                 <textarea name="bio"
-                                          rows="7"
+                                          rows="5"
                                           placeholder="나를 소개하는 문장을 입력하세요."
-                                          class="w-full resize-none rounded-[22px] border border-black/[0.08] bg-[#fbfbfd] px-6 py-5 text-[17px] leading-[1.5] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">{{ info.bio|default_if_none:'' }}</textarea>
+                                          class="w-full resize-none rounded-[22px] border border-black/[0.07] bg-white px-6 py-5 text-[16px] leading-[1.5] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">{{ info.bio|default_if_none:'' }}</textarea>
                             </div>
 
                             <div>
                                 <label class="mb-3 block text-[14px] font-semibold">관심 분야</label>
 
                                 <div id="interests_box"
-                                     class="flex min-h-[54px] flex-wrap items-center gap-2 rounded-full border border-black/[0.08] bg-[#fbfbfd] px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
+                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-full border border-black/[0.07] bg-white px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
                                     <div id="interests_tags" class="flex flex-wrap items-center gap-2"></div>
                                     <input id="interests_field"
                                            type="text"
                                            placeholder="키워드 입력 후 Enter"
-                                           class="ml-1 min-w-[150px] flex-1 bg-transparent text-[15px] leading-none outline-none placeholder:text-[#9ca3af]">
+                                           class="ml-1 min-w-[150px] flex-1 bg-transparent text-[14px] leading-none outline-none placeholder:text-[#9ca3af]">
                                 </div>
                             </div>
 
@@ -239,63 +209,47 @@
                                 <label class="mb-3 block text-[14px] font-semibold">대표 키워드</label>
 
                                 <div id="keywords_box"
-                                     class="flex min-h-[54px] flex-wrap items-center gap-2 rounded-full border border-black/[0.08] bg-[#fbfbfd] px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
+                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-full border border-black/[0.07] bg-white px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
                                     <div id="keywords_tags" class="flex flex-wrap items-center gap-2"></div>
                                     <input id="keywords_field"
                                            type="text"
                                            placeholder="키워드 입력 후 Enter"
-                                           class="ml-1 min-w-[150px] flex-1 bg-transparent text-[15px] leading-none outline-none placeholder:text-[#9ca3af]">
+                                           class="ml-1 min-w-[150px] flex-1 bg-transparent text-[14px] leading-none outline-none placeholder:text-[#9ca3af]">
                                 </div>
-                            </div>
-
-                            <div>
-                                <label class="mb-3 block text-[14px] font-semibold">지역</label>
-                                <input type="text"
-                                       name="location"
-                                       value="{{ info.location|default_if_none:'' }}"
-                                       placeholder="Daejeon, South Korea"
-                                       class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                             </div>
 
                             <div>
                                 <label class="mb-3 block text-[14px] font-semibold">공개 여부</label>
                                 <select name="is_visible"
-                                        class="h-[54px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+                                        class="h-[52px] w-[220px] rounded-full border border-black/[0.07] bg-white px-6 text-[16px] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                                     <option value="true" {% if info.is_visible %}selected{% endif %}>공개</option>
                                     <option value="false" {% if info and not info.is_visible %}selected{% endif %}>비공개</option>
                                 </select>
                             </div>
 
                         </div>
-
                     </section>
-
                 </div>
 
                 <div class="mt-10 flex items-center justify-between border-t border-black/[0.06] pt-8">
-
                     <p class="text-[14px] text-[#6e6e73]">
                         저장하면 메인 포트폴리오 페이지의 프로필 영역에 반영됩니다.
                     </p>
 
                     <div class="flex gap-3">
                         <a href="{% url 'studio:profile' %}"
-                           class="inline-flex h-[48px] items-center rounded-full border border-black/[0.08] px-6 text-[15px] text-[#1d1d1f]">
+                           class="inline-flex h-[46px] items-center rounded-full border border-black/[0.08] px-6 text-[14px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">
                             Cancel
                         </a>
 
                         <button type="submit"
-                                class="h-[48px] rounded-full bg-[#0066cc] px-7 text-[15px] text-white transition active:scale-[0.97]">
+                                class="h-[46px] rounded-full bg-[#0066cc] px-7 text-[14px] text-white transition active:scale-[0.97]">
                             Save Changes
                         </button>
                     </div>
-
                 </div>
-
             </form>
-
         </main>
-
     </div>
 </div>
 
@@ -305,6 +259,24 @@
     const placeholder = document.getElementById("profilePlaceholder");
     const removeButton = document.getElementById("removeImageButton");
     const removeProfileImage = document.getElementById("remove_profile_image");
+    const form = document.querySelector("form");
+
+    form.addEventListener("submit", () => {
+        sessionStorage.setItem("profile_basic_scroll", window.scrollY);
+    });
+
+    window.addEventListener("load", () => {
+        const savedScroll = sessionStorage.getItem("profile_basic_scroll");
+
+        if (savedScroll !== null) {
+            window.scrollTo({
+                top: parseInt(savedScroll),
+                behavior: "instant"
+            });
+
+            sessionStorage.removeItem("profile_basic_scroll");
+        }
+    });
 
     imageInput.addEventListener("change", function () {
         const file = this.files[0];
@@ -318,12 +290,9 @@
         reader.onload = function (event) {
             preview.src = event.target.result;
             preview.classList.remove("hidden");
-
             placeholder.classList.add("hidden");
-
             removeButton.classList.remove("hidden");
             removeButton.classList.add("flex");
-
             removeProfileImage.value = "false";
         };
 
@@ -332,15 +301,11 @@
 
     removeButton.addEventListener("click", function () {
         imageInput.value = "";
-
         preview.src = "";
         preview.classList.add("hidden");
-
         placeholder.classList.remove("hidden");
-
         removeButton.classList.add("hidden");
         removeButton.classList.remove("flex");
-
         removeProfileImage.value = "true";
     });
 
@@ -362,7 +327,7 @@
                 const tagEl = document.createElement("span");
 
                 tagEl.className =
-                    "inline-flex items-center gap-2 rounded-full bg-white px-3 py-1.5 text-[13px] font-medium text-[#1d1d1f] border border-black/[0.06] transition hover:border-black/[0.12]";
+                    "inline-flex items-center gap-1.5 rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[12px] font-medium text-[#1d1d1f] border border-black/[0.04] transition hover:border-black/[0.12]";
 
                 tagEl.innerHTML = `
                     <span>${tag}</span>
@@ -436,28 +401,6 @@
             toast.style.transform = "translateY(-10px)";
         });
     }, 2200);
-
-    const form = document.querySelector("form");
-
-    form.addEventListener("submit", () => {
-        sessionStorage.setItem(
-            "profile_basic_scroll",
-            window.scrollY
-        );
-    });
-
-    window.addEventListener("load", () => {
-    const savedScroll = sessionStorage.getItem("profile_basic_scroll");
-
-    if (savedScroll !== null) {
-        window.scrollTo({
-            top: parseInt(savedScroll),
-            behavior: "instant"
-        });
-
-        sessionStorage.removeItem("profile_basic_scroll");
-    }
-});
 </script>
 
 {% endblock %}
