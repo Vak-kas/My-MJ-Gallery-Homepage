@@ -7,8 +7,10 @@
     </a>
 </div>
 
+<div id="section-flash" class="section-flash"></div>
+
 <main class="bg-[#f5f5f7] px-6 py-10 md:px-12 lg:px-24">
-    <section class="mx-auto flex min-h-[90vh] max-w-[1320px] flex-col justify-center">
+    <section data-section="profile" class="page-section profile-section mx-auto flex min-h-[90vh] max-w-[1320px] flex-col justify-center is-active">
         <div class="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div class="reveal">
                 <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MJGALLERY / PROFILE</p>
@@ -158,9 +160,9 @@
             </div>
         </div>
     </section>
-    
+
     <!-- Career -->
-    <section class="mx-auto mt-24 max-w-[1320px] pb-20">
+    <section data-section="career" class="page-section career-section mx-auto mt-16 max-w-[1320px] pb-20">
 
         <!-- Header -->
         <div class="reveal mb-12">
@@ -403,6 +405,63 @@
 </main>
 
 <style>
+    :root {
+        --career-progress: 0;
+    }
+
+    .section-flash {
+        position: fixed;
+        inset: 0;
+        z-index: 40;
+        pointer-events: none;
+        opacity: 0;
+        background:
+            radial-gradient(1000px 300px at 50% 30%, rgba(59, 130, 246, 0.18), transparent 70%),
+            linear-gradient(180deg, rgba(255,255,255,0.55), rgba(245,245,247,0.08));
+        mix-blend-mode: screen;
+    }
+
+    .section-flash.run {
+        animation: sectionFlash .7s cubic-bezier(.22,.61,.36,1);
+    }
+
+    @keyframes sectionFlash {
+        0% { opacity: 0; }
+        /* 28% { opacity: .92; } */
+        28% { opacity: .45; }
+        100% { opacity: 0; }
+    }
+
+    .page-section {
+        transition: opacity .55s ease, transform .65s cubic-bezier(.22,.61,.36,1), filter .65s ease;
+        will-change: opacity, transform, filter;
+    }
+
+    .profile-section {
+        opacity: calc(1 - (var(--career-progress) * 0.86));
+        filter: blur(calc(var(--career-progress) * 10px));
+        transform: translateY(calc(var(--career-progress) * -42px)) scale(calc(1 - (var(--career-progress) * 0.035)));
+    }
+
+    .career-section {
+        opacity: calc(0.22 + (var(--career-progress) * 0.78));
+        filter: blur(calc((1 - var(--career-progress)) * 10px));
+        transform: translateY(calc((1 - var(--career-progress)) * 56px)) scale(calc(0.965 + (var(--career-progress) * 0.035)));
+    }
+
+    html.focus-career .profile-section {
+        /* opacity: 0; */
+        filter: blur(10px);
+        transform: translateY(-72px) scale(.95);
+        /* pointer-events: none; */
+    }
+
+    html.focus-career .career-section {
+        opacity: 1;
+        filter: blur(0);
+        transform: translateY(0) scale(1);
+    }
+
     .reveal {
         opacity: 0;
         transform: translateY(28px);
@@ -438,6 +497,49 @@
 </style>
 
 <script>
+    const rootEl = document.documentElement;
+    const profileSection = document.querySelector('.profile-section');
+    const careerSection = document.querySelector('.career-section');
+    const flash = document.getElementById('section-flash');
+    let focusCareer = false;
+
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+
+    const playFlash = () => {
+        if (!flash) return;
+        flash.classList.remove('run');
+        void flash.offsetWidth;
+        flash.classList.add('run');
+    };
+
+    const updateSectionProgress = () => {
+        if (!profileSection || !careerSection) return;
+
+        const vh = window.innerHeight;
+        const rect = careerSection.getBoundingClientRect();
+
+        // Career가 화면 하단에 걸치기 시작하면 progress 증가
+        // const start = vh * 0.95;
+        // // Career 헤더가 상단 근처까지 올라오면 거의 완료
+        // const end = vh * 0.16;
+        const start = vh * 0.82;
+        const end = vh * 0.22;
+        const progress = clamp((start - rect.top) / (start - end), 0, 1);
+
+        rootEl.style.setProperty('--career-progress', progress.toFixed(3));
+
+        const nextFocus = progress > 0.9;
+        if (nextFocus !== focusCareer) {
+            focusCareer = nextFocus;
+            rootEl.classList.toggle('focus-career', focusCareer);
+            playFlash();
+        }
+    };
+
+    updateSectionProgress();
+    window.addEventListener('scroll', updateSectionProgress, { passive: true });
+    window.addEventListener('resize', updateSectionProgress);
+
     const reveals = document.querySelectorAll('.reveal');
     const io = new IntersectionObserver((entries) => {
         entries.forEach((entry) => {
