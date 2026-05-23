@@ -82,6 +82,7 @@ def activity(request):
         ("seminar", "세미나 (Seminar)"),
         ("community", "커뮤니티 (Community)"),
         ("volunteer", "봉사 (Volunteer)"),
+        ("challenge", "대회 (Challenge)"),
         ("other", "기타 (Other)"),
     ]
     section_icons = {
@@ -89,6 +90,7 @@ def activity(request):
         "seminar": "🎤",
         "community": "🤝",
         "volunteer": "🌿",
+        "challenge": "🏆",
         "other": "🗂",
     }
     activity_sections = [

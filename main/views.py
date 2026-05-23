@@ -33,6 +33,7 @@ def home(request):
         {"key": "seminar", "title": "Seminar", "subtitle": "세미나", "icon": "🎤", "items": activities.filter(activity_type="seminar")[:4], "total": activities.filter(activity_type="seminar").count()},
         {"key": "community", "title": "Community", "subtitle": "커뮤니티", "icon": "🤝", "items": activities.filter(activity_type="community")[:4], "total": activities.filter(activity_type="community").count()},
         {"key": "volunteer", "title": "Volunteer", "subtitle": "봉사", "icon": "🌿", "items": activities.filter(activity_type="volunteer")[:4], "total": activities.filter(activity_type="volunteer").count()},
+        {"key": "challenge", "title": "Challenge", "subtitle": "대회", "icon": "🏆", "items": activities.filter(activity_type="challenge")[:4], "total": activities.filter(activity_type="challenge").count()},
         {"key": "other", "title": "Other", "subtitle": "기타", "icon": "🗂", "items": activities.filter(activity_type="other")[:4], "total": activities.filter(activity_type="other").count()},
     ]
 

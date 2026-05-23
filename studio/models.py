@@ -245,6 +245,7 @@ class Activity(models.Model):
         ("community", "Community"),
         ("seminar", "Seminar"),
         ("volunteer", "Volunteer"),
+        ("challenge", "Challenge"),
         ("other", "Other"),
     ]
 

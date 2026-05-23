@@ -214,7 +214,7 @@
 
     // 섹션 자동 snap 보정: 경계 영역에서만 snap (threshold 범위 내)
     let scrollEndTimer;
-    const SNAP_THRESHOLD = 200; // 경계에서 snap 판단하는 거리(px)
+    const SNAP_THRESHOLD = 200;
     
     window.addEventListener('scroll', () => {
         clearTimeout(scrollEndTimer);
@@ -222,19 +222,14 @@
             const sections = Array.from(document.querySelectorAll('[data-section]'));
             const currentScrollY = window.scrollY;
             
-            // 맨 위에서는 snap 로직 실행 안 함 (0~50px)
-            if (currentScrollY < 50) {
-                return;
-            }
+            if (currentScrollY < 50) return;
             
-            // 현재 스크롤 위치에서 가장 가까운 섹션 찾기
             let closestSection = null;
             let closestDistance = Infinity;
             
             sections.forEach((section) => {
                 const sectionTop = section.offsetTop;
                 const distance = Math.abs(currentScrollY - sectionTop);
-                
                 if (distance < closestDistance) {
                     closestDistance = distance;
                     closestSection = section;
@@ -245,17 +240,10 @@
             
             const closestSectionTop = closestSection.offsetTop;
             
-            // 이미 해당 섹션 내부에 있으면 snap하지 않기
-            if (currentScrollY > closestSectionTop) {
-                return;
-            }
+            if (currentScrollY > closestSectionTop) return;
             
-            // 경계 영역에만 snap (threshold 범위 내에서만)
             if (closestDistance < SNAP_THRESHOLD) {
-                window.scrollTo({
-                    top: closestSectionTop,
-                    behavior: 'smooth',
-                });
+                window.scrollTo({ top: closestSectionTop, behavior: 'smooth' });
             }
         }, 150);
     }, { passive: true });
