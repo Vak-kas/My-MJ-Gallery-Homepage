@@ -64,6 +64,7 @@ def activity_create(request):
         end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
         description = request.POST.get("description", "").strip()
         url = request.POST.get("url", "").strip()
+        attachment = request.FILES.get("attachment")
         is_visible = request.POST.get("is_visible") == "true"
         order = get_next_order(Activity)
 
@@ -85,6 +86,7 @@ def activity_create(request):
             is_current=is_current,
             description=description,
             url=url,
+            attachment=attachment,
             is_visible=is_visible,
             order=order,
         )
@@ -107,6 +109,8 @@ def activity_update(request, id):
         end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
         description = request.POST.get("description", "").strip()
         url = request.POST.get("url", "").strip()
+        attachment = request.FILES.get("attachment")
+        remove_attachment = request.POST.get("remove_attachment") == "true"
         is_visible = request.POST.get("is_visible") == "true"
 
         if not title:
@@ -126,6 +130,16 @@ def activity_update(request, id):
         activity_item.is_current = is_current
         activity_item.description = description
         activity_item.url = url
+
+        if remove_attachment and activity_item.attachment:
+            activity_item.attachment.delete(save=False)
+            activity_item.attachment = None
+
+        if attachment:
+            if activity_item.attachment:
+                activity_item.attachment.delete(save=False)
+            activity_item.attachment = attachment
+
         activity_item.is_visible = is_visible
         activity_item.save()
         messages.success(request, "수정 완료되었습니다.")
@@ -138,6 +152,8 @@ def activity_delete(request, id):
     activity_item = get_object_or_404(Activity, id=id)
 
     if request.method == "POST":
+        if activity_item.attachment:
+            activity_item.attachment.delete(save=False)
         activity_item.delete()
         messages.success(request, "활동이 삭제되었습니다.")
 

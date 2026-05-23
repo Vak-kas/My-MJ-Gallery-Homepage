@@ -259,6 +259,7 @@ class Activity(models.Model):
 
     description = models.TextField(blank=True)
     url = models.URLField(blank=True)
+    attachment = models.FileField(upload_to="activity/", blank=True, null=True)
 
     is_visible = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
