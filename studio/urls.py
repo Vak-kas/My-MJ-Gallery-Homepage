@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import view_handlers as views
 
 app_name = 'studio'
 
