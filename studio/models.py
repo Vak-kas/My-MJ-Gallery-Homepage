@@ -64,3 +64,36 @@ class Contact(models.Model):
 
     def __str__(self):
         return f"{self.label} - {self.value}"
+    
+
+class Link(models.Model):
+    PLATFORM_CHOICES = [
+        ("github", "GitHub"),
+        ("velog", "Velog"),
+        ("tistory", "Tistory"),
+        ("linkedin", "LinkedIn"),
+        ("notion", "Notion"),
+        ("scholar", "Google Scholar"),
+        ("youtube", "YouTube"),
+        ("instagram", "Instagram"),
+        ("x", "X"),
+        ("website", "Website"),
+        ("other", "Other"),
+    ]
+
+    platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES)
+    label = models.CharField(max_length=100, blank=True)
+    url = models.URLField()
+
+    is_visible = models.BooleanField(default=True)
+    is_primary = models.BooleanField(default=False)
+    order = models.PositiveIntegerField(default=0)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.get_platform_display()} - {self.url}"

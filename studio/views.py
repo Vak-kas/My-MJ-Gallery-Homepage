@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import user_passes_test
-from .models import BasicInfo, Contact
+from django.urls import reverse
+from .models import BasicInfo, Contact, Link
 from django.contrib import messages
 
 
@@ -17,9 +18,6 @@ def index(request):
 def profile(request):
     return redirect('studio:profile_basic')
 
-@user_passes_test(superuser_required, login_url='accounts:login')
-def profile_links(request):
-    return render(request, 'studio/profile_links.html')
 
 @user_passes_test(superuser_required, login_url='accounts:login')
 def profile_resume(request):
@@ -194,3 +192,99 @@ def profile_contact_toggle_visibility(request, contact_id):
         contact.save()
 
     return redirect("studio:profile_contact")
+
+
+@user_passes_test(superuser_required, login_url='accounts:login')
+def profile_links(request):
+    links = Link.objects.all()
+
+    if request.method == "POST":
+        platform = request.POST.get("platform", "").strip()
+        label = request.POST.get("label", "").strip()
+        url = request.POST.get("url", "").strip()
+        is_visible = request.POST.get("is_visible") == "true"
+        is_primary = request.POST.get("is_primary") == "true"
+
+        if platform and url:
+            Link.objects.create(
+                platform=platform,
+                label=label,
+                url=url,
+                is_visible=is_visible,
+                is_primary=is_primary,
+            )
+            messages.success(request, "링크가 추가되었습니다.")
+        else:
+            messages.error(request, "플랫폼과 URL을 입력해주세요.")
+
+        return redirect("studio:profile_links")
+
+    edit_id = request.GET.get("edit", "").strip()
+    editing_link_id = int(edit_id) if edit_id.isdigit() else None
+
+    return render(request, "studio/profile_links.html", {
+        "links": links,
+        "editing_link_id": editing_link_id,
+    })
+
+
+@user_passes_test(superuser_required, login_url='accounts:login')
+def profile_link_update(request, link_id):
+    link = get_object_or_404(Link, id=link_id)
+
+    if request.method == "POST":
+        platform = request.POST.get("platform", "").strip()
+        label = request.POST.get("label", "").strip()
+        url = request.POST.get("url", "").strip()
+        is_visible = request.POST.get("is_visible") == "true"
+        is_primary = request.POST.get("is_primary") == "true"
+
+        if platform and url:
+            link.platform = platform
+            link.label = label
+            link.url = url
+            link.is_visible = is_visible
+            link.is_primary = is_primary
+            link.save()
+            messages.success(request, "링크가 수정되었습니다.")
+            return redirect("studio:profile_links")
+
+        messages.error(request, "플랫폼과 URL을 입력해주세요.")
+        return redirect(f"{reverse('studio:profile_links')}?edit={link_id}#link-{link_id}")
+
+    return redirect("studio:profile_links")
+
+
+@user_passes_test(superuser_required, login_url='accounts:login')
+def profile_link_delete(request, link_id):
+    link = get_object_or_404(Link, id=link_id)
+
+    if request.method == "POST":
+        link.delete()
+        messages.success(request, "링크가 삭제되었습니다.")
+
+    return redirect("studio:profile_links")
+
+
+@user_passes_test(superuser_required, login_url='accounts:login')
+def profile_link_toggle_visibility(request, link_id):
+    link = get_object_or_404(Link, id=link_id)
+
+    if request.method == "POST":
+        link.is_visible = request.POST.get("is_visible") == "true"
+        link.save()
+        messages.success(request, "공개 여부가 변경되었습니다.")
+
+    return redirect("studio:profile_links")
+
+
+@user_passes_test(superuser_required, login_url='accounts:login')
+def profile_link_toggle_primary(request, link_id):
+    link = get_object_or_404(Link, id=link_id)
+
+    if request.method == "POST":
+        link.is_primary = request.POST.get("is_primary") == "true"
+        link.save()
+        messages.success(request, "대표 링크 여부가 변경되었습니다.")
+
+    return redirect("studio:profile_links")
