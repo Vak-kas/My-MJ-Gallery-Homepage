@@ -1,5 +1,6 @@
 from pathlib import Path
 from uuid import uuid4
+from io import BytesIO
 
 from django.contrib import messages
 from django.core.files.base import ContentFile
@@ -26,9 +27,14 @@ def build_safe_award_upload_name(original_name, folder="award", forced_ext=None,
 
 def sync_award_preview_image(award_item, regenerate=False):
     attachment = award_item.attachment
-    has_pdf = bool(attachment and Path(attachment.name).suffix.lower() == ".pdf")
+    attachment_ext = Path(attachment.name).suffix.lower() if attachment else ""
+    has_pdf = bool(attachment and attachment_ext == ".pdf")
+    has_image = bool(
+        attachment
+        and attachment_ext in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".tif", ".tiff"}
+    )
 
-    if not has_pdf:
+    if not has_pdf and not has_image:
         if award_item.preview_image:
             award_item.preview_image.delete(save=False)
             award_item.preview_image = None
@@ -37,27 +43,54 @@ def sync_award_preview_image(award_item, regenerate=False):
     if not regenerate and award_item.preview_image:
         return
 
-    try:
-        import fitz  # PyMuPDF
-    except ImportError as exc:
-        raise RuntimeError("PyMuPDF 패키지가 필요합니다. (pip install pymupdf)") from exc
+    if has_pdf:
+        try:
+            import fitz  # PyMuPDF
+        except ImportError as exc:
+            raise RuntimeError("PyMuPDF 패키지가 필요합니다. (pip install pymupdf)") from exc
 
-    attachment.open("rb")
-    try:
-        pdf_bytes = attachment.read()
-    finally:
-        attachment.close()
+        attachment.open("rb")
+        try:
+            pdf_bytes = attachment.read()
+        finally:
+            attachment.close()
 
-    try:
-        with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
-            if document.page_count < 1:
-                raise RuntimeError("PDF 페이지를 찾을 수 없습니다.")
+        try:
+            with fitz.open(stream=pdf_bytes, filetype="pdf") as document:
+                if document.page_count < 1:
+                    raise RuntimeError("PDF 페이지를 찾을 수 없습니다.")
 
-            page = document.load_page(0)
-            pixmap = page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False)
-            preview_bytes = pixmap.tobytes("png")
-    except Exception as exc:
-        raise RuntimeError(f"PDF 미리보기 생성 실패: {exc}") from exc
+                page = document.load_page(0)
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(1.6, 1.6), alpha=False)
+                preview_bytes = pixmap.tobytes("png")
+        except Exception as exc:
+            raise RuntimeError(f"PDF 미리보기 생성 실패: {exc}") from exc
+    else:
+        try:
+            from PIL import Image, ImageOps
+        except ImportError as exc:
+            raise RuntimeError("Pillow 패키지가 필요합니다. (pip install pillow)") from exc
+
+        attachment.open("rb")
+        try:
+            image_bytes = attachment.read()
+        finally:
+            attachment.close()
+
+        try:
+            with Image.open(BytesIO(image_bytes)) as image:
+                image = ImageOps.exif_transpose(image)
+                if image.mode not in ("RGB", "L"):
+                    image = image.convert("RGB")
+                elif image.mode == "L":
+                    image = image.convert("RGB")
+
+                image.thumbnail((1600, 1600))
+                output = BytesIO()
+                image.save(output, format="PNG", optimize=True)
+                preview_bytes = output.getvalue()
+        except Exception as exc:
+            raise RuntimeError(f"이미지 미리보기 생성 실패: {exc}") from exc
 
     if award_item.preview_image:
         award_item.preview_image.delete(save=False)
