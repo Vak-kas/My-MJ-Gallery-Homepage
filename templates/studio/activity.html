@@ -218,14 +218,14 @@
 
                         <div class="grid grid-cols-2 gap-3">
                             <input type="month" name="start_date" value="{{ editing_activity.start_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
-                            <input type="month" name="end_date" value="{{ editing_activity.end_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            <input type="month" name="end_date" value="{{ editing_activity.end_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" data-end-date>
                         </div>
 
                         <div class="flex items-center justify-between">
                             <span class="text-[13px] font-semibold text-[#6e6e73]">현재 진행중</span>
                             <label class="inline-flex cursor-pointer items-center gap-2">
                                 <input type="hidden" name="is_current" value="false">
-                                <input type="checkbox" name="is_current" value="true" {% if editing_activity and editing_activity.is_current %}checked{% endif %} class="peer sr-only">
+                                <input type="checkbox" name="is_current" value="true" {% if editing_activity and editing_activity.is_current %}checked{% endif %} class="peer sr-only" data-current-checkbox>
                                 <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0a84ff] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
                                 <span class="text-[11px] font-semibold text-[#0a84ff]">ON</span>
                             </label>
@@ -441,9 +441,27 @@
 
     const editPanel = document.getElementById('activity-edit-panel');
     const mainForm = document.getElementById('activity-main-form');
+    const currentCheckbox = document.querySelector('[data-current-checkbox]');
+    const endDateInput = document.querySelector('[data-end-date]');
     const cancelLinks = document.querySelectorAll('[data-edit-cancel]');
     const searchParams = new URLSearchParams(window.location.search);
     const hasEditQuery = Boolean(searchParams.get('edit'));
+
+    function syncEndDateLock() {
+        if (!currentCheckbox || !endDateInput) return;
+        const isCurrent = currentCheckbox.checked;
+        endDateInput.disabled = isCurrent;
+        endDateInput.classList.toggle('bg-[#f2f2f7]', isCurrent);
+        endDateInput.classList.toggle('text-[#8e8e93]', isCurrent);
+        if (isCurrent) {
+            endDateInput.value = '';
+        }
+    }
+
+    if (currentCheckbox) {
+        currentCheckbox.addEventListener('change', syncEndDateLock);
+        syncEndDateLock();
+    }
 
     const savedY = sessionStorage.getItem(SCROLL_KEY);
     if (savedY !== null) {
