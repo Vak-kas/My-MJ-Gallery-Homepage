@@ -1,0 +1,722 @@
+{% if publications_international or publications_domestic %}
+<style>
+    /* ── Publications Escalator ─────────────────────────── */
+    .pub-escalator-col {
+        position: relative;
+        height: 520px;
+        overflow: hidden;
+    }
+
+    .pub-escalator-col::before,
+    .pub-escalator-col::after {
+        content: '';
+        position: absolute;
+        left: 0; right: 0;
+        height: 80px;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .pub-escalator-col::before {
+        top: 0;
+        background: linear-gradient(to bottom, #f5f5f7 0%, transparent 100%);
+    }
+
+    .pub-escalator-col::after {
+        bottom: 0;
+        background: linear-gradient(to top, #f5f5f7 0%, transparent 100%);
+    }
+
+    .pub-track {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        will-change: transform;
+    }
+
+    .pub-track.is-running {
+        animation: pub-scroll-up var(--pub-duration, 24s) linear infinite;
+    }
+
+    .pub-escalator-col:hover .pub-track {
+        animation-play-state: paused;
+    }
+
+    .pub-global-pause .pub-track {
+        animation-play-state: paused !important;
+    }
+
+    @keyframes pub-scroll-up {
+        0%   { transform: translateY(0); }
+        100% { transform: translateY(-50%); }
+    }
+
+    .pub-card {
+        position: relative;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.07);
+        border-radius: 18px;
+        padding: 18px 20px;
+        transition: box-shadow 0.25s, transform 0.25s;
+    }
+
+    .pub-escalator-col:hover .pub-card:hover {
+        box-shadow: 0 10px 32px rgba(0,0,0,0.09);
+        transform: translateY(-2px);
+    }
+
+    .pub-type-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 2px 10px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+
+    .pub-type-badge-journal { background: #e8f0ff; color: #0057cc; }
+    .pub-type-badge-conf    { background: #f3e8ff; color: #7c3aed; }
+    .pub-col-label-intl     { background: #e6f7ee; color: #0a7a3e; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
+    .pub-col-label-dom      { background: #fff3e0; color: #b45309; border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 600; }
+
+    .pub-pause-hint {
+        font-size: 11px;
+        color: #8e8e93;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+        margin-left: auto;
+    }
+
+    .pub-col-wrapper:hover .pub-pause-hint {
+        opacity: 1;
+    }
+
+    .pub-hover-preview {
+        position: fixed;
+        z-index: 97;
+        display: none;
+        width: min(360px, 86vw);
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.18);
+        overflow: hidden;
+        cursor: pointer;
+    }
+
+    .pub-hover-preview.is-open {
+        display: block;
+    }
+
+    .pub-hover-preview img {
+        width: 100%;
+        max-height: 240px;
+        object-fit: contain;
+        background: #fff;
+    }
+
+    .pub-hover-preview-meta {
+        padding: 10px 12px;
+        border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+
+    .pub-hover-preview-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1d1d1f;
+    }
+
+    .pub-hover-preview-hint {
+        margin-top: 3px;
+        font-size: 11px;
+        color: #0066cc;
+        font-weight: 600;
+    }
+
+    .pub-actions {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .pub-speed-range {
+        width: 92px;
+    }
+
+    .pub-list-btn {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        background: #fff;
+        color: #1d1d1f;
+        border-radius: 999px;
+        padding: 5px 11px;
+        font-size: 12px;
+        font-weight: 600;
+        transition: background 0.2s;
+    }
+
+    .pub-list-btn:hover {
+        background: #f5f5f7;
+    }
+
+    .pub-list-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 95;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(9, 12, 19, 0.62);
+        backdrop-filter: blur(2px);
+    }
+
+    .pub-list-modal.is-open {
+        display: flex;
+    }
+
+    .pub-list-dialog {
+        width: min(1080px, 96vw);
+        height: min(760px, 88vh);
+        overflow: hidden;
+        border-radius: 18px;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .pub-list-body {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        min-height: 0;
+        flex: 1;
+    }
+
+    @media (max-width: 900px) {
+        .pub-list-body { grid-template-columns: 1fr; }
+        .pub-list-preview { display: none; }
+    }
+
+    .pub-list-scroll {
+        height: 100%;
+        overflow: auto;
+        padding: 14px;
+    }
+
+    .pub-list-row {
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fff;
+        transition: border-color 0.2s, background 0.2s;
+    }
+
+    .pub-list-row + .pub-list-row {
+        margin-top: 10px;
+    }
+
+    .pub-list-row:hover {
+        border-color: rgba(0, 102, 204, 0.28);
+        background: #fbfdff;
+    }
+
+    .pub-list-preview {
+        border-left: 1px solid rgba(0, 0, 0, 0.06);
+        background: #fafbff;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 0;
+        overflow: auto;
+    }
+
+    .pub-list-preview-box {
+        border: 1px dashed rgba(0, 0, 0, 0.15);
+        border-radius: 12px;
+        min-height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .pub-list-preview-box img {
+        width: 100%;
+        max-height: 420px;
+        object-fit: contain;
+    }
+
+    .pub-attach-box {
+        margin-top: 2px;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        background: #fff;
+        padding: 10px 12px;
+    }
+
+    .pub-attach-title {
+        font-size: 11px;
+        font-weight: 700;
+        color: #6e6e73;
+        letter-spacing: 0.01em;
+    }
+
+    .pub-attach-link {
+        display: inline-flex;
+        margin-top: 8px;
+        border: 1px solid rgba(0, 102, 204, 0.24);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0066cc;
+        background: #f7fbff;
+    }
+
+    .pub-attach-link:hover {
+        background: #eef6ff;
+    }
+
+    .pub-attach-empty {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #8e8e93;
+    }
+
+    .pub-list-close {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 999px;
+        width: 34px;
+        height: 34px;
+        font-size: 20px;
+        line-height: 1;
+        color: #1d1d1f;
+        background: #fff;
+    }
+
+</style>
+
+<section data-section="publication" class="page-section publication-section mx-auto mt-16 max-w-[1320px] pb-20">
+
+    <div class="reveal mb-12">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">
+            MJGALLERY / PUBLICATIONS
+        </p>
+        <div class="mt-3 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+            <div>
+                <h2 class="apple-display text-[52px] font-semibold leading-[1.04] tracking-[-0.04em]">Publications.</h2>
+                <p class="mt-4 max-w-[560px] text-[17px] leading-[1.55] text-[#6e6e73]">
+                    저널 및 학술지 — 항목 위에 마우스를 올리면 스크롤이 멈춥니다.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid gap-8 {% if publications_international and publications_domestic %}md:grid-cols-2{% else %}md:grid-cols-1{% endif %}">
+
+        <!-- 국제지 / 국제학회 -->
+        {% if publications_international %}
+        <div class="reveal pub-col-wrapper">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="pub-col-label-intl">🌐 국제지 / 국제학회</span>
+                <span class="text-[12px] text-[#8e8e93]">{{ publications_international|length }}건</span>
+                <div class="pub-actions">
+                    <label class="text-[11px] text-[#8e8e93]">속도</label>
+                    <input type="range" class="pub-speed-range" min="18" max="80" step="1" value="36" data-pub-speed-control>
+                    <button type="button" class="pub-list-btn" data-open-pub-list="international">전체 리스트 보기</button>
+                </div>
+                <span class="pub-pause-hint">⏸ 일시정지</span>
+            </div>
+            <div class="pub-escalator-col">
+                <div class="pub-track" data-speed="36" data-pub-track="international">
+                    {% for item in publications_international %}
+                    <div class="pub-card"
+                        data-pub-card
+                        data-pub-group="international"
+                        data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                        data-preview-title="{{ item.title }}">
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <p class="text-[14px] font-semibold text-[#1d1d1f] leading-snug flex-1">{{ item.title }}</p>
+                            <span class="pub-type-badge shrink-0 {% if item.publication_kind == 'journal' %}pub-type-badge-journal{% else %}pub-type-badge-conf{% endif %}">
+                                {{ item.get_publication_kind_display }}
+                            </span>
+                        </div>
+                        {% if item.venue %}<p class="text-[12px] text-[#6e6e73] truncate">{{ item.venue }}</p>{% endif %}
+                        {% if item.authors %}<p class="mt-1 text-[11px] text-[#8e8e93] truncate">{{ item.authors }}</p>{% endif %}
+                        <div class="mt-2 flex items-center gap-3 flex-wrap">
+                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% endif %}
+                            {% if item.doi %}<span class="text-[11px] text-[#8e8e93]">DOI: {{ item.doi }}</span>{% endif %}
+                            {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="text-[11px] font-semibold text-[#0066cc] hover:underline">자세히 →</a>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 국내지 / 국내학회 -->
+        {% if publications_domestic %}
+        <div class="reveal pub-col-wrapper">
+            <div class="flex items-center gap-2 mb-4">
+                <span class="pub-col-label-dom">🇰🇷 국내지 / 국내학회</span>
+                <span class="text-[12px] text-[#8e8e93]">{{ publications_domestic|length }}건</span>
+                <div class="pub-actions">
+                    <label class="text-[11px] text-[#8e8e93]">속도</label>
+                    <input type="range" class="pub-speed-range" min="18" max="80" step="1" value="36" data-pub-speed-control>
+                    <button type="button" class="pub-list-btn" data-open-pub-list="domestic">전체 리스트 보기</button>
+                </div>
+                <span class="pub-pause-hint">⏸ 일시정지</span>
+            </div>
+            <div class="pub-escalator-col">
+                <div class="pub-track" data-speed="36" data-pub-track="domestic">
+                    {% for item in publications_domestic %}
+                    <div class="pub-card"
+                        data-pub-card
+                        data-pub-group="domestic"
+                        data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                        data-preview-title="{{ item.title }}">
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <p class="text-[14px] font-semibold text-[#1d1d1f] leading-snug flex-1">{{ item.title }}</p>
+                            <span class="pub-type-badge shrink-0 {% if item.publication_kind == 'journal' %}pub-type-badge-journal{% else %}pub-type-badge-conf{% endif %}">
+                                {{ item.get_publication_kind_display }}
+                            </span>
+                        </div>
+                        {% if item.venue %}<p class="text-[12px] text-[#6e6e73] truncate">{{ item.venue }}</p>{% endif %}
+                        {% if item.authors %}<p class="mt-1 text-[11px] text-[#8e8e93] truncate">{{ item.authors }}</p>{% endif %}
+                        <div class="mt-2 flex items-center gap-3 flex-wrap">
+                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% endif %}
+                            {% if item.doi %}<span class="text-[11px] text-[#8e8e93]">DOI: {{ item.doi }}</span>{% endif %}
+                            {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="text-[11px] font-semibold text-[#0066cc] hover:underline">자세히 →</a>{% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</section>
+
+{% if publications_international %}
+<div class="pub-list-modal" id="pub-list-modal-international" aria-hidden="true">
+    <div class="pub-list-dialog">
+        <div class="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
+            <p class="text-[15px] font-semibold text-[#1d1d1f]">국제지 / 국제학회 전체 리스트</p>
+            <button type="button" class="pub-list-close" data-close-pub-list="international">×</button>
+        </div>
+        <div class="pub-list-body">
+            <div class="pub-list-scroll">
+                {% for item in publications_international %}
+                <div class="pub-list-row"
+                     data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                     data-preview-title="{{ item.title }}"
+                     data-attachment-url="{% if item.attachment %}{{ item.attachment.url }}{% endif %}">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="text-[14px] font-semibold text-[#1d1d1f]">{{ item.title }}</p>
+                        <span class="pub-type-badge shrink-0 {% if item.publication_kind == 'journal' %}pub-type-badge-journal{% else %}pub-type-badge-conf{% endif %}">
+                            {{ item.get_publication_kind_display }}
+                        </span>
+                    </div>
+                    {% if item.venue %}<p class="mt-1 text-[12px] text-[#6e6e73]">{{ item.venue }}</p>{% endif %}
+                    {% if item.authors %}<p class="mt-1 text-[12px] text-[#8e8e93]">저자: {{ item.authors }}</p>{% endif %}
+                    <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
+                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% endif %}
+                        {% if item.doi %}<span>DOI: {{ item.doi }}</span>{% endif %}
+                        {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <aside class="pub-list-preview" data-preview-panel>
+                <p class="text-[12px] font-semibold text-[#6e6e73]">파일 미리보기 (hover)</p>
+                <div class="pub-list-preview-box" data-preview-box>
+                    <p class="text-[12px] text-[#8e8e93]">파일이 있는 항목에 마우스를 올리면 미리보기가 표시됩니다.</p>
+                </div>
+                <p class="text-[12px] text-[#8e8e93]" data-preview-caption>선택된 항목 없음</p>
+                <div class="pub-attach-box" data-preview-attach-box hidden>
+                    <p class="pub-attach-title">첨부파일</p>
+                    <a class="pub-attach-link" data-preview-download href="#" download>파일 다운로드</a>
+                </div>
+            </aside>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if publications_domestic %}
+<div class="pub-list-modal" id="pub-list-modal-domestic" aria-hidden="true">
+    <div class="pub-list-dialog">
+        <div class="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
+            <p class="text-[15px] font-semibold text-[#1d1d1f]">국내지 / 국내학회 전체 리스트</p>
+            <button type="button" class="pub-list-close" data-close-pub-list="domestic">×</button>
+        </div>
+        <div class="pub-list-body">
+            <div class="pub-list-scroll">
+                {% for item in publications_domestic %}
+                <div class="pub-list-row"
+                     data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                     data-preview-title="{{ item.title }}"
+                     data-attachment-url="{% if item.attachment %}{{ item.attachment.url }}{% endif %}">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="text-[14px] font-semibold text-[#1d1d1f]">{{ item.title }}</p>
+                        <span class="pub-type-badge shrink-0 {% if item.publication_kind == 'journal' %}pub-type-badge-journal{% else %}pub-type-badge-conf{% endif %}">
+                            {{ item.get_publication_kind_display }}
+                        </span>
+                    </div>
+                    {% if item.venue %}<p class="mt-1 text-[12px] text-[#6e6e73]">{{ item.venue }}</p>{% endif %}
+                    {% if item.authors %}<p class="mt-1 text-[12px] text-[#8e8e93]">저자: {{ item.authors }}</p>{% endif %}
+                    <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
+                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% endif %}
+                        {% if item.doi %}<span>DOI: {{ item.doi }}</span>{% endif %}
+                        {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <aside class="pub-list-preview" data-preview-panel>
+                <p class="text-[12px] font-semibold text-[#6e6e73]">파일 미리보기 (hover)</p>
+                <div class="pub-list-preview-box" data-preview-box>
+                    <p class="text-[12px] text-[#8e8e93]">파일이 있는 항목에 마우스를 올리면 미리보기가 표시됩니다.</p>
+                </div>
+                <p class="text-[12px] text-[#8e8e93]" data-preview-caption>선택된 항목 없음</p>
+                <div class="pub-attach-box" data-preview-attach-box hidden>
+                    <p class="pub-attach-title">첨부파일</p>
+                    <a class="pub-attach-link" data-preview-download href="#" download>파일 다운로드</a>
+                </div>
+            </aside>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="pub-hover-preview" id="pub-hover-preview" aria-hidden="true">
+    <img id="pub-hover-preview-image" src="" alt="">
+    <div class="pub-hover-preview-meta">
+        <p class="pub-hover-preview-title" id="pub-hover-preview-title">파일 미리보기</p>
+        <p class="pub-hover-preview-hint">클릭하면 전체 파일 보기</p>
+    </div>
+</div>
+
+<script>
+    (() => {
+        const recalcTrackSpeed = (track) => {
+            const speed = parseFloat(track.dataset.speed) || 36;
+            const halfH = track.scrollHeight / 2;
+            const duration = (halfH / speed).toFixed(1);
+            track.style.setProperty('--pub-duration', duration + 's');
+            track.classList.add('is-running');
+        };
+
+        document.querySelectorAll('.pub-track').forEach(track => {
+            const cards = track.querySelectorAll('.pub-card');
+            if (cards.length < 2) return;
+            const original = track.innerHTML;
+            track.innerHTML = original + original;
+            requestAnimationFrame(() => recalcTrackSpeed(track));
+        });
+
+        document.querySelectorAll('[data-pub-speed-control]').forEach(control => {
+            const wrapper = control.closest('.pub-col-wrapper');
+            const track = wrapper ? wrapper.querySelector('.pub-track') : null;
+            if (!track) return;
+            control.addEventListener('input', () => {
+                track.dataset.speed = control.value;
+                recalcTrackSpeed(track);
+            });
+        });
+
+        const openModal = (kind) => {
+            const modal = document.getElementById(`pub-list-modal-${kind}`);
+            if (!modal) return;
+            modal.classList.add('is-open');
+            modal.setAttribute('aria-hidden', 'false');
+        };
+
+        const closeModal = (kind) => {
+            const modal = document.getElementById(`pub-list-modal-${kind}`);
+            if (!modal) return;
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+        };
+
+        const hoverPreview = document.getElementById('pub-hover-preview');
+        const hoverPreviewImage = document.getElementById('pub-hover-preview-image');
+        const hoverPreviewTitle = document.getElementById('pub-hover-preview-title');
+        const rootEl = document.documentElement;
+        let activePreviewGroup = '';
+        let closePreviewTimer = null;
+
+        const cancelCloseHoverPreview = () => {
+            if (!closePreviewTimer) return;
+            clearTimeout(closePreviewTimer);
+            closePreviewTimer = null;
+        };
+
+        const scheduleCloseHoverPreview = (delay = 180) => {
+            cancelCloseHoverPreview();
+            closePreviewTimer = setTimeout(() => {
+                closeHoverPreview();
+            }, delay);
+        };
+
+        const positionHoverPreviewByCard = (cardEl) => {
+            if (!hoverPreview) return;
+            if (!cardEl) return;
+
+            const cardRect = cardEl.getBoundingClientRect();
+            const rect = hoverPreview.getBoundingClientRect();
+
+            // 기본: 카드 오른쪽 아래 쪽에 고정 배치
+            let left = cardRect.right - rect.width;
+            let top = cardRect.bottom + 10;
+
+            // 화면 밖으로 나가면 안전하게 보정
+            if (left < 12) left = 12;
+            if (left + rect.width > window.innerWidth - 12) {
+                left = window.innerWidth - rect.width - 12;
+            }
+
+            if (top + rect.height > window.innerHeight - 12) {
+                top = cardRect.top - rect.height - 10;
+            }
+            if (top < 12) top = 12;
+
+            hoverPreview.style.left = `${left}px`;
+            hoverPreview.style.top = `${top}px`;
+        };
+
+        const openHoverPreview = (card) => {
+            if (!hoverPreview || !hoverPreviewImage) return;
+            const previewUrl = card.dataset.previewUrl || '';
+            if (!previewUrl) return;
+
+            cancelCloseHoverPreview();
+
+            activePreviewGroup = card.dataset.pubGroup || '';
+            hoverPreviewImage.src = previewUrl;
+            hoverPreviewImage.alt = `${card.dataset.previewTitle || '파일'} 미리보기`;
+            if (hoverPreviewTitle) hoverPreviewTitle.textContent = card.dataset.previewTitle || '파일 미리보기';
+            hoverPreview.classList.add('is-open');
+            hoverPreview.setAttribute('aria-hidden', 'false');
+            requestAnimationFrame(() => positionHoverPreviewByCard(card));
+        };
+
+        const closeHoverPreview = () => {
+            if (!hoverPreview || !hoverPreviewImage) return;
+            cancelCloseHoverPreview();
+            rootEl.classList.remove('pub-global-pause');
+            hoverPreview.classList.remove('is-open');
+            hoverPreview.setAttribute('aria-hidden', 'true');
+            hoverPreviewImage.src = '';
+            hoverPreviewImage.alt = '';
+            activePreviewGroup = '';
+        };
+
+        document.addEventListener('click', (e) => {
+            const listBtn = e.target.closest('[data-open-pub-list]');
+            if (listBtn) {
+                openModal(listBtn.dataset.openPubList);
+                return;
+            }
+
+            if (hoverPreview && hoverPreview.contains(e.target) && activePreviewGroup) {
+                openModal(activePreviewGroup);
+                closeHoverPreview();
+            }
+        });
+
+        document.querySelectorAll('[data-close-pub-list]').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.dataset.closePubList));
+        });
+
+        if (hoverPreview) {
+            hoverPreview.addEventListener('mouseenter', () => {
+                cancelCloseHoverPreview();
+                rootEl.classList.add('pub-global-pause');
+            });
+            hoverPreview.addEventListener('mouseleave', () => {
+                rootEl.classList.remove('pub-global-pause');
+                scheduleCloseHoverPreview(120);
+            });
+        }
+
+        document.addEventListener('mouseover', (e) => {
+            const card = e.target.closest('[data-pub-card]');
+            if (!card) return;
+            openHoverPreview(card);
+        });
+
+        document.addEventListener('mouseout', (e) => {
+            const card = e.target.closest('[data-pub-card]');
+            if (!card) return;
+            const toEl = e.relatedTarget;
+            if (toEl && (card.contains(toEl) || (hoverPreview && hoverPreview.contains(toEl)))) return;
+            scheduleCloseHoverPreview(180);
+        });
+
+        document.querySelectorAll('.pub-list-modal').forEach(modal => {
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.remove('is-open');
+                    modal.setAttribute('aria-hidden', 'true');
+                }
+            });
+
+            const previewBox = modal.querySelector('[data-preview-box]');
+            const previewCaption = modal.querySelector('[data-preview-caption]');
+            const previewAttachBox = modal.querySelector('[data-preview-attach-box]');
+            const previewDownload = modal.querySelector('[data-preview-download]');
+
+            const syncDownloadState = (attachmentUrl) => {
+                if (!previewDownload || !previewAttachBox) return;
+                if (attachmentUrl) {
+                    previewDownload.href = attachmentUrl;
+                    previewAttachBox.hidden = false;
+                } else {
+                    previewDownload.href = '#';
+                    previewAttachBox.hidden = true;
+                }
+            };
+
+            syncDownloadState('');
+
+            modal.querySelectorAll('.pub-list-row').forEach(row => {
+                row.addEventListener('mouseenter', () => {
+                    if (!previewBox || !previewCaption) return;
+                    const previewUrl = row.dataset.previewUrl || '';
+                    const title = row.dataset.previewTitle || '선택된 항목';
+                    const attachmentUrl = row.dataset.attachmentUrl || '';
+
+                    syncDownloadState(attachmentUrl);
+
+                    if (!previewUrl) {
+                        previewBox.innerHTML = '<p class="text-[12px] text-[#8e8e93]">첨부파일 미리보기 이미지가 없습니다.</p>';
+                        previewCaption.textContent = `${title} · 미리보기 없음`;
+                        return;
+                    }
+
+                    previewBox.innerHTML = `<img src="${previewUrl}" alt="${title} 미리보기">`;
+                    previewCaption.textContent = title;
+                });
+            });
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            closeHoverPreview();
+            document.querySelectorAll('.pub-list-modal.is-open').forEach(modal => {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+            });
+        });
+    })();
+</script>
+{% endif %}

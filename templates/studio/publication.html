@@ -2,7 +2,7 @@
 
 {% block content %}
 <style>
-    .award-item-card {
+    .publication-item-card {
         background: #ffffff;
         border-color: #e3e3e8 !important;
         transition: box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
@@ -17,7 +17,7 @@
         position: relative;
     }
 
-    .award-item-card:hover {
+    .publication-item-card:hover {
         transform: translateY(-1px);
         box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
         border-color: rgba(0, 102, 204, 0.18) !important;
@@ -56,22 +56,22 @@
         bottom: -2px;
     }
 
-    .award-edit-panel {
+    .publication-edit-panel {
         transform-style: preserve-3d;
         backface-visibility: hidden;
     }
 
-    .award-edit-panel.is-flip-in {
-        animation: awardCardFlipIn 560ms cubic-bezier(0.22, 1, 0.36, 1);
+    .publication-edit-panel.is-flip-in {
+        animation: publicationCardFlipIn 560ms cubic-bezier(0.22, 1, 0.36, 1);
         transform-origin: center;
     }
 
-    .award-edit-panel.is-flip-out {
-        animation: awardCardFlipOut 520ms cubic-bezier(0.22, 1, 0.36, 1);
+    .publication-edit-panel.is-flip-out {
+        animation: publicationCardFlipOut 520ms cubic-bezier(0.22, 1, 0.36, 1);
         transform-origin: center;
     }
 
-    @keyframes awardCardFlipIn {
+    @keyframes publicationCardFlipIn {
         0% {
             opacity: 0;
             transform: perspective(1200px) rotateY(-76deg) translateY(8px) scale(0.98);
@@ -89,7 +89,7 @@
         }
     }
 
-    @keyframes awardCardFlipOut {
+    @keyframes publicationCardFlipOut {
         0% {
             opacity: 0;
             transform: perspective(1200px) rotateY(72deg) translateY(8px) scale(0.98);
@@ -153,66 +153,79 @@
             </div>
 
             <section>
-                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">AWARDS</p>
-                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Awards.</h1>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">PUBLICATIONS</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Publications.</h1>
                 <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">
-                    수상 이력과 대회 성과를 관리합니다. 왼쪽에서 추가하고, 오른쪽에서 목록을 확인하세요.
+                    논문 및 학술지 정보를 관리합니다. PDF 첨부 시 미리보기가 자동 생성됩니다.
                 </p>
             </section>
 
             <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
-                <aside id="award-edit-panel" class="award-edit-panel h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                <aside id="publication-edit-panel" class="publication-edit-panel h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
                     <div class="flex items-start justify-between gap-3">
-                        <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_award %}Edit Award{% else %}Add Award{% endif %}</h2>
-                        {% if editing_award %}
-                        <a href="{% url 'studio:award' %}" data-edit-cancel class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]" aria-label="편집 닫기">×</a>
+                        <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_publication %}Edit Publication{% else %}Add Publication{% endif %}</h2>
+                        {% if editing_publication %}
+                        <a href="{% url 'studio:publication' %}" data-edit-cancel class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]" aria-label="편집 닫기">×</a>
                         {% endif %}
                     </div>
-                    <p class="mt-3 text-[14px] leading-[1.6] text-[#6e6e73]">수상 정보를 입력하고 파일을 첨부할 수 있습니다.</p>
 
-                    <form id="award-main-form" method="post" enctype="multipart/form-data" action="{% if editing_award %}{% url 'studio:award_update' editing_award.id %}{% else %}{% url 'studio:award_create' %}{% endif %}" class="mt-7 space-y-4" data-is-editing="{% if editing_award %}true{% else %}false{% endif %}">
+                    <form id="publication-main-form" method="post" enctype="multipart/form-data" action="{% if editing_publication %}{% url 'studio:publication_update' editing_publication.id %}{% else %}{% url 'studio:publication_create' %}{% endif %}" class="mt-7 space-y-4" data-is-editing="{% if editing_publication %}true{% else %}false{% endif %}">
                         {% csrf_token %}
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">수상명 *</label>
-                            <input type="text" name="title" value="{{ editing_award.title|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 최우수상, 장려상, 대통령상">
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">수여 기관</label>
-                            <input type="text" name="organizer" value="{{ editing_award.organizer|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 과학기술정보통신부, 삼성전자, ACM">
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">대회 / 프로그램명</label>
-                            <input type="text" name="award_name" value="{{ editing_award.award_name|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 전국 대학생 해커톤, ICPC 2024">
-                        </div>
-
-                        <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">분류</label>
-                            <select name="award_category" class="h-[44px] w-full rounded-full border border-black/[0.08] bg-white px-4 text-[14px] outline-none focus:border-[#0066cc]">
-                                {% for value, label in award_categories %}
-                                <option value="{{ value }}" {% if editing_award and editing_award.award_category == value %}selected{% elif not editing_award and value == 'other' %}selected{% endif %}>{{ label }}</option>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">구분</label>
+                            <select name="publication_type" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in publication_types %}
+                                <option value="{{ value }}"{% if editing_publication %}{% if editing_publication.publication_type == value %} selected{% endif %}{% else %}{% if value == 'international' %} selected{% endif %}{% endif %}>{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">수상 날짜</label>
-                            <input type="month" name="date" value="{{ editing_award.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">형태</label>
+                            <select name="publication_kind" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in publication_kinds %}
+                                <option value="{{ value }}"{% if editing_publication %}{% if editing_publication.publication_kind == value %} selected{% endif %}{% else %}{% if value == 'journal' %} selected{% endif %}{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
                         </div>
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">관련 링크</label>
-                            <input type="url" name="url" value="{{ editing_award.url|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="https://...">
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">제목 *</label>
+                            <input type="text" name="title" value="{{ editing_publication.title|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: Efficient ...">
                         </div>
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">첨부 파일</label>
-                            <input type="file" name="attachment" class="block w-full rounded-[12px] border border-black/[0.08] bg-white px-3 py-2 text-[13px] text-[#1d1d1f] file:mr-3 file:rounded-full file:border-0 file:bg-[#f2f2f7] file:px-3 file:py-1.5 file:text-[12px] file:font-semibold file:text-[#1d1d1f]">
-                            {% if editing_award and editing_award.attachment %}
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">저자</label>
+                            <input type="text" name="authors" value="{{ editing_publication.authors|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: Kim, Lee, Park">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">저널/학회/출판처</label>
+                            <input type="text" name="venue" value="{{ editing_publication.venue|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: IEEE Access, KCC 2026">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">발행일</label>
+                            <input type="month" name="date" value="{{ editing_publication.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">DOI</label>
+                            <input type="text" name="doi" value="{{ editing_publication.doi|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="10.xxxx/xxxxx">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">URL</label>
+                            <input type="url" name="url" value="{{ editing_publication.url|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="https://...">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">첨부 파일 (PDF)</label>
+                            <input type="file" name="attachment" class="block w-full rounded-[12px] border border-black/[0.08] bg-white px-3 py-2 text-[13px]">
+                            {% if editing_publication and editing_publication.attachment %}
                             <div class="mt-2 flex items-center justify-between gap-3 rounded-[12px] border border-black/[0.06] bg-[#fbfbfd] px-3 py-2">
-                                <a href="{{ editing_award.attachment.url }}" target="_blank" rel="noreferrer" class="truncate text-[12px] text-[#0066cc] hover:underline">{{ editing_award.attachment.name|cut:'award/' }}</a>
+                                <a href="{{ editing_publication.attachment.url }}" target="_blank" rel="noreferrer" class="truncate text-[12px] text-[#0066cc] hover:underline">{{ editing_publication.attachment.name|cut:'publication/' }}</a>
                                 <label class="inline-flex shrink-0 items-center gap-1.5 text-[12px] text-[#6e6e73]">
                                     <input type="checkbox" name="remove_attachment" value="true">
                                     파일 제거
@@ -222,76 +235,66 @@
                         </div>
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">설명</label>
-                            <textarea name="description" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]" placeholder="수상 내용, 경쟁률, 성과 요약">{{ editing_award.description|default:'' }}</textarea>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">초록 / 설명</label>
+                            <textarea name="abstract" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]">{{ editing_publication.abstract|default:'' }}</textarea>
                         </div>
 
                         <div class="flex items-center justify-between">
                             <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
                             <label class="inline-flex cursor-pointer items-center gap-2">
                                 <input type="hidden" name="is_visible" value="false">
-                                <input type="checkbox" name="is_visible" value="true" {% if not editing_award or editing_award.is_visible %}checked{% endif %} class="peer sr-only">
+                                <input type="checkbox" name="is_visible" value="true" {% if not editing_publication or editing_publication.is_visible %}checked{% endif %} class="peer sr-only">
                                 <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
                                 <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
                             </label>
                         </div>
 
-                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_award %}수정 저장{% else %}추가{% endif %}</button>
-
-                        {% if editing_award %}
-                        <a id="award-edit-cancel" data-edit-cancel href="{% url 'studio:award' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
-                        {% endif %}
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_publication %}수정 저장{% else %}추가{% endif %}</button>
                     </form>
                 </aside>
 
                 <div>
                     <div class="mb-3 rounded-[16px] border border-black/[0.06] bg-[#fbfbfd] px-5 py-3 text-[13px] text-[#6e6e73]">
-                        🏅 저장 목록 {{ awards.count }}개 · 드래그로 순서 변경
+                        📚 저장 목록 {{ publications.count }}개 · 드래그로 순서 변경
                     </div>
-                    <div class="space-y-3" data-sortable-list data-reorder-url="{% url 'studio:award_reorder' %}">
-                        {% for award_item in awards %}
-                        <div id="award-{{ award_item.id }}" class="award-item-card rounded-[16px] border border-black/[0.06] p-4 {% if editing_award_id == award_item.id %}ring-2 ring-[#0066cc]/20{% endif %}" draggable="true" data-item-id="{{ award_item.id }}">
+                    <div class="space-y-3" data-sortable-list data-reorder-url="{% url 'studio:publication_reorder' %}">
+                        {% for publication_item in publications %}
+                        <div id="publication-{{ publication_item.id }}" class="publication-item-card rounded-[16px] border border-black/[0.06] p-4 {% if editing_publication_id == publication_item.id %}ring-2 ring-[#0066cc]/20{% endif %}" draggable="true" data-item-id="{{ publication_item.id }}">
                             <div class="flex items-start justify-between gap-3">
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">
-                                            {% if award_item.organizer %}{{ award_item.organizer }} {% endif %}{% if award_item.award_name %}{{ award_item.award_name }} {% endif %}{{ award_item.title }}
-                                        </p>
-                                        {% if award_item.award_category == 'campus' %}
-                                        <span class="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-semibold text-[#047857]">교내</span>
-                                        {% elif award_item.award_category == 'external' %}
-                                        <span class="rounded-full bg-[#eff6ff] px-2.5 py-1 text-[11px] font-semibold text-[#1d4ed8]">대외</span>
-                                        {% else %}
-                                        <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#4b5563]">기타</span>
-                                        {% endif %}
-                                        {% if award_item.is_visible %}
-                                        <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
-                                        {% else %}
-                                        <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
-                                        {% endif %}
+                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ publication_item.title }}</p>
+                                        <span class="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[11px] font-semibold text-[#1d4ed8]">{{ publication_item.get_publication_type_display }}</span>
+                                        <span class="rounded-full bg-[#f8f3ff] px-2.5 py-1 text-[11px] font-semibold text-[#7c3aed]">{{ publication_item.get_publication_kind_display }}</span>
                                     </div>
-                                    {% if award_item.date %}
-                                    <p class="mt-1 text-[12px] text-[#8e8e93]">{{ award_item.date|date:"Y.m" }}</p>
+                                    {% if publication_item.authors %}
+                                    <p class="mt-1 text-[12px] text-[#8e8e93]">{{ publication_item.authors }}</p>
                                     {% endif %}
-                                    {% if award_item.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ award_item.description }}</p>{% endif %}
-                                    {% if award_item.url %}<a href="{{ award_item.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0066cc] hover:underline">{{ award_item.url }}</a>{% endif %}
-                                    {% if award_item.attachment %}<a href="{{ award_item.attachment.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0a84ff] hover:underline">첨부파일 열기</a>{% endif %}
+                                    {% if publication_item.venue %}
+                                    <p class="mt-1 text-[12px] text-[#8e8e93]">{{ publication_item.venue }}</p>
+                                    {% endif %}
+                                    {% if publication_item.date %}
+                                    <p class="mt-1 text-[12px] text-[#8e8e93]">{{ publication_item.date|date:"Y.m" }}</p>
+                                    {% endif %}
+                                    {% if publication_item.doi %}<p class="mt-1 text-[12px] text-[#8e8e93]">DOI: {{ publication_item.doi }}</p>{% endif %}
+                                    {% if publication_item.abstract %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ publication_item.abstract }}</p>{% endif %}
+                                    {% if publication_item.url %}<a href="{{ publication_item.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0066cc] hover:underline">{{ publication_item.url }}</a>{% endif %}
+                                    {% if publication_item.attachment %}<a href="{{ publication_item.attachment.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0a84ff] hover:underline">첨부파일 열기</a>{% endif %}
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <form method="GET" action="{% url 'studio:award' %}" data-edit-trigger-form>
-                                        <input type="hidden" name="edit" value="{{ award_item.id }}">
+                                    <form method="GET" action="{% url 'studio:publication' %}" data-edit-trigger-form>
+                                        <input type="hidden" name="edit" value="{{ publication_item.id }}">
                                         <button type="submit" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]">Edit</button>
                                     </form>
-                                    <form method="POST" action="{% url 'studio:award_delete' award_item.id %}" onsubmit="return confirm('이 수상 이력을 삭제할까요?');">
+                                    <form method="POST" action="{% url 'studio:publication_delete' publication_item.id %}" onsubmit="return confirm('이 출판물을 삭제할까요?');">
                                         {% csrf_token %}
                                         <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
                                     </form>
-                                    <div class="ml-1 text-[12px] text-[#8e8e93] select-none">↕︎ 드래그</div>
                                 </div>
                             </div>
                         </div>
                         {% empty %}
-                        <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-6 text-center text-[13px] text-[#8e8e93]">저장된 수상 이력이 없습니다.</div>
+                        <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-6 text-center text-[13px] text-[#8e8e93]">저장된 출판물이 없습니다.</div>
                         {% endfor %}
                     </div>
                 </div>
@@ -301,8 +304,8 @@
 </div>
 
 <script>
-    const SCROLL_KEY = 'studio_award_scroll_y';
-    const PANEL_MODE_KEY = 'studio_award_panel_mode';
+    const SCROLL_KEY = 'studio_publication_scroll_y';
+    const PANEL_MODE_KEY = 'studio_publication_panel_mode';
 
     function getCookie(name) {
         const value = `; ${document.cookie}`;
@@ -313,9 +316,7 @@
 
     function initSortableList(listEl) {
         let dragged = null;
-
         const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
-
         const clearDropMarkers = () => {
             getItems().forEach((it) => it.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
         };
@@ -401,8 +402,8 @@
 
     document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
 
-    const editPanel = document.getElementById('award-edit-panel');
-    const mainForm = document.getElementById('award-main-form');
+    const editPanel = document.getElementById('publication-edit-panel');
+    const mainForm = document.getElementById('publication-main-form');
     const cancelLinks = document.querySelectorAll('[data-edit-cancel]');
     const searchParams = new URLSearchParams(window.location.search);
     const hasEditQuery = Boolean(searchParams.get('edit'));

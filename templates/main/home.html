@@ -14,6 +14,7 @@
     {% include "main/sections/career.html" %}
     {% include "main/sections/activity.html" %}
     {% include "main/sections/award.html" %}
+    {% include "main/sections/publication.html" %}
     
 
 
@@ -33,6 +34,7 @@
         --career-progress: 0;
         --activity-progress: 0;
         --award-progress: 0;
+        --publication-progress: 0;
     }
 
     .section-flash {
@@ -81,9 +83,15 @@
     }
 
     .award-section {
-        opacity: calc(0.18 + (var(--award-progress) * 0.82));
-        filter: blur(calc((1 - var(--award-progress)) * 10px));
-        transform: translateY(calc((1 - var(--award-progress)) * 56px)) scale(calc(0.965 + (var(--award-progress) * 0.035)));
+        opacity: calc((0.18 + (var(--award-progress) * 0.82)) * (1 - (var(--publication-progress) * 0.82)));
+        filter: blur(calc(((1 - var(--award-progress)) * 10px) + (var(--publication-progress) * 8px)));
+        transform: translateY(calc(((1 - var(--award-progress)) * 56px) + (var(--publication-progress) * -36px))) scale(calc((0.965 + (var(--award-progress) * 0.035)) - (var(--publication-progress) * 0.03)));
+    }
+
+    .publication-section {
+        opacity: calc(0.18 + (var(--publication-progress) * 0.82));
+        filter: blur(calc((1 - var(--publication-progress)) * 10px));
+        transform: translateY(calc((1 - var(--publication-progress)) * 56px)) scale(calc(0.965 + (var(--publication-progress) * 0.035)));
     }
 
     .page-section.is-last-section {
@@ -115,6 +123,11 @@
     }
 
     html.focus-award .activity-section {
+        filter: blur(10px);
+        transform: translateY(-64px) scale(.96);
+    }
+
+    html.focus-publication .award-section {
         filter: blur(10px);
         transform: translateY(-64px) scale(.96);
     }
@@ -161,6 +174,7 @@
         career: document.querySelector('.career-section'),
         activity: document.querySelector('.activity-section'),
         award: document.querySelector('.award-section'),
+        publication: document.querySelector('.publication-section'),
     };
 
     const transitionConfig = {
@@ -203,6 +217,7 @@
     let prevFocusCareer = false;
     let prevFocusActivity = false;
     let prevFocusAward = false;
+    let prevFocusPublication = false;
 
     const updateSectionTransitions = () => {
         updateLastSectionMarker();
@@ -210,24 +225,34 @@
         const careerProgress = calculateSectionProgress(sections.career);
         const activityProgress = calculateSectionProgress(sections.activity);
         const awardProgress = calculateSectionProgress(sections.award);
+        const publicationProgress = calculateSectionProgress(sections.publication);
 
         rootEl.style.setProperty('--career-progress', careerProgress.toFixed(3));
         rootEl.style.setProperty('--activity-progress', activityProgress.toFixed(3));
         rootEl.style.setProperty('--award-progress', awardProgress.toFixed(3));
+        rootEl.style.setProperty('--publication-progress', publicationProgress.toFixed(3));
 
-        const focusAward = awardProgress > transitionConfig.focusThreshold;
+        const focusPublication = publicationProgress > transitionConfig.focusThreshold;
+        const focusAward = awardProgress > transitionConfig.focusThreshold && publicationProgress < 0.55;
         const focusActivity = activityProgress > transitionConfig.focusThreshold && awardProgress < 0.55;
         const focusCareer = careerProgress > transitionConfig.focusThreshold && activityProgress < 0.55;
 
         rootEl.classList.toggle('focus-career', focusCareer);
         rootEl.classList.toggle('focus-activity', focusActivity);
         rootEl.classList.toggle('focus-award', focusAward);
+        rootEl.classList.toggle('focus-publication', focusPublication);
 
-        if (prevFocusCareer !== focusCareer || prevFocusActivity !== focusActivity || prevFocusAward !== focusAward) {
+        if (
+            prevFocusCareer !== focusCareer
+            || prevFocusActivity !== focusActivity
+            || prevFocusAward !== focusAward
+            || prevFocusPublication !== focusPublication
+        ) {
             playFlash();
             prevFocusCareer = focusCareer;
             prevFocusActivity = focusActivity;
             prevFocusAward = focusAward;
+            prevFocusPublication = focusPublication;
         }
     };
 

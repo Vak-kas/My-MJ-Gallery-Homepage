@@ -23,6 +23,13 @@ urlpatterns = [
     path('award/<int:id>/delete/', views.award_delete, name='award_delete'),
     path('award/<int:id>/toggle-visibility/', views.award_toggle_visibility, name='award_toggle_visibility'),
     path('award/reorder/', views.award_reorder, name='award_reorder'),
+
+    path('publication/', views.publication, name='publication'),
+    path('publication/create/', views.publication_create, name='publication_create'),
+    path('publication/<int:id>/update/', views.publication_update, name='publication_update'),
+    path('publication/<int:id>/delete/', views.publication_delete, name='publication_delete'),
+    path('publication/<int:id>/toggle-visibility/', views.publication_toggle_visibility, name='publication_toggle_visibility'),
+    path('publication/reorder/', views.publication_reorder, name='publication_reorder'),
     
     # Education
     path('career/education/create/', views.education_create, name='education_create'),

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 
-from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity, Award
+from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity, Award, Publication
 
 
 def home(request):
@@ -37,11 +37,23 @@ def home(request):
         {"key": "other", "title": "Other", "subtitle": "기타", "icon": "🗂", "items": activities.filter(activity_type="other")[:4], "total": activities.filter(activity_type="other").count()},
     ]
 
+    awards = Award.objects.filter(is_visible=True)
+
+    award_stats = {
+        "total": awards.count(),
+        "campus": awards.filter(award_category="campus").count(),
+        "external": awards.filter(award_category="external").count(),
+        "other": awards.filter(award_category="other").count(),
+    }
+
     return render(request, "main/home.html", {
         "info": info,
         "contact_sections": contact_sections,
         "links": links,
         "career_sections": career_sections,
         "activity_sections": activity_sections,
-        "awards": Award.objects.filter(is_visible=True),
+        "awards": awards,
+        "award_stats": award_stats,
+        "publications_international": Publication.objects.filter(is_visible=True, publication_type="international"),
+        "publications_domestic": Publication.objects.filter(is_visible=True, publication_type="domestic"),
     })

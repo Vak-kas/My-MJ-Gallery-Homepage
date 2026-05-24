@@ -57,3 +57,11 @@ from .award import (
     award_toggle_visibility,
     award_reorder,
 )
+from .publication import (
+    publication,
+    publication_create,
+    publication_update,
+    publication_delete,
+    publication_toggle_visibility,
+    publication_reorder,
+)

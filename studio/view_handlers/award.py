@@ -77,6 +77,7 @@ def award(request):
     editing_award_id = request.GET.get("edit", "").strip()
     editing_award_id = int(editing_award_id) if editing_award_id.isdigit() else None
     editing_award = Award.objects.filter(id=editing_award_id).first() if editing_award_id else None
+    award_categories = Award.AWARD_CATEGORY_CHOICES
 
     return render(
         request,
@@ -85,6 +86,7 @@ def award(request):
             "awards": awards,
             "editing_award_id": editing_award_id,
             "editing_award": editing_award,
+            "award_categories": award_categories,
         },
     )
 
@@ -95,6 +97,10 @@ def award_create(request):
         title = request.POST.get("title", "").strip()
         organizer = request.POST.get("organizer", "").strip()
         award_name = request.POST.get("award_name", "").strip()
+        award_category = request.POST.get("award_category", "other").strip()
+        valid_categories = {choice[0] for choice in Award.AWARD_CATEGORY_CHOICES}
+        if award_category not in valid_categories:
+            award_category = "other"
         date_str = request.POST.get("date", "").strip()
         date = None
         if date_str:
@@ -119,6 +125,7 @@ def award_create(request):
             title=title,
             organizer=organizer,
             award_name=award_name,
+            award_category=award_category,
             date=date,
             description=description,
             url=url,
@@ -147,6 +154,10 @@ def award_update(request, id):
         title = request.POST.get("title", "").strip()
         organizer = request.POST.get("organizer", "").strip()
         award_name = request.POST.get("award_name", "").strip()
+        award_category = request.POST.get("award_category", "other").strip()
+        valid_categories = {choice[0] for choice in Award.AWARD_CATEGORY_CHOICES}
+        if award_category not in valid_categories:
+            award_category = "other"
         date_str = request.POST.get("date", "").strip()
         date = None
         if date_str:
@@ -171,6 +182,7 @@ def award_update(request, id):
         award_item.title = title
         award_item.organizer = organizer
         award_item.award_name = award_name
+        award_item.award_category = award_category
         award_item.date = date
         award_item.description = description
         award_item.url = url

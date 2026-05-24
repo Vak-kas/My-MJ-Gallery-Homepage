@@ -1,5 +1,87 @@
 {% if awards %}
 <style>
+    .award-section--expanded {
+        min-height: clamp(760px, 85vh, 980px);
+    }
+
+    /* ── Award Marquee ────────────────────────────────────── */
+    .award-marquee-outer {
+        overflow: hidden;
+        position: relative;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        min-height: 380px;
+    }
+
+    @media (max-width: 767px) {
+        .award-section--expanded {
+            min-height: 680px;
+        }
+
+        .award-marquee-outer {
+            min-height: 340px;
+        }
+    }
+
+    /* 좌우 페이드 */
+    .award-marquee-outer::before,
+    .award-marquee-outer::after {
+        content: '';
+        position: absolute;
+        top: 0; bottom: 0;
+        width: 56px;
+        z-index: 2;
+        pointer-events: none;
+    }
+
+    .award-marquee-outer::before {
+        left: 0;
+        background: linear-gradient(to right, rgba(245,245,247,0.92) 0%, rgba(245,245,247,0) 100%);
+    }
+
+    .award-marquee-outer::after {
+        right: 0;
+        background: linear-gradient(to left, rgba(245,245,247,0.92) 0%, rgba(245,245,247,0) 100%);
+    }
+
+    .award-marquee-track {
+        display: flex;
+        gap: 20px;
+        width: max-content;
+        will-change: transform;
+    }
+
+    .award-marquee-track.is-running {
+        animation: award-marquee-left var(--award-duration, 30s) linear infinite;
+    }
+
+    .award-marquee-outer:hover .award-marquee-track {
+        animation-play-state: paused;
+    }
+
+    @keyframes award-marquee-left {
+        0%   { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+
+    /* 카드 */
+    .award-card {
+        flex-shrink: 0;
+        width: 320px;
+        min-height: 332px;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.07);
+        border-radius: 22px;
+        padding: 20px;
+        transition: box-shadow 0.25s, transform 0.25s;
+    }
+
+    .award-marquee-outer:hover .award-card:hover {
+        box-shadow: 0 12px 36px rgba(0,0,0,0.09);
+        transform: translateY(-3px);
+    }
+
+    /* 이미지 확대 모달 */
     .main-award-preview-trigger {
         display: block;
         width: 100%;
@@ -34,14 +116,12 @@
 
     .main-award-image-modal-close {
         position: absolute;
-        top: 10px;
-        right: 10px;
+        top: 10px; right: 10px;
         z-index: 2;
-        width: 36px;
-        height: 36px;
+        width: 36px; height: 36px;
         border-radius: 9999px;
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        background: rgba(255, 255, 255, 0.95);
+        border: 1px solid rgba(0,0,0,0.08);
+        background: rgba(255,255,255,0.95);
         color: #1d1d1f;
         font-size: 22px;
         line-height: 1;
@@ -55,80 +135,362 @@
         object-fit: contain;
         background: #fff;
     }
+
+    .award-pause-hint {
+        font-size: 11px;
+        color: #8e8e93;
+        opacity: 0;
+        transition: opacity 0.2s;
+        pointer-events: none;
+        margin-left: auto;
+    }
+
+    .award-marquee-outer:hover ~ .award-pause-hint,
+    .award-marquee-wrap:hover .award-pause-hint {
+        opacity: 1;
+    }
+
+    .award-stats-grid {
+        margin-top: 18px;
+        display: grid;
+        gap: 12px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    @media (min-width: 768px) {
+        .award-stats-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+
+    .award-stat-item {
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        background: #fff;
+        border-radius: 16px;
+        padding: 14px 16px;
+    }
+
+    .award-stat-label {
+        font-size: 11px;
+        color: #8e8e93;
+        letter-spacing: 0.01em;
+    }
+
+    .award-stat-value {
+        margin-top: 4px;
+        font-size: 24px;
+        font-weight: 650;
+        line-height: 1.1;
+        color: #1d1d1f;
+    }
+
+    .award-controls {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .award-speed-range {
+        width: 110px;
+    }
+
+    .award-list-btn {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 999px;
+        background: #fff;
+        color: #1d1d1f;
+        padding: 5px 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .award-list-btn:hover {
+        background: #f5f5f7;
+    }
+
+    .award-list-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 86;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(9, 12, 19, 0.62);
+        backdrop-filter: blur(2px);
+    }
+
+    .award-list-modal.is-open {
+        display: flex;
+    }
+
+    .award-list-dialog {
+        width: min(980px, 96vw);
+        height: min(760px, 88vh);
+        border-radius: 18px;
+        overflow: hidden;
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        box-shadow: 0 28px 70px rgba(0, 0, 0, 0.24);
+        display: flex;
+        flex-direction: column;
+    }
+
+    .award-list-scroll {
+        height: 100%;
+        overflow: auto;
+        padding: 14px;
+        background: #f8f8fb;
+    }
+
+    .award-list-body {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        min-height: 0;
+        flex: 1;
+    }
+
+    @media (max-width: 920px) {
+        .award-list-body { grid-template-columns: 1fr; }
+        .award-list-preview { display: none; }
+    }
+
+    .award-list-row {
+        position: relative;
+        border: 1px solid rgba(0, 0, 0, 0.07);
+        border-radius: 14px;
+        padding: 12px 14px;
+        background: #fff;
+        transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    .award-list-row + .award-list-row {
+        margin-top: 10px;
+    }
+
+    .award-list-row::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 10px;
+        bottom: 10px;
+        width: 3px;
+        border-radius: 999px;
+        background: #0a84ff;
+        opacity: 0;
+        transform: scaleY(0.4);
+        transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .award-list-row:hover,
+    .award-list-row.is-active {
+        transform: translateY(-1px);
+        border-color: rgba(10, 132, 255, 0.28);
+        background: #fbfdff;
+        box-shadow: 0 8px 22px rgba(10, 132, 255, 0.08);
+    }
+
+    .award-list-row:hover::before,
+    .award-list-row.is-active::before {
+        opacity: 1;
+        transform: scaleY(1);
+    }
+
+    .award-list-close {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 999px;
+        width: 34px;
+        height: 34px;
+        font-size: 20px;
+        line-height: 1;
+        background: #fff;
+        color: #1d1d1f;
+    }
+
+    .award-list-preview {
+        border-left: 1px solid rgba(0, 0, 0, 0.06);
+        background: #fafbff;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        min-height: 0;
+        overflow: auto;
+    }
+
+    .award-list-preview-box {
+        border: 1px dashed rgba(0, 0, 0, 0.15);
+        border-radius: 12px;
+        min-height: 280px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .award-list-preview-box img {
+        width: 100%;
+        max-height: 420px;
+        object-fit: contain;
+    }
+
+    .award-attach-box {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 12px;
+        background: #fff;
+        padding: 10px 12px;
+    }
+
+    .award-attach-link {
+        display: inline-flex;
+        margin-top: 8px;
+        border: 1px solid rgba(0, 102, 204, 0.24);
+        border-radius: 999px;
+        padding: 5px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0066cc;
+        background: #f7fbff;
+    }
+
+    .award-attach-link:hover {
+        background: #eef6ff;
+    }
 </style>
 
-<section data-section="award" class="page-section award-section mx-auto mt-16 max-w-[1320px] pb-20">
+<section data-section="award" class="page-section award-section award-section--expanded mx-auto mt-16 max-w-[1320px] pb-28">
 
     <div class="reveal mb-12">
         <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">
             MJGALLERY / AWARDS
         </p>
-
         <div class="mt-3 flex flex-col justify-between gap-5 md:flex-row md:items-end">
             <div>
                 <h2 class="apple-display text-[52px] font-semibold leading-[1.04] tracking-[-0.04em]">Awards.</h2>
                 <p class="mt-4 max-w-[560px] text-[17px] leading-[1.55] text-[#6e6e73]">
-                    수상 이력과 대회 성과
+                    수상 이력과 대회 성과 — 마우스를 올리면 멈춥니다.
                 </p>
             </div>
+            <div class="award-controls">
+                <label class="text-[11px] text-[#8e8e93]">속도</label>
+                <input type="range" class="award-speed-range" min="18" max="90" step="1" value="30" data-award-speed-control>
+                <button type="button" class="award-list-btn" id="open-award-list">전체 리스트 보기</button>
+                <span class="award-pause-hint mb-1">⏸ 일시정지</span>
+            </div>
         </div>
     </div>
 
-    <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {% for award_item in awards %}
-        <div class="reveal group relative overflow-hidden rounded-[22px] border border-black/[0.07] bg-white p-6 transition hover:shadow-[0_12px_36px_rgba(0,0,0,0.07)]">
-
-            {% if award_item.preview_image %}
-            <div class="mb-4 overflow-hidden rounded-[14px]">
-                <button type="button"
-                        class="main-award-preview-trigger"
-                        data-main-award-preview-open
-                        data-image-url="{{ award_item.preview_image.url }}"
-                        data-image-alt="{{ award_item.title }} 상장 이미지">
-                    <img src="{{ award_item.preview_image.url }}" alt="{{ award_item.title }} 미리보기"
-                         class="w-full object-cover transition group-hover:scale-[1.02]" style="max-height:180px;">
-                </button>
-            </div>
-            {% endif %}
-
-            <div class="flex items-start gap-3">
-                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#fff3cd] text-[18px]">🏅</div>
-                <div class="min-w-0 flex-1">
-                    <p class="truncate text-[15px] font-semibold text-[#1d1d1f]">{{ award_item.title }}</p>
-                    {% if award_item.award_name %}
-                    <p class="mt-0.5 truncate text-[12px] text-[#6e6e73]">{{ award_item.award_name }}</p>
+    <div class="award-marquee-wrap reveal">
+        <div class="award-marquee-outer" id="award-marquee-outer">
+            <div class="award-marquee-track" id="award-marquee-track" data-speed="30">
+                {% for award_item in awards %}
+                <div class="award-card group">
+                    {% if award_item.preview_image %}
+                    <div class="mb-3 overflow-hidden rounded-[14px]">
+                        <button type="button"
+                                class="main-award-preview-trigger"
+                                data-main-award-preview-open
+                                data-image-url="{{ award_item.preview_image.url }}"
+                                data-image-alt="{{ award_item.title }} 상장 이미지">
+                            <img src="{{ award_item.preview_image.url }}" alt="{{ award_item.title }} 미리보기"
+                                   class="w-full object-cover transition group-hover:scale-[1.02]" style="height:190px; object-fit:cover;">
+                        </button>
+                    </div>
                     {% endif %}
-                    {% if award_item.organizer %}
-                    <p class="mt-0.5 truncate text-[12px] text-[#8e8e93]">{{ award_item.organizer }}</p>
+
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fff3cd] text-[16px]">🏅</div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-[15px] font-semibold text-[#1d1d1f] leading-snug line-clamp-2">{{ award_item.title }}</p>
+                            {% if award_item.award_name %}<p class="mt-0.5 truncate text-[13px] text-[#5f5f64]">{{ award_item.award_name }}</p>{% endif %}
+                            {% if award_item.organizer %}<p class="mt-0.5 truncate text-[12px] text-[#75757c]">{{ award_item.organizer }}</p>{% endif %}
+                        </div>
+                    </div>
+
+                    {% if award_item.date %}<p class="mt-2 text-[12px] font-medium text-[#6e6e73]">{{ award_item.date|date:"Y.m" }}</p>{% endif %}
+
+                    {% if award_item.url %}
+                    <a href="{{ award_item.url }}" target="_blank" rel="noreferrer"
+                       class="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[#0066cc] hover:underline">
+                        자세히 →
+                    </a>
                     {% endif %}
                 </div>
+                {% endfor %}
             </div>
-
-            {% if award_item.date %}
-            <p class="mt-3 text-[12px] font-medium text-[#8e8e93]">{{ award_item.date|date:"Y.m" }}</p>
-            {% endif %}
-
-            {% if award_item.description %}
-            <p class="mt-3 text-[13px] leading-[1.55] text-[#6e6e73]">{{ award_item.description }}</p>
-            {% endif %}
-
-            {% if award_item.url %}
-            <a href="{{ award_item.url }}" target="_blank" rel="noreferrer"
-               class="mt-3 inline-flex items-center gap-1 text-[12px] font-semibold text-[#0066cc] hover:underline">
-                자세히 보기 →
-            </a>
-            {% endif %}
-
-            {% if award_item.attachment and not award_item.preview_image %}
-            <a href="{{ award_item.attachment.url }}" target="_blank" rel="noreferrer"
-               class="mt-3 inline-flex items-center gap-1 text-[12px] font-medium text-[#0a84ff] hover:underline">
-                첨부파일 열기
-            </a>
-            {% endif %}
         </div>
-        {% endfor %}
+
+        {% if award_stats %}
+        <div class="award-stats-grid" aria-label="Awards 통계">
+            <div class="award-stat-item">
+                <p class="award-stat-label">전체 수상</p>
+                <p class="award-stat-value">{{ award_stats.total }}</p>
+            </div>
+            <div class="award-stat-item">
+                <p class="award-stat-label">교내</p>
+                <p class="award-stat-value">{{ award_stats.campus }}</p>
+            </div>
+            <div class="award-stat-item">
+                <p class="award-stat-label">대외</p>
+                <p class="award-stat-value">{{ award_stats.external }}</p>
+            </div>
+            <div class="award-stat-item">
+                <p class="award-stat-label">기타</p>
+                <p class="award-stat-value">{{ award_stats.other }}</p>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </section>
+
+<div id="award-list-modal" class="award-list-modal" aria-hidden="true">
+    <div class="award-list-dialog">
+        <div class="flex items-center justify-between border-b border-black/[0.06] px-4 py-3">
+            <p class="text-[15px] font-semibold text-[#1d1d1f]">Awards 전체 리스트</p>
+            <button type="button" class="award-list-close" id="award-list-close" aria-label="닫기">×</button>
+        </div>
+        <div class="award-list-body">
+            <div class="award-list-scroll">
+                {% for award_item in awards %}
+                <div class="award-list-row"
+                     data-preview-url="{% if award_item.preview_image %}{{ award_item.preview_image.url }}{% endif %}"
+                     data-preview-title="{{ award_item.title }}"
+                     data-attachment-url="{% if award_item.attachment %}{{ award_item.attachment.url }}{% endif %}">
+                    <div class="flex items-start justify-between gap-2">
+                        <p class="text-[14px] font-semibold text-[#1d1d1f]">{{ award_item.title }}</p>
+                        {% if award_item.award_category == 'campus' %}
+                        <span class="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[11px] font-semibold text-[#047857]">교내</span>
+                        {% elif award_item.award_category == 'external' %}
+                        <span class="rounded-full bg-[#eff6ff] px-2.5 py-1 text-[11px] font-semibold text-[#1d4ed8]">대외</span>
+                        {% else %}
+                        <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#4b5563]">기타</span>
+                        {% endif %}
+                    </div>
+                    {% if award_item.award_name %}<p class="mt-1 text-[12px] text-[#5f5f64]">{{ award_item.award_name }}</p>{% endif %}
+                    {% if award_item.organizer %}<p class="mt-1 text-[12px] text-[#75757c]">{{ award_item.organizer }}</p>{% endif %}
+                    <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
+                        {% if award_item.date %}<span>{{ award_item.date|date:"Y.m" }}</span>{% endif %}
+                        {% if award_item.url %}<a href="{{ award_item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
+                        {% if award_item.attachment %}<span class="font-semibold text-[#0a84ff]">첨부파일 있음</span>{% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            <aside class="award-list-preview">
+                <p class="text-[12px] font-semibold text-[#6e6e73]">상장 미리보기 (hover)</p>
+                <div class="award-list-preview-box" data-award-preview-box>
+                    <p class="text-[12px] text-[#8e8e93]">항목에 마우스를 올리면 상장 미리보기가 표시됩니다.</p>
+                </div>
+                <p class="text-[12px] text-[#8e8e93]" data-award-preview-caption>선택된 항목 없음</p>
+                <div class="award-attach-box" data-award-attach-box hidden>
+                    <p class="text-[11px] font-semibold text-[#6e6e73]">첨부파일</p>
+                    <a class="award-attach-link" data-award-attach-link href="#" download>파일 다운로드</a>
+                </div>
+            </aside>
+        </div>
+    </div>
+</div>
 
 <div id="main-award-image-modal" class="main-award-image-modal" aria-hidden="true">
     <div class="main-award-image-modal-dialog">
@@ -139,11 +501,114 @@
 
 <script>
     (() => {
+        /* ── Award Marquee ── */
+        const track = document.getElementById('award-marquee-track');
+        const speedControl = document.querySelector('[data-award-speed-control]');
+        const awardListModal = document.getElementById('award-list-modal');
+        const awardListOpen = document.getElementById('open-award-list');
+        const awardListClose = document.getElementById('award-list-close');
+
+        const recalcAwardSpeed = () => {
+            if (!track) return;
+            const speed = parseFloat(track.dataset.speed) || 30;
+            const halfW = track.scrollWidth / 2;
+            const duration = (halfW / speed).toFixed(1);
+            track.style.setProperty('--award-duration', duration + 's');
+            track.classList.add('is-running');
+        };
+
+        if (track) {
+            const cards = track.querySelectorAll('.award-card');
+            if (cards.length >= 2) {
+                track.innerHTML += track.innerHTML;
+                requestAnimationFrame(recalcAwardSpeed);
+            }
+        }
+
+        if (speedControl && track) {
+            speedControl.addEventListener('input', () => {
+                track.dataset.speed = speedControl.value;
+                recalcAwardSpeed();
+            });
+        }
+
+        const openAwardListModal = () => {
+            if (!awardListModal) return;
+            awardListModal.classList.add('is-open');
+            awardListModal.setAttribute('aria-hidden', 'false');
+        };
+
+        const closeAwardListModal = () => {
+            if (!awardListModal) return;
+            awardListModal.classList.remove('is-open');
+            awardListModal.setAttribute('aria-hidden', 'true');
+        };
+
+        awardListOpen && awardListOpen.addEventListener('click', openAwardListModal);
+        awardListClose && awardListClose.addEventListener('click', closeAwardListModal);
+        awardListModal && awardListModal.addEventListener('click', (e) => {
+            if (e.target === awardListModal) closeAwardListModal();
+        });
+
+        if (awardListModal) {
+            const previewBox = awardListModal.querySelector('[data-award-preview-box]');
+            const previewCaption = awardListModal.querySelector('[data-award-preview-caption]');
+            const attachBox = awardListModal.querySelector('[data-award-attach-box]');
+            const attachLink = awardListModal.querySelector('[data-award-attach-link]');
+
+            const syncAttach = (url) => {
+                if (!attachBox || !attachLink) return;
+                if (url) {
+                    attachLink.href = url;
+                    attachBox.hidden = false;
+                } else {
+                    attachLink.href = '#';
+                    attachBox.hidden = true;
+                }
+            };
+
+            syncAttach('');
+
+            awardListModal.querySelectorAll('.award-list-row').forEach((row) => {
+                row.addEventListener('mouseenter', () => {
+                    if (!previewBox || !previewCaption) return;
+
+                    awardListModal.querySelectorAll('.award-list-row.is-active').forEach((activeRow) => {
+                        activeRow.classList.remove('is-active');
+                    });
+                    row.classList.add('is-active');
+
+                    const previewUrl = row.dataset.previewUrl || '';
+                    const title = row.dataset.previewTitle || '선택된 항목';
+                    const attachmentUrl = row.dataset.attachmentUrl || '';
+
+                    syncAttach(attachmentUrl);
+
+                    if (!previewUrl) {
+                        previewBox.innerHTML = '<p class="text-[12px] text-[#8e8e93]">미리보기 이미지가 없습니다.</p>';
+                        previewCaption.textContent = `${title} · 미리보기 없음`;
+                        return;
+                    }
+
+                    previewBox.innerHTML = `<img src="${previewUrl}" alt="${title} 미리보기">`;
+                    previewCaption.textContent = title;
+                });
+
+                row.addEventListener('mouseleave', () => {
+                    row.classList.remove('is-active');
+                });
+            });
+        }
+
+        /* ── 이미지 확대 모달 ── */
         const modal = document.getElementById('main-award-image-modal');
         const modalImg = document.getElementById('main-award-image-modal-img');
         const closeBtn = document.getElementById('main-award-image-modal-close');
-
         if (!modal || !modalImg) return;
+
+        // 안전 초기화: 어떤 경우에도 시작 시 모달은 닫힌 상태
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
 
         const closeModal = () => {
             modal.classList.remove('is-open');
@@ -160,26 +625,16 @@
             modal.setAttribute('aria-hidden', 'false');
         };
 
-        document.querySelectorAll('[data-main-award-preview-open]').forEach((trigger) => {
-            trigger.addEventListener('click', () => {
-                openModal(trigger.dataset.imageUrl, trigger.dataset.imageAlt);
-            });
+        document.querySelectorAll('[data-main-award-preview-open]').forEach(trigger => {
+            trigger.addEventListener('click', () => openModal(trigger.dataset.imageUrl, trigger.dataset.imageAlt));
         });
 
-        if (closeBtn) {
-            closeBtn.addEventListener('click', closeModal);
-        }
-
-        modal.addEventListener('click', (event) => {
-            if (event.target === modal) {
-                closeModal();
-            }
-        });
-
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') {
-                closeModal();
-            }
+        closeBtn && closeBtn.addEventListener('click', closeModal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeModal(); });
+        document.addEventListener('keydown', e => {
+            if (e.key !== 'Escape') return;
+            closeModal();
+            closeAwardListModal();
         });
     })();
 </script>

@@ -276,15 +276,58 @@ class Activity(models.Model):
 
 
 class Award(models.Model):
+    AWARD_CATEGORY_CHOICES = [
+        ("campus", "교내"),
+        ("external", "대외"),
+        ("other", "기타"),
+    ]
+
     title = models.CharField(max_length=200)
     organizer = models.CharField(max_length=200, blank=True)
     award_name = models.CharField(max_length=200, blank=True)
+    award_category = models.CharField(max_length=20, choices=AWARD_CATEGORY_CHOICES, default="other")
     date = models.DateField(blank=True, null=True)
 
     description = models.TextField(blank=True)
     url = models.URLField(blank=True)
     attachment = models.FileField(upload_to="award/", max_length=255, blank=True, null=True)
     preview_image = models.ImageField(upload_to="award/previews/", max_length=255, blank=True, null=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-date", "id"]
+
+    def __str__(self):
+        return self.title
+
+
+class Publication(models.Model):
+    PUBLICATION_TYPE_CHOICES = [
+        ("international", "국제지/국제학회"),
+        ("domestic", "국내지/국내학회"),
+    ]
+
+    PUBLICATION_KIND_CHOICES = [
+        ("journal", "저널"),
+        ("conference", "학술지"),
+    ]
+
+    publication_type = models.CharField(max_length=20, choices=PUBLICATION_TYPE_CHOICES, default="international")
+    publication_kind = models.CharField(max_length=20, choices=PUBLICATION_KIND_CHOICES, default="journal")
+    title = models.CharField(max_length=255)
+    venue = models.CharField(max_length=255, blank=True)
+    authors = models.CharField(max_length=255, blank=True)
+    date = models.DateField(blank=True, null=True)
+
+    doi = models.CharField(max_length=120, blank=True)
+    url = models.URLField(blank=True)
+    abstract = models.TextField(blank=True)
+    attachment = models.FileField(upload_to="publication/", max_length=255, blank=True, null=True)
+    preview_image = models.ImageField(upload_to="publication/previews/", max_length=255, blank=True, null=True)
 
     is_visible = models.BooleanField(default=True)
     order = models.PositiveIntegerField(default=0)
