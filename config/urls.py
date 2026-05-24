@@ -26,9 +26,8 @@ urlpatterns = [
     path('studio/', include('studio.urls')),
 ]
 
-
-
-urlpatterns += static(
-    settings.MEDIA_URL,
-    document_root=settings.MEDIA_ROOT
-)
+if not getattr(settings, "USE_S3", False):
+    urlpatterns += static(
+        settings.MEDIA_URL,
+        document_root=settings.MEDIA_ROOT
+    )

@@ -35,6 +35,10 @@ def load_env_file(env_path: Path):
 load_env_file(BASE_DIR / ".env")
 
 
+def env_bool(name: str, default: str = "False") -> bool:
+    return os.getenv(name, default).strip().lower() == "true"
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -52,6 +56,8 @@ ALLOWED_HOSTS = [
     if host.strip()
 ]
 
+USE_S3 = env_bool("USE_S3", "False")
+
 
 # Application definition
 
@@ -62,6 +68,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'storages',
     'accounts',
     'studio',
     'main',
@@ -159,8 +166,42 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+MEDIA_ROOT = BASE_DIR / 'media'
+
+if USE_S3:
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME", "")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME", "ap-northeast-2")
+    AWS_S3_SIGNATURE_VERSION = os.getenv("AWS_S3_SIGNATURE_VERSION", "s3v4")
+    AWS_S3_FILE_OVERWRITE = env_bool("AWS_S3_FILE_OVERWRITE", "False")
+    AWS_QUERYSTRING_AUTH = env_bool("AWS_QUERYSTRING_AUTH", "False")
+    AWS_DEFAULT_ACL = None
+
+    if not AWS_ACCESS_KEY_ID or not AWS_SECRET_ACCESS_KEY or not AWS_STORAGE_BUCKET_NAME:
+        raise ValueError("S3를 사용하려면 AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_STORAGE_BUCKET_NAME이 필요합니다.")
+
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
+    MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/"
+else:
+    STORAGES = {
+        "default": {
+            "BACKEND": "django.core.files.storage.FileSystemStorage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
+
+    MEDIA_URL = '/media/'
+
 
 LOGIN_REDIRECT_URL = "/"
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
