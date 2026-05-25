@@ -17,5 +17,18 @@ jobs:
           username: ${{ secrets.LIGHTSAIL_USER }}
           key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
+            set -e
             cd /home/ubuntu/projects/smjgallery
             ./deploy.sh
+
+            # 안전장치: 배포 후 DB 스키마 최신화
+            if [ -x venv/bin/python ]; then
+              PYTHON_BIN="venv/bin/python"
+            elif [ -x .venv/bin/python ]; then
+              PYTHON_BIN=".venv/bin/python"
+            else
+              PYTHON_BIN="python3"
+            fi
+
+            "$PYTHON_BIN" manage.py migrate --noinput
+            "$PYTHON_BIN" manage.py check
