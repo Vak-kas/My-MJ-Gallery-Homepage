@@ -1,0 +1,20 @@
+<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4af37;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#b8860b;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- 흰색 배경 -->
+  <rect width="120" height="120" fill="#ffffff" rx="28"/>
+  
+  <!-- 금색 원형 선 (좌상단 호) -->
+  <circle cx="60" cy="60" r="48" fill="none" stroke="url(#goldGrad)" stroke-width="2.5" opacity="0.9"/>
+  
+  <!-- M 글자 (금색) -->
+  <text x="38" y="78" font-family="Georgia, serif" font-size="58" font-weight="700" fill="#d4af37" letter-spacing="-3">M</text>
+  
+  <!-- J 글자 (검은색) -->
+  <text x="75" y="78" font-family="Georgia, serif" font-size="58" font-weight="700" fill="#1a1a1a" letter-spacing="-2">J</text>
+</svg>
