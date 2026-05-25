@@ -340,6 +340,7 @@
                         data-pub-card
                         data-pub-group="international"
                         data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                        data-attachment-url="{% if item.attachment %}{{ item.attachment.url }}{% endif %}"
                         data-preview-title="{{ item.title }}">
                         <div class="flex items-start justify-between gap-2 mb-2">
                             <p class="text-[14px] font-semibold text-[#1d1d1f] leading-snug flex-1">{{ item.title }}</p>
@@ -381,6 +382,7 @@
                         data-pub-card
                         data-pub-group="domestic"
                         data-preview-url="{% if item.preview_image %}{{ item.preview_image.url }}{% endif %}"
+                        data-attachment-url="{% if item.attachment %}{{ item.attachment.url }}{% endif %}"
                         data-preview-title="{{ item.title }}">
                         <div class="flex items-start justify-between gap-2 mb-2">
                             <p class="text-[14px] font-semibold text-[#1d1d1f] leading-snug flex-1">{{ item.title }}</p>
@@ -552,6 +554,7 @@
         const hoverPreviewTitle = document.getElementById('pub-hover-preview-title');
         const rootEl = document.documentElement;
         let activePreviewGroup = '';
+        let activePreviewAttachmentUrl = '';
         let closePreviewTimer = null;
 
         const cancelCloseHoverPreview = () => {
@@ -601,6 +604,7 @@
             cancelCloseHoverPreview();
 
             activePreviewGroup = card.dataset.pubGroup || '';
+            activePreviewAttachmentUrl = card.dataset.attachmentUrl || '';
             hoverPreviewImage.src = previewUrl;
             hoverPreviewImage.alt = `${card.dataset.previewTitle || '파일'} 미리보기`;
             if (hoverPreviewTitle) hoverPreviewTitle.textContent = card.dataset.previewTitle || '파일 미리보기';
@@ -618,6 +622,7 @@
             hoverPreviewImage.src = '';
             hoverPreviewImage.alt = '';
             activePreviewGroup = '';
+            activePreviewAttachmentUrl = '';
         };
 
         document.addEventListener('click', (e) => {
@@ -628,7 +633,11 @@
             }
 
             if (hoverPreview && hoverPreview.contains(e.target) && activePreviewGroup) {
-                openModal(activePreviewGroup);
+                if (activePreviewAttachmentUrl) {
+                    window.open(activePreviewAttachmentUrl, '_blank', 'noopener,noreferrer');
+                } else {
+                    openModal(activePreviewGroup);
+                }
                 closeHoverPreview();
             }
         });
