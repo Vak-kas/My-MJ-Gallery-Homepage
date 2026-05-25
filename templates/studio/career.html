@@ -350,7 +350,7 @@
                                             <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
                                             {% endif %}
                                         </div>
-                                        <p class="mt-1 text-[12px] text-[#8e8e93]">{{ education.get_status_display }} · {{ education.start_date|date:"Y.m"|default:"-" }} ~ {% if education.status == 'graduated' and education.end_date %}{{ education.end_date|date:"Y.m" }}{% endif %}</p>
+                                        <p class="mt-1 text-[12px] text-[#8e8e93]">{{ education.get_status_display }} · {{ education.start_date|date:"Y.m"|default:"-" }} ~ {{ education.end_date|date:"Y.m"|default:"-" }}</p>
                                         {% if education.gpa %}<p class="mt-1 text-[12px] text-[#8e8e93]">학점 {{ education.gpa }}</p>{% endif %}
                                         {% if education.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ education.description }}</p>{% endif %}
                                     </div>
@@ -437,7 +437,7 @@
                                         </div>
                                         <p class="mt-1 text-[12px] text-[#8e8e93]">
                                             {{ internship.start_date|date:"Y.m"|default:"-" }} ~
-                                            {% if internship.is_current %}현재 진행중{% else %}{{ internship.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                            {% if internship.end_date %}{{ internship.end_date|date:"Y.m" }}{% elif internship.is_current %}현재 진행중{% else %}-{% endif %}
                                         </p>
                                         {% if internship.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ internship.description }}</p>{% endif %}
                                     </div>
@@ -504,7 +504,7 @@
                                         </div>
                                         <p class="mt-1 text-[12px] text-[#8e8e93]">
                                             {{ research.start_date|date:"Y.m"|default:"-" }} ~
-                                            {% if research.is_current %}현재 진행중{% else %}{{ research.end_date|date:"Y.m"|default:"-" }}{% endif %}
+                                            {% if research.end_date %}{{ research.end_date|date:"Y.m" }}{% elif research.is_current %}현재 진행중{% else %}-{% endif %}
                                         </p>
                                         {% if research.output %}<p class="mt-1 text-[12px] text-[#8e8e93]">성과: {{ research.output }}</p>{% endif %}
                                         {% if research.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ research.description }}</p>{% endif %}
@@ -811,30 +811,7 @@
         syncTypeForm();
     }
 
-    ['internship', 'research', 'teaching'].forEach((typeKey) => {
-        const currentEl = document.getElementById(typeKey + '-current');
-        const endEl = document.getElementById(typeKey + '-end-date');
-        if (!currentEl || !endEl) return;
-
-        const sync = () => {
-            endEl.disabled = currentEl.checked;
-            if (currentEl.checked) endEl.value = '';
-        };
-        currentEl.addEventListener('change', sync);
-        sync();
-    });
-
-    const educationStatus = document.getElementById('education-status');
-    const educationEndDate = document.getElementById('education-end-date');
-    if (educationStatus && educationEndDate) {
-        const syncEducationEndDate = () => {
-            const locked = educationStatus.value === 'enrolled';
-            educationEndDate.disabled = locked;
-            if (locked) educationEndDate.value = '';
-        };
-        educationStatus.addEventListener('change', syncEducationEndDate);
-        syncEducationEndDate();
-    }
+    // 종료일은 사용자가 직접 관리하도록 자동 비활성화/초기화하지 않음
 
     function getCookie(name) {
         const value = `; ${document.cookie}`;

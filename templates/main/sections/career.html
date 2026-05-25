@@ -58,7 +58,7 @@
                 </span>
             </div>
 
-            <div class="space-y-3">
+            <div class="space-y-3 {% if section.key == 'affiliation' %}max-h-[440px] overflow-y-auto pr-1{% endif %}">
                 {% for item in section.items %}
                 <div class="group rounded-[22px] bg-[#fbfbfd] px-4 py-4 transition duration-300 hover:bg-[#f5f5f7]">
                     {% if section.key == 'education' %}

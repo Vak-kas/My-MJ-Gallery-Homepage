@@ -114,8 +114,6 @@ def education_create(request):
         status = request.POST.get("status", "graduated").strip()
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         end_date = parse_month_input(request.POST.get("end_date", "").strip())
-        if status == "enrolled":
-            end_date = None
         gpa = parse_gpa_input(request)
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"
@@ -157,8 +155,6 @@ def education_update(request, id):
         status = request.POST.get("status", "graduated").strip()
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         end_date = parse_month_input(request.POST.get("end_date", "").strip())
-        if status == "enrolled":
-            end_date = None
         gpa = parse_gpa_input(request)
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"
@@ -235,7 +231,7 @@ def internship_create(request):
             position = ""
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         is_current = request.POST.get("is_current") == "true"
-        end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
+        end_date = parse_month_input(request.POST.get("end_date", "").strip())
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"
         order = get_next_order(Internship)
@@ -278,7 +274,7 @@ def internship_update(request, id):
             position = ""
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         is_current = request.POST.get("is_current") == "true"
-        end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
+        end_date = parse_month_input(request.POST.get("end_date", "").strip())
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"
 
@@ -351,7 +347,7 @@ def research_create(request):
         role = request.POST.get("role", "").strip()
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         is_current = request.POST.get("is_current") == "true"
-        end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
+        end_date = parse_month_input(request.POST.get("end_date", "").strip())
         output = request.POST.get("output", "").strip()
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"
@@ -392,7 +388,7 @@ def research_update(request, id):
         role = request.POST.get("role", "").strip()
         start_date = parse_month_input(request.POST.get("start_date", "").strip())
         is_current = request.POST.get("is_current") == "true"
-        end_date = None if is_current else parse_month_input(request.POST.get("end_date", "").strip())
+        end_date = parse_month_input(request.POST.get("end_date", "").strip())
         output = request.POST.get("output", "").strip()
         description = request.POST.get("description", "").strip()
         is_visible = request.POST.get("is_visible") == "true"

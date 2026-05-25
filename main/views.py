@@ -21,20 +21,20 @@ def home(request):
     mentorings = Teaching.objects.filter(is_visible=True)
 
     career_sections = [
-        {"key": "education", "title": "Education", "subtitle": "학력", "icon": "🎓", "items": educations[:4], "total": educations.count()},
-        {"key": "affiliation", "title": "Affiliation", "subtitle": "소속/역할", "icon": "🔬", "items": affiliations[:4], "total": affiliations.count()},
-        {"key": "internship", "title": "Internship", "subtitle": "경력", "icon": "💼", "items": internships[:4], "total": internships.count()},
-        {"key": "mentoring", "title": "Mentoring", "subtitle": "멘토링", "icon": "📚", "items": mentorings[:4], "total": mentorings.count()},
+        {"key": "education", "title": "Education", "subtitle": "학력", "icon": "🎓", "items": educations, "total": educations.count()},
+        {"key": "affiliation", "title": "Affiliation", "subtitle": "소속/역할", "icon": "🔬", "items": affiliations, "total": affiliations.count()},
+        {"key": "internship", "title": "Internship", "subtitle": "경력", "icon": "💼", "items": internships, "total": internships.count()},
+        {"key": "mentoring", "title": "Mentoring", "subtitle": "멘토링", "icon": "📚", "items": mentorings, "total": mentorings.count()},
     ]
 
     activities = Activity.objects.filter(is_visible=True)
     activity_sections = [
-        {"key": "external_program", "title": "External Program", "subtitle": "대외활동", "icon": "🌍", "items": activities.filter(activity_type="external_program")[:4], "total": activities.filter(activity_type="external_program").count()},
-        {"key": "seminar", "title": "Seminar", "subtitle": "세미나", "icon": "🎤", "items": activities.filter(activity_type="seminar")[:4], "total": activities.filter(activity_type="seminar").count()},
-        {"key": "community", "title": "Community", "subtitle": "커뮤니티", "icon": "🤝", "items": activities.filter(activity_type="community")[:4], "total": activities.filter(activity_type="community").count()},
-        {"key": "volunteer", "title": "Volunteer", "subtitle": "봉사", "icon": "🌿", "items": activities.filter(activity_type="volunteer")[:4], "total": activities.filter(activity_type="volunteer").count()},
-        {"key": "challenge", "title": "Challenge", "subtitle": "대회", "icon": "🏆", "items": activities.filter(activity_type="challenge")[:4], "total": activities.filter(activity_type="challenge").count()},
-        {"key": "other", "title": "Other", "subtitle": "기타", "icon": "🗂", "items": activities.filter(activity_type="other")[:4], "total": activities.filter(activity_type="other").count()},
+        {"key": "external_program", "title": "External Program", "subtitle": "대외활동", "icon": "🌍", "items": activities.filter(activity_type="external_program"), "total": activities.filter(activity_type="external_program").count()},
+        {"key": "seminar", "title": "Seminar", "subtitle": "세미나", "icon": "🎤", "items": activities.filter(activity_type="seminar"), "total": activities.filter(activity_type="seminar").count()},
+        {"key": "community", "title": "Community", "subtitle": "커뮤니티", "icon": "🤝", "items": activities.filter(activity_type="community"), "total": activities.filter(activity_type="community").count()},
+        {"key": "volunteer", "title": "Volunteer", "subtitle": "봉사", "icon": "🌿", "items": activities.filter(activity_type="volunteer"), "total": activities.filter(activity_type="volunteer").count()},
+        {"key": "challenge", "title": "Challenge", "subtitle": "대회", "icon": "🏆", "items": activities.filter(activity_type="challenge"), "total": activities.filter(activity_type="challenge").count()},
+        {"key": "other", "title": "Other", "subtitle": "기타", "icon": "🗂", "items": activities.filter(activity_type="other"), "total": activities.filter(activity_type="other").count()},
     ]
 
     awards = Award.objects.filter(is_visible=True)
