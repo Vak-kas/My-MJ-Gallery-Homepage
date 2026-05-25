@@ -472,7 +472,6 @@
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
                         {% if award_item.date %}<span>{{ award_item.date|date:"Y.m" }}</span>{% endif %}
                         {% if award_item.url %}<a href="{{ award_item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
-                        {% if award_item.attachment %}<span class="font-semibold text-[#0a84ff]">첨부파일 있음</span>{% endif %}
                     </div>
                 </div>
                 {% endfor %}
