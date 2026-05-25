@@ -2,6 +2,7 @@ import json
 
 from django.contrib.auth.decorators import user_passes_test
 from django.http import JsonResponse
+from django.db.models import F
 from django.utils.dateparse import parse_date
 
 
@@ -32,8 +33,8 @@ def parse_gpa_input(request):
 
 
 def get_next_order(model_cls):
-    latest = model_cls.objects.order_by("-order", "-id").first()
-    return (latest.order + 1) if latest else 0
+    model_cls.objects.all().update(order=F("order") + 1)
+    return 0
 
 
 def apply_reorder(model_cls, ordered_ids):
