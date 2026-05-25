@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+            {% if messages %}
+            <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">완료</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-8">
+                <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">PROJECTS</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Projects.</h1>
+                <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">
+                    진행한 프로젝트를 등록하고 관리합니다. 각 프로젝트 상세 페이지가 메인 포트폴리오에 노출됩니다.
+                </p>
+            </section>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[420px_1fr]">
+
+                <!-- Form -->
+                <aside class="h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <div class="flex items-start justify-between gap-3">
+                        <h2 class="text-[28px] font-semibold tracking-[-0.03em]">{% if editing_project %}Edit Project{% else %}Add Project{% endif %}</h2>
+                        {% if editing_project %}
+                        <a href="{% url 'studio:project' %}" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">×</a>
+                        {% endif %}
+                    </div>
+
+                    <form method="post"
+                          action="{% if editing_project %}{% url 'studio:project_update' editing_project.id %}{% else %}{% url 'studio:project_create' %}{% endif %}"
+                          enctype="multipart/form-data"
+                          class="mt-6 space-y-4">
+                        {% csrf_token %}
+
+                        <!-- 기본 정보 -->
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">프로젝트명 *</label>
+                            <input type="text" name="title" value="{{ editing_project.title|default:'' }}" required
+                                   class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: STUV 학습 관리 플랫폼">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">한줄 소개</label>
+                            <input type="text" name="subtitle" value="{{ editing_project.subtitle|default:'' }}"
+                                   class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 학습에 재미와 경쟁 요소를 더한 플랫폼">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">프로젝트 타입</label>
+                            <select name="project_type" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <option value="research" {% if editing_project and editing_project.project_type == 'research' %}selected{% endif %}>연구</option>
+                                <option value="personal" {% if editing_project and editing_project.project_type == 'personal' %}selected{% endif %}>개인</option>
+                                <option value="team" {% if not editing_project or editing_project.project_type == 'team' %}selected{% endif %}>팀 프로젝트</option>
+                            </select>
+                        </div>
+
+                        <!-- 썸네일 -->
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">대표 이미지</label>
+                            {% if editing_project and editing_project.thumbnail %}
+                            <div class="mb-2 overflow-hidden rounded-[12px] border border-black/[0.06]">
+                                <img src="{{ editing_project.thumbnail.url }}" alt="" class="h-32 w-full object-cover">
+                            </div>
+                            <label class="mb-2 flex cursor-pointer items-center gap-1 text-[12px] text-[#ff3b30]">
+                                <input type="checkbox" name="remove_thumbnail" value="true" class="accent-[#ff3b30]"> 이미지 삭제
+                            </label>
+                            {% endif %}
+                            <input type="file" name="thumbnail" accept="image/*"
+                                   class="block w-full text-[13px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-[#f5f5f7] file:px-4 file:py-1.5 file:text-[12px] file:font-semibold file:text-[#1d1d1f]">
+                        </div>
+
+                        <div class="rounded-[16px] border border-black/[0.06] bg-[#fbfbfd] p-4">
+                            <p class="mb-3 text-[13px] font-semibold text-[#6e6e73]">상세 이미지 (추가 3장 · 총 4장)</p>
+
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="mb-1 block text-[12px] text-[#8e8e93]">상세 이미지 1</label>
+                                    {% if editing_project and editing_project.detail_image_1 %}
+                                    <div class="mb-2 overflow-hidden rounded-[10px] border border-black/[0.06]">
+                                        <img src="{{ editing_project.detail_image_1.url }}" alt="" class="h-24 w-full object-cover">
+                                    </div>
+                                    <label class="mb-2 flex cursor-pointer items-center gap-1 text-[12px] text-[#ff3b30]">
+                                        <input type="checkbox" name="remove_detail_image_1" value="true" class="accent-[#ff3b30]"> 이미지 삭제
+                                    </label>
+                                    {% endif %}
+                                    <input type="file" name="detail_image_1" accept="image/*"
+                                           class="block w-full text-[12px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-[#1d1d1f]">
+                                </div>
+
+                                <div>
+                                    <label class="mb-1 block text-[12px] text-[#8e8e93]">상세 이미지 2</label>
+                                    {% if editing_project and editing_project.detail_image_2 %}
+                                    <div class="mb-2 overflow-hidden rounded-[10px] border border-black/[0.06]">
+                                        <img src="{{ editing_project.detail_image_2.url }}" alt="" class="h-24 w-full object-cover">
+                                    </div>
+                                    <label class="mb-2 flex cursor-pointer items-center gap-1 text-[12px] text-[#ff3b30]">
+                                        <input type="checkbox" name="remove_detail_image_2" value="true" class="accent-[#ff3b30]"> 이미지 삭제
+                                    </label>
+                                    {% endif %}
+                                    <input type="file" name="detail_image_2" accept="image/*"
+                                           class="block w-full text-[12px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-[#1d1d1f]">
+                                </div>
+
+                                <div>
+                                    <label class="mb-1 block text-[12px] text-[#8e8e93]">상세 이미지 3</label>
+                                    {% if editing_project and editing_project.detail_image_3 %}
+                                    <div class="mb-2 overflow-hidden rounded-[10px] border border-black/[0.06]">
+                                        <img src="{{ editing_project.detail_image_3.url }}" alt="" class="h-24 w-full object-cover">
+                                    </div>
+                                    <label class="mb-2 flex cursor-pointer items-center gap-1 text-[12px] text-[#ff3b30]">
+                                        <input type="checkbox" name="remove_detail_image_3" value="true" class="accent-[#ff3b30]"> 이미지 삭제
+                                    </label>
+                                    {% endif %}
+                                    <input type="file" name="detail_image_3" accept="image/*"
+                                           class="block w-full text-[12px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-3 file:py-1.5 file:text-[11px] file:font-semibold file:text-[#1d1d1f]">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 링크 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">GitHub URL</label>
+                                <input type="url" name="github_url" value="{{ editing_project.github_url|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="https://github.com/...">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">배포 URL</label>
+                                <input type="url" name="deploy_url" value="{{ editing_project.deploy_url|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="https://...">
+                            </div>
+                        </div>
+
+                        <!-- 기간 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">시작월</label>
+                                <input type="month" name="period_start" value="{{ editing_project.period_start|date:'Y-m'|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">종료월</label>
+                                <input type="month" name="period_end" value="{{ editing_project.period_end|date:'Y-m'|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">진행 상태</label>
+                            <select name="status" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                                <option value="in_progress" {% if not editing_project or editing_project.status == 'in_progress' %}selected{% endif %}>진행중</option>
+                                <option value="completed" {% if editing_project and editing_project.status == 'completed' %}selected{% endif %}>완료</option>
+                                <option value="on_hold" {% if editing_project and editing_project.status == 'on_hold' %}selected{% endif %}>보류</option>
+                            </select>
+                        </div>
+
+                        <!-- 팀 정보 -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">팀 인원수</label>
+                                <input type="number" name="team_size" min="1" value="{{ editing_project.team_size|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 8">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">참여도</label>
+                                <input type="text" name="contribution" value="{{ editing_project.contribution|default:'' }}"
+                                       class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 20% (6명)">
+                            </div>
+                        </div>
+
+                        <!-- 기술 스택 -->
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">기술 스택 <span class="font-normal text-[#8e8e93]">(쉼표로 구분)</span></label>
+                            <input type="text" name="tech_stack" value="{{ editing_project.tech_stack|default:'' }}"
+                                   class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: SpringBoot, Java, MariaDB, Redis">
+                        </div>
+
+                        <!-- 텍스트 섹션들 -->
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">프로젝트 소개</label>
+                            <textarea name="description" rows="4" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-3 text-[14px] leading-relaxed" placeholder="프로젝트 배경, 목표, 기획 의도 등을 작성하세요.">{{ editing_project.description|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">담당 역할</label>
+                            <textarea name="role" rows="4" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-3 text-[14px] leading-relaxed" placeholder="본인이 맡은 업무를 구체적으로 작성하세요. (줄바꿈 지원)">{{ editing_project.role|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">주요 고려사항</label>
+                            <textarea name="key_points" rows="4" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-3 text-[14px] leading-relaxed" placeholder="기술적 도전, 설계 결정, 개선 사항 등을 작성하세요.">{{ editing_project.key_points|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">배운점</label>
+                            <textarea name="lessons_learned" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-3 text-[14px] leading-relaxed" placeholder="프로젝트를 통해 배운 점을 작성하세요.">{{ editing_project.lessons_learned|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">결과물 / 성과</label>
+                            <textarea name="results" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-3 text-[14px] leading-relaxed" placeholder="수치로 나타낼 수 있는 성과, 배포 링크 등을 작성하세요.">{{ editing_project.results|default:'' }}</textarea>
+                        </div>
+
+                        <!-- 첨부파일 (PPT, PDF 등) -->
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">첨부파일 <span class="font-normal text-[#8e8e93]">(발표자료, PDF 등)</span></label>
+                            {% if editing_project and editing_project.attachment %}
+                            <div class="mb-2 flex items-center gap-2 rounded-[12px] bg-[#f5f5f7] px-3 py-2 text-[12px] text-[#1d1d1f]">
+                                <span>📎 {{ editing_project.attachment.name|slice:"21:" }}</span>
+                                <a href="{{ editing_project.attachment.url }}" target="_blank" class="ml-auto text-[#0066cc] hover:underline">보기</a>
+                                <label class="ml-3 flex cursor-pointer items-center gap-1 text-[#ff3b30]">
+                                    <input type="checkbox" name="remove_attachment" value="true" class="accent-[#ff3b30]"> 삭제
+                                </label>
+                            </div>
+                            {% endif %}
+                            <input type="file" name="attachment" accept=".pdf,.ppt,.pptx,.doc,.docx,.zip"
+                                   class="block w-full text-[13px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-[#f5f5f7] file:px-4 file:py-1.5 file:text-[12px] file:font-semibold file:text-[#1d1d1f]">
+                        </div>
+
+                        <!-- 공개 여부 -->
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="hidden" name="is_visible" value="false">
+                                <input type="checkbox" name="is_visible" value="true" {% if not editing_project or editing_project.is_visible %}checked{% endif %} class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">
+                            {% if editing_project %}수정 저장{% else %}추가{% endif %}
+                        </button>
+                        {% if editing_project %}
+                        <a href="{% url 'studio:project' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
+                        {% endif %}
+                    </form>
+                </aside>
+
+                <!-- List -->
+                <div>
+                    <div class="mb-3 rounded-[16px] border border-black/[0.06] bg-[#fbfbfd] px-5 py-3 text-[13px] text-[#6e6e73]">
+                        🗂 저장된 프로젝트 {{ projects.count }}개 · 드래그로 순서 변경
+                    </div>
+                    <div class="space-y-3" data-sortable-list data-reorder-url="{% url 'studio:project_reorder' %}">
+                        {% for item in projects %}
+                        <div id="project-{{ item.id }}"
+                             class="rounded-[20px] border border-black/[0.06] bg-white overflow-hidden {% if editing_project_id == item.id %}ring-2 ring-[#0066cc]/20{% endif %}"
+                             draggable="true" data-item-id="{{ item.id }}">
+                            <div class="flex gap-0">
+                                {% if item.thumbnail %}
+                                <div class="w-[120px] shrink-0">
+                                    <img src="{{ item.thumbnail.url }}" alt="{{ item.title }}" class="h-full w-full object-cover">
+                                </div>
+                                {% endif %}
+                                <div class="flex flex-1 flex-col gap-0 p-4">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ item.title }}</p>
+                                                <span class="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4338ca]">{{ item.get_project_type_display }}</span>
+                                                {% if item.is_visible %}
+                                                <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                                {% else %}
+                                                <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                                {% endif %}
+                                                {% if item.status == 'in_progress' %}
+                                                <span class="rounded-full bg-[#e8ffe8] px-2.5 py-1 text-[11px] font-semibold text-[#34c759]">진행중</span>
+                                                {% elif item.status == 'completed' %}
+                                                <span class="rounded-full bg-[#eef2ff] px-2.5 py-1 text-[11px] font-semibold text-[#4338ca]">완료</span>
+                                                {% else %}
+                                                <span class="rounded-full bg-[#fff7ed] px-2.5 py-1 text-[11px] font-semibold text-[#c2410c]">보류</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if item.subtitle %}<p class="mt-0.5 text-[12px] text-[#8e8e93]">{{ item.subtitle }}</p>{% endif %}
+                                            <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                                {{ item.period_display }}{% if item.team_size %} · {{ item.team_size }}명{% endif %}{% if item.contribution %} · {{ item.contribution }}{% endif %}
+                                            </p>
+                                            {% if item.tech_stack %}
+                                            <div class="mt-2 flex flex-wrap gap-1">
+                                                {% for t in item.tech_list %}
+                                                <span class="rounded-full bg-[#f5f5f7] px-2 py-0.5 text-[10px] text-[#6e6e73]">{{ t }}</span>
+                                                {% endfor %}
+                                            </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex shrink-0 flex-col items-end gap-2">
+                                            <div class="flex items-center gap-2">
+                                                <a href="{% url 'studio:project' %}?edit={{ item.id }}#project-{{ item.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]">Edit</a>
+                                                <form method="post" action="{% url 'studio:project_delete' item.id %}" onsubmit="return confirm('이 프로젝트를 삭제할까요?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                                </form>
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                {% if item.github_url %}<a href="{{ item.github_url }}" target="_blank" class="text-[11px] text-[#0066cc] hover:underline">GitHub</a>{% endif %}
+                                                {% if item.deploy_url %}<a href="{{ item.deploy_url }}" target="_blank" class="text-[11px] text-[#0066cc] hover:underline">배포</a>{% endif %}
+                                                {% if item.attachment %}<a href="{{ item.attachment.url }}" target="_blank" class="text-[11px] text-[#34c759] hover:underline">📎</a>{% endif %}
+                                                <a href="{% url 'main:project_detail' item.id %}" target="_blank" class="text-[11px] text-[#8e8e93] hover:underline">미리보기 →</a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 프로젝트가 없습니다.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+(() => {
+    setTimeout(() => {
+        document.querySelectorAll('.toast-message').forEach((toast) => {
+            toast.style.transition = 'all 0.35s ease';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+        });
+    }, 2200);
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function initSortableList(listEl) {
+        let dragged = null;
+        const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
+        const clearDropMarkers = () => getItems().forEach(it => it.classList.remove('is-drop-target','is-drop-before','is-drop-after'));
+
+        const saveOrder = async () => {
+            const orderedIds = getItems().map(item => Number(item.dataset.itemId));
+            const url = listEl.dataset.reorderUrl;
+            if (!url || !orderedIds.length) return;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+                body: JSON.stringify({ ordered_ids: orderedIds }),
+            });
+            if (!response.ok) throw new Error('order-save-failed');
+        };
+
+        getItems().forEach(item => {
+            item.addEventListener('dragstart', () => { dragged = item; item.classList.add('is-dragging'); });
+            item.addEventListener('dragend', async () => {
+                item.classList.remove('is-dragging');
+                clearDropMarkers();
+                dragged = null;
+                try { await saveOrder(); } catch { window.location.reload(); }
+            });
+            item.addEventListener('dragover', (event) => {
+                if (!dragged || dragged === item) return;
+                event.preventDefault();
+                const rect = item.getBoundingClientRect();
+                const before = event.clientY < rect.top + rect.height / 2;
+                clearDropMarkers();
+                item.classList.add('is-drop-target', before ? 'is-drop-before' : 'is-drop-after');
+                if (before) listEl.insertBefore(dragged, item);
+                else listEl.insertBefore(dragged, item.nextSibling);
+            });
+            item.addEventListener('drop', (event) => {
+                if (!dragged || dragged === item) return;
+                event.preventDefault();
+                clearDropMarkers();
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
+})();
+</script>
+{% endblock %}

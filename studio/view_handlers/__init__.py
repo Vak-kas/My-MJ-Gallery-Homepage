@@ -73,3 +73,11 @@ from .certification import (
     certification_toggle_visibility,
     certification_reorder,
 )
+from .project import (
+    project,
+    project_create,
+    project_update,
+    project_delete,
+    project_toggle_visibility,
+    project_reorder,
+)

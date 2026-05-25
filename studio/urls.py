@@ -37,6 +37,13 @@ urlpatterns = [
     path('certification/<int:id>/delete/', views.certification_delete, name='certification_delete'),
     path('certification/<int:id>/toggle-visibility/', views.certification_toggle_visibility, name='certification_toggle_visibility'),
     path('certification/reorder/', views.certification_reorder, name='certification_reorder'),
+
+    path('project/', views.project, name='project'),
+    path('project/create/', views.project_create, name='project_create'),
+    path('project/<int:id>/update/', views.project_update, name='project_update'),
+    path('project/<int:id>/delete/', views.project_delete, name='project_delete'),
+    path('project/<int:id>/toggle-visibility/', views.project_toggle_visibility, name='project_toggle_visibility'),
+    path('project/reorder/', views.project_reorder, name='project_reorder'),
     
     # Education
     path('career/education/create/', views.education_create, name='education_create'),
