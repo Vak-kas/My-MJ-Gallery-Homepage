@@ -239,6 +239,106 @@ class Teaching(models.Model):
         return f"{self.course_name} - {self.get_role_display()}"
 
 
+class Certification(models.Model):
+    name = models.CharField(max_length=200)
+    issuer = models.CharField(max_length=200, blank=True)
+    score = models.CharField(max_length=80, blank=True)
+
+    acquired_date = models.DateField(blank=True, null=True)
+    expiration_date = models.DateField(blank=True, null=True)
+
+    credential_id = models.CharField(max_length=120, blank=True)
+    url = models.URLField(blank=True)
+    description = models.TextField(blank=True)
+
+    attachment = models.FileField(upload_to="certification/", blank=True, null=True)
+    preview_image = models.ImageField(upload_to="certification/previews/", blank=True, null=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-acquired_date", "id"]
+
+    def __str__(self):
+        return self.name
+
+
+class Project(models.Model):
+    PROJECT_TYPE_CHOICES = [
+        ("research", "연구"),
+        ("personal", "개인"),
+        ("team", "팀 프로젝트"),
+    ]
+    STATUS_CHOICES = [
+        ("in_progress", "진행중"),
+        ("completed", "완료"),
+        ("on_hold", "보류"),
+    ]
+
+    title = models.CharField(max_length=200)
+    subtitle = models.CharField(max_length=300, blank=True)
+    project_type = models.CharField(max_length=20, choices=PROJECT_TYPE_CHOICES, default="team")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="in_progress")
+    thumbnail = models.ImageField(upload_to="project/", blank=True, null=True)
+    detail_image_1 = models.ImageField(upload_to="project/", blank=True, null=True)
+    detail_image_2 = models.ImageField(upload_to="project/", blank=True, null=True)
+    detail_image_3 = models.ImageField(upload_to="project/", blank=True, null=True)
+
+    github_url = models.URLField(blank=True)
+    deploy_url = models.URLField(blank=True)
+
+    period_start = models.DateField(blank=True, null=True)
+    period_end = models.DateField(blank=True, null=True)
+    is_current = models.BooleanField(default=False)
+
+    team_size = models.PositiveSmallIntegerField(blank=True, null=True)
+    contribution = models.CharField(max_length=100, blank=True)  # e.g. "20% (6명)"
+
+    tech_stack = models.CharField(max_length=500, blank=True)  # 쉼표 구분 입력
+
+    description = models.TextField(blank=True)      # 프로젝트 소개
+    role = models.TextField(blank=True)             # 담당 역할
+    key_points = models.TextField(blank=True)       # 주요 고려사항
+    lessons_learned = models.TextField(blank=True)  # 배운점
+    results = models.TextField(blank=True)          # 결과물/성과
+
+    attachment = models.FileField(upload_to="project/attachments/", blank=True, null=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-period_start", "id"]
+
+    def __str__(self):
+        return self.title
+
+    def tech_list(self):
+        return [t.strip() for t in self.tech_stack.split(",") if t.strip()]
+
+    def period_display(self):
+        if not self.period_start:
+            return ""
+        start = self.period_start.strftime("%Y.%m")
+        if self.status == "in_progress":
+            end = "현재"
+        elif self.period_end:
+            end = self.period_end.strftime("%Y.%m")
+        elif self.status == "on_hold":
+            end = "보류"
+        else:
+            return start
+        return f"{start} ~ {end}"
+
+    def all_images(self):
+        return [img for img in [self.thumbnail, self.detail_image_1, self.detail_image_2, self.detail_image_3] if img]
+
+
 class Activity(models.Model):
     ACTIVITY_TYPE_CHOICES = [
         ("external_program", "External Program"),

@@ -51,10 +51,8 @@
                 논문, 학회 발표, 출판물을 관리합니다.
             </span>
         </a>
-        {% endwith %}
-
-        <a href="#"
-           class="group relative flex items-center rounded-2xl px-5 py-4 text-[16px] text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">
+        <a href="{% url 'studio:certification' %}"
+           class="group relative flex items-center rounded-2xl px-5 py-4 text-[16px] transition {% if current_name == 'certification' or current_name == 'certification_create' or current_name == 'certification_update' or current_name == 'certification_delete' or current_name == 'certification_toggle_visibility' or current_name == 'certification_reorder' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Certifications</span>
             <span class="pointer-events-none absolute left-[calc(100%+14px)] top-1/2 z-50 w-[240px] -translate-y-1/2 translate-x-[-8px] rounded-2xl border border-black/[0.06] bg-white px-5 py-4 text-[14px] leading-[1.5] text-[#6e6e73] opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
                 자격증과 인증 정보를 관리합니다.
@@ -69,13 +67,15 @@
             </span>
         </a>
 
-        <a href="#"
-           class="group relative flex items-center rounded-2xl px-5 py-4 text-[16px] text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">
+        <a href="{% url 'studio:project' %}"
+           class="group relative flex items-center rounded-2xl px-5 py-4 text-[16px] transition {% if current_name == 'project' or current_name == 'project_create' or current_name == 'project_update' or current_name == 'project_delete' or current_name == 'project_toggle_visibility' or current_name == 'project_reorder' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Projects</span>
             <span class="pointer-events-none absolute left-[calc(100%+14px)] top-1/2 z-50 w-[240px] -translate-y-1/2 translate-x-[-8px] rounded-2xl border border-black/[0.06] bg-white px-5 py-4 text-[14px] leading-[1.5] text-[#6e6e73] opacity-0 shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 group-hover:translate-x-0 group-hover:opacity-100">
                 프로젝트 설명, 이미지, 기술 스택을 관리합니다.
             </span>
         </a>
+
+        {% endwith %}
 
         <a href="#"
            class="group relative flex items-center rounded-2xl px-5 py-4 text-[16px] text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">

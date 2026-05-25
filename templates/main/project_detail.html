@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <!-- 상단 바 -->
+    <div class="fixed right-5 top-5 z-50 flex items-center gap-3">
+        {% if request.user.is_authenticated and not is_embedded %}
+        <a href="{% url 'studio:project' %}?edit={{ proj.id }}" class="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-[13px] text-[#0066cc] backdrop-blur transition hover:bg-white">Edit</a>
+        {% endif %}
+        <a href="{% url 'main:home' %}" class="rounded-full border border-black/10 bg-white/80 px-4 py-2 text-[13px] text-[#1d1d1f] backdrop-blur transition hover:bg-white">← 메인으로</a>
+    </div>
+
+    <main class="mx-auto max-w-[900px] px-6 py-16 pb-28 md:px-12">
+
+        <!-- 이미지 갤러리 (대표 1장 + 하단 상세 이미지) -->
+        {% if proj.thumbnail or proj.detail_image_1 or proj.detail_image_2 or proj.detail_image_3 %}
+        <div class="mb-10">
+            {% if proj.thumbnail %}
+            <div class="overflow-hidden rounded-[22px] border border-black/[0.06] bg-white shadow-[0_14px_35px_rgba(0,0,0,0.06)]">
+                <img src="{{ proj.thumbnail.url }}" alt="{{ proj.title }} 대표 이미지" class="w-full object-cover">
+            </div>
+            {% endif %}
+
+            {% if proj.detail_image_1 or proj.detail_image_2 or proj.detail_image_3 %}
+            <div class="mt-3 grid gap-3 {% if proj.detail_image_3 %}md:grid-cols-3{% elif proj.detail_image_2 %}md:grid-cols-2{% else %}md:grid-cols-1{% endif %}">
+                {% if proj.detail_image_1 %}
+                <div class="overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.05)]">
+                    <img src="{{ proj.detail_image_1.url }}" alt="{{ proj.title }} 상세 이미지 1" class="h-full w-full object-cover">
+                </div>
+                {% endif %}
+                {% if proj.detail_image_2 %}
+                <div class="overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.05)]">
+                    <img src="{{ proj.detail_image_2.url }}" alt="{{ proj.title }} 상세 이미지 2" class="h-full w-full object-cover">
+                </div>
+                {% endif %}
+                {% if proj.detail_image_3 %}
+                <div class="overflow-hidden rounded-[18px] border border-black/[0.06] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.05)]">
+                    <img src="{{ proj.detail_image_3.url }}" alt="{{ proj.title }} 상세 이미지 3" class="h-full w-full object-cover">
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 제목 영역 -->
+        <div class="mb-10">
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">PROJECT</p>
+            <h1 class="apple-display mt-3 text-[48px] font-semibold leading-[1.05] tracking-[-0.04em] md:text-[60px]">{{ proj.title }}</h1>
+            <div class="mt-3">
+                <span class="inline-flex rounded-full bg-[#eef2ff] px-3 py-1 text-[12px] font-semibold text-[#4338ca]">{{ proj.get_project_type_display }}</span>
+            </div>
+            {% if proj.subtitle %}
+            <p class="mt-4 text-[20px] leading-[1.5] text-[#6e6e73]">{{ proj.subtitle }}</p>
+            {% endif %}
+        </div>
+
+        <!-- 메타 정보 카드 -->
+        <div class="mb-10 grid gap-3 rounded-[24px] border border-black/[0.06] bg-white p-6 sm:grid-cols-2 lg:grid-cols-4">
+            {% if proj.period_display %}
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">기간</p>
+                <p class="mt-1 text-[15px] font-medium text-[#1d1d1f]">{{ proj.period_display }}</p>
+            </div>
+            {% endif %}
+            {% if proj.team_size %}
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">팀 인원수</p>
+                <p class="mt-1 text-[15px] font-medium text-[#1d1d1f]">{{ proj.team_size }}명</p>
+            </div>
+            {% endif %}
+            {% if proj.contribution %}
+            <div>
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">참여도</p>
+                <p class="mt-1 text-[15px] font-medium text-[#1d1d1f]">{{ proj.contribution }}</p>
+            </div>
+            {% endif %}
+            {% if proj.tech_stack %}
+            <div class="sm:col-span-2 lg:col-span-1">
+                <p class="text-[11px] font-semibold uppercase tracking-wider text-[#8e8e93]">기술 스택</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    {% for t in proj.tech_list %}
+                    <span class="rounded-full bg-[#f0f4ff] px-2.5 py-0.5 text-[12px] font-medium text-[#0066cc]">{{ t }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 링크 & 첨부파일 버튼 -->
+        {% if proj.github_url or proj.deploy_url or proj.attachment %}
+        <div class="mb-10 flex flex-wrap gap-3">
+            {% if proj.github_url %}
+            <a href="{{ proj.github_url }}" target="_blank" rel="noreferrer"
+               class="inline-flex items-center gap-2 rounded-full border border-black/[0.1] bg-white px-5 py-2.5 text-[14px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+                GitHub
+            </a>
+            {% endif %}
+            {% if proj.deploy_url %}
+            <a href="{{ proj.deploy_url }}" target="_blank" rel="noreferrer"
+               class="inline-flex items-center gap-2 rounded-full border border-black/[0.1] bg-white px-5 py-2.5 text-[14px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]">
+                🌐 배포 사이트
+            </a>
+            {% endif %}
+            {% if proj.attachment %}
+            <a href="{{ proj.attachment.url }}" target="_blank" rel="noreferrer"
+               class="inline-flex items-center gap-2 rounded-full bg-[#0066cc] px-5 py-2.5 text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">
+                📎 발표자료 다운로드
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 본문 섹션들 -->
+        {% if proj.description %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">☑️</span> 프로젝트 소개
+            </h2>
+            <div class="prose-project text-[15px] leading-[1.75] text-[#3a3a3c]">{{ proj.description|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if proj.role %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">🛠</span> 담당 역할
+            </h2>
+            <div class="prose-project text-[15px] leading-[1.75] text-[#3a3a3c]">{{ proj.role|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if proj.key_points %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">💡</span> 주요 고려사항
+            </h2>
+            <div class="prose-project text-[15px] leading-[1.75] text-[#3a3a3c]">{{ proj.key_points|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if proj.lessons_learned %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">📖</span> 배운점
+            </h2>
+            <div class="prose-project text-[15px] leading-[1.75] text-[#3a3a3c]">{{ proj.lessons_learned|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        {% if proj.results %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">🏆</span> 결과물 / 성과
+            </h2>
+            <div class="prose-project text-[15px] leading-[1.75] text-[#3a3a3c]">{{ proj.results|linebreaks }}</div>
+        </div>
+        {% endif %}
+
+        <!-- 첨부파일 페이지 내 미리보기 (하단 배치) -->
+        {% if proj.attachment %}
+        <div class="mb-8 rounded-[20px] border border-black/[0.06] bg-white p-7">
+            <h2 class="mb-4 flex items-center gap-2 text-[20px] font-semibold">
+                <span class="text-[22px]">📎</span> 발표자료 보기
+            </h2>
+
+            {% if is_pdf_attachment %}
+            <div class="overflow-hidden rounded-[14px] border border-black/[0.08]">
+                <iframe src="{{ proj.attachment.url }}" title="발표자료 PDF" class="h-[680px] w-full"></iframe>
+            </div>
+            {% elif is_office_attachment and office_preview_url %}
+            <div class="overflow-hidden rounded-[14px] border border-black/[0.08]">
+                <iframe src="{{ office_preview_url }}" title="발표자료 미리보기" class="h-[700px] w-full"></iframe>
+            </div>
+            <p class="mt-2 text-[12px] text-[#8e8e93]">로컬 개발 환경에서는 미리보기가 제한될 수 있습니다. 배포 환경에서 가장 안정적으로 동작합니다.</p>
+            {% elif is_image_attachment %}
+            <div class="overflow-hidden rounded-[14px] border border-black/[0.08] bg-[#f8f8fa] p-3">
+                <img src="{{ proj.attachment.url }}" alt="첨부 이미지" class="mx-auto max-h-[720px] w-auto max-w-full object-contain">
+            </div>
+            {% else %}
+            <div class="rounded-[14px] border border-dashed border-black/[0.12] bg-[#fbfbfd] p-5">
+                <p class="text-[14px] text-[#6e6e73]">
+                    이 파일 형식(<strong>{{ attachment_ext|upper|default:"UNKNOWN" }}</strong>)은 브라우저 내 미리보기를 지원하지 않습니다.
+                </p>
+                <a href="{{ proj.attachment.url }}" target="_blank" rel="noreferrer"
+                   class="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0066cc] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#0052a3]">
+                    다운로드하여 보기
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- 하단 네비게이션 -->
+        <div class="mt-14 flex justify-center">
+            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] bg-white px-8 py-3 text-[14px] font-semibold text-[#1d1d1f] transition hover:bg-[#f5f5f7]">
+                ← 메인으로 돌아가기
+            </a>
+        </div>
+
+    </main>
+</div>
+
+<style>
+    .prose-project p { margin-bottom: 0.75em; }
+    .prose-project p:last-child { margin-bottom: 0; }
+</style>
+{% endblock %}

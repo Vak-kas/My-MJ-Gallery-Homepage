@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+            {% if messages %}
+            <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="toast-message rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <div class="flex items-start gap-3">
+                        <div class="mt-[2px] text-[#0066cc]">✓</div>
+                        <div>
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">완료</p>
+                            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-8">
+                <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">CERTIFICATIONS</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Certifications.</h1>
+                <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">
+                    토익, TOPCIT 등 자격증/인증 내역을 등록하고 정렬할 수 있습니다.
+                </p>
+            </section>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
+                <aside class="h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <div class="flex items-start justify-between gap-3">
+                        <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_certification %}Edit Certification{% else %}Add Certification{% endif %}</h2>
+                        {% if editing_certification %}
+                        <a href="{% url 'studio:certification' %}" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] text-[18px] leading-none text-[#6e6e73] transition hover:bg-[#f5f5f7] hover:text-[#1d1d1f]">×</a>
+                        {% endif %}
+                    </div>
+
+                    <form method="post" action="{% if editing_certification %}{% url 'studio:certification_update' editing_certification.id %}{% else %}{% url 'studio:certification_create' %}{% endif %}" enctype="multipart/form-data" class="mt-7 space-y-4">
+                        {% csrf_token %}
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">자격증명 *</label>
+                            <input type="text" name="name" value="{{ editing_certification.name|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: TOEIC, TOPCIT">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">발급기관</label>
+                            <input type="text" name="issuer" value="{{ editing_certification.issuer|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: ETS, IITP">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">점수/등급</label>
+                            <input type="text" name="score" value="{{ editing_certification.score|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: 920, Level 3">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">취득일</label>
+                                <input type="month" name="acquired_date" value="{{ editing_certification.acquired_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                            <div>
+                                <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">만료일</label>
+                                <input type="month" name="expiration_date" value="{{ editing_certification.expiration_date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">링크</label>
+                            <input type="url" name="url" value="{{ editing_certification.url|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="https://...">
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">설명</label>
+                            <textarea name="description" rows="3" class="w-full rounded-[16px] border border-black/[0.08] px-4 py-2 text-[14px]">{{ editing_certification.description|default:'' }}</textarea>
+                        </div>
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">자격증 파일 <span class="font-normal text-[#8e8e93]">(PDF·이미지)</span></label>
+                            {% if editing_certification and editing_certification.attachment %}
+                            <div class="mb-2 flex items-center gap-2 rounded-[12px] bg-[#f5f5f7] px-3 py-2 text-[12px] text-[#1d1d1f]">
+                                <span>📎 {{ editing_certification.attachment.name|slice:"14:" }}</span>
+                                <a href="{{ editing_certification.attachment.url }}" target="_blank" class="ml-auto text-[#0066cc] hover:underline">보기</a>
+                                <label class="ml-3 flex cursor-pointer items-center gap-1 text-[#ff3b30]">
+                                    <input type="checkbox" name="remove_attachment" value="true" class="accent-[#ff3b30]"> 삭제
+                                </label>
+                            </div>
+                            {% endif %}
+                            <input type="file" name="attachment" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp" class="block w-full text-[13px] text-[#6e6e73] file:mr-3 file:rounded-full file:border-0 file:bg-[#f5f5f7] file:px-4 file:py-1.5 file:text-[12px] file:font-semibold file:text-[#1d1d1f]">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="hidden" name="is_visible" value="false">
+                                <input type="checkbox" name="is_visible" value="true" {% if not editing_certification or editing_certification.is_visible %}checked{% endif %} class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_certification %}수정 저장{% else %}추가{% endif %}</button>
+                        {% if editing_certification %}
+                        <a href="{% url 'studio:certification' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
+                        {% endif %}
+                    </form>
+                </aside>
+
+                <div>
+                    <div class="mb-3 rounded-[16px] border border-black/[0.06] bg-[#fbfbfd] px-5 py-3 text-[13px] text-[#6e6e73]">
+                        📜 저장 목록 {{ certifications.count }}개 · 드래그로 순서 변경
+                    </div>
+                    <div class="space-y-3" data-sortable-list data-reorder-url="{% url 'studio:certification_reorder' %}">
+                        {% for item in certifications %}
+                        <div id="certification-{{ item.id }}" class="rounded-[16px] border border-black/[0.06] bg-white p-4 {% if editing_certification_id == item.id %}ring-2 ring-[#0066cc]/20{% endif %}" draggable="true" data-item-id="{{ item.id }}">
+                            <div class="flex items-start justify-between gap-3">
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ item.name }}</p>
+                                        {% if item.is_visible %}
+                                        <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">공개</span>
+                                        {% else %}
+                                        <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비공개</span>
+                                        {% endif %}
+                                    </div>
+                                    <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                        {% if item.issuer %}{{ item.issuer }}{% endif %}
+                                        {% if item.score %} · {{ item.score }}{% endif %}
+                                    </p>
+                                    <p class="mt-1 text-[12px] text-[#8e8e93]">
+                                        {{ item.acquired_date|date:'Y.m'|default:'-' }} ~ {{ item.expiration_date|date:'Y.m'|default:'No Exp.' }}
+                                    </p>
+                                    {% if item.description %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ item.description }}</p>{% endif %}
+                                    {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="mt-2 inline-flex text-[12px] font-medium text-[#0066cc] hover:underline">링크 열기</a>{% endif %}
+                                    {% if item.attachment %}
+                                    <a href="{{ item.attachment.url }}" target="_blank" rel="noreferrer" class="mt-1 inline-flex items-center gap-1 text-[12px] font-medium text-[#34c759] hover:underline">📎 첨부파일 보기</a>
+                                    {% endif %}
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <a href="{% url 'studio:certification' %}?edit={{ item.id }}#certification-{{ item.id }}" class="rounded-full border border-black/[0.08] px-3 py-1.5 text-[11px] font-semibold text-[#1d1d1f]">Edit</a>
+                                    <form method="post" action="{% url 'studio:certification_delete' item.id %}" onsubmit="return confirm('이 자격증 항목을 삭제할까요?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="rounded-full border border-[#ff3b30]/30 px-3 py-1.5 text-[11px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                                    </form>
+                                    <div class="ml-1 text-[12px] text-[#8e8e93]">↕︎ 드래그</div>
+                                </div>
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="rounded-[16px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-4 text-[13px] text-[#8e8e93]">저장된 자격증 항목이 없습니다.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+
+<script>
+(() => {
+    setTimeout(() => {
+        document.querySelectorAll('.toast-message').forEach((toast) => {
+            toast.style.transition = 'all 0.35s ease';
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateY(-10px)';
+        });
+    }, 2200);
+
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
+    function initSortableList(listEl) {
+        let dragged = null;
+
+        const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
+
+        const clearDropMarkers = () => {
+            getItems().forEach((it) => it.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
+        };
+
+        const saveOrder = async () => {
+            const orderedIds = getItems().map((item) => Number(item.dataset.itemId));
+            const url = listEl.dataset.reorderUrl;
+            if (!url || orderedIds.length === 0) return;
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify({ ordered_ids: orderedIds }),
+            });
+
+            if (!response.ok) {
+                throw new Error('order-save-failed');
+            }
+        };
+
+        getItems().forEach((item) => {
+            item.addEventListener('dragstart', () => {
+                dragged = item;
+                item.classList.add('is-dragging');
+            });
+
+            item.addEventListener('dragend', async () => {
+                item.classList.remove('is-dragging');
+                clearDropMarkers();
+                dragged = null;
+                try {
+                    await saveOrder();
+                } catch {
+                    window.location.reload();
+                }
+            });
+
+            item.addEventListener('dragover', (event) => {
+                if (!dragged || dragged === item) return;
+                event.preventDefault();
+                const rect = item.getBoundingClientRect();
+                const before = event.clientY < rect.top + rect.height / 2;
+
+                clearDropMarkers();
+                item.classList.add('is-drop-target');
+                item.classList.add(before ? 'is-drop-before' : 'is-drop-after');
+
+                if (before) listEl.insertBefore(dragged, item);
+                else listEl.insertBefore(dragged, item.nextSibling);
+            });
+
+            item.addEventListener('drop', (event) => {
+                if (!dragged || dragged === item) return;
+                event.preventDefault();
+                clearDropMarkers();
+            });
+        });
+    }
+
+    document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
+})();
+</script>
+{% endblock %}
