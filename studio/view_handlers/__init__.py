@@ -65,3 +65,11 @@ from .publication import (
     publication_toggle_visibility,
     publication_reorder,
 )
+from .certification import (
+    certification,
+    certification_create,
+    certification_update,
+    certification_delete,
+    certification_toggle_visibility,
+    certification_reorder,
+)

@@ -30,6 +30,13 @@ urlpatterns = [
     path('publication/<int:id>/delete/', views.publication_delete, name='publication_delete'),
     path('publication/<int:id>/toggle-visibility/', views.publication_toggle_visibility, name='publication_toggle_visibility'),
     path('publication/reorder/', views.publication_reorder, name='publication_reorder'),
+
+    path('certification/', views.certification, name='certification'),
+    path('certification/create/', views.certification_create, name='certification_create'),
+    path('certification/<int:id>/update/', views.certification_update, name='certification_update'),
+    path('certification/<int:id>/delete/', views.certification_delete, name='certification_delete'),
+    path('certification/<int:id>/toggle-visibility/', views.certification_toggle_visibility, name='certification_toggle_visibility'),
+    path('certification/reorder/', views.certification_reorder, name='certification_reorder'),
     
     # Education
     path('career/education/create/', views.education_create, name='education_create'),

@@ -1,6 +1,6 @@
 from django.shortcuts import render
 
-from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Activity, Award, Publication
+from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Certification, Activity, Award, Publication
 
 
 def home(request):
@@ -19,12 +19,14 @@ def home(request):
     internships = Internship.objects.filter(is_visible=True)
     affiliations = Research.objects.filter(is_visible=True)
     mentorings = Teaching.objects.filter(is_visible=True)
+    certifications = Certification.objects.filter(is_visible=True)
 
     career_sections = [
         {"key": "education", "title": "Education", "subtitle": "학력", "icon": "🎓", "items": educations, "total": educations.count()},
         {"key": "affiliation", "title": "Affiliation", "subtitle": "소속/역할", "icon": "🔬", "items": affiliations, "total": affiliations.count()},
         {"key": "internship", "title": "Internship", "subtitle": "경력", "icon": "💼", "items": internships, "total": internships.count()},
         {"key": "mentoring", "title": "Mentoring", "subtitle": "멘토링", "icon": "📚", "items": mentorings, "total": mentorings.count()},
+        {"key": "certification", "title": "Certification", "subtitle": "자격증", "icon": "📜", "items": certifications, "total": certifications.count()},
     ]
 
     activities = Activity.objects.filter(is_visible=True)
@@ -54,6 +56,7 @@ def home(request):
         "activity_sections": activity_sections,
         "awards": awards,
         "award_stats": award_stats,
+        "certifications": certifications,
         "publications_international": Publication.objects.filter(is_visible=True, publication_type="international"),
         "publications_domestic": Publication.objects.filter(is_visible=True, publication_type="domestic"),
     })

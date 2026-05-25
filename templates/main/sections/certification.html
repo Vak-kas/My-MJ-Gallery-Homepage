@@ -1,0 +1,159 @@
+{% if certifications %}
+<section class="mx-auto mt-16 max-w-[1320px] pb-20">
+    <div class="mb-10">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MJGALLERY / CERTIFICATIONS</p>
+        <h2 class="apple-display mt-3 text-[52px] font-semibold leading-[1.04] tracking-[-0.04em]">Certifications.</h2>
+        <p class="mt-4 max-w-[680px] text-[17px] leading-[1.55] text-[#6e6e73]">토익, TOPCIT 등 자격증 및 인증 내역입니다.</p>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-2">
+        {% for item in certifications %}
+        <article class="cert-card rounded-[20px] border border-black/10 bg-white px-5 py-4 transition hover:-translate-y-0.5 hover:shadow-[0_12px_26px_rgba(0,0,0,0.06)]"
+            {% if request.user.is_authenticated and item.preview_image %}
+            data-cert-card
+            data-preview-url="{{ item.preview_image.url }}"
+            data-attachment-url="{% if item.attachment %}{{ item.attachment.url }}{% endif %}"
+            data-preview-title="{{ item.name }}"
+            {% endif %}>
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-[16px] font-semibold text-[#1d1d1f]">{{ item.name }}</h3>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">
+                        {% if item.issuer %}{{ item.issuer }}{% endif %}
+                        {% if item.score %} · {{ item.score }}{% endif %}
+                    </p>
+                </div>
+                <span class="rounded-full bg-[#f5f5f7] px-3 py-1 text-[11px] text-[#8e8e93]">
+                    {{ item.acquired_date|date:"Y.m"|default:"-" }}
+                </span>
+            </div>
+            {% if item.description %}
+            <p class="mt-2 text-[13px] leading-[1.55] text-[#6e6e73]">{{ item.description }}</p>
+            {% endif %}
+            <div class="mt-2 flex flex-wrap items-center gap-3">
+                {% if item.url %}
+                <a href="{{ item.url }}" target="_blank" rel="noreferrer" class="inline-flex text-[12px] font-semibold text-[#0066cc] hover:underline">자격 링크 →</a>
+                {% endif %}
+                {% if request.user.is_authenticated and item.attachment and not item.preview_image %}
+                <a href="{{ item.attachment.url }}" target="_blank" rel="noreferrer" class="inline-flex items-center gap-1 text-[12px] font-semibold text-[#34c759] hover:underline">📎 파일 보기</a>
+                {% endif %}
+            </div>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+
+{% if request.user.is_authenticated %}
+<style>
+    .cert-hover-preview {
+        position: fixed;
+        z-index: 97;
+        display: none;
+        width: min(340px, 86vw);
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 20px 45px rgba(0,0,0,0.18);
+        overflow: hidden;
+        cursor: pointer;
+    }
+    .cert-hover-preview.is-open { display: block; }
+    .cert-hover-preview img {
+        width: 100%;
+        max-height: 220px;
+        object-fit: contain;
+        background: #fff;
+    }
+    .cert-hover-preview-meta {
+        padding: 10px 12px;
+        border-top: 1px solid rgba(0,0,0,0.06);
+    }
+    .cert-hover-preview-title { font-size: 12px; font-weight: 600; color: #1d1d1f; }
+    .cert-hover-preview-hint  { margin-top: 3px; font-size: 11px; color: #0066cc; font-weight: 600; }
+</style>
+
+<div class="cert-hover-preview" id="cert-hover-preview" aria-hidden="true">
+    <img id="cert-hover-preview-image" src="" alt="">
+    <div class="cert-hover-preview-meta">
+        <p class="cert-hover-preview-title" id="cert-hover-preview-title">파일 미리보기</p>
+        <p class="cert-hover-preview-hint">클릭하면 전체 파일 보기</p>
+    </div>
+</div>
+
+<script>
+(() => {
+    const hoverPreview = document.getElementById('cert-hover-preview');
+    const hoverImage   = document.getElementById('cert-hover-preview-image');
+    const hoverTitle   = document.getElementById('cert-hover-preview-title');
+    if (!hoverPreview) return;
+
+    let activeAttachUrl = '';
+    let closeTimer = null;
+
+    const cancelClose = () => { if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; } };
+    const scheduleClose = (delay = 180) => {
+        cancelClose();
+        closeTimer = setTimeout(closePreview, delay);
+    };
+
+    const position = (cardEl) => {
+        const cr = cardEl.getBoundingClientRect();
+        const pr = hoverPreview.getBoundingClientRect();
+        let left = cr.right - pr.width;
+        let top  = cr.bottom + 10;
+        if (left < 12) left = 12;
+        if (left + pr.width > window.innerWidth - 12) left = window.innerWidth - pr.width - 12;
+        if (top + pr.height > window.innerHeight - 12) top = cr.top - pr.height - 10;
+        if (top < 12) top = 12;
+        hoverPreview.style.left = `${left}px`;
+        hoverPreview.style.top  = `${top}px`;
+    };
+
+    const openPreview = (card) => {
+        const url = card.dataset.previewUrl || '';
+        if (!url) return;
+        cancelClose();
+        activeAttachUrl = card.dataset.attachmentUrl || '';
+        hoverImage.src = url;
+        hoverImage.alt = card.dataset.previewTitle || '';
+        if (hoverTitle) hoverTitle.textContent = card.dataset.previewTitle || '파일 미리보기';
+        hoverPreview.classList.add('is-open');
+        hoverPreview.setAttribute('aria-hidden', 'false');
+        requestAnimationFrame(() => position(card));
+    };
+
+    const closePreview = () => {
+        cancelClose();
+        hoverPreview.classList.remove('is-open');
+        hoverPreview.setAttribute('aria-hidden', 'true');
+        hoverImage.src = '';
+        activeAttachUrl = '';
+    };
+
+    document.addEventListener('mouseover', (e) => {
+        const card = e.target.closest('[data-cert-card]');
+        if (card) openPreview(card);
+    });
+
+    document.addEventListener('mouseout', (e) => {
+        const card = e.target.closest('[data-cert-card]');
+        if (!card) return;
+        const to = e.relatedTarget;
+        if (to && (card.contains(to) || hoverPreview.contains(to))) return;
+        scheduleClose(180);
+    });
+
+    hoverPreview.addEventListener('mouseenter', () => cancelClose());
+    hoverPreview.addEventListener('mouseleave', () => scheduleClose(120));
+
+    hoverPreview.addEventListener('click', () => {
+        if (activeAttachUrl) window.open(activeAttachUrl, '_blank', 'noopener,noreferrer');
+        closePreview();
+    });
+
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePreview(); });
+})();
+</script>
+{% endif %}
+
+{% endif %}

@@ -239,6 +239,33 @@ class Teaching(models.Model):
         return f"{self.course_name} - {self.get_role_display()}"
 
 
+class Certification(models.Model):
+    name = models.CharField(max_length=200)
+    issuer = models.CharField(max_length=200, blank=True)
+    score = models.CharField(max_length=80, blank=True)
+
+    acquired_date = models.DateField(blank=True, null=True)
+    expiration_date = models.DateField(blank=True, null=True)
+
+    credential_id = models.CharField(max_length=120, blank=True)
+    url = models.URLField(blank=True)
+    description = models.TextField(blank=True)
+
+    attachment = models.FileField(upload_to="certification/", blank=True, null=True)
+    preview_image = models.ImageField(upload_to="certification/previews/", blank=True, null=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "-acquired_date", "id"]
+
+    def __str__(self):
+        return self.name
+
+
 class Activity(models.Model):
     ACTIVITY_TYPE_CHOICES = [
         ("external_program", "External Program"),
