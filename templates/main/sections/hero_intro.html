@@ -1,0 +1,32 @@
+{% load static %}
+<section data-section="hero" class="hero-intro" aria-label="Intro">
+    <nav class="hero-social" aria-label="소셜 링크">
+        <a
+            href="{% if hero_github %}{{ hero_github.url }}{% else %}{% url 'studio:profile_links' %}{% endif %}"
+            class="hero-social-link{% if not hero_github %} hero-social-link--placeholder{% endif %}"
+            {% if hero_github %}target="_blank" rel="noopener noreferrer"{% endif %}
+            aria-label="GitHub"
+        >
+            <img src="{% static 'images/hero-svg/github.svg' %}" width="44" height="44" alt="" decoding="async">
+        </a>
+        <a
+            href="{% if hero_email %}mailto:{{ hero_email.value }}{% else %}{% url 'studio:profile_contact' %}{% endif %}"
+            class="hero-social-link{% if not hero_email %} hero-social-link--placeholder{% endif %}"
+            aria-label="{% if hero_email %}이메일: {{ hero_email.value }}{% else %}이메일{% endif %}"
+        >
+            <img src="{% static 'images/hero-svg/mail.svg' %}" width="44" height="44" alt="" decoding="async">
+        </a>
+    </nav>
+
+    <div class="hero-intro-content">
+        <div class="hero-logo-slot">
+            {% include "components/smj_logo.svg.html" %}
+        </div>
+        <div class="hero-title-group">
+            {% include "components/hero_arrow.svg.html" %}
+            <p class="hero-title">서민재 갤러리</p>
+            <p class="hero-subtitle" aria-label="SMJ GALLERY">SMJ GALLERY</p>
+            <p class="hero-scroll-hint">위로 스크롤 하세요</p>
+        </div>
+    </div>
+</section>
