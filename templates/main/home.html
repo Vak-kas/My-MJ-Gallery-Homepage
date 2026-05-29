@@ -104,6 +104,10 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        border: none;
+        padding: 0;
+        background: none;
+        cursor: pointer;
         transition: opacity 0.2s ease, transform 0.2s ease;
     }
 
@@ -112,18 +116,35 @@
         transform: translateY(-1px);
     }
 
-    .hero-social-link--placeholder {
-        opacity: 0.55;
-    }
-
-    .hero-social-link--placeholder:hover {
-        opacity: 0.75;
-    }
-
     .hero-social-link img {
         display: block;
         width: clamp(36px, 8vw, 44px);
         height: auto;
+    }
+
+    .hero-copy-toast {
+        position: fixed;
+        left: 50%;
+        bottom: clamp(24px, 5vh, 48px);
+        z-index: 60;
+        margin: 0;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.92);
+        color: #1d1d1f;
+        font-family: "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+        font-size: 13px;
+        line-height: 1.4;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+        transform: translate(-50%, 12px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .25s ease, transform .25s ease;
+    }
+
+    .hero-copy-toast.is-visible {
+        opacity: 1;
+        transform: translate(-50%, 0);
     }
 
     .hero-intro-content {
@@ -577,6 +598,51 @@
 
     updateSectionTransitions();
     updateStudioLinkStyle();
+
+    const heroCopyBtn = document.querySelector('.hero-social-link--copy');
+    const heroCopyToast = document.getElementById('hero-copy-toast');
+    let heroCopyTimer;
+
+    const showHeroCopyToast = () => {
+        if (!heroCopyToast) return;
+        heroCopyToast.hidden = false;
+        heroCopyToast.classList.add('is-visible');
+        clearTimeout(heroCopyTimer);
+        heroCopyTimer = setTimeout(() => {
+            heroCopyToast.classList.remove('is-visible');
+            heroCopyToast.hidden = true;
+        }, 1800);
+    };
+
+    const copyHeroEmail = async (text) => {
+        if (navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+    };
+
+    heroCopyBtn?.addEventListener('click', async () => {
+        const email = heroCopyBtn.dataset.copy;
+        if (!email) return;
+
+        try {
+            await copyHeroEmail(email);
+            showHeroCopyToast();
+        } catch {
+            window.prompt('이메일을 복사해 주세요.', email);
+        }
+    });
+
     window.addEventListener('scroll', () => {
         updateSectionTransitions();
         updateStudioLinkStyle();

@@ -49,13 +49,8 @@ def home(request):
         "other": awards.filter(award_category="other").count(),
     }
 
-    hero_github = links.filter(platform="github").first()
-    hero_email = contacts.filter(contact_type="email").first()
-
     return render(request, "main/home.html", {
         "info": info,
-        "hero_github": hero_github,
-        "hero_email": hero_email,
         "contact_sections": contact_sections,
         "links": links,
         "career_sections": career_sections,
