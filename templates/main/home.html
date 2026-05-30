@@ -78,8 +78,6 @@
     
 </main>
 
-{% include "components/site_footer.html" %}
-
 <button id="back-to-top-btn" type="button" aria-label="상단으로 이동" class="back-to-top-btn" hidden>↑</button>
 
 <style>
@@ -633,6 +631,36 @@
         color: #ffffff;
     }
 
+    html.theme-dark .side-toc-dot {
+        border-color: rgba(255, 255, 255, 0.36);
+        background: rgba(255, 255, 255, 0.32);
+    }
+
+    html.theme-dark .side-toc-dot.is-active {
+        border-color: rgba(41, 151, 255, 0.95);
+        background: rgba(41, 151, 255, 0.96);
+        box-shadow: 0 0 0 8px rgba(41, 151, 255, 0.25);
+    }
+
+    html.theme-dark .side-toc-panel {
+        border-color: rgba(255,255,255,0.24);
+        background: rgba(18, 24, 35, 0.92);
+    }
+
+    html.theme-dark .side-toc-item {
+        color: rgba(255,255,255,0.82);
+    }
+
+    html.theme-dark .side-toc-item:hover {
+        background: rgba(255,255,255,0.12);
+        color: #ffffff;
+    }
+
+    html.theme-dark .side-toc-item.is-active {
+        background: rgba(41, 151, 255, 0.22);
+        color: #7fc2ff;
+    }
+
     .career-grid {
         columns: 1;
         column-gap: 2.5rem;
@@ -775,6 +803,10 @@
     const heroSection = document.querySelector('[data-section="hero"]');
     const sideToc = document.getElementById('side-toc');
     const backToTopBtn = document.getElementById('back-to-top-btn');
+    const HERO_NAV_PEEK_MS = 1800;
+    let heroNavPeekUntil = 0;
+    let heroNavHideTimer = null;
+    let lastScrollY = window.scrollY;
 
     const tocSchema = [
         { key: 'hero', label: '인트로' },
@@ -851,13 +883,15 @@
     const updateQuickNavStyle = () => {
         if (!quickNav || !heroSection || !quickNavLinks.length) return;
         const onHero = heroSection.getBoundingClientRect().bottom > window.innerHeight * 0.45;
+        const showOnHeroPeek = Date.now() < heroNavPeekUntil;
+        const shouldShowNav = !onHero || showOnHeroPeek;
 
-        quickNav.classList.toggle('opacity-0', onHero);
-        quickNav.classList.toggle('pointer-events-none', onHero);
-        quickNav.classList.toggle('-translate-y-2', onHero);
-        quickNav.classList.toggle('opacity-100', !onHero);
-        quickNav.classList.toggle('pointer-events-auto', !onHero);
-        quickNav.classList.toggle('translate-y-0', !onHero);
+        quickNav.classList.toggle('opacity-0', !shouldShowNav);
+        quickNav.classList.toggle('pointer-events-none', !shouldShowNav);
+        quickNav.classList.toggle('-translate-y-2', !shouldShowNav);
+        quickNav.classList.toggle('opacity-100', shouldShowNav);
+        quickNav.classList.toggle('pointer-events-auto', shouldShowNav);
+        quickNav.classList.toggle('translate-y-0', shouldShowNav);
 
         quickNavLinks.forEach((link) => {
             link.classList.toggle('border-white/20', onHero);
@@ -870,6 +904,20 @@
             link.classList.toggle('hover:bg-white', !onHero);
         });
         sideToc?.classList.toggle('on-hero', onHero);
+    };
+
+    const scheduleHeroNavAutoHide = () => {
+        if (heroNavHideTimer) {
+            clearTimeout(heroNavHideTimer);
+            heroNavHideTimer = null;
+        }
+
+        const remain = heroNavPeekUntil - Date.now();
+        if (remain > 0) {
+            heroNavHideTimer = setTimeout(() => {
+                updateQuickNavStyle();
+            }, remain + 10);
+        }
     };
 
     const updateBackToTopButton = () => {
@@ -933,10 +981,32 @@
     });
 
     window.addEventListener('scroll', () => {
+        const currentY = window.scrollY;
+        const onHeroNow = heroSection && heroSection.getBoundingClientRect().bottom > window.innerHeight * 0.45;
+        if (onHeroNow && currentY > lastScrollY + 2) {
+            heroNavPeekUntil = 0;
+        }
+        lastScrollY = currentY;
+
         updateSectionTransitions();
         updateQuickNavStyle();
         updateSideTocActive();
         updateBackToTopButton();
+    }, { passive: true });
+
+    window.addEventListener('wheel', (e) => {
+        if (!heroSection) return;
+        const onHeroNow = heroSection.getBoundingClientRect().bottom > window.innerHeight * 0.45;
+        if (!onHeroNow) return;
+
+        if (e.deltaY < -2) {
+            heroNavPeekUntil = Date.now() + HERO_NAV_PEEK_MS;
+            updateQuickNavStyle();
+            scheduleHeroNavAutoHide();
+        } else if (e.deltaY > 2) {
+            heroNavPeekUntil = 0;
+            updateQuickNavStyle();
+        }
     }, { passive: true });
     window.addEventListener('resize', () => {
         updateSectionTransitions();

@@ -9,6 +9,19 @@
     <link rel="icon" type="image/svg+xml" href="{% static 'images/mj-logo.svg' %}?v=2">
     <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22><rect width=%22120%22 height=%22120%22 fill=%22%23ffffff%22 rx=%2228%22/><circle cx=%2260%22 cy=%2260%22 r=%2248%22 fill=%22none%22 stroke=%22%23d4af37%22 stroke-width=%222.5%22 opacity=%220.9%22/><text x=%2238%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%23d4af37%22 letter-spacing=%22-3%22>M</text><text x=%2275%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%231a1a1a%22 letter-spacing=%22-2%22>J</text></svg>">
 
+    <script>
+        (() => {
+            try {
+                const storedTheme = localStorage.getItem("theme-mode");
+                if (storedTheme === "dark") {
+                    document.documentElement.classList.add("theme-dark");
+                }
+            } catch (e) {
+                // ignore storage errors
+            }
+        })();
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
 
     <style>
@@ -16,11 +29,80 @@
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
             background: #f5f5f7;
             color: #1d1d1f;
+            transition: background-color .25s ease, color .25s ease;
         }
 
         .apple-display {
             font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
             letter-spacing: -0.03em;
+        }
+
+        .theme-toggle-btn {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 80;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(0, 0, 0, 0.12);
+            background: rgba(255, 255, 255, 0.9);
+            color: #1d1d1f;
+            border-radius: 9999px;
+            width: 46px;
+            height: 46px;
+            padding: 0;
+            font-size: 18px;
+            font-weight: 600;
+            backdrop-filter: blur(8px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            transition: background .2s ease, transform .2s ease;
+        }
+
+        .theme-toggle-btn.is-stacked {
+            bottom: 76px;
+        }
+
+        .theme-toggle-btn:hover {
+            transform: translateY(-1px);
+            background: #ffffff;
+        }
+
+        html.theme-dark body {
+            background: #0f1115;
+            color: #f3f4f6;
+        }
+
+        html.theme-dark [class*="bg-white"] {
+            background-color: #171a20 !important;
+        }
+
+        html.theme-dark [class*="bg-[#f5f5f7]"],
+        html.theme-dark [class*="bg-[#fbfbfd]"],
+        html.theme-dark [class*="bg-[#fafafc]"],
+        html.theme-dark [class*="bg-[#f2f2f7]"] {
+            background-color: #111318 !important;
+        }
+
+        html.theme-dark [class*="text-[#1d1d1f]"] {
+            color: #f3f4f6 !important;
+        }
+
+        html.theme-dark [class*="text-[#6e6e73]"],
+        html.theme-dark [class*="text-[#86868b]"],
+        html.theme-dark [class*="text-[#8e8e93]"] {
+            color: #a1a1aa !important;
+        }
+
+        html.theme-dark [class*="border-black"] {
+            border-color: rgba(255, 255, 255, 0.14) !important;
+        }
+
+        html.theme-dark .theme-toggle-btn {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(30, 35, 45, 0.86);
+            color: #f3f4f6;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
         }
     </style>
 </head>
@@ -28,5 +110,43 @@
 <body class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f] antialiased">
     {% block content %}
     {% endblock %}
+
+    {% block site_footer %}
+    {% include "components/site_footer.html" %}
+    {% endblock %}
+
+    <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="다크모드 토글">
+        <span id="theme-toggle-icon">🌙</span>
+    </button>
+
+    <script>
+        (() => {
+            const btn = document.getElementById("theme-toggle-btn");
+            const icon = document.getElementById("theme-toggle-icon");
+            if (!btn || !icon) return;
+
+            const applyThemeLabel = () => {
+                const isDark = document.documentElement.classList.contains("theme-dark");
+                icon.textContent = isDark ? "☀️" : "🌙";
+                btn.setAttribute("aria-label", isDark ? "라이트모드로 전환" : "다크모드로 전환");
+            };
+
+            if (document.getElementById("back-to-top-btn")) {
+                btn.classList.add("is-stacked");
+            }
+
+            applyThemeLabel();
+
+            btn.addEventListener("click", () => {
+                const isDark = document.documentElement.classList.toggle("theme-dark");
+                try {
+                    localStorage.setItem("theme-mode", isDark ? "dark" : "light");
+                } catch (e) {
+                    // ignore storage errors
+                }
+                applyThemeLabel();
+            });
+        })();
+    </script>
 </body>
 </html>
