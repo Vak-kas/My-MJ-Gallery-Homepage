@@ -8,9 +8,7 @@
 
         <div class="flex items-center gap-2">
             <a href="{% url 'main:home' %}" id="home-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Home</a>
-            <a href="{% url 'main:blog' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Tech Blog</a>
-            <a href="{% url 'main:board' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Board</a>
-            <a href="{% url 'main:diary' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Diary</a>
+            <a href="{% url 'blog:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Blog</a>
 
             {% if user.is_authenticated %}
                 {% if user.is_superuser %}
@@ -49,24 +47,24 @@
             </div>
 
             <div class="mt-8 grid gap-3 md:grid-cols-3">
-                <a href="{% url 'main:blog' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                <a href="{% url 'blog:tech' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
                     <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
                     <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Tech Blog</p>
                     <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">기술 블로그</p>
                     <p class="mt-1 text-[13px] text-[#6e6e73]">트러블슈팅 · 아키텍처</p>
                 </a>
 
-                <a href="{% url 'main:board' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                <a href="{% url 'blog:board' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
                     <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
                     <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Free Board</p>
                     <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">자유게시판</p>
                     <p class="mt-1 text-[13px] text-[#6e6e73]">일상/공지/자유 글</p>
                 </a>
 
-                <a href="{% url 'main:diary' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                <a href="{% url 'blog:life' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
                     <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
-                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Diary</p>
-                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">일기</p>
+                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Life</p>
+                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">라이프 블로그</p>
                     <p class="mt-1 text-[13px] text-[#6e6e73]">기록 · 생각 · 메모</p>
                 </a>
             </div>

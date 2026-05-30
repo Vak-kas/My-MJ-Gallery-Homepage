@@ -74,18 +74,6 @@ def home(request):
     })
 
 
-def blog(request):
-    return render(request, "main/blog.html")
-
-
-def board(request):
-    return render(request, "main/board.html")
-
-
-def diary(request):
-    return render(request, "main/diary.html")
-
-
 @xframe_options_exempt
 def project_detail(request, id):
     proj = get_object_or_404(Project, id=id, is_visible=True)

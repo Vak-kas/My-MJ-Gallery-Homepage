@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block title %}글쓰기 — Blog{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 py-12">
+
+    <!-- 헤더 -->
+    <div class="mb-8 flex items-center justify-between">
+        <div>
+            <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Blog</p>
+            <h1 class="mt-1 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">새 글 작성</h1>
+        </div>
+        <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
+            ← 허브로
+        </a>
+    </div>
+
+    <!-- 메시지 -->
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <div class="rounded-xl {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %} px-4 py-3 text-[14px]">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'blog:post_create' %}">
+        {% csrf_token %}
+
+        <div class="space-y-5">
+
+            <!-- 카테고리 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <label class="mb-3 block text-[13px] font-semibold text-[#1d1d1f]">카테고리 <span class="text-red-500">*</span></label>
+                <div class="flex flex-wrap gap-2">
+                    {% for value, label in categories %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="category" value="{{ value }}"
+                            {% if form_data.category == value %}checked{% elif not form_data.category and value == 'tech' %}checked{% endif %}
+                            class="peer sr-only">
+                        <span class="inline-block rounded-full border px-4 py-1.5 text-[13px] font-medium transition-colors
+                            peer-checked:border-[#0066cc] peer-checked:bg-[#0066cc] peer-checked:text-white
+                            {% if value == 'secret' %}border-red-300 text-red-700 peer-checked:border-red-600 peer-checked:bg-red-600 peer-checked:text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}
+                            hover:border-[#0066cc]">
+                            {{ label }}{% if value == 'secret' %} 🔒{% endif %}
+                        </span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 제목 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <label for="title" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">제목 <span class="text-red-500">*</span></label>
+                <input type="text" id="title" name="title"
+                    value="{{ form_data.title|default:'' }}"
+                    placeholder="글 제목을 입력하세요"
+                    class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[15px] text-[#1d1d1f] placeholder-[#aeaeb2] outline-none focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/30 transition-colors"
+                    required>
+            </div>
+
+            <!-- 요약 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <label for="summary" class="mb-1 block text-[13px] font-semibold text-[#1d1d1f]">요약 <span class="text-[11px] font-normal text-[#8e8e93]">(최대 240자, 선택)</span></label>
+                <p class="mb-2 text-[12px] text-[#aeaeb2]">목록에서 미리 보여지는 한 줄 소개입니다.</p>
+                <input type="text" id="summary" name="summary"
+                    value="{{ form_data.summary|default:'' }}"
+                    placeholder="한 줄 요약..."
+                    maxlength="240"
+                    class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] text-[#1d1d1f] placeholder-[#aeaeb2] outline-none focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/30 transition-colors">
+            </div>
+
+            <!-- 본문 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <label for="content" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">본문</label>
+                <textarea id="content" name="content" rows="18"
+                    placeholder="여기에 본문을 작성하세요..."
+                    class="w-full resize-y rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] leading-relaxed text-[#1d1d1f] placeholder-[#aeaeb2] outline-none focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/30 transition-colors font-mono">{{ form_data.content|default:'' }}</textarea>
+            </div>
+
+            <!-- 태그 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <label for="tags" class="mb-1 block text-[13px] font-semibold text-[#1d1d1f]">태그 <span class="text-[11px] font-normal text-[#8e8e93]">(선택)</span></label>
+                <p class="mb-2 text-[12px] text-[#aeaeb2]">쉼표(,)로 구분해서 입력하세요. 예: Django, Python, 개발일지</p>
+                <input type="text" id="tags" name="tags"
+                    value="{{ form_data.tags|default:'' }}"
+                    placeholder="태그1, 태그2, ..."
+                    class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] text-[#1d1d1f] placeholder-[#aeaeb2] outline-none focus:border-[#0066cc] focus:ring-1 focus:ring-[#0066cc]/30 transition-colors">
+            </div>
+
+            <!-- 공개 설정 + 버튼 -->
+            <div class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-4">
+                    <label class="flex cursor-pointer items-center gap-3">
+                        <div class="relative">
+                            <input type="checkbox" name="is_published" value="1"
+                                id="is_published"
+                                {% if form_data.is_published == '1' or not form_data %}checked{% endif %}
+                                class="peer sr-only">
+                            <div class="h-6 w-11 rounded-full bg-[#e5e5ea] transition-colors peer-checked:bg-[#34c759]"></div>
+                            <div class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform peer-checked:translate-x-5"></div>
+                        </div>
+                        <span class="text-[14px] text-[#1d1d1f]">즉시 공개</span>
+                        <span class="text-[12px] text-[#8e8e93]">체크 해제 시 비공개로 저장됩니다</span>
+                    </label>
+
+                    <div class="flex gap-3">
+                        <a href="{% url 'blog:index' %}"
+                            class="rounded-full border border-black/[0.1] px-5 py-2.5 text-[14px] text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
+                            취소
+                        </a>
+                        <button type="submit"
+                            class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0055b3] transition-colors">
+                            게시하기
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </form>
+</div>
+{% endblock %}

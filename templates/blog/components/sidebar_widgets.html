@@ -1,0 +1,70 @@
+<aside class="space-y-4 lg:sticky lg:top-24">
+    <section class="rounded-[18px] border border-black/[0.08] bg-white p-5">
+        <h3 class="text-[15px] font-semibold text-[#1d1d1f]">인기글 순위</h3>
+        <ol class="mt-4 space-y-3">
+            {% for post in popular_posts|slice:":10" %}
+            <li class="flex gap-3 text-[13px]">
+                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#f2f2f7] text-[11px] font-semibold text-[#0066cc]">{{ forloop.counter }}</span>
+                <div class="min-w-0">
+                    <p class="truncate font-medium text-[#1d1d1f]">{{ post.title }}</p>
+                </div>
+            </li>
+            {% empty %}
+            <li class="text-[13px] text-[#8e8e93]">아직 인기글 데이터가 없습니다.</li>
+            {% endfor %}
+        </ol>
+    </section>
+
+    <section class="rounded-[18px] border border-black/[0.08] bg-white p-5">
+        <h3 class="text-[15px] font-semibold text-[#1d1d1f]">태그</h3>
+        <div class="mt-4 flex flex-wrap gap-2">
+            {% for tag in tag_list %}
+            <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#6e6e73]">#{{ tag.name }} ({{ tag.published_post_count }})</span>
+            {% empty %}
+            <p class="text-[13px] text-[#8e8e93]">등록된 태그가 없습니다.</p>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="rounded-[18px] border border-black/[0.08] bg-white p-5">
+        <h3 class="text-[15px] font-semibold text-[#1d1d1f]">최근 댓글</h3>
+        <ul class="mt-4 space-y-3">
+            {% for comment in recent_comments|slice:":6" %}
+            <li>
+                <p class="line-clamp-2 text-[13px] text-[#1d1d1f]">{{ comment.content|truncatechars:68 }}</p>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">{{ comment.author_name }} · {{ comment.post.title|truncatechars:22 }}</p>
+            </li>
+            {% empty %}
+            <li class="text-[13px] text-[#8e8e93]">최근 댓글이 없습니다.</li>
+            {% endfor %}
+        </ul>
+    </section>
+
+    <section id="guestbook" class="rounded-[18px] border border-black/[0.08] bg-white p-5">
+        <div class="flex items-center justify-between gap-2">
+            <h3 class="text-[15px] font-semibold text-[#1d1d1f]">방명록</h3>
+            <span class="text-[11px] text-[#8e8e93]">최근 {{ guestbook_entries|length }}개</span>
+        </div>
+
+        {% if request.resolver_match.url_name == 'index' %}
+        <form method="post" action="{% url 'blog:index' %}" class="mt-4 space-y-2">
+            {% csrf_token %}
+            <input type="text" name="author_name" maxlength="60" required placeholder="이름" class="h-9 w-full rounded-lg border border-black/[0.08] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+            <textarea name="message" rows="3" maxlength="1000" required placeholder="메시지를 남겨주세요" class="w-full rounded-lg border border-black/[0.08] px-3 py-2 text-[13px] outline-none focus:border-[#0066cc]"></textarea>
+            <p class="text-[11px] text-[#8e8e93]">작성한 방명록은 다른 방문자에게 공개됩니다.</p>
+            <button type="submit" class="h-9 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white">남기기</button>
+        </form>
+        {% endif %}
+
+        <ul class="mt-4 space-y-3">
+            {% for entry in guestbook_entries %}
+            <li class="rounded-lg bg-[#f8fafc] px-3 py-2">
+                <p class="text-[13px] text-[#1d1d1f]">{{ entry.message|linebreaksbr|truncatechars:120 }}</p>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">{{ entry.author_name }} · {{ entry.created_at|date:"m.d H:i" }}</p>
+            </li>
+            {% empty %}
+            <li class="text-[13px] text-[#8e8e93]">방명록이 아직 없습니다.</li>
+            {% endfor %}
+        </ul>
+    </section>
+</aside>

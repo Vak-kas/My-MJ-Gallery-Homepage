@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+        <nav class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
+            <a href="{% url 'blog:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Blog</a>
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Studio</a>
+                {% endif %}
+                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="mx-auto max-w-[1320px] px-6 py-16">
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <div class="rounded-xl border border-black/[0.08] bg-white px-4 py-3 text-[13px] text-[#1d1d1f]">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">BLOG HUB</p>
+    <h1 class="apple-display mt-4 text-[56px] font-semibold tracking-[-0.04em]">Blog.</h1>
+    <p class="mt-4 text-[18px] text-[#6e6e73]">Tech, Board, Life의 최신 글과 커뮤니티 위젯을 한 번에 볼 수 있는 허브 페이지입니다.</p>
+
+    <section class="mt-8 rounded-[20px] border border-black/[0.08] bg-white p-6">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+                <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Integrated Search</p>
+                <h2 class="mt-1 text-[22px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">통합 검색</h2>
+                <p class="mt-1 text-[13px] text-[#8e8e93]">제목/요약/본문/태그를 한번에 검색합니다.</p>
+            </div>
+            <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">총 {{ total_posts }}개</span>
+        </div>
+
+        <form method="get" action="{% url 'blog:index' %}" class="mt-5 flex flex-wrap items-center gap-2">
+            {% if current_sort != 'latest' %}
+            <input type="hidden" name="sort" value="{{ current_sort }}">
+            {% endif %}
+            {% if mine_only %}
+            <input type="hidden" name="mine" value="1">
+            {% endif %}
+            {% if show_all %}
+            <input type="hidden" name="show" value="all">
+            {% endif %}
+            <input type="text" name="q" value="{{ search_query }}" placeholder="제목/요약/내용/태그 검색" class="h-10 min-w-[220px] flex-1 rounded-full border border-black/[0.1] px-4 text-[13px] outline-none focus:border-[#0066cc]">
+            <button type="submit" class="h-10 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white">검색</button>
+            {% if search_query %}
+            <a href="{% url 'blog:index' %}" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">초기화</a>
+            {% endif %}
+            {% if has_more_posts %}
+            <a href="{% url 'blog:index' %}{{ show_all_qs }}#feed" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">더보기 (전체)</a>
+            {% endif %}
+            {% if show_all and total_posts > page_limit %}
+            <a href="{% url 'blog:index' %}{{ collapse_qs }}#feed" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">접기</a>
+            {% endif %}
+        </form>
+    </section>
+
+    <section class="mt-10 grid gap-8 lg:grid-cols-[340px_minmax(0,1fr)]">
+        {% include "blog/components/sidebar_widgets.html" %}
+
+        <div class="space-y-8">
+            <section id="feed" class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Main Feed</p>
+                        <h2 class="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">전체 게시글 보기</h2>
+                        <p class="mt-2 text-[14px] text-[#6e6e73]">최신순으로 모아보며, 검색과 더보기를 통해 전체 글을 탐색할 수 있습니다.</p>
+                    </div>
+                    <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">표시 {{ feed_posts|length }}개</span>
+                </div>
+                {% if user.is_authenticated %}
+                <div class="mt-3">
+                    <a href="{% url 'blog:post_create' %}" class="inline-flex items-center gap-1.5 rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0055b3] transition-colors">
+                        <span>✏️</span> 글쓰기
+                    </a>
+                </div>
+                {% endif %}
+                <div class="mt-5 flex flex-wrap items-center justify-between gap-2">
+                    <p class="text-[13px] text-[#8e8e93]">
+                        {% if search_query %}
+                            "{{ search_query }}" 검색 결과 {{ total_posts }}개
+                        {% elif current_sort == 'oldest' %}
+                            오래된 순 피드 (기본 {{ page_limit }}개)
+                        {% elif current_sort == 'popular' %}
+                            인기 순 피드 (기본 {{ page_limit }}개)
+                        {% else %}
+                            최신 순 피드 (기본 {{ page_limit }}개)
+                        {% endif %}
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <a href="{% url 'blog:index' %}{{ sort_latest_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'latest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">최신 순</a>
+                        <a href="{% url 'blog:index' %}{{ sort_oldest_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'oldest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">오래된 순</a>
+                        <a href="{% url 'blog:index' %}{{ sort_popular_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'popular' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">인기 순</a>
+                        {% if user.is_authenticated %}
+                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">내가 쓴글 보기</a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="mt-4 grid gap-4">
+                    {% for post in feed_posts %}
+                        {% include "blog/components/post_card.html" with post=post %}
+                    {% empty %}
+                    <p class="text-[14px] text-[#8e8e93]">
+                        {% if search_query %}
+                        검색된 게시글이 없습니다.
+                        {% else %}
+                        게시글이 아직 없습니다.
+                        {% endif %}
+                    </p>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="grid gap-4 md:grid-cols-3">
+                <article class="rounded-[20px] border border-black/[0.08] bg-white p-5">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-[20px] font-semibold">Tech</h3>
+                        <a href="{% url 'blog:tech' %}" class="text-[12px] font-semibold text-[#0066cc]">더 보기</a>
+                    </div>
+                    <p class="mt-2 text-[12px] text-[#8e8e93]">기술 블로그 · 개발 노트 · 트러블슈팅</p>
+                    <ul class="mt-3 space-y-2">
+                        {% for post in tech_posts %}
+                        <li class="text-[13px] text-[#1d1d1f] truncate">• {{ post.title }}</li>
+                        {% empty %}
+                        <li class="text-[13px] text-[#8e8e93]">아직 없음</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+
+                <article class="rounded-[20px] border border-black/[0.08] bg-white p-5">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-[20px] font-semibold">Board</h3>
+                        <a href="{% url 'blog:board' %}" class="text-[12px] font-semibold text-[#0066cc]">더 보기</a>
+                    </div>
+                    <p class="mt-2 text-[12px] text-[#8e8e93]">자유 게시판 · 공지 · 소통</p>
+                    <ul class="mt-3 space-y-2">
+                        {% for post in board_posts %}
+                        <li class="text-[13px] text-[#1d1d1f] truncate">• {{ post.title }}</li>
+                        {% empty %}
+                        <li class="text-[13px] text-[#8e8e93]">아직 없음</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+
+                <article class="rounded-[20px] border border-black/[0.08] bg-white p-5">
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-[20px] font-semibold">Life</h3>
+                        <a href="{% url 'blog:life' %}" class="text-[12px] font-semibold text-[#0066cc]">더 보기</a>
+                    </div>
+                    <p class="mt-2 text-[12px] text-[#8e8e93]">일상 메모 · 생각 기록 · 회고</p>
+                    <ul class="mt-3 space-y-2">
+                        {% for post in life_posts %}
+                        <li class="text-[13px] text-[#1d1d1f] truncate">• {{ post.title }}</li>
+                        {% empty %}
+                        <li class="text-[13px] text-[#8e8e93]">아직 없음</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+
+                {% if show_secret %}
+                <article class="rounded-[20px] border border-red-300 bg-red-50/40 p-5 md:col-span-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            <h3 class="text-[20px] font-semibold text-red-700">Secret</h3>
+                            <span class="rounded-full border border-red-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-red-600">Admin Only</span>
+                        </div>
+                        <a href="{% url 'blog:secret' %}" class="text-[12px] font-semibold text-[#0066cc]">관리자 전용 보기</a>
+                    </div>
+                    <p class="mt-2 text-[12px] text-red-700/80">너드인의 새벽 · 관리자 비공개 메모 공간</p>
+                    <ul class="mt-3 space-y-2">
+                        {% for post in secret_posts %}
+                        <li class="text-[13px] text-[#1d1d1f] truncate">• {{ post.title }}</li>
+                        {% empty %}
+                        <li class="text-[13px] text-[#8e8e93]">아직 없음</li>
+                        {% endfor %}
+                    </ul>
+                </article>
+                {% endif %}
+            </section>
+        </div>
+    </section>
+</main>
+{% endblock %}

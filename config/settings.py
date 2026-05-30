@@ -71,6 +71,7 @@ INSTALLED_APPS = [
     'accounts',
     'studio',
     'main',
+    'blog',
     
 ]
 

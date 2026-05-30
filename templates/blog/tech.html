@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+        <nav class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
+            <a href="{% url 'blog:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Blog</a>
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Studio</a>
+                {% endif %}
+                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="mx-auto max-w-[1320px] px-6 py-16">
+    <div class="mb-8">
+        <a href="{% url 'blog:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+            <span class="text-[18px]">←</span>
+            <span>Back to Blog Hub</span>
+        </a>
+    </div>
+
+    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">BLOG / TECH</p>
+    <h1 class="apple-display mt-4 text-[56px] font-semibold tracking-[-0.04em]">Tech.</h1>
+    <p class="mt-4 text-[18px] text-[#6e6e73]">기술 콘텐츠 목록입니다.</p>
+
+    <div class="mt-8 flex flex-wrap gap-2">
+        <a href="{% url 'blog:tech' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[12px] font-semibold text-white">Tech</a>
+        <a href="{% url 'blog:board' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[12px] text-[#1d1d1f]">Board</a>
+        <a href="{% url 'blog:life' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[12px] text-[#1d1d1f]">Life</a>
+        {% if user.is_superuser %}
+        <a href="{% url 'blog:secret' %}" class="rounded-full border border-red-300 bg-red-50 px-4 py-1.5 text-[12px] font-semibold text-red-700">Secret</a>
+        {% endif %}
+    </div>
+
+    <section class="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div class="grid gap-4">
+            {% for post in posts %}
+                {% include "blog/components/post_card.html" with post=post %}
+            {% empty %}
+            <div class="rounded-[18px] border border-black/[0.08] bg-white p-6 text-[14px] text-[#8e8e93]">Tech 글이 아직 없습니다.</div>
+            {% endfor %}
+        </div>
+
+        {% include "blog/components/sidebar_widgets.html" %}
+    </section>
+</main>
+{% endblock %}
