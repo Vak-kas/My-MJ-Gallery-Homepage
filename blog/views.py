@@ -2,13 +2,13 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import Http404
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode
 
-from .models import Comment, GuestbookEntry, Post, Tag
+from .models import Comment, GuestbookEntry, Post, PostLike, Tag
 
 
 def _published_posts_qs():
@@ -20,6 +20,62 @@ def _accessible_posts_qs(request):
 	if request.user.is_superuser:
 		return qs
 	return qs.exclude(category=Post.CATEGORY_SECRET)
+
+
+def _single_post_qs(request):
+	qs = Post.objects.select_related("author").prefetch_related("tags", "comments")
+	if request.user.is_superuser:
+		return qs
+	return qs.filter(is_published=True).exclude(category=Post.CATEGORY_SECRET)
+
+
+def _can_manage_post(request, post: Post) -> bool:
+	return request.user.is_authenticated and (
+		request.user.is_superuser or post.author_id == request.user.id
+	)
+
+
+def _serialize_post_form_data(post: Post):
+	return {
+		"draft_id": str(post.id),
+		"title": post.title,
+		"category": post.category,
+		"summary": post.summary,
+		"content": post.content,
+		"cover_image": post.cover_image.url if post.cover_image else "",
+		"tags": ", ".join(tag.name for tag in post.tags.all()),
+		"is_published": "1" if post.is_published else "0",
+	}
+
+
+def _apply_post_tags(post: Post, tags_raw: str):
+	post.tags.clear()
+	if tags_raw:
+		for tag_name in [t.strip() for t in tags_raw.split(",") if t.strip()]:
+			tag_slug = slugify(tag_name, allow_unicode=True) or tag_name[:60]
+			tag, _ = Tag.objects.get_or_create(
+				slug=tag_slug,
+				defaults={"name": tag_name[:40]},
+			)
+			post.tags.add(tag)
+
+
+def _write_page_context(request, form_data=None, selected_draft=None, editing_post=None):
+	draft_posts_qs = Post.objects.filter(author=request.user, is_published=False)
+	if editing_post:
+		draft_posts_qs = draft_posts_qs.exclude(id=editing_post.id)
+
+	return {
+		"categories": Post.CATEGORY_CHOICES,
+		"form_data": form_data or {},
+		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
+		"selected_draft": selected_draft,
+		"editor_mode": "edit" if editing_post else "create",
+		"form_action_url": reverse("blog:post_edit", args=[editing_post.slug]) if editing_post else reverse("blog:post_create"),
+		"editor_heading": "글 수정" if editing_post else "새 글 작성",
+		"editor_submit_label": "수정 완료" if editing_post else "완료",
+		"editing_post": editing_post,
+	}
 
 
 def _sidebar_context(request):
@@ -198,6 +254,59 @@ def secret(request):
 	return render(request, "blog/secret.html", _category_page(request, Post.CATEGORY_SECRET, "Secret"))
 
 
+def post_detail(request, slug: str):
+	post = get_object_or_404(_single_post_qs(request), slug=slug)
+	if not post.is_published and not request.user.is_superuser:
+		raise Http404("Not found")
+
+	if request.method == "POST":
+		action = (request.POST.get("action") or "").strip()
+
+		if action == "comment":
+			author_name = (request.POST.get("author_name") or "").strip()
+			content = (request.POST.get("content") or "").strip()
+			if not author_name and request.user.is_authenticated:
+				author_name = request.user.get_username()
+			if author_name and content:
+				Comment.objects.create(post=post, author_name=author_name[:60], content=content[:1200])
+				messages.success(request, "댓글이 등록되었습니다.")
+			else:
+				messages.error(request, "이름과 댓글 내용을 모두 입력해 주세요.")
+			return redirect("blog:post_detail", slug=post.slug)
+
+		if action == "like":
+			if not request.user.is_authenticated:
+				messages.error(request, "좋아요는 로그인 후 사용할 수 있습니다.")
+				return redirect("accounts:login")
+
+			like, created = PostLike.objects.get_or_create(post=post, user=request.user)
+			if not created:
+				like.delete()
+				messages.success(request, "좋아요를 취소했습니다.")
+			else:
+				messages.success(request, "좋아요를 눌렀습니다.")
+			return redirect("blog:post_detail", slug=post.slug)
+
+	Post.objects.filter(id=post.id).update(views=post.views + 1)
+	post.views += 1
+
+	visible_comments = post.comments.filter(is_visible=True).select_related(None)
+	likes_count = post.likes.count()
+	user_liked = request.user.is_authenticated and post.likes.filter(user=request.user).exists()
+
+	context = {
+		"post": post,
+		"visible_comments": visible_comments,
+		"comment_count": visible_comments.count(),
+		"likes_count": likes_count,
+		"user_liked": user_liked,
+		"can_manage_post": _can_manage_post(request, post),
+		"comment_form_author": request.user.get_username() if request.user.is_authenticated else "",
+	}
+	context.update(_sidebar_context(request))
+	return render(request, "blog/post_detail.html", context)
+
+
 def _build_unique_slug(title: str, exclude_post_id=None):
 	base_slug = slugify(title, allow_unicode=True) or "post"
 	slug = base_slug
@@ -241,32 +350,29 @@ def post_create(request):
 		category = (request.POST.get("category") or "").strip()
 		summary = (request.POST.get("summary") or "").strip()
 		content = (request.POST.get("content") or "").strip()
+		cover_image = request.FILES.get("cover_image")
 		tags_raw = (request.POST.get("tags") or "").strip()
 		submit_action = (request.POST.get("submit_action") or "publish").strip()
 		is_published = submit_action != "draft" and request.POST.get("is_published") == "1"
 
 		if not title or category not in dict(Post.CATEGORY_CHOICES):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
-			return render(request, "blog/write.html", {
-				"categories": Post.CATEGORY_CHOICES,
-				"form_data": request.POST,
-				"draft_posts": draft_posts,
-				"selected_draft": selected_draft,
-			})
+			form_data = dict(request.POST)
+			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
+			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
 		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
 			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
-			return render(request, "blog/write.html", {
-				"categories": Post.CATEGORY_CHOICES,
-				"form_data": request.POST,
-				"draft_posts": draft_posts,
-				"selected_draft": selected_draft,
-			})
+			form_data = dict(request.POST)
+			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
+			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
 		if existing_draft:
 			post = existing_draft
 			post.title = title
 			post.category = category
+			if cover_image:
+				post.cover_image = cover_image
 			if post.slug:
 				post.slug = _build_unique_slug(title, exclude_post_id=post.id)
 			else:
@@ -283,6 +389,7 @@ def post_create(request):
 			post = Post.objects.create(
 				title=title,
 				category=category,
+				cover_image=cover_image,
 				slug=_build_unique_slug(title),
 				summary=summary[:240] if summary else "",
 				content=content,
@@ -291,17 +398,7 @@ def post_create(request):
 				published_at=timezone.now() if is_published else None,
 			)
 
-		post.tags.clear()
-
-		# 태그 처리 (쉼표 구분)
-		if tags_raw:
-			for tag_name in [t.strip() for t in tags_raw.split(",") if t.strip()]:
-				tag_slug = slugify(tag_name, allow_unicode=True) or tag_name[:60]
-				tag, _ = Tag.objects.get_or_create(
-					slug=tag_slug,
-					defaults={"name": tag_name[:40]},
-				)
-				post.tags.add(tag)
+		_apply_post_tags(post, tags_raw)
 
 		if submit_action == "draft" or not is_published:
 			messages.success(request, f'"{post.title}" 글이 임시저장되었습니다.')
@@ -317,15 +414,78 @@ def post_create(request):
 			"category": selected_draft.category,
 			"summary": selected_draft.summary,
 			"content": selected_draft.content,
+			"cover_image": selected_draft.cover_image.url if selected_draft.cover_image else "",
 			"tags": ", ".join(tag.name for tag in selected_draft.tags.all()),
 			"is_published": "0",
 		}
 	else:
 		form_data = {}
 
-	return render(request, "blog/write.html", {
-		"categories": Post.CATEGORY_CHOICES,
-		"form_data": form_data,
-		"draft_posts": draft_posts,
-		"selected_draft": selected_draft,
-	})
+	return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
+
+
+@login_required
+def post_edit(request, slug: str):
+	post = get_object_or_404(Post.objects.prefetch_related("tags"), slug=slug)
+	if not _can_manage_post(request, post):
+		raise Http404("Not found")
+
+	if request.method == "POST":
+		title = (request.POST.get("title") or "").strip()
+		category = (request.POST.get("category") or "").strip()
+		summary = (request.POST.get("summary") or "").strip()
+		content = (request.POST.get("content") or "").strip()
+		cover_image = request.FILES.get("cover_image")
+		tags_raw = (request.POST.get("tags") or "").strip()
+		submit_action = (request.POST.get("submit_action") or "publish").strip()
+		is_published = submit_action != "draft" and request.POST.get("is_published") == "1"
+
+		form_data = dict(request.POST)
+		form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
+		form_data["cover_image"] = post.cover_image.url if post.cover_image else ""
+
+		if not title or category not in dict(Post.CATEGORY_CHOICES):
+			messages.error(request, "제목과 카테고리는 필수입니다.")
+			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
+
+		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
+			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
+			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
+
+		post.title = title
+		post.category = category
+		post.summary = summary[:240] if summary else ""
+		post.content = content
+		post.slug = _build_unique_slug(title, exclude_post_id=post.id)
+		post.is_published = is_published
+		if cover_image:
+			post.cover_image = cover_image
+		if is_published and not post.published_at:
+			post.published_at = timezone.now()
+		if not is_published:
+			post.published_at = None
+		post.save()
+		_apply_post_tags(post, tags_raw)
+
+		if submit_action == "draft" or not is_published:
+			messages.success(request, f'"{post.title}" 글이 임시저장되었습니다.')
+			return redirect("blog:post_edit", slug=post.slug)
+
+		messages.success(request, f'"{post.title}" 글이 수정되었습니다.')
+		return redirect("blog:post_detail", slug=post.slug)
+
+	return render(request, "blog/write.html", _write_page_context(request, _serialize_post_form_data(post), editing_post=post))
+
+
+@login_required
+def post_delete(request, slug: str):
+	post = get_object_or_404(Post.objects.all(), slug=slug)
+	if not _can_manage_post(request, post):
+		raise Http404("Not found")
+	if request.method != "POST":
+		return redirect("blog:post_detail", slug=post.slug)
+
+	title = post.title
+	post.delete()
+	messages.success(request, f'"{title}" 글이 삭제되었습니다.')
+	return redirect("blog:index")

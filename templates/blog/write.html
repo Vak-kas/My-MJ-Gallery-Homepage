@@ -1,30 +1,171 @@
 {% extends "base.html" %}
 
-{% block title %}글쓰기 — Blog{% endblock %}
+{% block title %}{{ editor_heading|default:"글쓰기" }} — Blog{% endblock %}
 
 {% block content %}
-<link href="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.snow.css" rel="stylesheet">
-
 <style>
-    .ql-toolbar.ql-snow,
-    .ql-container.ql-snow {
-        border-color: rgba(0, 0, 0, 0.08);
+    .editor-shell {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 16px;
+        background: #fff;
     }
 
-    .ql-toolbar.ql-snow {
-        border-radius: 16px 16px 0 0;
+    .editor-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 10px 12px;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
         background: #fbfbfd;
+        border-radius: 16px 16px 0 0;
     }
 
-    .ql-container.ql-snow {
-        border-radius: 0 0 16px 16px;
-        min-height: 540px;
-        font-size: 15px;
-        line-height: 1.75;
+    .editor-toolbar button {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 9999px;
+        font-size: 12px;
+        padding: 4px 10px;
     }
 
-    .ql-editor {
-        min-height: 540px;
+    .editor-holder {
+        min-height: 560px;
+        padding: 14px 8px;
+    }
+
+    .ce-block__content,
+    .ce-toolbar__content {
+        max-width: 760px;
+    }
+
+    /* Tailwind preflight 리셋을 덮어쓰는 강제 헤더 스타일 */
+    .ce-header[data-level="1"],
+    h1.ce-header {
+        font-size: 2em !important;
+        font-weight: 800 !important;
+        line-height: 1.25 !important;
+        letter-spacing: -0.03em !important;
+        margin: 0.5em 0 0.25em !important;
+        color: #1a1a1a !important;
+    }
+
+    .ce-header[data-level="2"],
+    h2.ce-header {
+        font-size: 1.5em !important;
+        font-weight: 700 !important;
+        line-height: 1.3 !important;
+        letter-spacing: -0.02em !important;
+        margin: 0.5em 0 0.2em !important;
+        color: #1a1a1a !important;
+    }
+
+    .ce-header[data-level="3"],
+    h3.ce-header {
+        font-size: 1.2em !important;
+        font-weight: 600 !important;
+        line-height: 1.35 !important;
+        margin: 0.4em 0 0.15em !important;
+        color: #1a1a1a !important;
+    }
+
+    .ce-paragraph {
+        font-size: 15px !important;
+        line-height: 1.8 !important;
+    }
+
+    .mj-toggle-tool,
+    .mj-image-tool {
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 16px;
+        background: #fff;
+        padding: 14px;
+    }
+
+    .mj-toggle-tool__title,
+    .mj-image-tool input,
+    .mj-image-tool textarea {
+        width: 100%;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 12px;
+        background: #f9f9fb;
+        padding: 10px 12px;
+        outline: none;
+    }
+
+    .mj-toggle-tool__title:focus,
+    .mj-image-tool input:focus,
+    .mj-image-tool textarea:focus {
+        border-color: #0066cc;
+    }
+
+    .mj-toggle-tool__content,
+    .mj-image-tool__caption {
+        margin-top: 10px;
+    }
+
+    .mj-image-tool__preview {
+        margin-top: 12px;
+        border-radius: 14px;
+        overflow: hidden;
+        background: #f5f5f7;
+    }
+
+    .mj-image-tool__preview img {
+        display: block;
+        width: 100%;
+        max-height: 340px;
+        object-fit: cover;
+    }
+
+    .mj-image-tool__hint {
+        margin-top: 8px;
+        font-size: 12px;
+        color: #8e8e93;
+    }
+
+    .mj-image-tool__header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 10px;
+    }
+
+    .mj-image-tool__badge {
+        font-size: 11px;
+        color: #8e8e93;
+        letter-spacing: 0.02em;
+    }
+
+    .mj-image-tool__cover-btn {
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        border-radius: 9999px;
+        padding: 6px 12px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #1d1d1f;
+        background: #fff;
+        transition: all 0.2s ease;
+    }
+
+    .mj-image-tool__cover-btn.is-active {
+        border-color: #0066cc;
+        background: #0066cc;
+        color: #fff;
+    }
+
+    .mj-image-tool__url.is-data-url {
+        font-size: 12px;
+        color: #6e6e73;
+    }
+
+    .mj-delimiter-tool {
+        padding: 18px 0;
+    }
+
+    .mj-delimiter-tool hr {
+        border: 0;
+        border-top: 1px solid #d2d2d7;
+        margin: 0;
     }
 </style>
 
@@ -32,7 +173,7 @@
     <div class="mb-7 flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Blog Editor</p>
-            <h1 class="mt-1 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">새 글 작성</h1>
+            <h1 class="mt-1 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">{{ editor_heading|default:"새 글 작성" }}</h1>
             <p class="mt-2 text-[13px] text-[#8e8e93]">바로 적용되는 WYSIWYG · 헤더/체크리스트/코드/인용/구분선</p>
         </div>
         <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">← 허브로</a>
@@ -66,7 +207,7 @@
             </div>
         </aside>
 
-    <form id="writer-form" method="post" action="{% url 'blog:post_create' %}" class="space-y-5">
+    <form id="writer-form" method="post" action="{{ form_action_url|default:''|default_if_none:'' }}{% if not form_action_url %}{% url 'blog:post_create' %}{% endif %}" enctype="multipart/form-data" class="space-y-5">
         {% csrf_token %}
         <input type="hidden" id="draft_id" name="draft_id" value="{{ form_data.draft_id|default:'' }}">
         <input type="hidden" id="content" name="content" value="{{ form_data.content|default:'' }}">
@@ -109,19 +250,37 @@
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p class="text-[13px] font-semibold text-[#1d1d1f]">본문</p>
-                    <p class="text-[12px] text-[#8e8e93]">노션처럼 바로 적용됩니다. 왼쪽/오른쪽 분할 없이 편집 화면만 보입니다.</p>
+                    <p class="text-[12px] text-[#8e8e93]">노션처럼 바로 적용됩니다. 예: #, ##, ###, /제목1, /표, /토글, /이미지, /구분선 · 이미지 블록 오른쪽 위에서 대표이미지 1개 선택</p>
                 </div>
                 <button id="preview-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">미리보기</button>
             </div>
             <div class="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
                 <span class="text-[#8e8e93]">슬래시 커맨드:</span>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h1">/h1</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h2">/h2</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="todo">/todo</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="divider">/divider</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="toggle">/toggle</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h1">/제목1</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h2">/제목2</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h3">/제목3</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="table">/표</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="toggle">/토글</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="image">/이미지</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="divider">/구분선</button>
             </div>
-            <div id="editor" class="rounded-2xl"></div>
+            <div class="editor-shell">
+                <div class="editor-toolbar">
+                    <button type="button" class="block-btn" data-block="paragraph">문단</button>
+                    <button type="button" class="block-btn" data-block="h1">제목1</button>
+                    <button type="button" class="block-btn" data-block="h2">제목2</button>
+                    <button type="button" class="block-btn" data-block="h3">제목3</button>
+                    <button type="button" class="block-btn" data-block="list">리스트</button>
+                    <button type="button" class="block-btn" data-block="checklist">체크</button>
+                    <button type="button" class="block-btn" data-block="quote">인용</button>
+                    <button type="button" class="block-btn" data-block="code">코드</button>
+                    <button type="button" class="block-btn" data-block="table">표</button>
+                    <button type="button" class="block-btn" data-block="toggle">토글</button>
+                    <button type="button" class="block-btn" data-block="image">이미지</button>
+                    <button type="button" class="block-btn" data-block="divider">구분선</button>
+                </div>
+                <div id="editor" class="editor-holder"></div>
+            </div>
             <div id="preview-panel" class="mt-4 hidden rounded-xl border border-black/[0.08] bg-[#fcfcfe] p-4 text-[14px] text-[#1d1d1f]"></div>
         </section>
 
@@ -140,7 +299,7 @@
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="draft-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">임시저장</button>
                     <button id="preview-submit-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">미리보기</button>
-                    <button id="publish-btn" type="button" class="rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">완료</button>
+                    <button id="publish-btn" type="button" class="rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">{{ editor_submit_label|default:"완료" }}</button>
                 </div>
             </div>
         </section>
@@ -148,7 +307,14 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/quill@1.3.7/dist/quill.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@2.30.6"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/header@2.8.8"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/list@1.10.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/checklist@1.6.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/quote@2.7.6"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/delimiter@1.4.2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/code@2.9.3"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/table@2.4.4"></script>
 <script>
 (() => {
     const form = document.getElementById('writer-form');
@@ -161,41 +327,558 @@
     const draftBtn = document.getElementById('draft-btn');
     const publishBtn = document.getElementById('publish-btn');
     const slashButtons = document.querySelectorAll('.slash-btn');
+    const blockButtons = document.querySelectorAll('.block-btn');
+    const imageToolInstances = new Set();
 
-    const quill = new Quill('#editor', {
-        theme: 'snow',
-        placeholder: '여기에 글을 작성하세요...',
-        modules: {
-            toolbar: [
-                [{ header: [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ list: 'ordered' }, { list: 'bullet' }, { list: 'check' }],
-                ['blockquote', 'code-block', 'link'],
-                ['clean']
-            ]
+    const svgIcon = (paths) => `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
+    const TOOLBAR_ICON = {
+        toggle: svgIcon('<path d="M6 4l5 5-5 5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'),
+        image: svgIcon('<path d="M3 4h12v10H3V4Zm2 7 2.2-2.2 2 2L12 8l3 3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1" fill="currentColor"/>'),
+    };
+
+    const wrapTool = (BaseTool, title) => class extends BaseTool {
+        static get toolbox() {
+            const base = typeof BaseTool.toolbox === 'function' ? BaseTool.toolbox() : (BaseTool.toolbox || {});
+            return { ...base, title };
         }
-    });
+    };
 
-    if (contentInput.value) {
-        quill.root.innerHTML = contentInput.value;
+    const KoreanHeader = wrapTool(Header, '제목');
+    const KoreanHeader1 = wrapTool(Header, '제목1');
+    const KoreanHeader2 = wrapTool(Header, '제목2');
+    const KoreanHeader3 = wrapTool(Header, '제목3');
+    const KoreanList = wrapTool(List, '리스트');
+    const KoreanChecklist = wrapTool(Checklist, '체크');
+    const KoreanQuote = wrapTool(Quote, '인용');
+    const KoreanCode = wrapTool(CodeTool, '코드');
+    const KoreanTable = wrapTool(Table, '표');
+
+    class LineDelimiterTool {
+        static get toolbox() {
+            return {
+                title: '구분선',
+                icon: `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
+            };
+        }
+
+        render() {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'mj-delimiter-tool';
+            wrapper.innerHTML = '<hr />';
+            return wrapper;
+        }
+
+        save() {
+            return {};
+        }
+
+        static get isReadOnlySupported() {
+            return true;
+        }
     }
+
+    class ToggleTool {
+        static get toolbox() {
+            return { title: '토글', icon: TOOLBAR_ICON.toggle };
+        }
+
+        constructor({ data, api }) {
+            this.api = api;
+            this.data = {
+                title: data?.title || '',
+                items: Array.isArray(data?.items) ? data.items : (data?.content ? [data.content] : []),
+            };
+            this.wrapper = null;
+            this.titleInput = null;
+            this.contentInput = null;
+        }
+
+        render() {
+            this.wrapper = document.createElement('div');
+            this.wrapper.className = 'mj-toggle-tool';
+
+            this.titleInput = document.createElement('input');
+            this.titleInput.className = 'mj-toggle-tool__title';
+            this.titleInput.type = 'text';
+            this.titleInput.placeholder = '토글 제목';
+            this.titleInput.value = this.data.title || '';
+
+            this.contentInput = document.createElement('textarea');
+            this.contentInput.className = 'mj-toggle-tool__content';
+            this.contentInput.rows = 4;
+            this.contentInput.placeholder = '토글 내용 (줄바꿈으로 여러 줄 가능)';
+            this.contentInput.value = (this.data.items || []).join('\n');
+
+            this.wrapper.appendChild(this.titleInput);
+            this.wrapper.appendChild(this.contentInput);
+
+            window.setTimeout(() => this.titleInput?.focus(), 0);
+            return this.wrapper;
+        }
+
+        save() {
+            return {
+                title: this.titleInput?.value?.trim() || '',
+                items: (this.contentInput?.value || '')
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean),
+            };
+        }
+
+        validate(savedData) {
+            return Boolean(savedData?.title || (savedData?.items && savedData.items.length));
+        }
+
+        static get isReadOnlySupported() {
+            return true;
+        }
+    }
+
+    class ImageTool {
+        static get toolbox() {
+            return { title: '이미지', icon: TOOLBAR_ICON.image };
+        }
+
+        constructor({ data, api }) {
+            this.api = api;
+            this.data = {
+                url: data?.url || data?.file?.url || '',
+                caption: data?.caption || '',
+                alt: data?.alt || '',
+            };
+            this.wrapper = null;
+            this.urlInput = null;
+            this.captionInput = null;
+            this.preview = null;
+            this.coverButton = null;
+            this.isCover = Boolean(data?.isCover);
+        }
+
+        setCoverState(isCover) {
+            this.isCover = Boolean(isCover);
+            if (this.coverButton) {
+                this.coverButton.classList.toggle('is-active', this.isCover);
+                this.coverButton.textContent = this.isCover ? '대표이미지 선택됨' : '대표로 선택';
+            }
+        }
+
+        static clearOtherCovers(activeInstance) {
+            imageToolInstances.forEach((instance) => {
+                instance.setCoverState(instance === activeInstance);
+            });
+        }
+
+        render() {
+            this.wrapper = document.createElement('div');
+            this.wrapper.className = 'mj-image-tool';
+
+            const header = document.createElement('div');
+            header.className = 'mj-image-tool__header';
+
+            const badge = document.createElement('div');
+            badge.className = 'mj-image-tool__badge';
+            badge.textContent = '본문 이미지';
+
+            this.coverButton = document.createElement('button');
+            this.coverButton.type = 'button';
+            this.coverButton.className = 'mj-image-tool__cover-btn';
+            this.coverButton.addEventListener('click', () => {
+                ImageTool.clearOtherCovers(this);
+            });
+
+            header.appendChild(badge);
+            header.appendChild(this.coverButton);
+
+            this.urlInput = document.createElement('input');
+            this.urlInput.type = 'url';
+            this.urlInput.className = 'mj-image-tool__url';
+            this.urlInput.placeholder = '이미지 URL 붙여넣기';
+            this.urlInput.value = this.data.url || '';
+
+            this.captionInput = document.createElement('input');
+            this.captionInput.className = 'mj-image-tool__caption';
+            this.captionInput.type = 'text';
+            this.captionInput.placeholder = '캡션 (선택)';
+            this.captionInput.value = this.data.caption || '';
+
+            this.preview = document.createElement('div');
+            this.preview.className = 'mj-image-tool__preview';
+
+            const hint = document.createElement('div');
+            hint.className = 'mj-image-tool__hint';
+            hint.textContent = '이미지 주소를 넣으면 바로 미리보기됩니다.';
+
+            const updatePreview = () => {
+                const url = this.urlInput.value.trim();
+                this.urlInput.classList.toggle('is-data-url', url.startsWith('data:image/'));
+                this.urlInput.title = url;
+                if (url) {
+                    this.preview.innerHTML = `<img src="${url}" alt="${this.captionInput.value.trim() || ''}" />`;
+                } else {
+                    this.preview.innerHTML = '';
+                }
+            };
+
+            this.urlInput.addEventListener('input', updatePreview);
+            this.captionInput.addEventListener('input', updatePreview);
+
+            this.wrapper.appendChild(header);
+            this.wrapper.appendChild(this.urlInput);
+            this.wrapper.appendChild(this.captionInput);
+            this.wrapper.appendChild(this.preview);
+            this.wrapper.appendChild(hint);
+
+            imageToolInstances.add(this);
+            this.setCoverState(this.isCover);
+            if (this.isCover) {
+                ImageTool.clearOtherCovers(this);
+            }
+            updatePreview();
+            window.setTimeout(() => this.urlInput?.focus(), 0);
+            return this.wrapper;
+        }
+
+        save() {
+            return {
+                url: this.urlInput?.value?.trim() || '',
+                caption: this.captionInput?.value?.trim() || '',
+                alt: this.captionInput?.value?.trim() || '',
+                isCover: this.isCover,
+            };
+        }
+
+        validate(savedData) {
+            return true;
+        }
+
+        static get isReadOnlySupported() {
+            return true;
+        }
+    }
+
+    const parseInitialData = () => {
+        if (!contentInput.value) {
+            return { blocks: [{ type: 'paragraph', data: { text: '' } }] };
+        }
+
+        try {
+            const parsed = JSON.parse(contentInput.value);
+            if (parsed && Array.isArray(parsed.blocks)) return parsed;
+        } catch (e) {
+            // old html fallback
+        }
+
+        const temp = document.createElement('div');
+        temp.innerHTML = contentInput.value;
+        const plain = (temp.textContent || '').trim();
+        return {
+            blocks: [{ type: 'paragraph', data: { text: plain } }],
+        };
+    };
+
+    const editor = new EditorJS({
+        holder: 'editor',
+        autofocus: true,
+        placeholder: '여기에 글을 작성하세요...',
+        data: parseInitialData(),
+        tools: {
+            header: { class: KoreanHeader, inlineToolbar: true, config: { levels: [1, 2, 3], defaultLevel: 2 } },
+            h1: { class: KoreanHeader1, inlineToolbar: true, config: { levels: [1], defaultLevel: 1 } },
+            h2: { class: KoreanHeader2, inlineToolbar: true, config: { levels: [2], defaultLevel: 2 } },
+            h3: { class: KoreanHeader3, inlineToolbar: true, config: { levels: [3], defaultLevel: 3 } },
+            list: { class: KoreanList, inlineToolbar: true },
+            checklist: { class: KoreanChecklist, inlineToolbar: true },
+            quote: { class: KoreanQuote, inlineToolbar: true },
+            delimiter: { class: LineDelimiterTool },
+            code: KoreanCode,
+            table: { class: KoreanTable, inlineToolbar: true },
+            toggle: { class: ToggleTool, inlineToolbar: true },
+            image: { class: ImageTool, inlineToolbar: true },
+        },
+        onReady: () => {
+            const holder = document.getElementById('editor');
+            let isConverting = false;
+            let convertTimer = null;
+
+            // 현재 포커스된 paragraph 블록 정보 반환
+            const getFocusedParaInfo = () => {
+                // .ce-block--focused 우선, 없으면 activeElement 기반
+                let paraEl = holder.querySelector('.ce-block--focused .ce-paragraph');
+                if (!paraEl) {
+                    const act = document.activeElement;
+                    const blk = act ? act.closest('.ce-block') : null;
+                    paraEl = blk ? blk.querySelector('.ce-paragraph') : null;
+                }
+                if (!paraEl) return null;
+
+                const blockEl = paraEl.closest('.ce-block');
+                if (!blockEl) return null;
+                const idx = Array.from(holder.querySelectorAll('.ce-block')).indexOf(blockEl);
+                if (idx < 0) return null;
+
+                const raw = (paraEl.textContent || '')
+                    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+                    .replace(/\u00A0/g, ' ');
+
+                return { idx, raw, paraEl };
+            };
+
+            // 텍스트 패턴 → 커맨드 매핑 (공백 포함 패턴만, prefix-only 제외)
+            const parseShortcut = (raw) => {
+                const s = (raw || '').trimStart();
+                if (s.startsWith('## ')) return { command: 'h2', text: s.slice(3).trimStart() };
+                if (s.startsWith('### ')) return { command: 'h3', text: s.slice(4).trimStart() };
+                if (s.startsWith('# '))  return { command: 'h1', text: s.slice(2).trimStart() };
+                if (s.startsWith('- '))  return { command: 'list', text: s.slice(2).trimStart() };
+                if (s.startsWith('* '))  return { command: 'list', text: s.slice(2).trimStart() };
+                if (s.startsWith('> '))  return { command: 'quote', text: s.slice(2).trimStart() };
+                if (s.startsWith('/제목1 ')) return { command: 'h1', text: s.slice(5).trimStart() };
+                if (s.startsWith('/제목2 ')) return { command: 'h2', text: s.slice(5).trimStart() };
+                if (s.startsWith('/제목3 ')) return { command: 'h3', text: s.slice(5).trimStart() };
+                if (s.startsWith('/h1 ')) return { command: 'h1', text: s.slice(4).trimStart() };
+                if (s.startsWith('/h2 ')) return { command: 'h2', text: s.slice(4).trimStart() };
+                if (s.startsWith('/h3 ')) return { command: 'h3', text: s.slice(4).trimStart() };
+                if (s.startsWith('/todo ')) return { command: 'todo', text: s.slice(6).trimStart() };
+                if (s.startsWith('/표 ')) return { command: 'table', text: s.slice(3).trimStart() };
+                if (s.startsWith('/토글 ')) return { command: 'toggle', text: s.slice(4).trimStart() };
+                if (s.startsWith('/이미지 ')) return { command: 'image', text: s.slice(5).trimStart() };
+                const t = s.trim();
+                if (t === '/divider' || t === '/구분선') return { command: 'divider', text: '' };
+                if (t === '/표') return { command: 'table', text: '' };
+                if (t === '/토글') return { command: 'toggle', text: '' };
+                if (t === '/이미지') return { command: 'image', text: '' };
+                return null;
+            };
+
+            // prefix-only 패턴 (Enter 전용)
+            const parsePrefixShortcut = (raw) => {
+                const t = (raw || '').trim();
+                if (t === '#')    return { command: 'h1', text: '' };
+                if (t === '##')   return { command: 'h2', text: '' };
+                if (t === '###')  return { command: 'h3', text: '' };
+                if (t === '-')    return { command: 'list', text: '' };
+                if (t === '>')    return { command: 'quote', text: '' };
+                if (t === '/h1')  return { command: 'h1', text: '' };
+                if (t === '/h2')  return { command: 'h2', text: '' };
+                if (t === '/h3')  return { command: 'h3', text: '' };
+                if (t === '/todo') return { command: 'todo', text: '' };
+                if (t === '/표') return { command: 'table', text: '' };
+                if (t === '/토글') return { command: 'toggle', text: '' };
+                if (t === '/이미지') return { command: 'image', text: '' };
+                return null;
+            };
+
+            const applyCommand = (idx, command, text = '') => {
+                if (idx < 0) return;
+                const blk = editor.blocks.getBlockByIndex(idx);
+                if (!blk || blk.name !== 'paragraph') return;
+
+                // 변환 중 플래그 — MutationObserver 재진입 방지
+                isConverting = true;
+                clearTimeout(convertTimer);
+
+                editor.blocks.delete(idx);
+
+                if (command === 'h1') {
+                    editor.blocks.insert('h1', { text, level: 1 }, undefined, idx, true);
+                } else if (command === 'h2') {
+                    editor.blocks.insert('h2', { text, level: 2 }, undefined, idx, true);
+                } else if (command === 'h3') {
+                    editor.blocks.insert('h3', { text, level: 3 }, undefined, idx, true);
+                } else if (command === 'list') {
+                    editor.blocks.insert('list', { style: 'unordered', items: [text || ''] }, undefined, idx, true);
+                } else if (command === 'quote') {
+                    editor.blocks.insert('quote', { text, caption: '' }, undefined, idx, true);
+                } else if (command === 'todo') {
+                    editor.blocks.insert('checklist', { items: [{ text: text || '', checked: false }] }, undefined, idx, true);
+                } else if (command === 'table') {
+                    editor.blocks.insert('table', {
+                        withHeadings: false,
+                        content: [
+                            ['', ''],
+                            ['', ''],
+                        ],
+                    }, undefined, idx, true);
+                } else if (command === 'toggle') {
+                    editor.blocks.insert('toggle', { title: text || '토글 제목', items: ['토글 내용을 작성하세요.'] }, undefined, idx, true);
+                } else if (command === 'image') {
+                    editor.blocks.insert('image', { url: text || '', caption: '', alt: '' }, undefined, idx, true);
+                } else if (command === 'divider') {
+                    editor.blocks.insert('delimiter', {}, undefined, idx, false);
+                    editor.blocks.insert('paragraph', { text: '' }, undefined, idx + 1, true);
+                }
+
+                // 변환 후 커서를 해당 블록으로 명시적 이동
+                window.requestAnimationFrame(() => {
+                    if (command === 'toggle') {
+                        const toggleTitle = holder.querySelector('.mj-toggle-tool__title');
+                        if (toggleTitle) toggleTitle.focus();
+                        return;
+                    }
+                    if (command === 'image') {
+                        const imageUrl = holder.querySelector('.mj-image-tool input[type="url"]');
+                        if (imageUrl) imageUrl.focus();
+                        return;
+                    }
+                    if (command === 'table') return;
+                    try { editor.caret.setToBlock(idx, 'end'); } catch (_) {}
+                });
+
+                // 변환 완료 후 플래그 해제 (충분한 딜레이)
+                convertTimer = setTimeout(() => { isConverting = false; }, 400);
+            };
+
+            const readClipboardImageAsDataUrl = (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result || ''));
+                reader.onerror = () => reject(reader.error || new Error('이미지를 읽을 수 없습니다.'));
+                reader.readAsDataURL(file);
+            });
+
+            const insertClipboardImage = async (file) => {
+                if (!file || !file.type || !file.type.startsWith('image/')) return;
+                const info = getFocusedParaInfo();
+                if (!info) return;
+
+                isConverting = true;
+                clearTimeout(convertTimer);
+
+                let targetIndex = info.idx + 1;
+                if ((info.raw || '').trim() === '') {
+                    editor.blocks.delete(info.idx);
+                    targetIndex = info.idx;
+                }
+
+                const dataUrl = await readClipboardImageAsDataUrl(file);
+                editor.blocks.insert('image', {
+                    url: dataUrl,
+                    caption: '',
+                    alt: file.name || '',
+                }, undefined, targetIndex, true);
+                editor.blocks.insert('paragraph', { text: '' }, undefined, targetIndex + 1, true);
+
+                window.requestAnimationFrame(() => {
+                    try { editor.caret.setToBlock(targetIndex + 1, 'end'); } catch (_) {}
+                });
+
+                convertTimer = setTimeout(() => { isConverting = false; }, 400);
+            };
+
+            // ── MutationObserver: 공백 입력 패턴 감지 ──────────────────
+            const observer = new MutationObserver(() => {
+                if (isConverting) return;
+                window.requestAnimationFrame(() => {
+                    if (isConverting) return;
+                    const info = getFocusedParaInfo();
+                    if (!info) return;
+                    const sc = parseShortcut(info.raw);
+                    if (sc) applyCommand(info.idx, sc.command, sc.text);
+                });
+            });
+
+            observer.observe(holder, { subtree: true, childList: true, characterData: true });
+
+            holder.addEventListener('paste', async (e) => {
+                if (isConverting) return;
+                const items = Array.from(e.clipboardData?.items || []);
+                const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
+                if (!imageItem) return;
+
+                const file = imageItem.getAsFile();
+                if (!file) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                try {
+                    await insertClipboardImage(file);
+                } catch (err) {
+                    console.error(err);
+                }
+            }, true);
+
+            // ── keydown: Enter 전용 (prefix-only 변환 + 일반 Enter 정상 동작) ──
+            holder.addEventListener('keydown', (e) => {
+                if (e.isComposing) return;
+                if (e.key !== 'Enter') return;
+                if (isConverting) return;
+
+                const info = getFocusedParaInfo();
+                if (!info) return;
+
+                const sc = parsePrefixShortcut(info.raw);
+                if (!sc) return; // 패턴 없으면 Editor.js 기본 Enter 동작
+
+                e.preventDefault();
+                e.stopPropagation();
+                applyCommand(info.idx, sc.command, sc.text);
+            }, true);
+        },
+    });
 
     const applyFont = () => {
         const fontFamily = fontSelect.value;
-        quill.root.style.fontFamily = fontFamily;
+        const zone = document.querySelector('.codex-editor');
+        if (zone) zone.style.fontFamily = fontFamily;
         previewPanel.style.fontFamily = fontFamily;
     };
     fontSelect.addEventListener('change', applyFont);
     setTimeout(applyFont, 0);
 
-    const syncContent = () => {
-        contentInput.value = quill.root.innerHTML;
+    const syncContent = async () => {
+        const output = await editor.save();
+        contentInput.value = JSON.stringify(output);
     };
 
-    const togglePreview = () => {
-        syncContent();
+    const renderPreviewHtml = (output) => {
+        const chunks = [];
+        (output.blocks || []).forEach((block) => {
+            const d = block.data || {};
+            if (block.type === 'paragraph') chunks.push(`<p class="mb-3">${d.text || ''}</p>`);
+            if (block.type === 'header' || block.type === 'h1' || block.type === 'h2' || block.type === 'h3') {
+                const level = block.type === 'h1' ? 1 : block.type === 'h2' ? 2 : block.type === 'h3' ? 3 : (d.level || 2);
+                chunks.push(`<h${level} class="font-semibold mt-4 mb-2">${d.text || ''}</h${level}>`);
+            }
+            if (block.type === 'quote') chunks.push(`<blockquote class="border-l-4 border-[#d2d2d7] pl-4 my-3 italic">${d.text || ''}</blockquote>`);
+            if (block.type === 'delimiter') chunks.push('<hr class="my-4 border-black/[0.12]" />');
+            if (block.type === 'image') {
+                const url = d.url || d.file?.url || '';
+                if (url) {
+                    const safeUrl = url.replace(/"/g, '&quot;');
+                    chunks.push(`<figure class="my-4 overflow-hidden rounded-2xl border border-black/[0.08] bg-[#f9f9fb]"><img src="${safeUrl}" alt="${d.alt || ''}" class="block w-full max-h-[420px] object-cover" />${d.caption ? `<figcaption class="px-4 py-3 text-[12px] text-[#8e8e93]">${d.caption}</figcaption>` : ''}</figure>`);
+                }
+            }
+            if (block.type === 'code') chunks.push(`<pre class="bg-[#f2f2f7] p-3 rounded-lg my-3 overflow-auto"><code>${(d.code || '').replace(/</g, '&lt;')}</code></pre>`);
+            if (block.type === 'list') {
+                const tag = d.style === 'ordered' ? 'ol' : 'ul';
+                const items = (d.items || []).map((it) => `<li>${typeof it === 'string' ? it : (it.content || '')}</li>`).join('');
+                chunks.push(`<${tag} class="pl-5 mb-3 list-${d.style === 'ordered' ? 'decimal' : 'disc'}">${items}</${tag}>`);
+            }
+            if (block.type === 'checklist') {
+                const items = (d.items || []).map((it) => `<li>${it.checked ? '✅' : '⬜'} ${it.text || ''}</li>`).join('');
+                chunks.push(`<ul class="mb-3">${items}</ul>`);
+            }
+            if (block.type === 'table') {
+                const rows = d.content || [];
+                if (rows.length) {
+                    const rowHtml = rows.map((row) => `<tr>${(row || []).map((cell) => `<td class="border border-black/[0.08] px-3 py-2">${cell || ''}</td>`).join('')}</tr>`).join('');
+                    chunks.push(`<div class="my-4 overflow-x-auto"><table class="min-w-full border-collapse">${rowHtml}</table></div>`);
+                }
+            }
+            if (block.type === 'toggle') {
+                const items = (d.items || []).map((item) => `<p class="mb-1">${item || ''}</p>`).join('');
+                chunks.push(`<details class="my-4 rounded-2xl border border-black/[0.08] bg-white"><summary class="cursor-pointer select-none px-4 py-3 font-medium list-none">${d.title || '토글'}</summary><div class="px-4 pb-4 text-[#6e6e73]">${items}</div></details>`);
+            }
+        });
+        return chunks.join('') || '<p class="text-[#8e8e93]">미리보기할 내용이 없습니다.</p>';
+    };
+
+    const togglePreview = async () => {
+        await syncContent();
+        const output = JSON.parse(contentInput.value || '{"blocks": []}');
         if (previewPanel.classList.contains('hidden')) {
-            previewPanel.innerHTML = contentInput.value || '<p class="text-[#8e8e93]">미리보기할 내용이 없습니다.</p>';
+            previewPanel.innerHTML = renderPreviewHtml(output);
             previewPanel.classList.remove('hidden');
         } else {
             previewPanel.classList.add('hidden');
@@ -208,39 +891,63 @@
     slashButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
             const cmd = btn.dataset.cmd;
-            const range = quill.getSelection(true) || { index: quill.getLength(), length: 0 };
-
             if (cmd === 'h1') {
-                quill.formatLine(range.index, 1, 'header', 1);
+                editor.blocks.insert('h1', { text: '', level: 1 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             } else if (cmd === 'h2') {
-                quill.formatLine(range.index, 1, 'header', 2);
+                editor.blocks.insert('h2', { text: '', level: 2 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
+            } else if (cmd === 'h3') {
+                editor.blocks.insert('h3', { text: '', level: 3 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             } else if (cmd === 'todo') {
-                quill.formatLine(range.index, 1, 'list', 'check');
+                editor.blocks.insert('checklist', { items: [{ text: '', checked: false }] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
+            } else if (cmd === 'table') {
+                editor.blocks.insert('table', { withHeadings: false, content: [['', ''], ['', '']] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             } else if (cmd === 'divider') {
-                quill.insertText(range.index, '\n──────────\n');
-                quill.setSelection(range.index + 12, 0);
+                editor.blocks.insert('delimiter', {}, undefined, editor.blocks.getCurrentBlockIndex() + 1, false);
+                editor.blocks.insert('paragraph', { text: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 2, true);
             } else if (cmd === 'toggle') {
-                quill.insertText(range.index, '▶ 토글 제목\n토글 내용\n');
-                quill.setSelection(range.index + 2, 0);
+                editor.blocks.insert('toggle', { title: '토글 제목', items: ['토글 내용을 작성하세요.'] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
+            } else if (cmd === 'image') {
+                editor.blocks.insert('image', { url: '', caption: '', alt: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             }
-
-            quill.focus();
         });
     });
 
-    draftBtn.addEventListener('click', () => {
-        syncContent();
+    blockButtons.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const type = btn.dataset.block;
+            const at = editor.blocks.getCurrentBlockIndex() + 1;
+            if (type === 'paragraph') editor.blocks.insert('paragraph', { text: '' }, undefined, at, true);
+            if (type === 'h1') editor.blocks.insert('h1', { text: '', level: 1 }, undefined, at, true);
+            if (type === 'h2') editor.blocks.insert('h2', { text: '', level: 2 }, undefined, at, true);
+            if (type === 'h3') editor.blocks.insert('h3', { text: '', level: 3 }, undefined, at, true);
+            if (type === 'list') editor.blocks.insert('list', { style: 'unordered', items: [''] }, undefined, at, true);
+            if (type === 'checklist') editor.blocks.insert('checklist', { items: [{ text: '', checked: false }] }, undefined, at, true);
+            if (type === 'quote') editor.blocks.insert('quote', { text: '', caption: '' }, undefined, at, true);
+            if (type === 'code') editor.blocks.insert('code', { code: '' }, undefined, at, true);
+            if (type === 'table') editor.blocks.insert('table', { withHeadings: false, content: [['', ''], ['', '']] }, undefined, at, true);
+            if (type === 'toggle') editor.blocks.insert('toggle', { title: '', items: [''] }, undefined, at, true);
+            if (type === 'image') editor.blocks.insert('image', { url: '', caption: '', alt: '' }, undefined, at, true);
+            if (type === 'divider') editor.blocks.insert('delimiter', {}, undefined, at, true);
+        });
+    });
+
+    draftBtn.addEventListener('click', async () => {
+        await syncContent();
         submitAction.value = 'draft';
         form.submit();
     });
 
-    publishBtn.addEventListener('click', () => {
-        syncContent();
+    publishBtn.addEventListener('click', async () => {
+        await syncContent();
         submitAction.value = 'publish';
         form.submit();
     });
 
-    form.addEventListener('submit', syncContent);
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await syncContent();
+        form.submit();
+    });
 })();
 </script>
 {% endblock %}

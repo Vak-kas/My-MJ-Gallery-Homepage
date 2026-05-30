@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% load blog_extras %}
+
+{% block content %}
+<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+        <nav class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
+            <a href="{% url 'blog:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Blog</a>
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Studio</a>
+                {% endif %}
+                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="mx-auto max-w-[1320px] px-6 py-12 lg:py-16">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <a href="{% url 'blog:index' %}#feed" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+            <span class="text-[18px]">←</span>
+            <span>목록으로</span>
+        </a>
+        <div class="flex items-center gap-2">
+            <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">조회 {{ post.views }}</span>
+            <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">좋아요 {{ likes_count|default:0 }}</span>
+        </div>
+    </div>
+
+    <article class="overflow-hidden rounded-[28px] border border-black/[0.08] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
+        {% with cover_from_content=post.content|editorjs_cover_image %}
+        <div class="border-b border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff]">
+            {% if cover_from_content %}
+            <img src="{{ cover_from_content }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
+            {% elif post.cover_image %}
+            <img src="{{ post.cover_image.url }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
+            {% else %}
+            <div class="flex h-[260px] items-center justify-center lg:h-[360px]">
+                <div class="text-center">
+                    <div class="mx-auto flex h-20 w-20 items-center justify-center rounded-[24px] bg-white/90 text-[28px] font-semibold text-[#0066cc] shadow-sm">MJ</div>
+                    <p class="mt-4 text-[12px] font-medium uppercase tracking-[0.16em] text-[#8e8e93]">No cover image</p>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endwith %}
+
+        <div class="border-b border-black/[0.06] px-6 py-5 lg:px-10 lg:py-7">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0066cc]">{{ post.get_category_display }}</span>
+                {% if post.is_published %}
+                <span class="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-700">Published</span>
+                {% else %}
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[11px] font-semibold text-amber-700">Draft</span>
+                {% endif %}
+            </div>
+
+            <h1 class="mt-4 text-[36px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[48px]">{{ post.title }}</h1>
+            {% if post.summary %}
+            <p class="mt-4 max-w-3xl text-[17px] leading-[1.75] text-[#6e6e73]">{{ post.summary }}</p>
+            {% endif %}
+
+            <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[#8e8e93]">
+                <span>작성자 {{ post.author|default:"익명" }}</span>
+                <span>·</span>
+                <span>{{ post.published_at|default:post.created_at|date:"Y.m.d H:i" }}</span>
+                <span>·</span>
+                <span>댓글 {{ comment_count }}</span>
+            </div>
+
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+                {% if user.is_authenticated %}
+                <form method="post" action="{% url 'blog:post_detail' post.slug %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="like">
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-semibold transition-colors {% if user_liked %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">
+                        <span>{% if user_liked %}💙{% else %}🤍{% endif %}</span>
+                        {% if user_liked %}좋아요 취소{% else %}좋아요{% endif %}
+                    </button>
+                </form>
+                {% else %}
+                <a href="{% url 'accounts:login' %}" class="inline-flex items-center gap-2 rounded-full border border-black/[0.1] px-4 py-2 text-[13px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]">🤍 좋아요는 로그인 후</a>
+                {% endif %}
+
+                {% if can_manage_post %}
+                <a href="{% url 'blog:post_edit' post.slug %}" class="inline-flex items-center gap-2 rounded-full border border-black/[0.1] px-4 py-2 text-[13px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7]">✏️ 수정</a>
+                <form method="post" action="{% url 'blog:post_delete' post.slug %}" onsubmit="return confirm('이 글을 삭제할까요?');">
+                    {% csrf_token %}
+                    <button type="submit" class="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-4 py-2 text-[13px] font-semibold text-red-600 hover:bg-red-100">🗑️ 삭제</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="px-6 py-8 lg:px-10 lg:py-10">
+            <div class="prose max-w-none prose-p:leading-[1.9] prose-headings:tracking-[-0.03em] prose-h1:text-[2.1rem] prose-h2:text-[1.65rem] prose-h3:text-[1.3rem] prose-table:w-full prose-img:rounded-2xl">
+                {{ post.content|render_editorjs }}
+            </div>
+        </div>
+    </article>
+
+    <section class="mt-10 space-y-8">
+        <div class="rounded-[24px] border border-black/[0.08] bg-white p-6">
+            <div class="flex items-center justify-between gap-3">
+                <h2 class="text-[22px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">댓글 {{ comment_count }}</h2>
+                <span class="text-[13px] text-[#8e8e93]">내 생각을 남겨주세요</span>
+            </div>
+
+            <form method="post" action="{% url 'blog:post_detail' post.slug %}" class="mt-5 space-y-3 rounded-[20px] border border-black/[0.08] bg-[#fafafb] p-4">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="comment">
+                <div class="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
+                    <input type="text" name="author_name" maxlength="60" value="{{ comment_form_author }}" placeholder="이름"
+                        class="h-10 rounded-xl border border-black/[0.1] bg-white px-4 text-[13px] outline-none focus:border-[#0066cc]" />
+                    <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">댓글 등록</button>
+                </div>
+                <textarea name="content" rows="4" maxlength="1200" placeholder="댓글을 입력하세요"
+                    class="w-full rounded-xl border border-black/[0.1] bg-white px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]"></textarea>
+                <p class="text-[11px] text-[#8e8e93]">댓글은 바로 반영됩니다.</p>
+            </form>
+
+            <div class="mt-6 space-y-4">
+                {% for comment in visible_comments %}
+                <article class="rounded-[18px] border border-black/[0.08] bg-[#fafafb] p-4">
+                    <p class="text-[14px] leading-[1.8] text-[#1d1d1f]">{{ comment.content|linebreaksbr }}</p>
+                    <p class="mt-3 text-[12px] text-[#8e8e93]">{{ comment.author_name }} · {{ comment.created_at|date:"Y.m.d H:i" }}</p>
+                </article>
+                {% empty %}
+                <p class="text-[14px] text-[#8e8e93]">아직 댓글이 없습니다.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+</main>
+{% endblock %}

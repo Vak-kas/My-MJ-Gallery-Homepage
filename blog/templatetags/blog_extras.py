@@ -1,10 +1,57 @@
 import json
+import re
 
 from django import template
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
 register = template.Library()
+
+
+def _strip_tags_text(value: str):
+    if not value:
+        return ""
+    return re.sub(r"<[^>]+>", "", value).strip()
+
+
+def _collect_block_text(block):
+    t = block.get("type", "")
+    d = block.get("data", {}) or {}
+
+    if t in {"paragraph", "header", "h1", "h2", "h3", "quote"}:
+        return _strip_tags_text(d.get("text", ""))
+
+    if t in {"list", "nestedList"}:
+        items = d.get("items", [])
+        chunks = []
+        for item in items:
+            if isinstance(item, dict):
+                chunks.append(_strip_tags_text(item.get("content", "")))
+                for sub_item in item.get("items", []):
+                    if isinstance(sub_item, dict):
+                        chunks.append(_strip_tags_text(sub_item.get("content", "")))
+                    else:
+                        chunks.append(_strip_tags_text(str(sub_item)))
+            else:
+                chunks.append(_strip_tags_text(str(item)))
+        return " ".join([c for c in chunks if c])
+
+    if t == "checklist":
+        items = d.get("items", [])
+        return " ".join(_strip_tags_text(item.get("text", "")) for item in items if isinstance(item, dict))
+
+    if t == "code":
+        return d.get("code", "").strip()
+
+    if t == "table":
+        rows = d.get("content", [])
+        cells = []
+        for row in rows:
+            for cell in row:
+                cells.append(_strip_tags_text(str(cell)))
+        return " ".join(cells)
+
+    return ""
 
 
 def _render_list_items(items, style):
@@ -22,6 +69,30 @@ def _render_list_items(items, style):
         else:
             parts.append(f"<li class='mb-1'>{item}</li>")
     return "".join(parts)
+
+
+def _extract_cover_image_url(content):
+    if not content:
+        return ""
+    try:
+        data = json.loads(content)
+        blocks = data.get("blocks", []) if isinstance(data, dict) else []
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return ""
+
+    first_image_url = ""
+    for block in blocks:
+        if block.get("type") != "image":
+            continue
+        image_data = block.get("data", {}) or {}
+        url = image_data.get("url") or image_data.get("file", {}).get("url") or image_data.get("src") or ""
+        if not url:
+            continue
+        if not first_image_url:
+            first_image_url = url
+        if image_data.get("isCover"):
+            return url
+    return first_image_url
 
 
 @register.filter
@@ -46,9 +117,9 @@ def render_editorjs(content):
             a_cls = f"text-{align}" if align in ("left", "center", "right", "justify") else ""
             html.append(f'<p class="mb-4 leading-[1.85] {a_cls}">{text}</p>')
 
-        elif t == "header":
+        elif t in {"header", "h1", "h2", "h3"}:
             text = d.get("text", "")
-            level = max(1, min(6, int(d.get("level", 2))))
+            level = 1 if t == "h1" else 2 if t == "h2" else 3 if t == "h3" else max(1, min(6, int(d.get("level", 2))))
             sizes = {
                 1: "text-[2rem] font-bold mt-10 mb-4 tracking-tight",
                 2: "text-[1.5rem] font-semibold mt-8 mb-3 tracking-tight",
@@ -100,9 +171,19 @@ def render_editorjs(content):
 
         elif t == "delimiter":
             html.append(
-                '<div class="my-10 flex items-center justify-center gap-4 text-[#c7c7cc] text-lg select-none">'
-                '<span>✦</span><span>✦</span><span>✦</span></div>'
+                '<div class="my-10 flex items-center justify-center"><hr class="w-full border-t border-[#d2d2d7]" /></div>'
             )
+
+        elif t == "image":
+            url = d.get("url") or d.get("file", {}).get("url") or d.get("src")
+            if url:
+                caption = d.get("caption", "")
+                html.append(
+                    f'<figure class="my-5 overflow-hidden rounded-2xl border border-[#e5e5ea] bg-[#f9f9fb]">'
+                    f'<img src="{escape(url)}" alt="{escape(d.get("alt", ""))}" class="block w-full max-h-[520px] object-cover" />'
+                    f'{f"<figcaption class=\"px-4 py-3 text-sm text-[#8e8e93]\">{escape(caption)}</figcaption>" if caption else ""}'
+                    f'</figure>'
+                )
 
         elif t == "warning":
             title = d.get("title", "알림")
@@ -149,3 +230,26 @@ def render_editorjs(content):
             )
 
     return mark_safe("".join(html))
+
+
+@register.filter
+def editorjs_excerpt(content, max_chars=180):
+    """Editor.js JSON 또는 HTML/텍스트에서 요약 문자열 추출"""
+    text = ""
+    if content:
+        try:
+            data = json.loads(content)
+            blocks = data.get("blocks", []) if isinstance(data, dict) else []
+            parts = [_collect_block_text(block) for block in blocks]
+            text = " ".join([p for p in parts if p]).strip()
+        except (json.JSONDecodeError, TypeError, ValueError):
+            text = _strip_tags_text(content)
+
+    if len(text) <= int(max_chars):
+        return text
+    return text[: int(max_chars)].rstrip() + "…"
+
+
+@register.filter
+def editorjs_cover_image(content):
+    return _extract_cover_image_url(content)

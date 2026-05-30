@@ -108,11 +108,11 @@
                     </div>
                 </div>
 
-                <div class="mt-4 grid gap-4">
+                <div class="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                     {% for post in feed_posts %}
-                        {% include "blog/components/post_card.html" with post=post %}
+                        {% include "blog/components/post_card.html" with post=post compact=True %}
                     {% empty %}
-                    <p class="text-[14px] text-[#8e8e93]">
+                    <p class="col-span-full text-[14px] text-[#8e8e93]">
                         {% if search_query %}
                         검색된 게시글이 없습니다.
                         {% else %}

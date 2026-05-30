@@ -6,7 +6,7 @@
             <li class="flex gap-3 text-[13px]">
                 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#f2f2f7] text-[11px] font-semibold text-[#0066cc]">{{ forloop.counter }}</span>
                 <div class="min-w-0">
-                    <p class="truncate font-medium text-[#1d1d1f]">{{ post.title }}</p>
+                    <a href="{% url 'blog:post_detail' post.slug %}" class="truncate font-medium text-[#1d1d1f] hover:text-[#0066cc]">{{ post.title }}</a>
                 </div>
             </li>
             {% empty %}
@@ -32,7 +32,7 @@
             {% for comment in recent_comments|slice:":6" %}
             <li>
                 <p class="line-clamp-2 text-[13px] text-[#1d1d1f]">{{ comment.content|truncatechars:68 }}</p>
-                <p class="mt-1 text-[11px] text-[#8e8e93]">{{ comment.author_name }} · {{ comment.post.title|truncatechars:22 }}</p>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">{{ comment.author_name }} · <a href="{% url 'blog:post_detail' comment.post.slug %}" class="hover:text-[#0066cc]">{{ comment.post.title|truncatechars:22 }}</a></p>
             </li>
             {% empty %}
             <li class="text-[13px] text-[#8e8e93]">최근 댓글이 없습니다.</li>

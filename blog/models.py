@@ -29,6 +29,7 @@ class Post(models.Model):
 
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
 	title = models.CharField(max_length=200)
+	cover_image = models.ImageField(upload_to="blog/covers/", blank=True, null=True)
 	author = models.ForeignKey(
 		settings.AUTH_USER_MODEL,
 		on_delete=models.SET_NULL,
@@ -51,6 +52,23 @@ class Post(models.Model):
 
 	def __str__(self):
 		return f"[{self.get_category_display()}] {self.title}"
+
+
+class PostLike(models.Model):
+	post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="likes")
+	user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="blog_post_likes",
+	)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		unique_together = ("post", "user")
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"{self.user} likes {self.post.title}"
 
 
 class Comment(models.Model):
