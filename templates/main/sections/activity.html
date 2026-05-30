@@ -1,4 +1,20 @@
 <style>
+    .activity-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 2rem;
+    }
+
+    @media (min-width: 768px) {
+        .activity-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+
+    .activity-grid > .career-card {
+        margin-bottom: 0;
+    }
+
     .activity-detail-card {
         position: relative;
         overflow: visible;
@@ -90,7 +106,7 @@
         </div>
     </div>
 
-    <div class="career-grid">
+    <div class="activity-grid">
         {% for section in activity_sections %}
         {% if section.total > 0 %}
         <article class="reveal career-card rounded-[30px] border border-black/10 bg-white p-6 transition duration-300 hover:-translate-y-1 hover:border-[#0066cc]/20">
