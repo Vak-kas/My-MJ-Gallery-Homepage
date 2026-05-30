@@ -68,6 +68,26 @@
             background: #ffffff;
         }
 
+        .site-global-nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 70;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+        }
+
+        .has-global-navbar {
+            padding-top: 62px;
+        }
+
+        .has-global-navbar #studio-sidebar {
+            top: 62px;
+            height: calc(100vh - 62px);
+        }
+
         html.theme-dark body {
             background: #0f1115;
             color: #f3f4f6;
@@ -104,10 +124,38 @@
             color: #f3f4f6;
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
         }
+
+        html.theme-dark .site-global-nav {
+            border-bottom-color: rgba(255, 255, 255, 0.12);
+            background: rgba(15, 18, 24, 0.88);
+        }
     </style>
 </head>
 
-<body class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f] antialiased">
+<body class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f] antialiased {% if request.resolver_match.namespace == 'studio' %}has-global-navbar{% endif %}">
+    {% if request.resolver_match.namespace == 'studio' %}
+    <header class="site-global-nav">
+        <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+            <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+            <nav class="flex items-center gap-2">
+                <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
+                <a href="{% url 'main:blog' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Tech Blog</a>
+                <a href="{% url 'main:board' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Board</a>
+                <a href="{% url 'main:diary' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Diary</a>
+
+                {% if user.is_authenticated %}
+                    {% if user.is_superuser %}
+                    <a href="{% url 'studio:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Studio</a>
+                    {% endif %}
+                    <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+                {% else %}
+                    <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+    {% endif %}
+
     {% block content %}
     {% endblock %}
 
