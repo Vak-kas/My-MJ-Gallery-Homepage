@@ -25,7 +25,7 @@
 </div>
 
 <div id="section-flash" class="section-flash"></div>
-<nav id="side-toc" class="side-toc" aria-label="페이지 섹션 목차"></nav>
+<nav id="side-toc" class="side-toc" aria-label="Page section navigation"></nav>
 
 {% include "main/sections/hero_intro.html" %}
 
@@ -809,14 +809,14 @@
     let lastScrollY = window.scrollY;
 
     const tocSchema = [
-        { key: 'hero', label: '인트로' },
-        { key: 'profile', label: '프로필' },
-        { key: 'skill', label: '스킬' },
-        { key: 'career', label: '커리어' },
-        { key: 'activity', label: '활동' },
-        { key: 'award', label: '수상' },
-        { key: 'publication', label: '출판' },
-        { key: 'project', label: '프로젝트' },
+        { key: 'hero', label: 'Intro' },
+        { key: 'profile', label: 'Profile' },
+        { key: 'skill', label: 'Skills' },
+        { key: 'career', label: 'Career' },
+        { key: 'activity', label: 'Activity' },
+        { key: 'award', label: 'Awards' },
+        { key: 'publication', label: 'Publications' },
+        { key: 'project', label: 'Projects' },
     ];
 
     const tocItems = [];
@@ -836,7 +836,7 @@
             const btn = document.createElement('button');
             btn.type = 'button';
             btn.className = 'side-toc-dot';
-            btn.setAttribute('aria-label', `${item.label} 섹션으로 이동`);
+            btn.setAttribute('aria-label', `Go to ${item.label} section`);
             btn.title = item.label;
             btn.addEventListener('click', () => {
                 const top = Math.max(sectionEl.offsetTop - NAV_OFFSET, 0);
