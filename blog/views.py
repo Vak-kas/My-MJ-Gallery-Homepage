@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -160,7 +162,7 @@ def index(request):
 		current_sort = "latest"
 
 	mine_only = request.user.is_authenticated and request.GET.get("mine") == "1"
-	page_limit = 10
+	page_limit = 15
 
 	post_comment_count = Count("comments", filter=Q(comments__is_visible=True), distinct=True)
 	feed_qs = _accessible_posts_qs(request).annotate(visible_comment_count=post_comment_count)
@@ -184,6 +186,14 @@ def index(request):
 		order_fields = ("-published_at", "-id")
 
 	all_posts = list(feed_qs.order_by(*order_fields))
+	recent_badge_cutoff = timezone.now() - timedelta(days=3)
+
+	def _preview_posts(category: str):
+		posts = [post for post in all_posts if post.category == category][:3]
+		for post in posts:
+			published_at = post.published_at or post.created_at
+			post.is_new_badge = bool(published_at and published_at >= recent_badge_cutoff)
+		return posts
 
 	def _query_link(**updates):
 		params = {}
@@ -210,6 +220,10 @@ def index(request):
 		return f"?{query}" if query else ""
 	feed_posts = all_posts if show_all else all_posts[:page_limit]
 	has_more_posts = len(all_posts) > page_limit and not show_all
+	tech_posts = _preview_posts(Post.CATEGORY_TECH)
+	board_posts = _preview_posts(Post.CATEGORY_BOARD)
+	life_posts = _preview_posts(Post.CATEGORY_LIFE)
+	secret_posts = _preview_posts(Post.CATEGORY_SECRET)
 
 	context = {
 		"active_tab": "hub",
@@ -229,10 +243,14 @@ def index(request):
 		"collapse_qs": _query_link(show=None),
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
-		"tech_posts": [post for post in all_posts if post.category == Post.CATEGORY_TECH][:3],
-		"board_posts": [post for post in all_posts if post.category == Post.CATEGORY_BOARD][:3],
-		"life_posts": [post for post in all_posts if post.category == Post.CATEGORY_LIFE][:3],
-		"secret_posts": [post for post in all_posts if post.category == Post.CATEGORY_SECRET][:3],
+		"tech_posts": tech_posts,
+		"board_posts": board_posts,
+		"life_posts": life_posts,
+		"secret_posts": secret_posts,
+		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
+		"board_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_BOARD),
+		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
+		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
 	}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/index.html", context)
