@@ -113,7 +113,7 @@
 
             <div class="space-y-3">
                 {% for item in section.items %}
-                <div class="group activity-detail-card rounded-[22px] bg-[#fbfbfd] px-4 py-4 transition duration-300 hover:bg-[#f5f5f7] {% if item.attachment %}has-attachment{% endif %}" {% if item.attachment %}data-activity-detail-card{% endif %}>
+                <div class="group activity-detail-card rounded-[22px] bg-[#fbfbfd] px-4 py-4 transition duration-300 hover:bg-[#f5f5f7] {% if item.attachment and item.is_attachment_public %}has-attachment{% endif %}" {% if item.attachment and item.is_attachment_public %}data-activity-detail-card{% endif %}>
                     <div class="flex items-start justify-between gap-4">
                         <div>
                             <h4 class="text-[15px] font-semibold text-[#1d1d1f]">{{ item.title }}</h4>
@@ -134,7 +134,7 @@
                                 {% if item.url %}
                                 <a href="{{ item.url }}" target="_blank" rel="noreferrer" class="text-[#0066cc] hover:underline">관련 링크</a>
                                 {% endif %}
-                                {% if item.attachment %}
+                                {% if item.attachment and item.is_attachment_public %}
                                 <a href="{{ item.attachment.url }}" target="_blank" rel="noreferrer" class="activity-detail-open-link text-[#0a84ff] hover:underline" aria-label="파일 열기">📎</a>
                                 {% endif %}
                             </div>
@@ -146,7 +146,7 @@
                         </time>
                     </div>
 
-                    {% if item.attachment %}
+                    {% if item.attachment and item.is_attachment_public %}
                     <div class="activity-detail-indicator">Detail →</div>
                     <div class="activity-attachment-popover p-3">
                         <p class="text-[11px] uppercase tracking-[0.14em] text-[#0a84ff]">Detail Preview</p>

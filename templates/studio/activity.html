@@ -248,6 +248,15 @@
                                 </label>
                             </div>
                             {% endif %}
+                            <div class="mt-3 flex items-center justify-between">
+                                <span class="text-[12px] font-semibold text-[#6e6e73]">파일 공개 여부</span>
+                                <label class="inline-flex cursor-pointer items-center gap-2">
+                                    <input type="hidden" name="is_attachment_public" value="false">
+                                    <input type="checkbox" name="is_attachment_public" value="true" {% if not editing_activity or editing_activity.is_attachment_public %}checked{% endif %} class="peer sr-only">
+                                    <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                    <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                                </label>
+                            </div>
                         </div>
 
                         <div>

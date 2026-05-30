@@ -132,6 +132,7 @@ def activity_create(request):
         attachment = request.FILES.get("attachment")
         if attachment:
             attachment.name = build_safe_upload_name(attachment.name, folder="activity", stem_limit=70)
+        is_attachment_public = request.POST.get("is_attachment_public") in ("true", "on")
         is_visible = request.POST.get("is_visible") == "true"
         order = get_next_order(Activity)
 
@@ -154,6 +155,7 @@ def activity_create(request):
             description=description,
             url=url,
             attachment=attachment,
+            is_attachment_public=is_attachment_public,
             is_visible=is_visible,
             order=order,
         )
@@ -188,6 +190,7 @@ def activity_update(request, id):
         if attachment:
             attachment.name = build_safe_upload_name(attachment.name, folder="activity", stem_limit=70)
         remove_attachment = request.POST.get("remove_attachment") == "true"
+        is_attachment_public = request.POST.get("is_attachment_public") in ("true", "on")
         is_visible = request.POST.get("is_visible") == "true"
         should_sync_preview = False
 
@@ -208,6 +211,7 @@ def activity_update(request, id):
         activity_item.is_current = is_current
         activity_item.description = description
         activity_item.url = url
+        activity_item.is_attachment_public = is_attachment_public
 
         if remove_attachment and activity_item.attachment:
             activity_item.attachment.delete(save=False)

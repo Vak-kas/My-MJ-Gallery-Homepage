@@ -361,6 +361,7 @@ class Activity(models.Model):
     description = models.TextField(blank=True)
     url = models.URLField(blank=True)
     attachment = models.FileField(upload_to="activity/", max_length=255, blank=True, null=True)
+    is_attachment_public = models.BooleanField(default=True, help_text="파일 공개 여부")
     preview_image = models.ImageField(upload_to="activity/previews/", max_length=255, blank=True, null=True)
 
     is_visible = models.BooleanField(default=True)
