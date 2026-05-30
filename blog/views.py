@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
 from django.http import Http404
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode
@@ -197,43 +198,100 @@ def secret(request):
 	return render(request, "blog/secret.html", _category_page(request, Post.CATEGORY_SECRET, "Secret"))
 
 
+def _build_unique_slug(title: str, exclude_post_id=None):
+	base_slug = slugify(title, allow_unicode=True) or "post"
+	slug = base_slug
+	counter = 1
+	qs = Post.objects.all()
+	if exclude_post_id:
+		qs = qs.exclude(id=exclude_post_id)
+	while qs.filter(slug=slug).exists():
+		slug = f"{base_slug}-{counter}"
+		counter += 1
+	return slug
+
+
 @login_required
 def post_create(request):
+	draft_id_param = (request.GET.get("draft") or "").strip()
+	selected_draft = None
+	if draft_id_param.isdigit():
+		selected_draft = Post.objects.filter(
+			id=int(draft_id_param),
+			author=request.user,
+			is_published=False,
+		).prefetch_related("tags").first()
+
+	draft_posts = list(
+		Post.objects.filter(author=request.user, is_published=False)
+		.order_by("-updated_at", "-id")[:20]
+	)
+
 	if request.method == "POST":
+		draft_id = (request.POST.get("draft_id") or "").strip()
+		existing_draft = None
+		if draft_id.isdigit():
+			existing_draft = Post.objects.filter(
+				id=int(draft_id),
+				author=request.user,
+				is_published=False,
+			).first()
+
 		title = (request.POST.get("title") or "").strip()
 		category = (request.POST.get("category") or "").strip()
 		summary = (request.POST.get("summary") or "").strip()
 		content = (request.POST.get("content") or "").strip()
 		tags_raw = (request.POST.get("tags") or "").strip()
-		is_published = request.POST.get("is_published") == "1"
+		submit_action = (request.POST.get("submit_action") or "publish").strip()
+		is_published = submit_action != "draft" and request.POST.get("is_published") == "1"
 
 		if not title or category not in dict(Post.CATEGORY_CHOICES):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
 			return render(request, "blog/write.html", {
 				"categories": Post.CATEGORY_CHOICES,
 				"form_data": request.POST,
+				"draft_posts": draft_posts,
+				"selected_draft": selected_draft,
 			})
 
-		# slug 생성 (중복 시 숫자 suffix)
-		base_slug = slugify(title, allow_unicode=True)
-		if not base_slug:
-			base_slug = "post"
-		slug = base_slug
-		counter = 1
-		while Post.objects.filter(slug=slug).exists():
-			slug = f"{base_slug}-{counter}"
-			counter += 1
+		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
+			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
+			return render(request, "blog/write.html", {
+				"categories": Post.CATEGORY_CHOICES,
+				"form_data": request.POST,
+				"draft_posts": draft_posts,
+				"selected_draft": selected_draft,
+			})
 
-		post = Post.objects.create(
-			title=title,
-			category=category,
-			slug=slug,
-			summary=summary[:240] if summary else "",
-			content=content,
-			author=request.user,
-			is_published=is_published,
-			published_at=timezone.now() if is_published else None,
-		)
+		if existing_draft:
+			post = existing_draft
+			post.title = title
+			post.category = category
+			if post.slug:
+				post.slug = _build_unique_slug(title, exclude_post_id=post.id)
+			else:
+				post.slug = _build_unique_slug(title, exclude_post_id=post.id)
+			post.summary = summary[:240] if summary else ""
+			post.content = content
+			post.is_published = is_published
+			if is_published and not post.published_at:
+				post.published_at = timezone.now()
+			if not is_published:
+				post.published_at = None
+			post.save()
+		else:
+			post = Post.objects.create(
+				title=title,
+				category=category,
+				slug=_build_unique_slug(title),
+				summary=summary[:240] if summary else "",
+				content=content,
+				author=request.user,
+				is_published=is_published,
+				published_at=timezone.now() if is_published else None,
+			)
+
+		post.tags.clear()
 
 		# 태그 처리 (쉼표 구분)
 		if tags_raw:
@@ -245,10 +303,29 @@ def post_create(request):
 				)
 				post.tags.add(tag)
 
-		messages.success(request, f'"{post.title}" 글이 등록되었습니다.')
+		if submit_action == "draft" or not is_published:
+			messages.success(request, f'"{post.title}" 글이 임시저장되었습니다.')
+			return redirect(f"{reverse('blog:post_create')}?draft={post.id}")
+		else:
+			messages.success(request, f'"{post.title}" 글이 등록되었습니다.')
 		return redirect("blog:index")
+
+	if selected_draft:
+		form_data = {
+			"draft_id": str(selected_draft.id),
+			"title": selected_draft.title,
+			"category": selected_draft.category,
+			"summary": selected_draft.summary,
+			"content": selected_draft.content,
+			"tags": ", ".join(tag.name for tag in selected_draft.tags.all()),
+			"is_published": "0",
+		}
+	else:
+		form_data = {}
 
 	return render(request, "blog/write.html", {
 		"categories": Post.CATEGORY_CHOICES,
-		"form_data": {},
+		"form_data": form_data,
+		"draft_posts": draft_posts,
+		"selected_draft": selected_draft,
 	})
