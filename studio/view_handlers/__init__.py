@@ -81,3 +81,10 @@ from .project import (
     project_toggle_visibility,
     project_reorder,
 )
+from .skill import (
+    skill,
+    skill_create,
+    skill_update,
+    skill_delete,
+    skill_toggle_visibility,
+)

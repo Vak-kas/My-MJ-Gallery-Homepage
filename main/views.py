@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.clickjacking import xframe_options_exempt
 from urllib.parse import quote
-from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Certification, Activity, Award, Publication, Project
+from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Certification, Activity, Award, Publication, Project, Skill
 
 
 def home(request):
@@ -41,6 +41,15 @@ def home(request):
     ]
 
     awards = Award.objects.filter(is_visible=True)
+    skills = Skill.objects.filter(is_visible=True)
+
+    skill_sections = [
+        {"key": "language_framework", "title": "Language & Framework", "icon": "🪄", "items": skills.filter(category="language_framework"), "total": skills.filter(category="language_framework").count()},
+        {"key": "devops_infra", "title": "DevOps/Infra Tools", "icon": "🏅", "items": skills.filter(category="devops_infra"), "total": skills.filter(category="devops_infra").count()},
+        {"key": "test_security", "title": "Test & Security Tools", "icon": "🔎", "items": skills.filter(category="test_security"), "total": skills.filter(category="test_security").count()},
+        {"key": "platform", "title": "Platform", "icon": "🐰", "items": skills.filter(category="platform"), "total": skills.filter(category="platform").count()},
+        {"key": "other", "title": "Other", "icon": "🧰", "items": skills.filter(category="other"), "total": skills.filter(category="other").count()},
+    ]
 
     award_stats = {
         "total": awards.count(),
@@ -61,7 +70,20 @@ def home(request):
         "publications_international": Publication.objects.filter(is_visible=True, publication_type="international"),
         "publications_domestic": Publication.objects.filter(is_visible=True, publication_type="domestic"),
         "projects": Project.objects.filter(is_visible=True),
+        "skill_sections": skill_sections,
     })
+
+
+def blog(request):
+    return render(request, "main/blog.html")
+
+
+def board(request):
+    return render(request, "main/board.html")
+
+
+def diary(request):
+    return render(request, "main/diary.html")
 
 
 @xframe_options_exempt

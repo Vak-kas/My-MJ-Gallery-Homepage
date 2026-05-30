@@ -44,6 +44,12 @@ urlpatterns = [
     path('project/<int:id>/delete/', views.project_delete, name='project_delete'),
     path('project/<int:id>/toggle-visibility/', views.project_toggle_visibility, name='project_toggle_visibility'),
     path('project/reorder/', views.project_reorder, name='project_reorder'),
+
+    path('skill/', views.skill, name='skill'),
+    path('skill/create/', views.skill_create, name='skill_create'),
+    path('skill/<int:id>/update/', views.skill_update, name='skill_update'),
+    path('skill/<int:id>/delete/', views.skill_delete, name='skill_delete'),
+    path('skill/<int:id>/toggle-visibility/', views.skill_toggle_visibility, name='skill_toggle_visibility'),
     
     # Education
     path('career/education/create/', views.education_create, name='education_create'),

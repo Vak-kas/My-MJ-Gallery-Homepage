@@ -2,45 +2,85 @@
 {% load static %}
 
 {% block content %}
-<div id="quick-nav" class="fixed right-5 top-5 z-50 flex gap-2">
-    <a href="/" id="home-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-        Home
-    </a>
-    {% if user.is_authenticated %}
-        {% if user.is_superuser %}
-        <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Studio
-        </a>
-        {% endif %}
-        <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Logout
-        </a>
-    {% else %}
-        <a href="{% url 'accounts:login' %}" id="login-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Login
-        </a>
-        <a href="{% url 'accounts:signup' %}" id="signup-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Signup
-        </a>
-    {% endif %}
+<div id="quick-nav" class="fixed inset-x-0 top-0 z-50 -translate-y-2 px-4 pt-4 opacity-0 transition-all duration-300 pointer-events-none md:px-8">
+    <nav class="mx-auto flex w-full max-w-[1320px] items-center justify-between rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur">
+        <a href="{% url 'main:home' %}" class="quick-nav-link rounded-full border border-transparent px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-white/20">MJ GALLERY</a>
+
+        <div class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" id="home-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Home</a>
+            <a href="{% url 'main:blog' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Tech Blog</a>
+            <a href="{% url 'main:board' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Board</a>
+            <a href="{% url 'main:diary' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Diary</a>
+
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Studio</a>
+                {% endif %}
+                <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" id="login-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Login</a>
+            {% endif %}
+        </div>
+    </nav>
 </div>
 
 <div id="section-flash" class="section-flash"></div>
+<nav id="side-toc" class="side-toc" aria-label="페이지 섹션 목차"></nav>
 
 {% include "main/sections/hero_intro.html" %}
 
 <main class="scroll-snap-main bg-[#f5f5f7] px-6 py-10 md:px-12 lg:px-24">
     {% include "main/sections/profile.html" %}
+    {% include "main/sections/skill.html" %}
     {% include "main/sections/career.html" %}
     {% include "main/sections/activity.html" %}
     {% include "main/sections/award.html" %}
     {% include "main/sections/publication.html" %}
     {% include "main/sections/project.html" %}
+
+    <section class="mx-auto mt-20 max-w-[1320px] pb-24">
+        <div class="overflow-hidden rounded-[30px] border border-black/[0.08] bg-white p-7 md:p-10">
+            <div class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NEXT STEP</p>
+                    <h3 class="mt-3 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f] md:text-[44px]">더 자세한 내용을 보고 싶다면</h3>
+                    <p class="mt-3 text-[16px] leading-[1.6] text-[#6e6e73]">카테고리별 페이지에서 기술 글, 자유게시판, 일기 콘텐츠를 확인하세요.</p>
+                </div>
+            </div>
+
+            <div class="mt-8 grid gap-3 md:grid-cols-3">
+                <a href="{% url 'main:blog' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
+                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Tech Blog</p>
+                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">기술 블로그</p>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">트러블슈팅 · 아키텍처</p>
+                </a>
+
+                <a href="{% url 'main:board' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
+                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Free Board</p>
+                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">자유게시판</p>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">일상/공지/자유 글</p>
+                </a>
+
+                <a href="{% url 'main:diary' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
+                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Diary</p>
+                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">일기</p>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">기록 · 생각 · 메모</p>
+                </a>
+            </div>
+        </div>
+    </section>
     
 
 
     
 </main>
+
+{% include "components/site_footer.html" %}
+
+<button id="back-to-top-btn" type="button" aria-label="상단으로 이동" class="back-to-top-btn" hidden>↑</button>
 
 <style>
     @font-face {
@@ -488,9 +528,118 @@
         transition: transform .25s linear;
     }
 
+    .side-toc {
+        position: fixed;
+        right: 22px;
+        top: 50%;
+        z-index: 55;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        transform: translateY(-50%);
+    }
+
+    .side-toc-dot {
+        width: 13px;
+        height: 13px;
+        border-radius: 9999px;
+        border: 1px solid rgba(29, 29, 31, 0.24);
+        background: rgba(29, 29, 31, 0.2);
+        transition: all .2s ease;
+        cursor: pointer;
+    }
+
+    .side-toc-dot.is-active {
+        width: 23px;
+        height: 23px;
+        border-color: rgba(0, 102, 204, 0.85);
+        background: rgba(0, 102, 204, 0.92);
+        box-shadow: 0 0 0 8px rgba(0, 102, 204, 0.13);
+    }
+
+    .side-toc-panel {
+        position: absolute;
+        right: 38px;
+        top: 50%;
+        min-width: 168px;
+        padding: 10px;
+        border-radius: 16px;
+        border: 1px solid rgba(0,0,0,0.08);
+        background: rgba(255,255,255,0.9);
+        backdrop-filter: blur(8px);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12);
+        transform: translateY(-50%) translateX(8px);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity .2s ease, transform .2s ease;
+    }
+
+    .side-toc:hover .side-toc-panel,
+    .side-toc:focus-within .side-toc-panel {
+        opacity: 1;
+        transform: translateY(-50%) translateX(0);
+        pointer-events: auto;
+    }
+
+    .side-toc-item {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border-radius: 10px;
+        padding: 6px 9px;
+        font-size: 13px;
+        color: #5c5c61;
+        transition: background .16s ease, color .16s ease;
+    }
+
+    .side-toc-item:hover {
+        background: rgba(0, 102, 204, 0.08);
+        color: #1d1d1f;
+    }
+
+    .side-toc-item.is-active {
+        background: rgba(0, 102, 204, 0.14);
+        color: #005fc0;
+        font-weight: 600;
+    }
+
+    .side-toc.on-hero .side-toc-dot {
+        border-color: rgba(255, 255, 255, 0.48);
+        background: rgba(255, 255, 255, 0.26);
+    }
+
+    .side-toc.on-hero .side-toc-dot.is-active {
+        border-color: rgba(255, 255, 255, 0.95);
+        background: rgba(255, 255, 255, 0.95);
+        box-shadow: 0 0 0 8px rgba(255, 255, 255, 0.2);
+    }
+
+    .side-toc.on-hero .side-toc-panel {
+        border-color: rgba(255,255,255,0.2);
+        background: rgba(10, 18, 40, 0.75);
+    }
+
+    .side-toc.on-hero .side-toc-item {
+        color: rgba(255,255,255,0.75);
+    }
+
+    .side-toc.on-hero .side-toc-item:hover {
+        background: rgba(255,255,255,0.12);
+        color: rgba(255,255,255,0.95);
+    }
+
+    .side-toc.on-hero .side-toc-item.is-active {
+        background: rgba(255,255,255,0.18);
+        color: #ffffff;
+    }
+
     .career-grid {
         columns: 1;
         column-gap: 2.5rem;
+    }
+
+    .page-section[data-section] {
+        scroll-margin-top: 92px;
     }
 
     @media (min-width: 768px) {
@@ -503,11 +652,36 @@
         break-inside: avoid;
         margin-bottom: 2.5rem;
     }
+
+    .back-to-top-btn {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 70;
+        width: 46px;
+        height: 46px;
+        border-radius: 9999px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        background: rgba(255, 255, 255, 0.92);
+        color: #1d1d1f;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.14);
+        backdrop-filter: blur(6px);
+        transition: transform .18s ease, background .18s ease;
+    }
+
+    .back-to-top-btn:hover {
+        transform: translateY(-1px);
+        background: #ffffff;
+    }
 </style>
 
 <script>
     const rootEl = document.documentElement;
     const flash = document.getElementById('section-flash');
+    const NAV_OFFSET = 92;
 
     const sections = {
         profile: document.querySelector('.profile-section'),
@@ -599,10 +773,92 @@
     const quickNav = document.getElementById('quick-nav');
     const quickNavLinks = quickNav ? quickNav.querySelectorAll('.quick-nav-link') : [];
     const heroSection = document.querySelector('[data-section="hero"]');
+    const sideToc = document.getElementById('side-toc');
+    const backToTopBtn = document.getElementById('back-to-top-btn');
+
+    const tocSchema = [
+        { key: 'hero', label: '인트로' },
+        { key: 'profile', label: '프로필' },
+        { key: 'skill', label: '스킬' },
+        { key: 'career', label: '커리어' },
+        { key: 'activity', label: '활동' },
+        { key: 'award', label: '수상' },
+        { key: 'publication', label: '출판' },
+        { key: 'project', label: '프로젝트' },
+    ];
+
+    const tocItems = [];
+
+    const buildSideToc = () => {
+        if (!sideToc) return;
+        sideToc.innerHTML = '';
+
+        const panel = document.createElement('div');
+        panel.className = 'side-toc-panel';
+        sideToc.appendChild(panel);
+
+        tocSchema.forEach((item) => {
+            const sectionEl = document.querySelector(`[data-section="${item.key}"]`);
+            if (!sectionEl) return;
+
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'side-toc-dot';
+            btn.setAttribute('aria-label', `${item.label} 섹션으로 이동`);
+            btn.title = item.label;
+            btn.addEventListener('click', () => {
+                const top = Math.max(sectionEl.offsetTop - NAV_OFFSET, 0);
+                window.scrollTo({ top, behavior: 'smooth' });
+            });
+
+            const itemBtn = document.createElement('button');
+            itemBtn.type = 'button';
+            itemBtn.className = 'side-toc-item';
+            itemBtn.textContent = item.label;
+            itemBtn.addEventListener('click', () => {
+                const top = Math.max(sectionEl.offsetTop - NAV_OFFSET, 0);
+                window.scrollTo({ top, behavior: 'smooth' });
+            });
+
+            sideToc.appendChild(btn);
+            panel.appendChild(itemBtn);
+            tocItems.push({ key: item.key, sectionEl, btn, itemBtn });
+        });
+    };
+
+    const updateSideTocActive = () => {
+        if (!tocItems.length) return;
+        const vhAnchor = window.innerHeight * 0.32;
+
+        let active = tocItems[0];
+        let minDistance = Infinity;
+
+        tocItems.forEach((item) => {
+            const rect = item.sectionEl.getBoundingClientRect();
+            const distance = Math.abs(rect.top - vhAnchor);
+            if (distance < minDistance) {
+                minDistance = distance;
+                active = item;
+            }
+        });
+
+        tocItems.forEach((item) => {
+            item.btn.classList.toggle('is-active', item === active);
+            item.itemBtn.classList.toggle('is-active', item === active);
+        });
+    };
 
     const updateQuickNavStyle = () => {
         if (!quickNav || !heroSection || !quickNavLinks.length) return;
         const onHero = heroSection.getBoundingClientRect().bottom > window.innerHeight * 0.45;
+
+        quickNav.classList.toggle('opacity-0', onHero);
+        quickNav.classList.toggle('pointer-events-none', onHero);
+        quickNav.classList.toggle('-translate-y-2', onHero);
+        quickNav.classList.toggle('opacity-100', !onHero);
+        quickNav.classList.toggle('pointer-events-auto', !onHero);
+        quickNav.classList.toggle('translate-y-0', !onHero);
+
         quickNavLinks.forEach((link) => {
             link.classList.toggle('border-white/20', onHero);
             link.classList.toggle('bg-white/10', onHero);
@@ -613,10 +869,24 @@
             link.classList.toggle('text-[#1d1d1f]', !onHero);
             link.classList.toggle('hover:bg-white', !onHero);
         });
+        sideToc?.classList.toggle('on-hero', onHero);
     };
 
+    const updateBackToTopButton = () => {
+        if (!backToTopBtn) return;
+        const visible = window.scrollY > 560;
+        backToTopBtn.hidden = !visible;
+    };
+
+    buildSideToc();
     updateSectionTransitions();
     updateQuickNavStyle();
+    updateSideTocActive();
+    updateBackToTopButton();
+
+    backToTopBtn?.addEventListener('click', () => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     const heroCopyBtn = document.querySelector('.hero-social-link--copy');
     const heroCopyToast = document.getElementById('hero-copy-toast');
@@ -665,10 +935,14 @@
     window.addEventListener('scroll', () => {
         updateSectionTransitions();
         updateQuickNavStyle();
+        updateSideTocActive();
+        updateBackToTopButton();
     }, { passive: true });
     window.addEventListener('resize', () => {
         updateSectionTransitions();
         updateQuickNavStyle();
+        updateSideTocActive();
+        updateBackToTopButton();
     });
 
     const reveals = document.querySelectorAll('.reveal');
@@ -706,7 +980,8 @@
             
             sections.forEach((section) => {
                 const sectionTop = section.offsetTop;
-                const distance = Math.abs(currentScrollY - sectionTop);
+                const adjustedTop = Math.max(sectionTop - NAV_OFFSET, 0);
+                const distance = Math.abs(currentScrollY - adjustedTop);
                 if (distance < closestDistance) {
                     closestDistance = distance;
                     closestSection = section;
@@ -715,7 +990,7 @@
             
             if (!closestSection) return;
             
-            const closestSectionTop = closestSection.offsetTop;
+            const closestSectionTop = Math.max(closestSection.offsetTop - NAV_OFFSET, 0);
             
             if (currentScrollY > closestSectionTop) return;
             

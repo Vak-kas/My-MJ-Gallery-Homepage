@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+            {% if messages %}
+            <div class="fixed right-8 top-8 z-50 space-y-3">
+                {% for message in messages %}
+                <div class="rounded-2xl border border-black/[0.06] bg-white/90 px-5 py-4 shadow-[0_12px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl">
+                    <p class="text-[15px] font-semibold text-[#1d1d1f]">완료</p>
+                    <p class="mt-1 text-[14px] text-[#6e6e73]">{{ message }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="mb-8">
+                <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                    <span class="text-[18px]">←</span>
+                    <span>Back to Studio</span>
+                </a>
+            </div>
+
+            <section>
+                <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SKILLS</p>
+                <h1 class="apple-display mt-4 text-[56px] font-semibold leading-[1.02] tracking-[-0.04em]">Skills.</h1>
+                <p class="mt-5 max-w-[760px] text-[18px] leading-[1.5] text-[#6e6e73]">사용 가능한 기술 스택을 추가하고 공개 여부를 관리합니다.</p>
+            </section>
+
+            <section class="mt-10 grid gap-8 lg:grid-cols-[360px_1fr]">
+                <aside class="h-fit rounded-[24px] border border-black/[0.06] bg-white p-6 lg:sticky lg:top-8">
+                    <h2 class="text-[34px] font-semibold tracking-[-0.03em]">{% if editing_skill %}Edit Skill{% else %}Add Skill{% endif %}</h2>
+
+                    <form method="post" action="{% if editing_skill %}{% url 'studio:skill_update' editing_skill.id %}{% else %}{% url 'studio:skill_create' %}{% endif %}" class="mt-7 space-y-4">
+                        {% csrf_token %}
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">기술명 *</label>
+                            <input type="text" name="name" value="{{ editing_skill.name|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: Python, Docker, GitHub Actions">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">카테고리</label>
+                            <select name="category" class="h-[44px] w-full rounded-full border border-black/[0.08] bg-white px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in skill_categories %}
+                                <option value="{{ value }}" {% if editing_skill and editing_skill.category == value %}selected{% elif not editing_skill and value == 'language_framework' %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">설명(선택)</label>
+                            <input type="text" name="note" value="{{ editing_skill.note|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]" placeholder="예: 실무 사용, 프로젝트 적용 경험">
+                        </div>
+
+                        <div class="flex items-center justify-between">
+                            <span class="text-[13px] font-semibold text-[#6e6e73]">공개여부</span>
+                            <label class="inline-flex cursor-pointer items-center gap-2">
+                                <input type="hidden" name="is_visible" value="false">
+                                <input type="checkbox" name="is_visible" value="true" {% if not editing_skill or editing_skill.is_visible %}checked{% endif %} class="peer sr-only">
+                                <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                                <span class="text-[11px] font-semibold text-[#34c759]">ON</span>
+                            </label>
+                        </div>
+
+                        <button type="submit" class="h-[42px] w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white transition hover:bg-[#0052a3]">{% if editing_skill %}수정 저장{% else %}추가{% endif %}</button>
+
+                        {% if editing_skill %}
+                        <a href="{% url 'studio:skill' %}" class="block h-[42px] w-full rounded-full border border-black/[0.08] text-center text-[14px] font-semibold leading-[42px] text-[#1d1d1f] transition hover:bg-[#f5f5f7]">취소</a>
+                        {% endif %}
+                    </form>
+                </aside>
+
+                <div class="space-y-6">
+                    {% for section in grouped_sections %}
+                    {% if section.count > 0 %}
+                    <section class="overflow-hidden rounded-[22px] border border-black/[0.08] bg-white">
+                        <div class="flex items-center justify-between border-b border-black/[0.06] bg-[#f8fafc] px-6 py-4">
+                            <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ section.icon }} {{ section.title }}</p>
+                            <span class="rounded-full bg-white px-3 py-1 text-[12px] text-[#6e6e73]">{{ section.count }}</span>
+                        </div>
+
+                        <div class="space-y-3 p-5">
+                            {% for skill_item in section.items %}
+                            <article id="skill-{{ skill_item.id }}" class="rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] p-4">
+                                <div class="flex items-center justify-between gap-3">
+                                    <div>
+                                        <p class="text-[16px] font-semibold text-[#1d1d1f]">{{ skill_item.name }}</p>
+                                        {% if skill_item.note %}
+                                        <p class="mt-1 text-[13px] text-[#6e6e73]">{{ skill_item.note }}</p>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="flex items-center gap-2">
+                                        <a href="{% url 'studio:skill' %}?edit={{ skill_item.id }}#skill-{{ skill_item.id }}" class="inline-flex h-9 items-center justify-center rounded-full border border-black/[0.08] px-3 text-[12px] text-[#1d1d1f] hover:bg-white">Edit</a>
+
+                                        <form method="post" action="{% url 'studio:skill_toggle_visibility' skill_item.id %}">
+                                            {% csrf_token %}
+                                            <input type="hidden" name="is_visible" value="{% if skill_item.is_visible %}false{% else %}true{% endif %}">
+                                            <button type="submit" class="inline-flex h-9 items-center justify-center rounded-full border border-black/[0.08] px-3 text-[12px] {% if skill_item.is_visible %}text-[#0a84ff]{% else %}text-[#f97316]{% endif %} hover:bg-white">
+                                                {% if skill_item.is_visible %}Public{% else %}Private{% endif %}
+                                            </button>
+                                        </form>
+
+                                        <form method="post" action="{% url 'studio:skill_delete' skill_item.id %}" onsubmit="return confirm('이 기술을 삭제할까요?')">
+                                            {% csrf_token %}
+                                            <button type="submit" class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-200 text-[12px] text-red-600 hover:bg-red-50">✕</button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </article>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endif %}
+                    {% endfor %}
+
+                    {% if skills|length == 0 %}
+                    <div class="rounded-[22px] border border-dashed border-black/[0.15] bg-white p-8 text-center text-[#6e6e73]">
+                        아직 등록된 기술이 없습니다. 왼쪽에서 첫 기술을 추가해보세요.
+                    </div>
+                    {% endif %}
+                </div>
+            </section>
+        </main>
+    </div>
+</div>
+{% endblock %}

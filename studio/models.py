@@ -440,3 +440,28 @@ class Publication(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Skill(models.Model):
+    CATEGORY_CHOICES = [
+        ("language_framework", "Language & Framework"),
+        ("devops_infra", "DevOps/Infra"),
+        ("test_security", "Test & Security"),
+        ("platform", "Platform"),
+        ("other", "Other"),
+    ]
+
+    name = models.CharField(max_length=100)
+    category = models.CharField(max_length=30, choices=CATEGORY_CHOICES, default="language_framework")
+    note = models.CharField(max_length=150, blank=True)
+
+    is_visible = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.name}"
