@@ -130,8 +130,6 @@
 
     if (!modal || !iframe) return;
 
-    let hoverTimer = null;
-
     const openModal = (url) => {
         if (!url) return;
         const embedUrl = `${url}${url.includes('?') ? '&' : '?'}embed=1`;
@@ -148,26 +146,6 @@
         iframe.src = 'about:blank';
         document.body.style.overflow = '';
     };
-
-    document.addEventListener('mouseover', (e) => {
-        const card = e.target.closest('[data-project-card]');
-        if (!card) return;
-        const from = e.relatedTarget;
-        if (from && card.contains(from)) return;
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => {
-            const url = card.dataset.detailUrl || '';
-            openModal(url);
-        }, 260);
-    });
-
-    document.addEventListener('mouseout', (e) => {
-        const card = e.target.closest('[data-project-card]');
-        if (!card) return;
-        const to = e.relatedTarget;
-        if (to && card.contains(to)) return;
-        clearTimeout(hoverTimer);
-    });
 
     document.addEventListener('click', (e) => {
         const onCard = e.target.closest('[data-project-card]');
@@ -188,14 +166,6 @@
             closeModal();
         }
     });
-
-    if (dialog) {
-        dialog.addEventListener('mouseleave', () => {
-            if (modal.classList.contains('is-open')) {
-                closeModal();
-            }
-        });
-    }
 })();
 </script>
 {% endif %}
