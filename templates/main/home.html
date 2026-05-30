@@ -2,10 +2,22 @@
 {% load static %}
 
 {% block content %}
-<div class="fixed right-5 top-5 z-50">
-    <a href="{% url 'studio:index' %}" id="studio-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-        Studio
-    </a>
+<div class="fixed right-5 top-5 z-50 flex gap-2">
+    {% if user.is_authenticated %}
+        <a href="/" id="home-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Home
+        </a>
+        <a href="{% url 'studio:index' %}" id="studio-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Studio
+        </a>
+    {% else %}
+        <a href="/" id="home-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Home
+        </a>
+        <a href="{% url 'accounts:login' %}" id="login-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Login
+        </a>
+    {% endif %}
 </div>
 
 <div id="section-flash" class="section-flash"></div>
