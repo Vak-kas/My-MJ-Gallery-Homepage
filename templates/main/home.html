@@ -2,20 +2,23 @@
 {% load static %}
 
 {% block content %}
-<div class="fixed right-5 top-5 z-50 flex gap-2">
+<div id="quick-nav" class="fixed right-5 top-5 z-50 flex gap-2">
+    <a href="/" id="home-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+        Home
+    </a>
     {% if user.is_authenticated %}
-        <a href="/" id="home-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Home
-        </a>
-        <a href="{% url 'studio:index' %}" id="studio-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+        <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
             Studio
         </a>
-    {% else %}
-        <a href="/" id="home-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
-            Home
+        <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Logout
         </a>
-        <a href="{% url 'accounts:login' %}" id="login-link" class="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+    {% else %}
+        <a href="{% url 'accounts:login' %}" id="login-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
             Login
+        </a>
+        <a href="{% url 'accounts:signup' %}" id="signup-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white backdrop-blur transition hover:bg-white/20">
+            Signup
         </a>
     {% endif %}
 </div>
@@ -591,24 +594,27 @@
         }
     };
 
-    const studioLink = document.getElementById('studio-link');
+    const quickNav = document.getElementById('quick-nav');
+    const quickNavLinks = quickNav ? quickNav.querySelectorAll('.quick-nav-link') : [];
     const heroSection = document.querySelector('[data-section="hero"]');
 
-    const updateStudioLinkStyle = () => {
-        if (!studioLink || !heroSection) return;
+    const updateQuickNavStyle = () => {
+        if (!quickNav || !heroSection || !quickNavLinks.length) return;
         const onHero = heroSection.getBoundingClientRect().bottom > window.innerHeight * 0.45;
-        studioLink.classList.toggle('border-white/20', onHero);
-        studioLink.classList.toggle('bg-white/10', onHero);
-        studioLink.classList.toggle('text-white', onHero);
-        studioLink.classList.toggle('hover:bg-white/20', onHero);
-        studioLink.classList.toggle('border-black/10', !onHero);
-        studioLink.classList.toggle('bg-white/80', !onHero);
-        studioLink.classList.toggle('text-[#1d1d1f]', !onHero);
-        studioLink.classList.toggle('hover:bg-white', !onHero);
+        quickNavLinks.forEach((link) => {
+            link.classList.toggle('border-white/20', onHero);
+            link.classList.toggle('bg-white/10', onHero);
+            link.classList.toggle('text-white', onHero);
+            link.classList.toggle('hover:bg-white/20', onHero);
+            link.classList.toggle('border-black/10', !onHero);
+            link.classList.toggle('bg-white/80', !onHero);
+            link.classList.toggle('text-[#1d1d1f]', !onHero);
+            link.classList.toggle('hover:bg-white', !onHero);
+        });
     };
 
     updateSectionTransitions();
-    updateStudioLinkStyle();
+    updateQuickNavStyle();
 
     const heroCopyBtn = document.querySelector('.hero-social-link--copy');
     const heroCopyToast = document.getElementById('hero-copy-toast');
@@ -656,11 +662,11 @@
 
     window.addEventListener('scroll', () => {
         updateSectionTransitions();
-        updateStudioLinkStyle();
+        updateQuickNavStyle();
     }, { passive: true });
     window.addEventListener('resize', () => {
         updateSectionTransitions();
-        updateStudioLinkStyle();
+        updateQuickNavStyle();
     });
 
     const reveals = document.querySelectorAll('.reveal');
