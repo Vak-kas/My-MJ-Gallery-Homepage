@@ -7,7 +7,7 @@
         <a href="{% url 'main:home' %}" class="quick-nav-link rounded-full border border-transparent px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-white/20">MJ GALLERY</a>
 
         <div class="flex items-center gap-2">
-            <a href="{% url 'main:home' %}" id="home-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Home</a>
+            <a href="{% url 'main:home' %}" id="home-link" aria-current="page" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-white/20">Home</a>
             <a href="{% url 'blog:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Blog</a>
 
             {% if user.is_authenticated %}
@@ -798,6 +798,7 @@
 
     const quickNav = document.getElementById('quick-nav');
     const quickNavLinks = quickNav ? quickNav.querySelectorAll('.quick-nav-link') : [];
+    const homeNavLink = document.getElementById('home-link');
     const heroSection = document.querySelector('[data-section="hero"]');
     const sideToc = document.getElementById('side-toc');
     const backToTopBtn = document.getElementById('back-to-top-btn');
@@ -901,6 +902,27 @@
             link.classList.toggle('text-[#1d1d1f]', !onHero);
             link.classList.toggle('hover:bg-white', !onHero);
         });
+
+        if (homeNavLink) {
+            homeNavLink.classList.add('font-semibold');
+            homeNavLink.classList.remove(
+                'border-[#0066cc]',
+                'bg-[#0066cc]',
+                'hover:bg-[#0055b3]',
+                'hover:bg-white/90',
+                'bg-white',
+                'bg-white/80',
+                'text-white',
+                'text-[#1d1d1f]',
+                'border-black/10',
+                'hover:bg-white'
+            );
+            if (onHero) {
+                homeNavLink.classList.add('border-white/20', 'bg-white', 'text-[#1d1d1f]', 'hover:bg-white/90');
+            } else {
+                homeNavLink.classList.add('border-[#0066cc]', 'bg-[#0066cc]', 'text-white', 'hover:bg-[#0055b3]');
+            }
+        }
         sideToc?.classList.toggle('on-hero', onHero);
     };
 
