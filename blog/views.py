@@ -91,8 +91,11 @@ def _sidebar_context(request):
 
 	popular_posts = list(
 		_accessible_posts_qs(request)
-		.annotate(visible_comment_count=post_comment_count)
-		.order_by("-views", "-visible_comment_count", "-published_at", "-id")[:10]
+		.annotate(
+			visible_comment_count=post_comment_count,
+			like_count=Count("likes", distinct=True),
+		)
+		.order_by("-views", "-visible_comment_count", "-published_at", "-id")[:5]
 	)
 
 	tag_filter = Q(posts__is_published=True)

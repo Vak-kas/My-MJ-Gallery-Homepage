@@ -1,7 +1,7 @@
 {% load blog_extras %}
 
-<a href="{% url 'blog:post_detail' post.slug %}" class="block transition-transform hover:-translate-y-0.5">
-    <article class="rounded-[18px] border border-black/[0.08] bg-white p-5 transition-shadow hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] {% if compact %}min-h-[180px]{% endif %}">
+<a href="{% url 'blog:post_detail' post.slug %}" class="block h-full transition-transform hover:-translate-y-0.5">
+    <article class="h-full rounded-[18px] border border-black/[0.08] bg-white p-5 transition-shadow hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] {% if compact %}min-h-[180px]{% endif %}">
         {% with cover_from_content=post.content|editorjs_cover_image %}
         <div class="mb-4 overflow-hidden rounded-2xl border border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff] {% if compact %}aspect-[4/3]{% else %}aspect-[16/10]{% endif %}">
             {% if cover_from_content %}
@@ -24,31 +24,35 @@
             <span class="text-[12px] text-[#8e8e93]">조회 {{ post.views }}</span>
         </div>
 
-        <h3 class="{% if compact %}mt-4 text-[18px]{% else %}mt-3 text-[20px]{% endif %} font-semibold tracking-[-0.02em] text-[#1d1d1f]">{{ post.title }}</h3>
+        <div class="mt-4 flex min-h-[170px] flex-col">
+            <h3 class="line-clamp-2 min-h-[56px] {% if compact %}text-[18px]{% else %}text-[20px]{% endif %} font-semibold tracking-[-0.02em] text-[#1d1d1f]">{{ post.title }}</h3>
 
-        {% if post.summary %}
-        <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.summary }}</p>
-        {% elif post.content %}
-        <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.content|editorjs_excerpt:180 }}</p>
-        {% endif %}
+            {% if post.summary %}
+            <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.summary }}</p>
+            {% elif post.content %}
+            <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.content|editorjs_excerpt:180 }}</p>
+            {% else %}
+            <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-transparent">.</p>
+            {% endif %}
 
-        <div class="mt-4 flex flex-wrap gap-2">
-            {% for tag in post.tags.all|slice:":4" %}
-            <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#6e6e73]">#{{ tag.name }}</span>
-            {% empty %}
-            <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#8e8e93]">#no-tag</span>
-            {% endfor %}
-        </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+                {% for tag in post.tags.all|slice:":4" %}
+                <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#6e6e73]">#{{ tag.name }}</span>
+                {% empty %}
+                <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#8e8e93]">#no-tag</span>
+                {% endfor %}
+            </div>
 
-        <div class="mt-4 flex items-center justify-between gap-3 text-[12px] text-[#8e8e93]">
-            <p class="text-[12px] text-[#8e8e93]">
-                {% if post.published_at %}
-                    {{ post.published_at|date:"Y.m.d H:i" }}
-                {% else %}
-                    {{ post.created_at|date:"Y.m.d H:i" }}
-                {% endif %}
-            </p>
-            <span class="font-semibold text-[#0066cc]">자세히 보기 →</span>
+            <div class="mt-auto flex items-center justify-between gap-3 pt-4 text-[12px] text-[#8e8e93]">
+                <p class="text-[12px] text-[#8e8e93]">
+                    {% if post.published_at %}
+                        {{ post.published_at|date:"Y.m.d H:i" }}
+                    {% else %}
+                        {{ post.created_at|date:"Y.m.d H:i" }}
+                    {% endif %}
+                </p>
+                <span class="font-semibold text-[#0066cc]">자세히 보기 →</span>
+            </div>
         </div>
     </article>
 </a>
