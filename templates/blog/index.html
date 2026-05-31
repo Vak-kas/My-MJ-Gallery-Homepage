@@ -100,11 +100,11 @@
                         {% endif %}
                     </p>
                     <div class="flex flex-wrap gap-2">
-                        <a href="{% url 'blog:index' %}{{ sort_latest_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'latest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">최신 순</a>
-                        <a href="{% url 'blog:index' %}{{ sort_oldest_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'oldest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">오래된 순</a>
-                        <a href="{% url 'blog:index' %}{{ sort_popular_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'popular' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">인기 순</a>
+                        <a href="{% url 'blog:index' %}{{ sort_latest_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'latest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">최신 순</a>
+                        <a href="{% url 'blog:index' %}{{ sort_oldest_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'oldest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">오래된 순</a>
+                        <a href="{% url 'blog:index' %}{{ sort_popular_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'popular' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">인기 순</a>
                         {% if user.is_authenticated %}
-                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}#feed" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">내가 쓴글 보기</a>
+                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">내가 쓴글 보기</a>
                         {% endif %}
                     </div>
                 </div>
@@ -366,4 +366,33 @@
         </div>
     </section>
 </main>
+
+<script>
+(() => {
+    const SCROLL_KEY = 'blog-index-scroll-y';
+    const FLAG_KEY = 'blog-index-scroll-restore';
+
+    const shouldRestore = sessionStorage.getItem(FLAG_KEY) === '1';
+    if (shouldRestore) {
+        const saved = parseInt(sessionStorage.getItem(SCROLL_KEY) || '0', 10);
+        if (!Number.isNaN(saved) && saved > 0) {
+            window.scrollTo(0, saved);
+            requestAnimationFrame(() => window.scrollTo(0, saved));
+            setTimeout(() => window.scrollTo(0, saved), 80);
+        }
+        sessionStorage.removeItem(FLAG_KEY);
+    }
+
+    document.querySelectorAll('a[data-preserve-scroll="1"]').forEach((link) => {
+        link.addEventListener('click', (e) => {
+            if (e.defaultPrevented) return;
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+            if (e.button !== 0) return;
+
+            sessionStorage.setItem(SCROLL_KEY, String(window.scrollY || window.pageYOffset || 0));
+            sessionStorage.setItem(FLAG_KEY, '1');
+        });
+    });
+})();
+</script>
 {% endblock %}

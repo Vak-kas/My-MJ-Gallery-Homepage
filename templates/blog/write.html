@@ -595,18 +595,7 @@
             <button id="publish-modal-close" type="button" class="mj-publish-modal__close" aria-label="닫기">×</button>
         </div>
         <div class="mj-publish-modal__body">
-            <div class="mj-publish-card">
-                <div class="mj-publish-card__meta">
-                    <span id="publish-preview-category" class="mj-publish-chip">카테고리</span>
-                    <span id="publish-preview-tags" class="mj-publish-chip">태그 없음</span>
-                    <span class="mj-publish-chip">공개됨</span>
-                </div>
-                <div class="mj-publish-card__content">
-                    <h4 id="publish-preview-title" class="mj-publish-card__title">(제목 없음)</h4>
-                    <p id="publish-preview-summary" class="mj-publish-card__summary">요약이 없습니다.</p>
-                    <div id="publish-preview-content" class="mj-publish-card__preview">미리보기 데이터가 없습니다.</div>
-                </div>
-            </div>
+            <p class="text-[14px] text-[#4b5563]">완료를 누르면 글이 공개 상태로 저장됩니다.</p>
         </div>
         <div class="mj-publish-modal__ft">
             <button id="publish-modal-cancel" type="button" class="rounded-full border border-black/[0.14] px-4 py-2 text-[13px] text-[#1d1d1f]">취소</button>
@@ -615,7 +604,25 @@
     </div>
 </div>
 
-<div class="mx-auto max-w-6xl px-4 py-10">
+<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+        <nav class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
+            <a href="{% url 'blog:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Blog</a>
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Studio</a>
+                {% endif %}
+                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+            {% else %}
+                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>
+
+<main class="mx-auto max-w-6xl px-4 py-10">
     <div class="mb-7 flex flex-wrap items-center justify-between gap-3">
         <div>
             <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Blog Editor</p>
@@ -694,7 +701,6 @@
                     <p class="text-[13px] font-semibold text-[#1d1d1f]">본문</p>
                     <p class="text-[12px] text-[#8e8e93]">노션처럼 바로 적용됩니다. 예: #, ##, ###, /제목1, /표, /토글, /이미지, /구분선 · 이미지 블록 오른쪽 위에서 대표이미지 1개 선택</p>
                 </div>
-                <button id="preview-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">미리보기</button>
             </div>
             <div class="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
                 <span class="text-[#8e8e93]">슬래시 커맨드:</span>
@@ -726,7 +732,6 @@
                 </div>
                 <div id="editor" class="editor-holder"></div>
             </div>
-            <div id="preview-panel" class="mt-4 hidden rounded-xl border border-black/[0.08] bg-[#fcfcfe] p-4 text-[14px] text-[#1d1d1f]"></div>
         </section>
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
@@ -740,14 +745,13 @@
                 <span class="text-[12px] text-[#8e8e93]">임시저장은 초안으로 저장되고, 완료는 즉시 공개됩니다.</span>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="draft-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">임시저장</button>
-                    <button id="preview-submit-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">미리보기</button>
                     <button id="publish-btn" type="button" class="rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">{{ editor_submit_label|default:"완료" }}</button>
                 </div>
             </div>
         </section>
     </form>
     </div>
-</div>
+</main>
 
 <script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@2.30.6"></script>
 <script src="https://cdn.jsdelivr.net/npm/@editorjs/header@2.8.8"></script>
@@ -762,9 +766,6 @@
 (() => {
     const form = document.getElementById('writer-form');
     const contentInput = document.getElementById('content');
-    const previewBtn = document.getElementById('preview-btn');
-    const previewSubmitBtn = document.getElementById('preview-submit-btn');
-    const previewPanel = document.getElementById('preview-panel');
     const fontSelect = document.getElementById('editor-font');
     const submitAction = document.getElementById('submit_action');
     const draftBtn = document.getElementById('draft-btn');
@@ -775,11 +776,6 @@
     const publishModalCloseBtn = document.getElementById('publish-modal-close');
     const publishModalCancelBtn = document.getElementById('publish-modal-cancel');
     const publishModalConfirmBtn = document.getElementById('publish-modal-confirm');
-    const publishPreviewTitle = document.getElementById('publish-preview-title');
-    const publishPreviewCategory = document.getElementById('publish-preview-category');
-    const publishPreviewTags = document.getElementById('publish-preview-tags');
-    const publishPreviewSummary = document.getElementById('publish-preview-summary');
-    const publishPreviewContent = document.getElementById('publish-preview-content');
     const inlineFontFamily = document.getElementById('inline-font-family');
     const inlineTextColor = document.getElementById('inline-text-color');
     const inlineBgColor = document.getElementById('inline-bg-color');
@@ -1660,7 +1656,6 @@
         const fontFamily = fontSelect.value;
         const zone = document.querySelector('.codex-editor');
         if (zone) zone.style.fontFamily = fontFamily;
-        previewPanel.style.fontFamily = fontFamily;
     };
     fontSelect.addEventListener('change', applyFont);
     setTimeout(applyFont, 0);
@@ -1841,38 +1836,8 @@
         });
     }
 
-    const buildPublishPreview = () => {
-        const output = JSON.parse(contentInput.value || '{"blocks": []}');
-        const plain = (output.blocks || [])
-            .map((b) => {
-                const d = b.data || {};
-                if (b.type === 'code') return d.code || '';
-                if (b.type === 'list') return (d.items || []).map((it) => typeof it === 'string' ? it : (it.content || '')).join(' ');
-                if (b.type === 'checklist') return (d.items || []).map((it) => it.text || '').join(' ');
-                if (b.type === 'toggle') return `${d.title || ''} ${(d.items || []).join(' ')}`;
-                return d.text || d.title || d.url || '';
-            })
-            .join(' ')
-            .replace(/<[^>]*>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-        publishPreviewTitle.textContent = (document.getElementById('title')?.value || '').trim() || '(제목 없음)';
-        const categorySelect = document.querySelector('select[name="category"]');
-        const categoryLabel = categorySelect?.selectedOptions?.[0]?.textContent?.trim() || '카테고리 없음';
-        publishPreviewCategory.textContent = categoryLabel;
-
-        const tagsText = (document.getElementById('tags')?.value || '').trim();
-        publishPreviewTags.textContent = tagsText ? tagsText : '태그 없음';
-
-        const summaryText = (document.getElementById('summary')?.value || '').trim();
-        publishPreviewSummary.textContent = summaryText || '요약이 없습니다.';
-        publishPreviewContent.textContent = plain ? `${plain.slice(0, 220)}${plain.length > 220 ? '…' : ''}` : '본문 미리보기가 없습니다.';
-    };
-
     const openPublishModal = () => {
         if (!publishConfirmModal) return;
-        buildPublishPreview();
         publishConfirmModal.classList.add('is-visible');
         publishConfirmModal.setAttribute('aria-hidden', 'false');
     };
@@ -1898,78 +1863,6 @@
         submitAction.value = 'publish';
         form.submit();
     });
-
-    const renderPreviewHtml = (output) => {
-        const chunks = [];
-        (output.blocks || []).forEach((block) => {
-            const d = block.data || {};
-            if (block.type === 'paragraph') chunks.push(`<p class="mb-3">${d.text || ''}</p>`);
-            if (block.type === 'header' || block.type === 'h1' || block.type === 'h2' || block.type === 'h3') {
-                const level = block.type === 'h1' ? 1 : block.type === 'h2' ? 2 : block.type === 'h3' ? 3 : (d.level || 2);
-                chunks.push(`<h${level} class="font-semibold mt-4 mb-2">${d.text || ''}</h${level}>`);
-            }
-            if (block.type === 'quote') chunks.push(`<blockquote class="border-l-4 border-[#d2d2d7] pl-4 my-3 italic">${d.text || ''}</blockquote>`);
-            if (block.type === 'delimiter') chunks.push('<hr class="my-4 border-black/[0.12]" />');
-            if (block.type === 'image') {
-                const url = d.url || d.file?.url || '';
-                if (url) {
-                    const safeUrl = url.replace(/"/g, '&quot;');
-                    chunks.push(`<figure class="my-4 overflow-hidden rounded-2xl border border-black/[0.08] bg-[#f9f9fb]"><img src="${safeUrl}" alt="${d.alt || ''}" class="block w-full max-h-[420px] object-cover" />${d.caption ? `<figcaption class="px-4 py-3 text-[12px] text-[#8e8e93]">${d.caption}</figcaption>` : ''}</figure>`);
-                }
-            }
-            if (block.type === 'code') chunks.push(`<pre class="bg-[#f2f2f7] p-3 rounded-lg my-3 overflow-auto"><code>${(d.code || '').replace(/</g, '&lt;')}</code></pre>`);
-            if (block.type === 'list') {
-                const tag = d.style === 'ordered' ? 'ol' : 'ul';
-                const items = (d.items || []).map((it) => `<li>${typeof it === 'string' ? it : (it.content || '')}</li>`).join('');
-                chunks.push(`<${tag} class="pl-5 mb-3 list-${d.style === 'ordered' ? 'decimal' : 'disc'}">${items}</${tag}>`);
-            }
-            if (block.type === 'checklist') {
-                const items = (d.items || []).map((it) => `<li>${it.checked ? '✅' : '⬜'} ${it.text || ''}</li>`).join('');
-                chunks.push(`<ul class="mb-3">${items}</ul>`);
-            }
-            if (block.type === 'table') {
-                const rows = d.content || [];
-                if (rows.length) {
-                    const rowHtml = rows.map((row) => `<tr>${(row || []).map((cell) => `<td class="border border-black/[0.08] px-3 py-2">${cell || ''}</td>`).join('')}</tr>`).join('');
-                    chunks.push(`<div class="my-4 overflow-x-auto"><table class="min-w-full border-collapse">${rowHtml}</table></div>`);
-                }
-            }
-            if (block.type === 'toggle') {
-                const items = (d.items || []).map((item) => `<p class="mb-1">${item || ''}</p>`).join('');
-                chunks.push(`<details class="my-4 rounded-2xl border border-black/[0.08] bg-white"><summary class="cursor-pointer select-none px-4 py-3 font-medium list-none">${d.title || '토글'}</summary><div class="px-4 pb-4 text-[#6e6e73]">${items}</div></details>`);
-            }
-            if (block.type === 'linkcard') {
-                const url = d.url || '';
-                if (url) {
-                    const title = d.title || url;
-                    const desc = d.description || '';
-                    const img = d.image || '';
-                    const favicon = d.favicon || '';
-                    const site = d.site_name || '';
-                    if (d.mode === 'mention') {
-                        chunks.push(`<div class="my-2 flex items-center gap-2 rounded-2xl bg-[#f5f5f7] px-4 py-2.5"><span>🔗</span><a href="${url}" target="_blank" rel="noopener" class="text-[13px] font-semibold text-[#1d1d1f] no-underline hover:text-[#0066cc]">${title}</a></div>`);
-                    } else {
-                        chunks.push(`<div class="my-4 overflow-hidden rounded-2xl border border-black/[0.08] bg-white"><a href="${url}" target="_blank" rel="noopener" class="flex no-underline"><div class="flex-1 min-w-0 p-4">${favicon ? `<div class="flex items-center gap-1.5 mb-1"><img src="${favicon}" width="14" height="14" class="rounded-sm" /><span class="text-[11px] text-[#8e8e93]">${site}</span></div>` : ''}<div class="text-[15px] font-semibold text-[#1d1d1f] truncate">${title}</div>${desc ? `<div class="mt-1 text-[12px] text-[#6e6e73] line-clamp-2">${desc}</div>` : ''}<div class="mt-1.5 text-[11px] text-[#0066cc] truncate">${url}</div></div>${img ? `<div class="w-28 flex-shrink-0 border-l border-black/[0.06]"><img src="${img}" alt="" class="h-full w-full object-cover" /></div>` : ''}</a></div>`);
-                    }
-                }
-            }
-        });
-        return chunks.join('') || '<p class="text-[#8e8e93]">미리보기할 내용이 없습니다.</p>';
-    };
-
-    const togglePreview = async () => {
-        await syncContent();
-        const output = JSON.parse(contentInput.value || '{"blocks": []}');
-        if (previewPanel.classList.contains('hidden')) {
-            previewPanel.innerHTML = renderPreviewHtml(output);
-            previewPanel.classList.remove('hidden');
-        } else {
-            previewPanel.classList.add('hidden');
-        }
-    };
-
-    previewBtn.addEventListener('click', togglePreview);
-    previewSubmitBtn.addEventListener('click', togglePreview);
 
     slashButtons.forEach((btn) => {
         btn.addEventListener('click', () => {
