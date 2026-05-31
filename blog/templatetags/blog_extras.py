@@ -229,6 +229,64 @@ def render_editorjs(content):
                 f'</details>'
             )
 
+        elif t == "linkcard":
+            url = escape(d.get("url", ""))
+            title = escape(d.get("title", "") or url)
+            desc = escape(d.get("description", ""))
+            image = escape(d.get("image", ""))
+            site = escape(d.get("site_name", ""))
+            favicon = escape(d.get("favicon", ""))
+            mode = d.get("mode", "card")
+
+            fav_html = f'<img src="{favicon}" alt="" class="h-4 w-4 rounded" onerror="this.style.display=\'none\'" />' if favicon else ""
+            desc_html = f'<p class="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">{desc}</p>' if desc else ""
+
+            if mode == "mention":
+                html.append(
+                    f'<p class="my-2"><a href="{url}" target="_blank" rel="noopener noreferrer" '
+                    f'class="inline-flex items-center gap-1.5 rounded-full border border-[#e5e5ea] bg-[#f5f5f7] px-3 py-1.5 text-[13px] font-medium text-[#1d1d1f] no-underline hover:bg-[#eef3ff] hover:border-[#0066cc]/40">'
+                    f'🔗 {title}</a></p>'
+                )
+            elif mode == "preview":
+                cover_html = (
+                    f'<div class="w-full h-44 overflow-hidden bg-[#f5f5f7]">'
+                    f'<img src="{image}" alt="" class="h-full w-full object-cover" /></div>'
+                ) if image else ""
+                html.append(
+                    f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
+                    f'class="my-4 block overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white no-underline transition hover:shadow-md">'
+                    f'{cover_html}'
+                    f'<div class="p-4">'
+                    f'<div class="flex items-center gap-2 text-[12px] text-[#8e8e93]">{fav_html}<span>{site}</span></div>'
+                    f'<p class="mt-2 text-[17px] font-bold text-[#1d1d1f]">{title}</p>'
+                    f'{desc_html}'
+                    f'<p class="mt-2 truncate text-[12px] text-[#0066cc]">{url}</p>'
+                    f'</div></a>'
+                )
+            else:  # card
+                img_html = f'<img src="{image}" alt="" class="absolute inset-0 h-full w-full object-cover" />' if image else ""
+                html.append(
+                    f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
+                    f'class="my-4 flex overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white no-underline transition hover:shadow-md block">'
+                    f'<div class="flex-1 min-w-0 p-4">'
+                    f'<div class="flex items-center gap-2 text-[12px] text-[#8e8e93]">{fav_html}<span>{site}</span></div>'
+                    f'<p class="mt-1.5 truncate text-[15px] font-semibold text-[#1d1d1f]">{title}</p>'
+                    f'{desc_html}'
+                    f'<p class="mt-2 truncate text-[12px] text-[#0066cc]">{url}</p>'
+                    f'</div>'
+                    + (f'<div class="relative h-auto w-[140px] shrink-0 overflow-hidden border-l border-[#e5e5ea] bg-[#f5f5f7]">{img_html}</div>' if image else "")
+                    + f'</a>'
+                )
+
+        elif t == "linkembed":
+            url = escape(d.get("url", ""))
+            label = escape(d.get("label", "") or url)
+            html.append(
+                f'<p class="my-2"><a href="{url}" target="_blank" rel="noopener noreferrer" '
+                f'class="inline-flex items-center gap-1.5 rounded-full border border-[#e5e5ea] bg-[#f5f5f7] px-3 py-1.5 text-[13px] font-medium text-[#1d1d1f] no-underline hover:bg-[#eef3ff] hover:border-[#0066cc]/40">'
+                f'🔗 {label}</a></p>'
+            )
+
     return mark_safe("".join(html))
 
 

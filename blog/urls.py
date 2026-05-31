@@ -14,4 +14,5 @@ urlpatterns = [
     path("board/", views.board, name="board"),
     path("life/", views.life, name="life"),
     path("secret/", views.secret, name="secret"),
+    path("api/url-preview/", views.url_preview, name="url_preview"),
 ]

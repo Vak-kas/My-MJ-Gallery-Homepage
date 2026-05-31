@@ -4,6 +4,8 @@
 
 {% block content %}
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap');
+
     .editor-shell {
         border: 1px solid rgba(0, 0, 0, 0.08);
         border-radius: 16px;
@@ -167,7 +169,451 @@
         border-top: 1px solid #d2d2d7;
         margin: 0;
     }
+
+    /* URL 임베드 피커 */
+    .mj-url-picker {
+        position: fixed;
+        z-index: 9999;
+        background: #fff;
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,0.13);
+        padding: 14px;
+        width: 320px;
+        display: none;
+    }
+    .mj-url-picker.is-visible { display: block; }
+    .mj-url-picker__title {
+        font-size: 12px;
+        font-weight: 700;
+        color: #8e8e93;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 10px;
+    }
+    .mj-url-picker__url {
+        font-size: 12px;
+        color: #6e6e73;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        margin-bottom: 10px;
+        padding: 6px 10px;
+        background: #f5f5f7;
+        border-radius: 10px;
+    }
+    .mj-url-picker__options {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    .mj-url-picker__opt {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(0,0,0,0.08);
+        background: #fafafa;
+        cursor: pointer;
+        transition: background 0.15s;
+        width: 100%;
+        text-align: left;
+    }
+    .mj-url-picker__opt:hover { background: #eef3ff; border-color: rgba(0,102,204,0.25); }
+    .mj-url-picker__opt-icon { font-size: 18px; line-height: 1; }
+    .mj-url-picker__opt-info { display: flex; flex-direction: column; gap: 2px; }
+    .mj-url-picker__opt-label { font-size: 13px; font-weight: 600; color: #1d1d1f; }
+    .mj-url-picker__opt-desc { font-size: 11px; color: #8e8e93; }
+    .mj-url-picker__cancel {
+        width: 100%;
+        margin-top: 8px;
+        padding: 7px;
+        border-radius: 10px;
+        font-size: 12px;
+        color: #8e8e93;
+        background: transparent;
+        border: none;
+        cursor: pointer;
+    }
+    .mj-url-picker__cancel:hover { background: #f5f5f7; }
+
+    /* 링크카드 블록 */
+    .mj-linkcard-tool {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 18px;
+        background: #fff;
+        overflow: hidden;
+    }
+    .mj-linkcard-preview {
+        display: flex;
+        align-items: stretch;
+        gap: 0;
+        text-decoration: none;
+    }
+    .mj-linkcard-preview__body {
+        flex: 1;
+        min-width: 0;
+        padding: 14px 16px;
+    }
+    .mj-linkcard-preview__site {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 11px;
+        color: #8e8e93;
+    }
+    .mj-linkcard-preview__title {
+        margin-top: 4px;
+        font-size: 15px;
+        font-weight: 600;
+        color: #1d1d1f;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mj-linkcard-preview__desc {
+        margin-top: 4px;
+        font-size: 12px;
+        color: #6e6e73;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .mj-linkcard-preview__url {
+        margin-top: 6px;
+        font-size: 11px;
+        color: #0066cc;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mj-linkcard-preview__img {
+        width: 120px;
+        flex-shrink: 0;
+        background: #f5f5f7;
+        border-left: 1px solid rgba(0,0,0,0.06);
+        overflow: hidden;
+    }
+    .mj-linkcard-preview__img img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+    .mj-linkcard-loading {
+        padding: 20px;
+        text-align: center;
+        font-size: 13px;
+        color: #8e8e93;
+    }
+    .mj-linkembed-tool {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 14px;
+        background: #f5f5f7;
+        padding: 10px 14px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .mj-linkembed-tool a {
+        font-size: 13px;
+        color: #1d1d1f;
+        font-weight: 600;
+        text-decoration: none;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .mj-linkembed-tool a:hover { color: #0066cc; }
+
+    /* 텍스트 선택 플로팅 스타일 툴바 */
+    .mj-inline-style-bubble {
+        position: fixed;
+        z-index: 10020;
+        display: none;
+        align-items: center;
+        gap: 6px;
+        padding: 7px 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(0,0,0,0.1);
+        background: #fff;
+        box-shadow: 0 12px 30px rgba(0,0,0,0.12);
+    }
+    .mj-inline-style-bubble.is-visible { display: inline-flex; }
+    .mj-inline-style-bubble select,
+    .mj-inline-style-bubble button,
+    .mj-inline-style-bubble label {
+        border: 1px solid rgba(0,0,0,0.1);
+        border-radius: 9999px;
+        background: #fff;
+        color: #1d1d1f;
+        font-size: 12px;
+        line-height: 1;
+        height: 28px;
+    }
+    .mj-inline-style-bubble select,
+    .mj-inline-style-bubble button {
+        padding: 0 10px;
+    }
+    .mj-inline-style-bubble button:hover { background: #f5f5f7; }
+    .mj-inline-style-bubble label {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 0 8px;
+    }
+    .mj-inline-style-bubble input[type="color"] {
+        width: 16px;
+        height: 16px;
+        border: 0;
+        padding: 0;
+        background: transparent;
+        cursor: pointer;
+    }
+    .mj-inline-style-bubble__sep {
+        width: 1px;
+        height: 16px;
+        background: rgba(0,0,0,0.12);
+        margin: 0 2px;
+    }
+
+    .mj-toast-container {
+        position: fixed;
+        right: 20px;
+        bottom: 20px;
+        z-index: 11000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        pointer-events: none;
+    }
+    .mj-toast {
+        min-width: 260px;
+        max-width: min(86vw, 420px);
+        border-radius: 12px;
+        border: 1px solid #d1fae5;
+        background: #ecfdf5;
+        color: #065f46;
+        padding: 10px 12px;
+        font-size: 13px;
+        box-shadow: 0 10px 26px rgba(0,0,0,0.12);
+        pointer-events: auto;
+        opacity: 0;
+        transform: translateY(6px);
+        transition: opacity .22s ease, transform .22s ease;
+    }
+    .mj-toast.is-error {
+        border-color: #fecaca;
+        background: #fef2f2;
+        color: #991b1b;
+    }
+    .mj-toast.is-visible {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    .mj-toast__title {
+        font-size: 11px;
+        opacity: .72;
+        margin-bottom: 2px;
+    }
+
+    .mj-publish-modal {
+        position: fixed;
+        inset: 0;
+        z-index: 10800;
+        display: none;
+    }
+    .mj-publish-modal.is-visible { display: block; }
+    .mj-publish-modal__backdrop {
+        position: absolute;
+        inset: 0;
+        background: rgba(0,0,0,0.35);
+        backdrop-filter: blur(2px);
+    }
+    .mj-publish-modal__panel {
+        position: relative;
+        width: min(92vw, 760px);
+        margin: 8vh auto 0;
+        border-radius: 18px;
+        border: 1px solid rgba(0,0,0,0.1);
+        background: #fff;
+        box-shadow: 0 28px 68px rgba(0,0,0,.22);
+        overflow: hidden;
+    }
+    .mj-publish-modal__hd {
+        padding: 16px 18px;
+        border-bottom: 1px solid rgba(0,0,0,0.08);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+    .mj-publish-modal__title { font-size: 16px; font-weight: 700; color: #1d1d1f; }
+    .mj-publish-modal__close {
+        border: 0;
+        background: transparent;
+        color: #8e8e93;
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .mj-publish-modal__body {
+        padding: 16px 18px;
+        max-height: min(64vh, 620px);
+        overflow: auto;
+    }
+    .mj-publish-card {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 14px;
+        overflow: hidden;
+        background: #fff;
+    }
+    .mj-publish-card__meta {
+        padding: 12px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        border-bottom: 1px solid rgba(0,0,0,0.06);
+        background: #fafafa;
+    }
+    .mj-publish-chip {
+        font-size: 11px;
+        color: #4b5563;
+        border: 1px solid rgba(0,0,0,0.12);
+        border-radius: 9999px;
+        padding: 3px 8px;
+        background: #fff;
+    }
+    .mj-publish-card__content { padding: 14px; }
+    .mj-publish-card__title {
+        font-size: 22px;
+        font-weight: 700;
+        color: #111827;
+        margin: 0 0 8px;
+    }
+    .mj-publish-card__summary {
+        font-size: 14px;
+        color: #4b5563;
+        margin-bottom: 12px;
+    }
+    .mj-publish-card__preview {
+        border: 1px solid rgba(0,0,0,0.08);
+        border-radius: 12px;
+        padding: 12px;
+        background: #fcfcfe;
+        font-size: 14px;
+        color: #1f2937;
+    }
+    .mj-publish-modal__ft {
+        padding: 14px 18px;
+        border-top: 1px solid rgba(0,0,0,0.08);
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+        background: #fff;
+    }
+
+    /* 기본 Editor.js 인라인 툴바는 숨기고 커스텀 툴바로 통합 */
+    .ce-inline-toolbar,
+    .ce-conversion-toolbar {
+        display: none !important;
+    }
 </style>
+
+<!-- URL 임베드 피커 -->
+<div id="mj-url-picker" class="mj-url-picker" role="dialog" aria-modal="true">
+    <div class="mj-url-picker__title">하이퍼링크 삽입</div>
+    <div class="mj-url-picker__url" id="mj-url-picker-url"></div>
+    <div class="mj-url-picker__options">
+        <button type="button" class="mj-url-picker__opt" data-mode="mention">
+            <span class="mj-url-picker__opt-icon">🔗</span>
+            <span class="mj-url-picker__opt-info">
+                <span class="mj-url-picker__opt-label">멘션</span>
+                <span class="mj-url-picker__opt-desc">링크를 인라인 텍스트로 삽입</span>
+            </span>
+        </button>
+        <button type="button" class="mj-url-picker__opt" data-mode="card">
+            <span class="mj-url-picker__opt-icon">📰</span>
+            <span class="mj-url-picker__opt-info">
+                <span class="mj-url-picker__opt-label">카드</span>
+                <span class="mj-url-picker__opt-desc">사이트 제목으로 팬카드 표시</span>
+            </span>
+        </button>
+        <button type="button" class="mj-url-picker__opt" data-mode="preview">
+            <span class="mj-url-picker__opt-icon">🖼️</span>
+            <span class="mj-url-picker__opt-info">
+                <span class="mj-url-picker__opt-label">페이지 미리보기</span>
+                <span class="mj-url-picker__opt-desc">OG 이미지 + 설명 쿠버 카드</span>
+            </span>
+        </button>
+    </div>
+    <button type="button" class="mj-url-picker__cancel" id="mj-url-picker-cancel">취소</button>
+</div>
+
+<div id="inline-style-bubble" class="mj-inline-style-bubble" role="toolbar" aria-label="선택 텍스트 스타일">
+    <select id="inline-font-family">
+        <option value="">글씨체</option>
+        <option value="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">기본</option>
+        <option value="'Noto Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Noto Sans KR (OFL)</option>
+        <option value="'Nanum Gothic', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Nanum Gothic (OFL)</option>
+        <option value="'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">IBM Plex Sans KR (OFL)</option>
+        <option value="Pretendard, -apple-system, sans-serif">Pretendard (OFL)</option>
+        <option value="'Noto Serif KR', serif">Noto Serif KR (OFL)</option>
+        <option value="Georgia, Times New Roman, serif">Serif</option>
+        <option value="Courier New, SFMono-Regular, Menlo, monospace">Monospace</option>
+    </select>
+    <label data-color-target="text" tabindex="0" role="button" aria-label="글자색 선택">
+        글자색
+        <input id="inline-text-color" type="color" value="#1d1d1f" />
+    </label>
+    <label data-color-target="bg" tabindex="0" role="button" aria-label="배경색 선택">
+        배경
+        <input id="inline-bg-color" type="color" value="#fff59d" />
+    </label>
+    <span class="mj-inline-style-bubble__sep" aria-hidden="true"></span>
+    <button id="inline-link" type="button" aria-label="링크">링크</button>
+    <button id="inline-bold" type="button" aria-label="굵게">굵게</button>
+    <button id="inline-italic" type="button" aria-label="기울임">기울임</button>
+    <button id="inline-clear-style" type="button">해제</button>
+</div>
+
+<div id="toast-container" class="mj-toast-container" aria-live="polite" aria-atomic="true">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="mj-toast {% if message.tags == 'error' %}is-error{% endif %}" data-auto-toast="1">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+</div>
+
+<div id="publish-confirm-modal" class="mj-publish-modal" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="mj-publish-modal__backdrop" data-modal-close="1"></div>
+    <div class="mj-publish-modal__panel">
+        <div class="mj-publish-modal__hd">
+            <h3 class="mj-publish-modal__title">이대로 저장하시겠습니까?</h3>
+            <button id="publish-modal-close" type="button" class="mj-publish-modal__close" aria-label="닫기">×</button>
+        </div>
+        <div class="mj-publish-modal__body">
+            <div class="mj-publish-card">
+                <div class="mj-publish-card__meta">
+                    <span id="publish-preview-category" class="mj-publish-chip">카테고리</span>
+                    <span id="publish-preview-tags" class="mj-publish-chip">태그 없음</span>
+                    <span class="mj-publish-chip">공개됨</span>
+                </div>
+                <div class="mj-publish-card__content">
+                    <h4 id="publish-preview-title" class="mj-publish-card__title">(제목 없음)</h4>
+                    <p id="publish-preview-summary" class="mj-publish-card__summary">요약이 없습니다.</p>
+                    <div id="publish-preview-content" class="mj-publish-card__preview">미리보기 데이터가 없습니다.</div>
+                </div>
+            </div>
+        </div>
+        <div class="mj-publish-modal__ft">
+            <button id="publish-modal-cancel" type="button" class="rounded-full border border-black/[0.14] px-4 py-2 text-[13px] text-[#1d1d1f]">취소</button>
+            <button id="publish-modal-confirm" type="button" class="rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">저장하기</button>
+        </div>
+    </div>
+</div>
 
 <div class="mx-auto max-w-6xl px-4 py-10">
     <div class="mb-7 flex flex-wrap items-center justify-between gap-3">
@@ -178,14 +624,6 @@
         </div>
         <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">← 허브로</a>
     </div>
-
-    {% if messages %}
-    <div class="mb-6 space-y-2">
-        {% for message in messages %}
-        <div class="rounded-xl {% if message.tags == 'error' %}bg-red-50 text-red-700 border border-red-200{% else %}bg-green-50 text-green-700 border border-green-200{% endif %} px-4 py-3 text-[14px]">{{ message }}</div>
-        {% endfor %}
-    </div>
-    {% endif %}
 
     <div class="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
         <aside class="rounded-[20px] border border-black/[0.08] bg-white p-4">
@@ -211,6 +649,7 @@
         {% csrf_token %}
         <input type="hidden" id="draft_id" name="draft_id" value="{{ form_data.draft_id|default:'' }}">
         <input type="hidden" id="content" name="content" value="{{ form_data.content|default:'' }}">
+        <input type="hidden" id="is_published" name="is_published" value="1">
         <input type="hidden" id="submit_action" name="submit_action" value="publish">
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
@@ -232,8 +671,11 @@
                     <label for="editor-font" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">글꼴</label>
                     <select id="editor-font" class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
                         <option value="system-ui, -apple-system, Inter, sans-serif">기본</option>
-                        <option value="'Pretendard', 'Noto Sans KR', sans-serif">Pretendard</option>
-                        <option value="'Noto Serif KR', serif">Noto Serif</option>
+                        <option value="'Noto Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Noto Sans KR (OFL)</option>
+                        <option value="'Nanum Gothic', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Nanum Gothic (OFL)</option>
+                        <option value="'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">IBM Plex Sans KR (OFL)</option>
+                        <option value="'Pretendard', 'Noto Sans KR', sans-serif">Pretendard (OFL)</option>
+                        <option value="'Noto Serif KR', serif">Noto Serif KR (OFL)</option>
                         <option value="'SFMono-Regular', Menlo, Monaco, Consolas, monospace">코딩 폰트</option>
                     </select>
                 </div>
@@ -263,7 +705,10 @@
                 <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="toggle">/토글</button>
                 <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="image">/이미지</button>
                 <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="divider">/구분선</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="code">/코드</button>
+                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="linkcard">/링크</button>
             </div>
+            <p class="mb-3 text-[12px] text-[#8e8e93]">텍스트를 드래그 선택하면 스타일 툴바가 떠요.</p>
             <div class="editor-shell">
                 <div class="editor-toolbar">
                     <button type="button" class="block-btn" data-block="paragraph">문단</button>
@@ -292,10 +737,7 @@
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <label class="inline-flex items-center gap-2 text-[13px] text-[#1d1d1f]">
-                    <input type="checkbox" name="is_published" value="1" {% if form_data.is_published == '1' or not form_data %}checked{% endif %} class="h-4 w-4 rounded border-black/[0.2]" />
-                    즉시 공개
-                </label>
+                <span class="text-[12px] text-[#8e8e93]">임시저장은 초안으로 저장되고, 완료는 즉시 공개됩니다.</span>
                 <div class="flex flex-wrap items-center gap-2">
                     <button id="draft-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">임시저장</button>
                     <button id="preview-submit-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">미리보기</button>
@@ -315,6 +757,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@editorjs/delimiter@1.4.2"></script>
 <script src="https://cdn.jsdelivr.net/npm/@editorjs/code@2.9.3"></script>
 <script src="https://cdn.jsdelivr.net/npm/@editorjs/table@2.4.4"></script>
+<script src="https://cdn.jsdelivr.net/npm/@editorjs/undo@1.1.3"></script>
 <script>
 (() => {
     const form = document.getElementById('writer-form');
@@ -326,9 +769,30 @@
     const submitAction = document.getElementById('submit_action');
     const draftBtn = document.getElementById('draft-btn');
     const publishBtn = document.getElementById('publish-btn');
+    const inlineStyleBubble = document.getElementById('inline-style-bubble');
+    const toastContainer = document.getElementById('toast-container');
+    const publishConfirmModal = document.getElementById('publish-confirm-modal');
+    const publishModalCloseBtn = document.getElementById('publish-modal-close');
+    const publishModalCancelBtn = document.getElementById('publish-modal-cancel');
+    const publishModalConfirmBtn = document.getElementById('publish-modal-confirm');
+    const publishPreviewTitle = document.getElementById('publish-preview-title');
+    const publishPreviewCategory = document.getElementById('publish-preview-category');
+    const publishPreviewTags = document.getElementById('publish-preview-tags');
+    const publishPreviewSummary = document.getElementById('publish-preview-summary');
+    const publishPreviewContent = document.getElementById('publish-preview-content');
+    const inlineFontFamily = document.getElementById('inline-font-family');
+    const inlineTextColor = document.getElementById('inline-text-color');
+    const inlineBgColor = document.getElementById('inline-bg-color');
+    const inlineTextColorLabel = inlineStyleBubble?.querySelector('[data-color-target="text"]');
+    const inlineBgColorLabel = inlineStyleBubble?.querySelector('[data-color-target="bg"]');
+    const inlineLinkBtn = document.getElementById('inline-link');
+    const inlineBoldBtn = document.getElementById('inline-bold');
+    const inlineItalicBtn = document.getElementById('inline-italic');
+    const inlineClearStyleBtn = document.getElementById('inline-clear-style');
     const slashButtons = document.querySelectorAll('.slash-btn');
     const blockButtons = document.querySelectorAll('.block-btn');
     const imageToolInstances = new Set();
+    const URL_PREVIEW_API = "{% url 'blog:url_preview' %}";
 
     const svgIcon = (paths) => `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
     const TOOLBAR_ICON = {
@@ -577,6 +1041,270 @@
         };
     };
 
+    // ── LinkCardTool ────────────────────────────────────────────
+    class LinkCardTool {
+        static get toolbox() {
+            return { title: '링크 카드', icon: '<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 3.5 L14.5 3.5 L14.5 7.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 10.5 L14.5 3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M12 10v4H4V6h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' };
+        }
+
+        constructor({ data, api }) {
+            this.api = api;
+            this.data = {
+                url: data?.url || '',
+                title: data?.title || '',
+                description: data?.description || '',
+                image: data?.image || '',
+                favicon: data?.favicon || '',
+                site_name: data?.site_name || '',
+                mode: data?.mode || 'card',  // card | mention
+            };
+            this.wrapper = null;
+        }
+
+        render() {
+            this.wrapper = document.createElement('div');
+            this.wrapper.className = 'mj-linkcard-tool';
+
+            if (this.data.title && this.data.url) {
+                this._renderCard();
+            } else {
+                this._renderInput();
+            }
+            return this.wrapper;
+        }
+
+        _renderInput() {
+            this.wrapper.innerHTML = '';
+            const inner = document.createElement('div');
+            inner.style.cssText = 'padding:14px;display:flex;gap:8px;align-items:center;';
+
+            const urlInput = document.createElement('input');
+            urlInput.type = 'url';
+            urlInput.className = 'mj-linkcard-tool__url-input';
+            urlInput.placeholder = 'URL을 입력하세요 (예: https://example.com)';
+            urlInput.value = this.data.url || '';
+            urlInput.style.cssText = 'flex:1;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:8px 12px;font-size:13px;outline:none;background:#fafafa;';
+            urlInput.addEventListener('focus', () => { urlInput.style.borderColor = '#0066cc'; });
+            urlInput.addEventListener('blur', () => { urlInput.style.borderColor = 'rgba(0,0,0,0.12)'; });
+
+            // Cmd+Z / Ctrl+Z 가 undo 플러그인에 잡히지 않도록 버블링 차단
+            // → 브라우저 기본 input undo 동작이 살아남
+            urlInput.addEventListener('keydown', (e) => {
+                const isUndo = (e.metaKey || e.ctrlKey) && e.key === 'z';
+                const isRedo = (e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'));
+                if (isUndo || isRedo) e.stopPropagation();
+            });
+
+            const fetchBtn = document.createElement('button');
+            fetchBtn.type = 'button';
+            fetchBtn.textContent = '미리보기 가져오기';
+            fetchBtn.style.cssText = 'flex-shrink:0;background:#0066cc;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;';
+
+            const status = document.createElement('div');
+            status.style.cssText = 'padding:8px 14px;font-size:12px;color:#8e8e93;display:none;';
+
+            const doFetch = async () => {
+                const url = urlInput.value.trim();
+                if (!url) return;
+                this.data.url = url;
+
+                fetchBtn.disabled = true;
+                fetchBtn.textContent = '가져오는 중...';
+                status.style.display = 'block';
+                status.textContent = '';
+
+                try {
+                    const resp = await fetch(`${URL_PREVIEW_API}?url=${encodeURIComponent(url)}`);
+                    const json = await resp.json();
+                    if (json.error) throw new Error(json.error);
+
+                    this.data.title = json.title || url;
+                    this.data.description = json.description || '';
+                    this.data.image = json.image || '';
+                    this.data.favicon = json.favicon || '';
+                    this.data.site_name = json.site_name || '';
+                    this._renderCard();
+                } catch (err) {
+                    // 메타 없이 URL만 저장
+                    this.data.title = url;
+                    this._renderCard();
+                } finally {
+                    fetchBtn.disabled = false;
+                    fetchBtn.textContent = '미리보기 가져오기';
+                }
+            };
+
+            fetchBtn.addEventListener('click', doFetch);
+            urlInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') { e.preventDefault(); doFetch(); }
+            });
+
+            inner.appendChild(urlInput);
+            inner.appendChild(fetchBtn);
+            this.wrapper.appendChild(inner);
+            this.wrapper.appendChild(status);
+
+            window.setTimeout(() => urlInput.focus(), 0);
+        }
+
+        _renderCard() {
+            this.wrapper.innerHTML = '';
+            const d = this.data;
+
+            const modeBar = document.createElement('div');
+            modeBar.style.cssText = 'padding:10px 14px 6px;display:flex;gap:6px;align-items:center;';
+
+            const modeLabel = document.createElement('span');
+            modeLabel.textContent = '표시 방식:';
+            modeLabel.style.cssText = 'font-size:11px;color:#8e8e93;margin-right:4px;';
+
+            const modes = [{ key: 'card', label: '카드' }, { key: 'preview', label: '페이지미리보기' }, { key: 'mention', label: '멘션' }];
+            modes.forEach(({ key, label }) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = label;
+                btn.dataset.mode = key;
+                btn.style.cssText = `border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid rgba(0,0,0,0.12);cursor:pointer;background:${d.mode === key ? '#0066cc' : '#fff'};color:${d.mode === key ? '#fff' : '#1d1d1f'};`;
+                btn.addEventListener('click', () => {
+                    d.mode = key;
+                    this._renderCard();
+                });
+                modeBar.appendChild(btn);
+            });
+
+            const editBtn = document.createElement('button');
+            editBtn.type = 'button';
+            editBtn.textContent = '✎ 수정';
+            editBtn.style.cssText = 'margin-left:auto;font-size:11px;color:#8e8e93;background:transparent;border:none;cursor:pointer;';
+            editBtn.addEventListener('click', () => this._renderInput());
+
+            modeBar.insertBefore(modeLabel, modeBar.firstChild);
+            modeBar.appendChild(editBtn);
+
+            let preview;
+            if (d.mode === 'mention') {
+                preview = document.createElement('div');
+                preview.className = 'mj-linkembed-tool';
+                preview.style.cssText = 'margin:0 14px 14px;';
+                preview.innerHTML = `<span>🔗</span><a href="${d.url}" target="_blank" rel="noopener">${d.title || d.url}</a>`;
+            } else if (d.mode === 'preview') {
+                // 페이지 미리보기: OG 이미지를 상단 전체넓비로, 하단에 정보
+                preview = document.createElement('a');
+                preview.href = d.url;
+                preview.target = '_blank';
+                preview.rel = 'noopener';
+                preview.style.cssText = 'display:block;text-decoration:none;';
+                if (d.image) {
+                    const coverImg = document.createElement('div');
+                    coverImg.style.cssText = 'width:100%;height:180px;overflow:hidden;background:#f5f5f7;';
+                    const img = document.createElement('img');
+                    img.src = d.image;
+                    img.alt = d.title || '';
+                    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+                    coverImg.appendChild(img);
+                    preview.appendChild(coverImg);
+                }
+                const infoBox = document.createElement('div');
+                infoBox.style.cssText = 'padding:14px 16px;';
+                const siteRow2 = document.createElement('div');
+                siteRow2.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#8e8e93;margin-bottom:4px;';
+                if (d.favicon) {
+                    const fav2 = document.createElement('img');
+                    fav2.src = d.favicon; fav2.width = 14; fav2.height = 14;
+                    fav2.style.borderRadius = '3px';
+                    siteRow2.appendChild(fav2);
+                }
+                const sn2 = document.createElement('span');
+                try { sn2.textContent = d.site_name || new URL(d.url).hostname.replace('www.', ''); } catch(_) { sn2.textContent = d.site_name || d.url; }
+                siteRow2.appendChild(sn2);
+                const t2 = document.createElement('div');
+                t2.style.cssText = 'font-size:16px;font-weight:700;color:#1d1d1f;';
+                t2.textContent = d.title || d.url;
+                const desc2 = document.createElement('div');
+                if (d.description) {
+                    desc2.style.cssText = 'margin-top:4px;font-size:13px;color:#6e6e73;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
+                    desc2.textContent = d.description;
+                }
+                const url2 = document.createElement('div');
+                url2.style.cssText = 'margin-top:8px;font-size:11px;color:#0066cc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                url2.textContent = d.url;
+                infoBox.appendChild(siteRow2);
+                infoBox.appendChild(t2);
+                if (d.description) infoBox.appendChild(desc2);
+                infoBox.appendChild(url2);
+                preview.appendChild(infoBox);
+            } else {
+                preview = document.createElement('a');
+                preview.className = 'mj-linkcard-preview';
+                preview.href = d.url;
+                preview.target = '_blank';
+                preview.rel = 'noopener';
+                preview.style.cssText = 'display:flex;text-decoration:none;margin:0 0 0 0;';
+
+                const body = document.createElement('div');
+                body.className = 'mj-linkcard-preview__body';
+
+                const siteRow = document.createElement('div');
+                siteRow.className = 'mj-linkcard-preview__site';
+                if (d.favicon) {
+                    const fav = document.createElement('img');
+                    fav.src = d.favicon;
+                    fav.width = 14;
+                    fav.height = 14;
+                    fav.style.borderRadius = '3px';
+                    siteRow.appendChild(fav);
+                }
+                const siteName = document.createElement('span');
+                siteName.textContent = d.site_name || new URL(d.url).hostname.replace('www.', '');
+                siteRow.appendChild(siteName);
+
+                const title = document.createElement('div');
+                title.className = 'mj-linkcard-preview__title';
+                title.textContent = d.title || d.url;
+
+                body.appendChild(siteRow);
+                body.appendChild(title);
+
+                if (d.description) {
+                    const desc = document.createElement('div');
+                    desc.className = 'mj-linkcard-preview__desc';
+                    desc.textContent = d.description;
+                    body.appendChild(desc);
+                }
+
+                const urlEl = document.createElement('div');
+                urlEl.className = 'mj-linkcard-preview__url';
+                urlEl.textContent = d.url;
+                body.appendChild(urlEl);
+
+                preview.appendChild(body);
+
+                if (d.image) {
+                    const imgWrap = document.createElement('div');
+                    imgWrap.className = 'mj-linkcard-preview__img';
+                    const img = document.createElement('img');
+                    img.src = d.image;
+                    img.alt = d.title || '';
+                    imgWrap.appendChild(img);
+                    preview.appendChild(imgWrap);
+                }
+            }
+
+            this.wrapper.appendChild(modeBar);
+            this.wrapper.appendChild(preview);
+        }
+
+        save() {
+            return { ...this.data };
+        }
+
+        validate(savedData) {
+            return Boolean(savedData?.url);
+        }
+
+        static get isReadOnlySupported() { return true; }
+    }
+
     const editor = new EditorJS({
         holder: 'editor',
         autofocus: true,
@@ -595,8 +1323,14 @@
             table: { class: KoreanTable, inlineToolbar: true },
             toggle: { class: ToggleTool, inlineToolbar: true },
             image: { class: ImageTool, inlineToolbar: true },
+            linkcard: { class: LinkCardTool },
         },
         onReady: () => {
+            // Undo/Redo 플러그인 (Cmd+Z / Ctrl+Z, Cmd+Shift+Z / Ctrl+Y)
+            if (typeof Undo !== 'undefined') {
+                new Undo({ editor });
+            }
+
             const holder = document.getElementById('editor');
             let isConverting = false;
             let convertTimer = null;
@@ -643,11 +1377,15 @@
                 if (s.startsWith('/표 ')) return { command: 'table', text: s.slice(3).trimStart() };
                 if (s.startsWith('/토글 ')) return { command: 'toggle', text: s.slice(4).trimStart() };
                 if (s.startsWith('/이미지 ')) return { command: 'image', text: s.slice(5).trimStart() };
+                if (s.startsWith('/코드 ')) return { command: 'code', text: s.slice(4).trimStart() };
+                if (s.startsWith('/링크 ')) return { command: 'linkcard', text: s.slice(4).trimStart() };
                 const t = s.trim();
                 if (t === '/divider' || t === '/구분선') return { command: 'divider', text: '' };
                 if (t === '/표') return { command: 'table', text: '' };
                 if (t === '/토글') return { command: 'toggle', text: '' };
                 if (t === '/이미지') return { command: 'image', text: '' };
+                if (t === '/코드') return { command: 'code', text: '' };
+                if (t === '/링크') return { command: 'linkcard', text: '' };
                 return null;
             };
 
@@ -707,6 +1445,10 @@
                 } else if (command === 'divider') {
                     editor.blocks.insert('delimiter', {}, undefined, idx, false);
                     editor.blocks.insert('paragraph', { text: '' }, undefined, idx + 1, true);
+                } else if (command === 'code') {
+                    editor.blocks.insert('code', { code: text || '' }, undefined, idx, true);
+                } else if (command === 'linkcard') {
+                    editor.blocks.insert('linkcard', { url: text || '' }, undefined, idx, true);
                 }
 
                 // 변환 후 커서를 해당 블록으로 명시적 이동
@@ -721,7 +1463,12 @@
                         if (imageUrl) imageUrl.focus();
                         return;
                     }
-                    if (command === 'table') return;
+                    if (command === 'linkcard') {
+                        const lcInput = holder.querySelector('.mj-linkcard-tool__url-input');
+                        if (lcInput) lcInput.focus();
+                        return;
+                    }
+                    if (command === 'table' || command === 'code') return;
                     try { editor.caret.setToBlock(idx, 'end'); } catch (_) {}
                 });
 
@@ -765,6 +1512,84 @@
                 convertTimer = setTimeout(() => { isConverting = false; }, 400);
             };
 
+            // ── URL 임베드 피커 ─────────────────────────────────
+            let _pendingUrl = null;
+            const _pickerEl = document.getElementById('mj-url-picker');
+            const _pickerUrlEl = document.getElementById('mj-url-picker-url');
+            const _pickerCancelEl = document.getElementById('mj-url-picker-cancel');
+
+            const _hideUrlPicker = () => {
+                _pickerEl.classList.remove('is-visible');
+                _pendingUrl = null;
+            };
+
+            const _showUrlPicker = (url, info) => {
+                _pickerUrlEl.textContent = url.length > 60 ? url.slice(0, 57) + '...' : url;
+                // 코너 클리핑 망기 (editor 중앙 상단)
+                const editorRect = holder.getBoundingClientRect();
+                _pickerEl.style.left = (editorRect.left + editorRect.width / 2 - 160) + 'px';
+                _pickerEl.style.top = (window.scrollY + editorRect.top + 40) + 'px';
+                _pickerEl.classList.add('is-visible');
+            };
+
+            _pickerCancelEl.addEventListener('click', _hideUrlPicker);
+
+            _pickerEl.querySelectorAll('.mj-url-picker__opt').forEach((btn) => {
+                btn.addEventListener('click', async () => {
+                    if (!_pendingUrl) { _hideUrlPicker(); return; }
+                    const { text: url, info } = _pendingUrl;
+                    const mode = btn.dataset.mode;
+                    _hideUrlPicker();
+
+                    isConverting = true;
+                    clearTimeout(convertTimer);
+
+                    // 빈 paragraph이면 삭제
+                    const targetIdx = info.idx;
+                    if ((info.raw || '').trim() === '') {
+                        editor.blocks.delete(targetIdx);
+                    }
+
+                    if (mode === 'mention') {
+                        editor.blocks.insert('paragraph', { text: `<a href="${url}">${url}</a>` }, undefined, targetIdx, true);
+                    } else {
+                        // card 또는 preview: linkcard 블록 삽입, 다음에 fetch
+                        editor.blocks.insert('linkcard', { url, mode: mode === 'preview' ? 'preview' : 'card' }, undefined, targetIdx, true);
+                        // 자동으로 OG 데이터 fetch
+                        try {
+                            const resp = await fetch(`${URL_PREVIEW_API}?url=${encodeURIComponent(url)}`);
+                            const json = await resp.json();
+                            if (!json.error) {
+                                const blk = editor.blocks.getBlockByIndex(targetIdx);
+                                if (blk) {
+                                    // 블록을 새 데이터로 교체
+                                    editor.blocks.delete(targetIdx);
+                                    editor.blocks.insert('linkcard', {
+                                        url,
+                                        title: json.title || url,
+                                        description: json.description || '',
+                                        image: json.image || '',
+                                        favicon: json.favicon || '',
+                                        site_name: json.site_name || '',
+                                        mode: mode === 'preview' ? 'preview' : 'card',
+                                    }, undefined, targetIdx, true);
+                                }
+                            }
+                        } catch (_) {}
+                    }
+
+                    convertTimer = setTimeout(() => { isConverting = false; }, 400);
+                });
+            });
+
+            // ESC로 피커 닫기
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && _pickerEl.classList.contains('is-visible')) {
+                    e.preventDefault();
+                    _hideUrlPicker();
+                }
+            });
+
             // ── MutationObserver: 공백 입력 패턴 감지 ──────────────────
             const observer = new MutationObserver(() => {
                 if (isConverting) return;
@@ -783,7 +1608,21 @@
                 if (isConverting) return;
                 const items = Array.from(e.clipboardData?.items || []);
                 const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
-                if (!imageItem) return;
+                if (!imageItem) {
+                    // URL 임베드 감지
+                    const text = e.clipboardData?.getData('text/plain')?.trim() || '';
+                    if (/^https?:\/\/\S+$/i.test(text)) {
+                        const info = getFocusedParaInfo();
+                        if (info && (info.raw || '').trim() === '') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            _pendingUrl = { text, info };
+                            _showUrlPicker(text, info);
+                            return;
+                        }
+                    }
+                    return;
+                }
 
                 const file = imageItem.getAsFile();
                 if (!file) return;
@@ -826,10 +1665,239 @@
     fontSelect.addEventListener('change', applyFont);
     setTimeout(applyFont, 0);
 
+    let inlineStyleRange = null;
+    const editorHolder = document.getElementById('editor');
+
+    const hideInlineStyleBubble = () => {
+        inlineStyleBubble?.classList.remove('is-visible');
+    };
+
+    const isRangeInsideEditor = (range) => {
+        if (!range || !editorHolder) return false;
+        return editorHolder.contains(range.commonAncestorContainer);
+    };
+
+    const updateInlineStyleBubble = () => {
+        if (!inlineStyleBubble) return;
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+            hideInlineStyleBubble();
+            return;
+        }
+        const range = sel.getRangeAt(0);
+        if (!isRangeInsideEditor(range)) {
+            hideInlineStyleBubble();
+            return;
+        }
+
+        inlineStyleRange = range.cloneRange();
+
+        const rect = range.getBoundingClientRect();
+        if (!rect || (!rect.width && !rect.height)) {
+            hideInlineStyleBubble();
+            return;
+        }
+
+        const bubbleW = inlineStyleBubble.offsetWidth || 330;
+        const left = Math.max(8, Math.min(window.innerWidth - bubbleW - 8, rect.left + rect.width / 2 - bubbleW / 2));
+        const top = Math.max(8, rect.top - 46);
+        inlineStyleBubble.style.left = `${left}px`;
+        inlineStyleBubble.style.top = `${top}px`;
+        inlineStyleBubble.classList.add('is-visible');
+    };
+
+    const applyInlineStyle = (action, value) => {
+        const sel = window.getSelection();
+        if (!sel) return;
+
+        let targetRange = null;
+        if (sel.rangeCount > 0 && !sel.isCollapsed) {
+            targetRange = sel.getRangeAt(0);
+        } else if (inlineStyleRange) {
+            targetRange = inlineStyleRange;
+            sel.removeAllRanges();
+            sel.addRange(targetRange);
+        }
+
+        if (!targetRange || targetRange.collapsed || !isRangeInsideEditor(targetRange)) return;
+
+        // Editor.js contentEditable에 직접 적용 (브라우저 기본 동작)
+        document.execCommand(action, false, value);
+        inlineStyleRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : inlineStyleRange;
+        window.requestAnimationFrame(updateInlineStyleBubble);
+    };
+
+    document.addEventListener('selectionchange', () => {
+        window.requestAnimationFrame(updateInlineStyleBubble);
+    });
+
+    document.addEventListener('scroll', () => {
+        if (inlineStyleBubble?.classList.contains('is-visible')) {
+            window.requestAnimationFrame(updateInlineStyleBubble);
+        }
+    }, true);
+
+    window.addEventListener('resize', () => {
+        if (inlineStyleBubble?.classList.contains('is-visible')) {
+            window.requestAnimationFrame(updateInlineStyleBubble);
+        }
+    });
+
+    document.addEventListener('mousedown', (e) => {
+        if (!inlineStyleBubble?.classList.contains('is-visible')) return;
+        const t = e.target;
+        if (inlineStyleBubble.contains(t) || editorHolder?.contains(t)) return;
+        hideInlineStyleBubble();
+    });
+
+    inlineFontFamily?.addEventListener('change', () => {
+        if (!inlineFontFamily.value) return;
+        applyInlineStyle('fontName', inlineFontFamily.value);
+        inlineFontFamily.value = '';
+    });
+
+    inlineTextColor?.addEventListener('input', () => {
+        applyInlineStyle('foreColor', inlineTextColor.value);
+    });
+
+    inlineBgColor?.addEventListener('input', () => {
+        applyInlineStyle('hiliteColor', inlineBgColor.value);
+    });
+
+    inlineClearStyleBtn?.addEventListener('click', () => {
+        applyInlineStyle('removeFormat');
+    });
+
+    inlineBoldBtn?.addEventListener('click', () => {
+        applyInlineStyle('bold');
+    });
+
+    inlineItalicBtn?.addEventListener('click', () => {
+        applyInlineStyle('italic');
+    });
+
+    inlineLinkBtn?.addEventListener('click', () => {
+        const url = window.prompt('링크 URL을 입력하세요', 'https://');
+        if (!url) return;
+        applyInlineStyle('createLink', url.trim());
+    });
+
+    const bindColorPickerTrigger = (labelEl, inputEl) => {
+        if (!labelEl || !inputEl) return;
+        const open = () => {
+            try { inputEl.focus({ preventScroll: true }); } catch (_) {}
+            if (typeof inputEl.showPicker === 'function') {
+                inputEl.showPicker();
+            } else {
+                inputEl.click();
+            }
+        };
+        labelEl.addEventListener('pointerdown', (e) => {
+            if (e.target === inputEl) return;
+            e.preventDefault();
+            e.stopPropagation();
+            open();
+        });
+        labelEl.addEventListener('click', (e) => {
+            if (e.target === inputEl) return;
+            e.preventDefault();
+            open();
+        });
+        labelEl.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            e.preventDefault();
+            open();
+        });
+    };
+
+    bindColorPickerTrigger(inlineTextColorLabel, inlineTextColor);
+    bindColorPickerTrigger(inlineBgColorLabel, inlineBgColor);
+
     const syncContent = async () => {
         const output = await editor.save();
         contentInput.value = JSON.stringify(output);
     };
+
+    const showToast = (text, type = 'success') => {
+        if (!toastContainer || !text) return;
+        const item = document.createElement('div');
+        item.className = `mj-toast ${type === 'error' ? 'is-error' : ''}`.trim();
+        item.innerHTML = `<div class="mj-toast__title">${type === 'error' ? '오류' : '알림'}</div><div>${text}</div>`;
+        toastContainer.appendChild(item);
+        requestAnimationFrame(() => item.classList.add('is-visible'));
+        setTimeout(() => {
+            item.classList.remove('is-visible');
+            setTimeout(() => item.remove(), 220);
+        }, 2400);
+    };
+
+    if (toastContainer) {
+        toastContainer.querySelectorAll('[data-auto-toast="1"]').forEach((el, idx) => {
+            setTimeout(() => el.classList.add('is-visible'), 20 + idx * 80);
+            setTimeout(() => {
+                el.classList.remove('is-visible');
+                setTimeout(() => el.remove(), 220);
+            }, 2600 + idx * 120);
+        });
+    }
+
+    const buildPublishPreview = () => {
+        const output = JSON.parse(contentInput.value || '{"blocks": []}');
+        const plain = (output.blocks || [])
+            .map((b) => {
+                const d = b.data || {};
+                if (b.type === 'code') return d.code || '';
+                if (b.type === 'list') return (d.items || []).map((it) => typeof it === 'string' ? it : (it.content || '')).join(' ');
+                if (b.type === 'checklist') return (d.items || []).map((it) => it.text || '').join(' ');
+                if (b.type === 'toggle') return `${d.title || ''} ${(d.items || []).join(' ')}`;
+                return d.text || d.title || d.url || '';
+            })
+            .join(' ')
+            .replace(/<[^>]*>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        publishPreviewTitle.textContent = (document.getElementById('title')?.value || '').trim() || '(제목 없음)';
+        const categorySelect = document.querySelector('select[name="category"]');
+        const categoryLabel = categorySelect?.selectedOptions?.[0]?.textContent?.trim() || '카테고리 없음';
+        publishPreviewCategory.textContent = categoryLabel;
+
+        const tagsText = (document.getElementById('tags')?.value || '').trim();
+        publishPreviewTags.textContent = tagsText ? tagsText : '태그 없음';
+
+        const summaryText = (document.getElementById('summary')?.value || '').trim();
+        publishPreviewSummary.textContent = summaryText || '요약이 없습니다.';
+        publishPreviewContent.textContent = plain ? `${plain.slice(0, 220)}${plain.length > 220 ? '…' : ''}` : '본문 미리보기가 없습니다.';
+    };
+
+    const openPublishModal = () => {
+        if (!publishConfirmModal) return;
+        buildPublishPreview();
+        publishConfirmModal.classList.add('is-visible');
+        publishConfirmModal.setAttribute('aria-hidden', 'false');
+    };
+
+    const closePublishModal = () => {
+        if (!publishConfirmModal) return;
+        publishConfirmModal.classList.remove('is-visible');
+        publishConfirmModal.setAttribute('aria-hidden', 'true');
+    };
+
+    publishConfirmModal?.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t?.dataset?.modalClose === '1') closePublishModal();
+    });
+    publishModalCloseBtn?.addEventListener('click', closePublishModal);
+    publishModalCancelBtn?.addEventListener('click', closePublishModal);
+
+    let publishConfirmed = false;
+    publishModalConfirmBtn?.addEventListener('click', async () => {
+        publishConfirmed = true;
+        closePublishModal();
+        await syncContent();
+        submitAction.value = 'publish';
+        form.submit();
+    });
 
     const renderPreviewHtml = (output) => {
         const chunks = [];
@@ -870,6 +1938,21 @@
                 const items = (d.items || []).map((item) => `<p class="mb-1">${item || ''}</p>`).join('');
                 chunks.push(`<details class="my-4 rounded-2xl border border-black/[0.08] bg-white"><summary class="cursor-pointer select-none px-4 py-3 font-medium list-none">${d.title || '토글'}</summary><div class="px-4 pb-4 text-[#6e6e73]">${items}</div></details>`);
             }
+            if (block.type === 'linkcard') {
+                const url = d.url || '';
+                if (url) {
+                    const title = d.title || url;
+                    const desc = d.description || '';
+                    const img = d.image || '';
+                    const favicon = d.favicon || '';
+                    const site = d.site_name || '';
+                    if (d.mode === 'mention') {
+                        chunks.push(`<div class="my-2 flex items-center gap-2 rounded-2xl bg-[#f5f5f7] px-4 py-2.5"><span>🔗</span><a href="${url}" target="_blank" rel="noopener" class="text-[13px] font-semibold text-[#1d1d1f] no-underline hover:text-[#0066cc]">${title}</a></div>`);
+                    } else {
+                        chunks.push(`<div class="my-4 overflow-hidden rounded-2xl border border-black/[0.08] bg-white"><a href="${url}" target="_blank" rel="noopener" class="flex no-underline"><div class="flex-1 min-w-0 p-4">${favicon ? `<div class="flex items-center gap-1.5 mb-1"><img src="${favicon}" width="14" height="14" class="rounded-sm" /><span class="text-[11px] text-[#8e8e93]">${site}</span></div>` : ''}<div class="text-[15px] font-semibold text-[#1d1d1f] truncate">${title}</div>${desc ? `<div class="mt-1 text-[12px] text-[#6e6e73] line-clamp-2">${desc}</div>` : ''}<div class="mt-1.5 text-[11px] text-[#0066cc] truncate">${url}</div></div>${img ? `<div class="w-28 flex-shrink-0 border-l border-black/[0.06]"><img src="${img}" alt="" class="h-full w-full object-cover" /></div>` : ''}</a></div>`);
+                    }
+                }
+            }
         });
         return chunks.join('') || '<p class="text-[#8e8e93]">미리보기할 내용이 없습니다.</p>';
     };
@@ -908,6 +1991,10 @@
                 editor.blocks.insert('toggle', { title: '토글 제목', items: ['토글 내용을 작성하세요.'] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             } else if (cmd === 'image') {
                 editor.blocks.insert('image', { url: '', caption: '', alt: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
+            } else if (cmd === 'code') {
+                editor.blocks.insert('code', { code: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
+            } else if (cmd === 'link' || cmd === 'linkcard') {
+                editor.blocks.insert('linkcard', { url: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
             }
         });
     });
@@ -933,19 +2020,28 @@
 
     draftBtn.addEventListener('click', async () => {
         await syncContent();
+        publishConfirmed = false;
         submitAction.value = 'draft';
+        showToast('임시저장 중...');
         form.submit();
     });
 
     publishBtn.addEventListener('click', async () => {
         await syncContent();
         submitAction.value = 'publish';
-        form.submit();
+        publishConfirmed = false;
+        openPublishModal();
     });
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
         await syncContent();
+
+        if (submitAction.value !== 'draft' && !publishConfirmed) {
+            openPublishModal();
+            return;
+        }
+
         form.submit();
     });
 })();

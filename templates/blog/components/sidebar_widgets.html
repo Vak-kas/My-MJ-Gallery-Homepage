@@ -19,7 +19,7 @@
         <h3 class="text-[15px] font-semibold text-[#1d1d1f]">태그</h3>
         <div class="mt-4 flex flex-wrap gap-2">
             {% for tag in tag_list %}
-            <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#6e6e73]">#{{ tag.name }} ({{ tag.published_post_count }})</span>
+            <span class="rounded-full border border-black/[0.08] px-2.5 py-1 text-[11px] text-[#6e6e73]">#{{ tag.name }}</span>
             {% empty %}
             <p class="text-[13px] text-[#8e8e93]">등록된 태그가 없습니다.</p>
             {% endfor %}

@@ -1,11 +1,17 @@
 from datetime import timedelta
 
+import json as _json
+import re as _re
+
+import requests as _requests
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.views.decorators.http import require_GET
 from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode
@@ -256,6 +262,55 @@ def index(request):
 	return render(request, "blog/index.html", context)
 
 
+@require_GET
+def url_preview(request):
+	"""URL OG 메타데이터를 JSON으로 반환하는 내부 API"""
+	url = (request.GET.get("url") or "").strip()
+	if not url or not _re.match(r'^https?://', url):
+		return JsonResponse({"error": "invalid url"}, status=400)
+
+	try:
+		headers = {
+			"User-Agent": "Mozilla/5.0 (compatible; MjGalleryBot/1.0)",
+			"Accept": "text/html,application/xhtml+xml",
+		}
+		resp = _requests.get(url, headers=headers, timeout=6, allow_redirects=True)
+		resp.raise_for_status()
+		html = resp.text
+		resp.encoding = resp.apparent_encoding or "utf-8"
+
+		def _meta(prop):
+			m = _re.search(
+				r'<meta[^>]+(?:property|name)=["\']' + _re.escape(prop) + r'["\'][^>]+content=["\']([^"\']*)["\']',
+				html, _re.I
+			) or _re.search(
+				r'<meta[^>]+content=["\']([^"\']*)["\'][^>]+(?:property|name)=["\']' + _re.escape(prop) + r'["\']',
+				html, _re.I
+			)
+			return m.group(1).strip() if m else ""
+
+		title_m = _re.search(r'<title[^>]*>([^<]+)</title>', html, _re.I)
+		title = _meta("og:title") or _meta("twitter:title") or (title_m.group(1).strip() if title_m else "")
+		desc = _meta("og:description") or _meta("twitter:description") or _meta("description")
+		image = _meta("og:image") or _meta("twitter:image")
+		site_name = _meta("og:site_name")
+
+		from urllib.parse import urlparse
+		parsed = urlparse(url)
+		favicon = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+
+		return JsonResponse({
+			"url": url,
+			"title": title[:200],
+			"description": desc[:400],
+			"image": image,
+			"site_name": site_name or parsed.netloc,
+			"favicon": favicon,
+		})
+	except Exception as e:
+		return JsonResponse({"error": str(e)[:120]}, status=200)
+
+
 def tech(request):
 	return render(request, "blog/tech.html", _category_page(request, Post.CATEGORY_TECH, "Tech"))
 
@@ -371,7 +426,7 @@ def post_create(request):
 		cover_image = request.FILES.get("cover_image")
 		tags_raw = (request.POST.get("tags") or "").strip()
 		submit_action = (request.POST.get("submit_action") or "publish").strip()
-		is_published = submit_action != "draft" and request.POST.get("is_published") == "1"
+		is_published = submit_action != "draft"
 
 		if not title or category not in dict(Post.CATEGORY_CHOICES):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
@@ -456,7 +511,7 @@ def post_edit(request, slug: str):
 		cover_image = request.FILES.get("cover_image")
 		tags_raw = (request.POST.get("tags") or "").strip()
 		submit_action = (request.POST.get("submit_action") or "publish").strip()
-		is_published = submit_action != "draft" and request.POST.get("is_published") == "1"
+		is_published = submit_action != "draft"
 
 		form_data = dict(request.POST)
 		form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
