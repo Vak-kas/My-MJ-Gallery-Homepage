@@ -80,13 +80,20 @@
                     </div>
                     <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">표시 {{ feed_posts|length }}개</span>
                 </div>
-                {% if user.is_authenticated %}
                 <div class="mt-3">
+                    {% if user.is_authenticated %}
                     <a href="{% url 'blog:post_create' %}" class="inline-flex items-center gap-1.5 rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0055b3] transition-colors">
                         <span>✏️</span> 글쓰기
                     </a>
+                    {% else %}
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="{% url 'accounts:login' %}" class="inline-flex items-center gap-1.5 rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] font-semibold text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">
+                            <span>✏️</span> 글쓰기
+                        </a>
+                        <span class="text-[12px] text-[#8e8e93]">글쓰기는 로그인 후 이용 가능합니다.</span>
+                    </div>
+                    {% endif %}
                 </div>
-                {% endif %}
                 <div class="mt-5 flex flex-wrap items-center justify-between gap-2">
                     <p class="text-[13px] text-[#8e8e93]">
                         {% if search_query %}

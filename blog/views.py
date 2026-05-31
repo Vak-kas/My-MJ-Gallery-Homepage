@@ -16,7 +16,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode
 
-from .models import Comment, GuestbookEntry, Post, PostLike, Tag
+from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
 
 
 def _published_posts_qs():
@@ -117,7 +117,9 @@ def _sidebar_context(request):
 	if not request.user.is_superuser:
 		recent_comment_qs = recent_comment_qs.exclude(post__category=Post.CATEGORY_SECRET)
 
-	recent_comments = list(recent_comment_qs.order_by("-created_at", "-id")[:8])
+	recent_comments = list(
+		recent_comment_qs.annotate(like_count=Count("likes", distinct=True)).order_by("-created_at", "-id")[:5]
+	)
 
 	guestbook_entries = list(
 		GuestbookEntry.objects.filter(is_visible=True).order_by("-created_at", "-id")[:8]
@@ -339,16 +341,41 @@ def post_detail(request, slug: str):
 		action = (request.POST.get("action") or "").strip()
 
 		if action == "comment":
-			author_name = (request.POST.get("author_name") or "").strip()
+			if not request.user.is_authenticated:
+				messages.error(request, "댓글은 로그인 후 작성할 수 있습니다.")
+				return redirect("accounts:login")
+
+			author_name = request.user.get_username().strip()
 			content = (request.POST.get("content") or "").strip()
-			if not author_name and request.user.is_authenticated:
-				author_name = request.user.get_username()
 			if author_name and content:
 				Comment.objects.create(post=post, author_name=author_name[:60], content=content[:1200])
 				messages.success(request, "댓글이 등록되었습니다.")
 			else:
-				messages.error(request, "이름과 댓글 내용을 모두 입력해 주세요.")
-			return redirect("blog:post_detail", slug=post.slug)
+				messages.error(request, "댓글 내용을 입력해 주세요.")
+			return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+		if action == "comment_like":
+			if not request.user.is_authenticated:
+				messages.error(request, "댓글 좋아요는 로그인 후 사용할 수 있습니다.")
+				return redirect("accounts:login")
+
+			comment_id = (request.POST.get("comment_id") or "").strip()
+			if not comment_id.isdigit():
+				messages.error(request, "잘못된 댓글 요청입니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			comment = post.comments.filter(id=int(comment_id), is_visible=True).first()
+			if not comment:
+				messages.error(request, "댓글을 찾을 수 없습니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			like, created = CommentLike.objects.get_or_create(comment=comment, user=request.user)
+			if not created:
+				like.delete()
+				messages.success(request, "댓글 좋아요를 취소했습니다.")
+			else:
+				messages.success(request, "댓글 좋아요를 눌렀습니다.")
+			return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
 
 		if action == "like":
 			if not request.user.is_authenticated:
@@ -366,9 +393,18 @@ def post_detail(request, slug: str):
 	Post.objects.filter(id=post.id).update(views=post.views + 1)
 	post.views += 1
 
-	visible_comments = post.comments.filter(is_visible=True).select_related(None)
+	visible_comments = post.comments.filter(is_visible=True).annotate(like_count=Count("likes", distinct=True))
 	likes_count = post.likes.count()
 	user_liked = request.user.is_authenticated and post.likes.filter(user=request.user).exists()
+	liked_comment_ids = set()
+	if request.user.is_authenticated:
+		liked_comment_ids = set(
+			CommentLike.objects.filter(comment__post=post, comment__is_visible=True, user=request.user)
+			.values_list("comment_id", flat=True)
+		)
+
+	for c in visible_comments:
+		c.user_liked = c.id in liked_comment_ids
 
 	context = {
 		"post": post,

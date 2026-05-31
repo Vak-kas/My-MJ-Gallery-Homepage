@@ -104,31 +104,64 @@
         </div>
     </article>
 
-    <section class="mt-10 space-y-8">
+    <section id="comments" class="mt-10 space-y-8 scroll-mt-24">
         <div class="rounded-[24px] border border-black/[0.08] bg-white p-6">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-[22px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">댓글 {{ comment_count }}</h2>
                 <span class="text-[13px] text-[#8e8e93]">내 생각을 남겨주세요</span>
             </div>
 
-            <form method="post" action="{% url 'blog:post_detail' post.slug %}" class="mt-5 space-y-3 rounded-[20px] border border-black/[0.08] bg-[#fafafb] p-4">
+            {% if user.is_authenticated %}
+            <form method="post" action="{% url 'blog:post_detail' post.slug %}#comments" class="mt-5 space-y-3 rounded-[20px] border border-black/[0.08] bg-white p-4">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="comment">
                 <div class="grid gap-3 md:grid-cols-[180px_minmax(0,1fr)]">
-                    <input type="text" name="author_name" maxlength="60" value="{{ comment_form_author }}" placeholder="이름"
-                        class="h-10 rounded-xl border border-black/[0.1] bg-white px-4 text-[13px] outline-none focus:border-[#0066cc]" />
+                    <div class="flex h-10 items-center rounded-xl border border-black/[0.1] bg-[#f8f8fa] px-4 text-[13px] text-[#6e6e73]">
+                        {{ request.user.username }}
+                    </div>
                     <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">댓글 등록</button>
                 </div>
                 <textarea name="content" rows="4" maxlength="1200" placeholder="댓글을 입력하세요"
                     class="w-full rounded-xl border border-black/[0.1] bg-white px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]"></textarea>
                 <p class="text-[11px] text-[#8e8e93]">댓글은 바로 반영됩니다.</p>
             </form>
+            {% else %}
+            <div class="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-black/[0.08] bg-[#f8f8fa] p-4">
+                <p class="text-[13px] font-medium text-[#6e6e73]">로그인 후 글 작성합니다</p>
+                <a href="{% url 'accounts:login' %}" class="inline-flex h-9 items-center rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white hover:bg-[#0055b3]">로그인하기</a>
+            </div>
+            {% endif %}
 
             <div class="mt-6 space-y-4">
                 {% for comment in visible_comments %}
-                <article class="rounded-[18px] border border-black/[0.08] bg-[#fafafb] p-4">
-                    <p class="text-[14px] leading-[1.8] text-[#1d1d1f]">{{ comment.content|linebreaksbr }}</p>
-                    <p class="mt-3 text-[12px] text-[#8e8e93]">{{ comment.author_name }} · {{ comment.created_at|date:"Y.m.d H:i" }}</p>
+                <article class="rounded-[18px] border border-black/[0.08] bg-white p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="flex min-w-0 flex-1 items-start gap-3">
+                            <div class="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#eef3ff] text-[13px] font-bold text-[#0066cc]">
+                                {{ comment.author_name|default:"?"|slice:":1"|upper }}
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-[14px] leading-[1.8] text-[#1d1d1f]">{{ comment.content|linebreaksbr }}</p>
+                                <p class="mt-3 text-[12px] text-[#8e8e93]">{{ comment.author_name }} · {{ comment.created_at|date:"Y.m.d H:i" }}</p>
+                            </div>
+                        </div>
+
+                        {% if user.is_authenticated %}
+                        <form method="post" action="{% url 'blog:post_detail' post.slug %}#comments" class="flex-shrink-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="comment_like">
+                            <input type="hidden" name="comment_id" value="{{ comment.id }}">
+                            <button type="submit" class="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-[12px] font-semibold transition-colors {% if comment.user_liked %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">
+                                <span>{% if comment.user_liked %}💙{% else %}🤍{% endif %}</span>
+                                <span>{{ comment.like_count|default:0 }}</span>
+                            </button>
+                        </form>
+                        {% else %}
+                        <a href="{% url 'accounts:login' %}" class="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] font-semibold text-[#6e6e73] hover:bg-[#f5f5f7]">
+                            🤍 {{ comment.like_count|default:0 }}
+                        </a>
+                        {% endif %}
+                    </div>
                 </article>
                 {% empty %}
                 <p class="text-[14px] text-[#8e8e93]">아직 댓글이 없습니다.</p>

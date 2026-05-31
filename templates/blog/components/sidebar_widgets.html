@@ -30,10 +30,10 @@
     <section class="rounded-[18px] border border-black/[0.08] bg-white p-5">
         <h3 class="text-[15px] font-semibold text-[#1d1d1f]">최근 댓글</h3>
         <ul class="mt-4 space-y-3">
-            {% for comment in recent_comments|slice:":6" %}
+            {% for comment in recent_comments|slice:":5" %}
             <li>
                 <p class="line-clamp-2 text-[13px] text-[#1d1d1f]">{{ comment.content|truncatechars:68 }}</p>
-                <p class="mt-1 text-[11px] text-[#8e8e93]">{{ comment.author_name }} · <a href="{% url 'blog:post_detail' comment.post.slug %}" class="hover:text-[#0066cc]">{{ comment.post.title|truncatechars:22 }}</a></p>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">좋아요 {{ comment.like_count|default:0 }}</p>
             </li>
             {% empty %}
             <li class="text-[13px] text-[#8e8e93]">최근 댓글이 없습니다.</li>

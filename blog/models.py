@@ -85,6 +85,23 @@ class Comment(models.Model):
 		return f"{self.author_name} on {self.post.title}"
 
 
+class CommentLike(models.Model):
+	comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="likes")
+	user = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.CASCADE,
+		related_name="blog_comment_likes",
+	)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		unique_together = ("comment", "user")
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"{self.user} likes comment #{self.comment_id}"
+
+
 class GuestbookEntry(models.Model):
 	author_name = models.CharField(max_length=60)
 	message = models.TextField(max_length=1000)
