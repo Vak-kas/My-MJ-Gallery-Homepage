@@ -19,6 +19,27 @@ from urllib.parse import urlencode
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
 
 
+def _unlocked_post_ids(request):
+	ids = request.session.get("blog_unlocked_post_ids", [])
+	if not isinstance(ids, list):
+		return set()
+	return {int(v) for v in ids if isinstance(v, int) or (isinstance(v, str) and str(v).isdigit())}
+
+
+def _is_unlocked_post(request, post: Post) -> bool:
+	if request.user.is_superuser:
+		return True
+	if post.visibility != Post.VISIBILITY_PROTECTED:
+		return True
+	return post.id in _unlocked_post_ids(request)
+
+
+def _unlock_post(request, post: Post):
+	ids = _unlocked_post_ids(request)
+	ids.add(post.id)
+	request.session["blog_unlocked_post_ids"] = sorted(ids)
+
+
 def _published_posts_qs():
 	return Post.objects.filter(is_published=True).prefetch_related("tags")
 
@@ -27,14 +48,14 @@ def _accessible_posts_qs(request):
 	qs = _published_posts_qs()
 	if request.user.is_superuser:
 		return qs
-	return qs.exclude(category=Post.CATEGORY_SECRET)
+	return qs.exclude(category=Post.CATEGORY_SECRET).exclude(visibility=Post.VISIBILITY_PRIVATE)
 
 
 def _single_post_qs(request):
 	qs = Post.objects.select_related("author").prefetch_related("tags", "comments")
 	if request.user.is_superuser:
 		return qs
-	return qs.filter(is_published=True).exclude(category=Post.CATEGORY_SECRET)
+	return qs.filter(is_published=True).exclude(category=Post.CATEGORY_SECRET).exclude(visibility=Post.VISIBILITY_PRIVATE)
 
 
 def _can_manage_post(request, post: Post) -> bool:
@@ -119,6 +140,7 @@ def _sidebar_context(request):
 	recent_comment_qs = Comment.objects.select_related("post").filter(
 		is_visible=True,
 		post__is_published=True,
+		post__visibility__in=[Post.VISIBILITY_PUBLIC, Post.VISIBILITY_PROTECTED],
 	)
 	if not request.user.is_superuser:
 		recent_comment_qs = recent_comment_qs.exclude(post__category=Post.CATEGORY_SECRET)
@@ -343,8 +365,27 @@ def post_detail(request, slug: str):
 	if not post.is_published and not request.user.is_superuser:
 		raise Http404("Not found")
 
+	is_locked_post = post.visibility == Post.VISIBILITY_PROTECTED and not _is_unlocked_post(request, post)
+
 	if request.method == "POST":
 		action = (request.POST.get("action") or "").strip()
+
+		if action == "unlock_post":
+			password = (request.POST.get("post_password") or "").strip()
+			if post.visibility != Post.VISIBILITY_PROTECTED:
+				messages.info(request, "이 글은 비밀번호가 필요하지 않습니다.")
+				return redirect("blog:post_detail", slug=post.slug)
+
+			if post.check_access_password(password):
+				_unlock_post(request, post)
+				messages.success(request, "보호글 비밀번호가 확인되었습니다.")
+			else:
+				messages.error(request, "비밀번호가 올바르지 않습니다.")
+			return redirect("blog:post_detail", slug=post.slug)
+
+		if is_locked_post:
+			messages.error(request, "이 글은 비밀번호 확인 후 이용할 수 있습니다.")
+			return redirect("blog:post_detail", slug=post.slug)
 
 		if action == "comment":
 			if not request.user.is_authenticated:
@@ -474,6 +515,7 @@ def post_detail(request, slug: str):
 
 	context = {
 		"post": post,
+		"is_locked_post": is_locked_post,
 		"visible_comments": visible_comments,
 		"comment_count": visible_comments.count(),
 		"likes_count": likes_count,

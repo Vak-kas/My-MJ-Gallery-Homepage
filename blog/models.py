@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth.hashers import check_password, make_password
 from django.db import models
 
 
@@ -15,6 +16,16 @@ class Tag(models.Model):
 
 
 class Post(models.Model):
+	VISIBILITY_PUBLIC = "public"
+	VISIBILITY_PRIVATE = "private"
+	VISIBILITY_PROTECTED = "protected"
+
+	VISIBILITY_CHOICES = [
+		(VISIBILITY_PUBLIC, "전체공개"),
+		(VISIBILITY_PRIVATE, "비공개"),
+		(VISIBILITY_PROTECTED, "일부공개(비밀번호)"),
+	]
+
 	CATEGORY_TECH = "tech"
 	CATEGORY_BOARD = "board"
 	CATEGORY_LIFE = "life"
@@ -42,6 +53,13 @@ class Post(models.Model):
 	content = models.TextField(blank=True)
 	tags = models.ManyToManyField(Tag, related_name="posts", blank=True)
 	is_published = models.BooleanField(default=True, db_index=True)
+	visibility = models.CharField(
+		max_length=20,
+		choices=VISIBILITY_CHOICES,
+		default=VISIBILITY_PUBLIC,
+		db_index=True,
+	)
+	access_password = models.CharField(max_length=128, blank=True)
 	views = models.PositiveIntegerField(default=0)
 	published_at = models.DateTimeField(null=True, blank=True, db_index=True)
 	created_at = models.DateTimeField(auto_now_add=True)
@@ -52,6 +70,18 @@ class Post(models.Model):
 
 	def __str__(self):
 		return f"[{self.get_category_display()}] {self.title}"
+
+	def set_access_password(self, raw_password: str):
+		raw_password = (raw_password or "").strip()
+		if raw_password:
+			self.access_password = make_password(raw_password)
+		else:
+			self.access_password = ""
+
+	def check_access_password(self, raw_password: str) -> bool:
+		if not self.access_password:
+			return False
+		return check_password((raw_password or "").strip(), self.access_password)
 
 
 class PostLike(models.Model):

@@ -45,6 +45,10 @@ urlpatterns = [
     path('project/<int:id>/toggle-visibility/', views.project_toggle_visibility, name='project_toggle_visibility'),
     path('project/reorder/', views.project_reorder, name='project_reorder'),
 
+    path('posts/', views.posts, name='posts'),
+    path('posts/<int:id>/visibility/', views.post_visibility_update, name='post_visibility_update'),
+    path('posts/<int:id>/delete/', views.post_delete, name='post_delete'),
+
     path('skill/', views.skill, name='skill'),
     path('skill/create/', views.skill_create, name='skill_create'),
     path('skill/<int:id>/update/', views.skill_update, name='skill_update'),

@@ -88,3 +88,8 @@ from .skill import (
     skill_delete,
     skill_toggle_visibility,
 )
+from .posts import (
+    posts,
+    post_visibility_update,
+    post_delete,
+)

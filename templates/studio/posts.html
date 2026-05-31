@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+        <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+            <a href="{% url 'blog:post_create' %}" class="inline-flex items-center gap-2 rounded-full bg-[#0066cc] px-4 py-2 text-[13px] font-semibold text-white hover:bg-[#0055b3]">✏️ 새 글 작성</a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO POSTS</p>
+            <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">글 공개/비공개 관리</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">게시 상태(발행/비발행), 공개 범위(전체공개/비공개/일부공개), 관리자 일괄 작업을 한 곳에서 관리합니다.</p>
+        </section>
+
+        <section class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold text-[#1d1d1f]">상태 안내</h2>
+                    <ul class="mt-3 space-y-2 text-[12px] leading-6 text-[#6e6e73]">
+                        <li><span class="font-semibold text-[#1d1d1f]">발행 ON</span>: 블로그 목록/상세에 노출됩니다.</li>
+                        <li><span class="font-semibold text-[#1d1d1f]">발행 OFF</span>: 초안 상태로 외부 비노출입니다.</li>
+                        <li><span class="font-semibold text-[#1d1d1f]">전체공개</span>: 누구나 열람 가능</li>
+                        <li><span class="font-semibold text-[#1d1d1f]">비공개</span>: 관리자만 관리 페이지에서 접근</li>
+                        <li><span class="font-semibold text-[#1d1d1f]">일부공개</span>: 비밀번호 입력 시 열람 가능</li>
+                    </ul>
+                </section>
+
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold text-[#1d1d1f]">필터</h2>
+                    <form method="get" class="mt-3 space-y-2">
+                        <input type="text" name="q" value="{{ search_query|default:'' }}" placeholder="제목/내용/작성자 검색"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <select name="author" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            <option value="">작성자 전체</option>
+                            {% for u in author_choices %}
+                            <option value="{{ u.id }}" {% if selected_author == u.id|stringformat:"s" %}selected{% endif %}>{{ u.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="created_from" value="{{ created_from|default:'' }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+                            <input type="date" name="created_to" value="{{ created_to|default:'' }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+                            <a href="{% url 'studio:posts' %}" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px] text-[#1d1d1f]">초기화</a>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold text-[#1d1d1f]">일괄 작업</h2>
+                    <form id="bulk-post-form" method="post" action="{% url 'studio:posts' %}" class="mt-3 space-y-2">
+                        {% csrf_token %}
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-black/[0.08] px-3 py-2 text-[12px] text-[#6e6e73]">
+                            <input id="select-all-posts" type="checkbox" class="h-4 w-4" />
+                            전체 선택
+                        </label>
+
+                        <select name="bulk_action" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            <option value="">일괄 작업 선택</option>
+                            <option value="publish">선택 글 발행</option>
+                            <option value="unpublish">선택 글 비발행</option>
+                            <option value="set_public">선택 글 전체공개</option>
+                            <option value="set_private">선택 글 비공개</option>
+                            <option value="set_protected">선택 글 일부공개(비밀번호)</option>
+                            <option value="delete">선택 글 삭제</option>
+                        </select>
+
+                        <input type="password" name="bulk_access_password" maxlength="120" placeholder="일부공개용 비밀번호"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+
+                        <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">일괄 실행</button>
+                        <p class="text-[12px] text-[#8e8e93]">삭제/비공개/일부공개를 포함해 관리자 전용으로 처리됩니다.</p>
+                    </form>
+                </section>
+            </aside>
+
+            <div>
+                <p class="mb-3 text-[12px] text-[#8e8e93]">검색 결과 {{ post_count|default:0 }}개 (최대 300개 표시)</p>
+
+                <section class="space-y-3">
+            {% for post in posts %}
+            <article class="rounded-[18px] border border-black/[0.06] bg-white p-4">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                    <div class="min-w-0 flex-1">
+                        <div class="mb-2">
+                            <label class="inline-flex items-center gap-2 text-[12px] text-[#6e6e73]">
+                                <input type="checkbox" name="selected_ids" value="{{ post.id }}" class="post-select-checkbox h-4 w-4" form="bulk-post-form" />
+                                선택
+                            </label>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <a href="{% url 'blog:post_detail' post.slug %}" target="_blank" rel="noreferrer" class="truncate text-[17px] font-semibold text-[#1d1d1f] hover:text-[#0066cc]">{{ post.title }}</a>
+                            {% if post.is_published %}
+                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">발행</span>
+                            {% else %}
+                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비발행</span>
+                            {% endif %}
+                            <span class="rounded-full bg-[#f2f2f7] px-2.5 py-1 text-[11px] font-semibold text-[#6e6e73]">{{ post.get_visibility_display }}</span>
+                        </div>
+                        <p class="mt-1 text-[12px] text-[#8e8e93]">
+                            작성자 {{ post.author.username|default:'익명' }} · 카테고리 {{ post.get_category_display }} · 생성 {{ post.created_at|date:"Y.m.d" }} · 수정 {{ post.updated_at|date:"Y.m.d H:i" }}
+                        </p>
+                    </div>
+
+                    <form method="post" action="{% url 'studio:post_visibility_update' post.id %}" class="grid min-w-[300px] gap-2 rounded-xl border border-black/[0.06] bg-[#fafafa] p-3 md:grid-cols-[auto_1fr_auto] md:items-center">
+                        {% csrf_token %}
+
+                        <label class="inline-flex cursor-pointer items-center gap-2">
+                            <input type="hidden" name="is_published" value="false">
+                            <input type="checkbox" name="is_published" value="true" {% if post.is_published %}checked{% endif %} class="peer sr-only">
+                            <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
+                            <span class="text-[12px] font-semibold text-[#34c759]">발행</span>
+                        </label>
+
+                        <div class="space-y-2">
+                            <select name="visibility" class="h-9 w-full rounded-lg border border-black/[0.1] bg-white px-2 text-[13px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in visibility_choices %}
+                                <option value="{{ value }}" {% if post.visibility == value %}selected{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="password" name="access_password" maxlength="120" placeholder="일부공개 비밀번호(변경 시만 입력)"
+                                class="h-9 w-full rounded-lg border border-black/[0.1] bg-white px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+                            {% if post.access_password %}
+                            <p class="text-[11px] text-[#8e8e93]">비밀번호가 이미 설정되어 있습니다.</p>
+                            {% endif %}
+                        </div>
+
+                        <button type="submit" class="h-9 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white hover:bg-[#0055b3]">저장</button>
+                    </form>
+
+                    <form method="post" action="{% url 'studio:post_delete' post.id %}" onsubmit="return confirm('이 글을 삭제할까요?');" class="ml-auto">
+                        {% csrf_token %}
+                        <button type="submit" class="h-9 rounded-full border border-[#ff3b30]/30 px-4 text-[12px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
+                    </form>
+                </div>
+            </article>
+            {% empty %}
+            <div class="rounded-[18px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-8 text-center text-[14px] text-[#8e8e93]">관리할 게시글이 없습니다.</div>
+            {% endfor %}
+                </section>
+            </div>
+        </section>
+        </main>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const selectAll = document.getElementById('select-all-posts');
+        const checkboxes = Array.from(document.querySelectorAll('.post-select-checkbox'));
+
+        if (!selectAll || checkboxes.length === 0) return;
+
+        selectAll.addEventListener('change', function () {
+            checkboxes.forEach((cb) => {
+                cb.checked = selectAll.checked;
+            });
+        });
+
+        checkboxes.forEach((cb) => {
+            cb.addEventListener('change', function () {
+                const allChecked = checkboxes.every((item) => item.checked);
+                selectAll.checked = allChecked;
+            });
+        });
+    })();
+</script>
+{% endblock %}
