@@ -21,13 +21,20 @@
 
         <div class="flex items-center justify-between gap-3">
             <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0066cc]">{{ post.get_category_display }}</span>
-            <span class="text-[12px] text-[#8e8e93]">조회 {{ post.views }}</span>
+            <div class="flex items-center gap-2">
+                {% if post.visibility == 'protected' %}
+                <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">🔒 보호글</span>
+                {% endif %}
+                <span class="text-[12px] text-[#8e8e93]">조회 {{ post.views }}</span>
+            </div>
         </div>
 
         <div class="mt-4 flex min-h-[170px] flex-col">
             <h3 class="line-clamp-2 min-h-[56px] {% if compact %}text-[18px]{% else %}text-[20px]{% endif %} font-semibold tracking-[-0.02em] text-[#1d1d1f]">{{ post.title }}</h3>
 
-            {% if post.summary %}
+            {% if post.visibility == 'protected' %}
+            <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#8e8e93]">이 글은 보호글입니다. 상세 페이지에서 비밀번호 입력 후 확인할 수 있습니다.</p>
+            {% elif post.summary %}
             <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.summary }}</p>
             {% elif post.content %}
             <p class="mt-2 {% if compact %}line-clamp-3{% else %}line-clamp-2{% endif %} text-[14px] leading-[1.65] text-[#6e6e73]">{{ post.content|editorjs_excerpt:180 }}</p>

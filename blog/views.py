@@ -7,6 +7,7 @@ import requests as _requests
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -17,6 +18,11 @@ from django.utils.text import slugify
 from urllib.parse import urlencode
 
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
+
+
+UNLOCK_MAX_ATTEMPTS = 5
+UNLOCK_WINDOW_SECONDS = 10 * 60
+UNLOCK_BLOCK_SECONDS = 10 * 60
 
 
 def _unlocked_post_ids(request):
@@ -38,6 +44,62 @@ def _unlock_post(request, post: Post):
 	ids = _unlocked_post_ids(request)
 	ids.add(post.id)
 	request.session["blog_unlocked_post_ids"] = sorted(ids)
+
+
+def _unlock_attempt_bucket(request):
+	bucket = request.session.get("blog_unlock_attempts", {})
+	if not isinstance(bucket, dict):
+		return {}
+	return bucket
+
+
+def _unlock_attempt_key(post: Post) -> str:
+	return str(post.id)
+
+
+def _is_unlock_temporarily_blocked(request, post: Post):
+	now_ts = int(timezone.now().timestamp())
+	bucket = _unlock_attempt_bucket(request)
+	entry = bucket.get(_unlock_attempt_key(post), {})
+	blocked_until = int(entry.get("blocked_until", 0) or 0)
+	if blocked_until <= now_ts:
+		return False, 0
+	return True, blocked_until - now_ts
+
+
+def _register_unlock_failure(request, post: Post):
+	now_ts = int(timezone.now().timestamp())
+	bucket = _unlock_attempt_bucket(request)
+	key = _unlock_attempt_key(post)
+	entry = bucket.get(key, {})
+
+	window_start = int(entry.get("window_start", 0) or 0)
+	count = int(entry.get("count", 0) or 0)
+
+	if not window_start or (now_ts - window_start) > UNLOCK_WINDOW_SECONDS:
+		window_start = now_ts
+		count = 0
+
+	count += 1
+	blocked_until = 0
+	if count >= UNLOCK_MAX_ATTEMPTS:
+		blocked_until = now_ts + UNLOCK_BLOCK_SECONDS
+
+	bucket[key] = {
+		"window_start": window_start,
+		"count": count,
+		"blocked_until": blocked_until,
+	}
+	request.session["blog_unlock_attempts"] = bucket
+	return blocked_until
+
+
+def _clear_unlock_failure(request, post: Post):
+	bucket = _unlock_attempt_bucket(request)
+	key = _unlock_attempt_key(post)
+	if key in bucket:
+		bucket.pop(key, None)
+		request.session["blog_unlock_attempts"] = bucket
 
 
 def _published_posts_qs():
@@ -140,10 +202,11 @@ def _sidebar_context(request):
 	recent_comment_qs = Comment.objects.select_related("post").filter(
 		is_visible=True,
 		post__is_published=True,
-		post__visibility__in=[Post.VISIBILITY_PUBLIC, Post.VISIBILITY_PROTECTED],
 	)
 	if not request.user.is_superuser:
-		recent_comment_qs = recent_comment_qs.exclude(post__category=Post.CATEGORY_SECRET)
+		recent_comment_qs = recent_comment_qs.exclude(post__category=Post.CATEGORY_SECRET).filter(
+			post__visibility=Post.VISIBILITY_PUBLIC
+		)
 
 	recent_comments = list(
 		recent_comment_qs.annotate(like_count=Count("likes", distinct=True)).order_by("-created_at", "-id")[:5]
@@ -195,13 +258,20 @@ def index(request):
 		return redirect("blog:index")
 
 	search_query = (request.GET.get("q") or "").strip()
-	show_all = request.GET.get("show") == "all"
 	current_sort = (request.GET.get("sort") or "latest").strip()
+	limit_raw = (request.GET.get("limit") or "5").strip()
+	page_raw = (request.GET.get("page") or "1").strip()
 	if current_sort not in {"latest", "oldest", "popular"}:
 		current_sort = "latest"
 
+	page_limit = int(limit_raw) if limit_raw.isdigit() else 5
+	if page_limit not in {5, 10, 15, 30}:
+		page_limit = 5
+	current_page = int(page_raw) if page_raw.isdigit() else 1
+	if current_page < 1:
+		current_page = 1
+
 	mine_only = request.user.is_authenticated and request.GET.get("mine") == "1"
-	page_limit = 15
 
 	post_comment_count = Count("comments", filter=Q(comments__is_visible=True), distinct=True)
 	feed_qs = _accessible_posts_qs(request).annotate(visible_comment_count=post_comment_count)
@@ -238,9 +308,10 @@ def index(request):
 		params = {}
 		if search_query:
 			params["q"] = search_query
-		if show_all:
-			params["show"] = "all"
 		params["sort"] = current_sort
+		params["limit"] = str(page_limit)
+		if current_page > 1:
+			params["page"] = str(current_page)
 		if mine_only:
 			params["mine"] = "1"
 
@@ -252,13 +323,23 @@ def index(request):
 
 		if params.get("sort") == "latest":
 			params.pop("sort", None)
+		if params.get("limit") == "5":
+			params.pop("limit", None)
+		if params.get("page") in {"1", 1}:
+			params.pop("page", None)
 		if params.get("mine") != "1":
 			params.pop("mine", None)
 
 		query = urlencode(params)
 		return f"?{query}" if query else ""
-	feed_posts = all_posts if show_all else all_posts[:page_limit]
-	has_more_posts = len(all_posts) > page_limit and not show_all
+	feed_paginator = Paginator(all_posts, page_limit)
+	feed_page = feed_paginator.get_page(current_page)
+	feed_posts = list(feed_page.object_list)
+	feed_total_pages = feed_paginator.num_pages
+	feed_start_page = max(1, feed_page.number - 2)
+	feed_end_page = min(feed_total_pages, feed_page.number + 2)
+	feed_page_numbers = list(range(feed_start_page, feed_end_page + 1))
+	feed_page_links = [(num, _query_link(page=num)) for num in feed_page_numbers]
 	tech_posts = _preview_posts(Post.CATEGORY_TECH)
 	board_posts = _preview_posts(Post.CATEGORY_BOARD)
 	life_posts = _preview_posts(Post.CATEGORY_LIFE)
@@ -270,16 +351,25 @@ def index(request):
 		"current_sort": current_sort,
 		"mine_only": mine_only,
 		"search_query": search_query,
-		"show_all": show_all,
 		"page_limit": page_limit,
 		"total_posts": len(all_posts),
-		"has_more_posts": has_more_posts,
-		"sort_latest_qs": _query_link(sort="latest"),
-		"sort_oldest_qs": _query_link(sort="oldest"),
-		"sort_popular_qs": _query_link(sort="popular"),
-		"toggle_mine_qs": _query_link(mine=None if mine_only else "1"),
-		"show_all_qs": _query_link(show="all"),
-		"collapse_qs": _query_link(show=None),
+		"sort_latest_qs": _query_link(sort="latest", page=None),
+		"sort_oldest_qs": _query_link(sort="oldest", page=None),
+		"sort_popular_qs": _query_link(sort="popular", page=None),
+		"limit_5_qs": _query_link(limit="5", page=None),
+		"limit_10_qs": _query_link(limit="10", page=None),
+		"limit_15_qs": _query_link(limit="15", page=None),
+		"limit_30_qs": _query_link(limit="30", page=None),
+		"toggle_mine_qs": _query_link(mine=None if mine_only else "1", page=None),
+		"feed_page": feed_page,
+		"feed_page_numbers": feed_page_numbers,
+		"feed_page_links": feed_page_links,
+		"feed_has_left_gap": feed_start_page > 1,
+		"feed_has_right_gap": feed_end_page < feed_total_pages,
+		"feed_first_qs": _query_link(page=1) if feed_page.number > 1 else "",
+		"feed_last_qs": _query_link(page=feed_total_pages) if feed_page.number < feed_total_pages else "",
+		"feed_prev_qs": _query_link(page=feed_page.previous_page_number()) if feed_page.has_previous() else "",
+		"feed_next_qs": _query_link(page=feed_page.next_page_number()) if feed_page.has_next() else "",
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
 		"tech_posts": tech_posts,
@@ -376,11 +466,22 @@ def post_detail(request, slug: str):
 				messages.info(request, "이 글은 비밀번호가 필요하지 않습니다.")
 				return redirect("blog:post_detail", slug=post.slug)
 
+			is_blocked, remain_seconds = _is_unlock_temporarily_blocked(request, post)
+			if is_blocked:
+				remain_minutes = max(1, (remain_seconds + 59) // 60)
+				messages.error(request, f"비밀번호 시도 횟수를 초과했습니다. {remain_minutes}분 후 다시 시도해 주세요.")
+				return redirect("blog:post_detail", slug=post.slug)
+
 			if post.check_access_password(password):
 				_unlock_post(request, post)
+				_clear_unlock_failure(request, post)
 				messages.success(request, "보호글 비밀번호가 확인되었습니다.")
 			else:
-				messages.error(request, "비밀번호가 올바르지 않습니다.")
+				blocked_until = _register_unlock_failure(request, post)
+				if blocked_until:
+					messages.error(request, "비밀번호 시도 횟수를 초과했습니다. 10분 후 다시 시도해 주세요.")
+				else:
+					messages.error(request, "비밀번호가 올바르지 않습니다.")
 			return redirect("blog:post_detail", slug=post.slug)
 
 		if is_locked_post:
@@ -496,8 +597,9 @@ def post_detail(request, slug: str):
 				messages.success(request, "좋아요를 눌렀습니다.")
 			return redirect("blog:post_detail", slug=post.slug)
 
-	Post.objects.filter(id=post.id).update(views=post.views + 1)
-	post.views += 1
+	if not is_locked_post:
+		Post.objects.filter(id=post.id).update(views=post.views + 1)
+		post.views += 1
 
 	visible_comments = post.comments.filter(is_visible=True).annotate(like_count=Count("likes", distinct=True))
 	likes_count = post.likes.count()

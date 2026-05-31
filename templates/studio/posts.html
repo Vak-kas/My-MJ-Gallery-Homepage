@@ -48,6 +48,16 @@
                             <input type="date" name="created_from" value="{{ created_from|default:'' }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
                             <input type="date" name="created_to" value="{{ created_to|default:'' }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
                         </div>
+                        <select name="sort" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            {% for value, label in sort_choices %}
+                            <option value="{{ value }}" {% if selected_sort == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="per_page" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            {% for size in per_page_choices %}
+                            <option value="{{ size }}" {% if selected_per_page == size %}selected{% endif %}>페이지당 {{ size }}개</option>
+                            {% endfor %}
+                        </select>
                         <div class="flex items-center gap-2">
                             <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
                             <a href="{% url 'studio:posts' %}" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px] text-[#1d1d1f]">초기화</a>
@@ -59,6 +69,7 @@
                     <h2 class="text-[14px] font-semibold text-[#1d1d1f]">일괄 작업</h2>
                     <form id="bulk-post-form" method="post" action="{% url 'studio:posts' %}" class="mt-3 space-y-2">
                         {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string|default:'' }}">
                         <label class="inline-flex items-center gap-2 rounded-lg border border-black/[0.08] px-3 py-2 text-[12px] text-[#6e6e73]">
                             <input id="select-all-posts" type="checkbox" class="h-4 w-4" />
                             전체 선택
@@ -76,6 +87,9 @@
 
                         <input type="password" name="bulk_access_password" maxlength="120" placeholder="일부공개용 비밀번호"
                             class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+
+                        <input type="text" name="bulk_delete_confirm" placeholder="일괄 삭제 시 DELETE 입력"
+                            class="h-10 w-full rounded-xl border border-[#ff3b30]/20 px-3 text-[12px] outline-none focus:border-[#ff3b30]" />
 
                         <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">일괄 실행</button>
                         <p class="text-[12px] text-[#8e8e93]">삭제/비공개/일부공개를 포함해 관리자 전용으로 처리됩니다.</p>
@@ -113,6 +127,7 @@
 
                     <form method="post" action="{% url 'studio:post_visibility_update' post.id %}" class="grid min-w-[300px] gap-2 rounded-xl border border-black/[0.06] bg-[#fafafa] p-3 md:grid-cols-[auto_1fr_auto] md:items-center">
                         {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string|default:'' }}">
 
                         <label class="inline-flex cursor-pointer items-center gap-2">
                             <input type="hidden" name="is_published" value="false">
@@ -139,6 +154,7 @@
 
                     <form method="post" action="{% url 'studio:post_delete' post.id %}" onsubmit="return confirm('이 글을 삭제할까요?');" class="ml-auto">
                         {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string|default:'' }}">
                         <button type="submit" class="h-9 rounded-full border border-[#ff3b30]/30 px-4 text-[12px] font-semibold text-[#ff3b30] hover:bg-[#ff3b30]/5">삭제</button>
                     </form>
                 </div>
@@ -147,6 +163,20 @@
             <div class="rounded-[18px] border border-dashed border-black/[0.1] bg-[#fbfbfd] p-8 text-center text-[14px] text-[#8e8e93]">관리할 게시글이 없습니다.</div>
             {% endfor %}
                 </section>
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav class="mt-5 flex flex-wrap items-center gap-2 text-[12px]">
+                    {% if page_obj.has_previous %}
+                    <a href="{% url 'studio:posts' %}?{{ pagination_base_qs }}&page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]">이전</a>
+                    {% endif %}
+
+                    <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+                    {% if page_obj.has_next %}
+                    <a href="{% url 'studio:posts' %}?{{ pagination_base_qs }}&page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]">다음</a>
+                    {% endif %}
+                </nav>
+                {% endif %}
             </div>
         </section>
         </main>

@@ -47,22 +47,16 @@
             {% if current_sort != 'latest' %}
             <input type="hidden" name="sort" value="{{ current_sort }}">
             {% endif %}
+            {% if page_limit != 5 %}
+            <input type="hidden" name="limit" value="{{ page_limit }}">
+            {% endif %}
             {% if mine_only %}
             <input type="hidden" name="mine" value="1">
-            {% endif %}
-            {% if show_all %}
-            <input type="hidden" name="show" value="all">
             {% endif %}
             <input type="text" name="q" value="{{ search_query }}" placeholder="제목/요약/내용/태그 검색" class="h-10 min-w-[220px] flex-1 rounded-full border border-black/[0.1] px-4 text-[13px] outline-none focus:border-[#0066cc]">
             <button type="submit" class="h-10 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white">검색</button>
             {% if search_query %}
             <a href="{% url 'blog:index' %}" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">초기화</a>
-            {% endif %}
-            {% if has_more_posts %}
-            <a href="{% url 'blog:index' %}{{ show_all_qs }}#feed" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">더보기 (전체)</a>
-            {% endif %}
-            {% if show_all and total_posts > page_limit %}
-            <a href="{% url 'blog:index' %}{{ collapse_qs }}#feed" class="h-10 rounded-full border border-black/[0.1] px-4 text-[12px] leading-[40px] text-[#1d1d1f]">접기</a>
             {% endif %}
         </form>
     </section>
@@ -110,8 +104,14 @@
                         <a href="{% url 'blog:index' %}{{ sort_latest_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'latest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">최신 순</a>
                         <a href="{% url 'blog:index' %}{{ sort_oldest_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'oldest' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">오래된 순</a>
                         <a href="{% url 'blog:index' %}{{ sort_popular_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if current_sort == 'popular' %}border-[#0066cc] bg-[#0066cc] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">인기 순</a>
+                        <select id="feed-limit-select" class="h-[30px] rounded-full border border-black/[0.1] bg-white px-3 text-[12px] text-[#1d1d1f] outline-none">
+                            <option value="{% url 'blog:index' %}{{ limit_5_qs }}" {% if page_limit == 5 %}selected{% endif %}>표시 5개</option>
+                            <option value="{% url 'blog:index' %}{{ limit_10_qs }}" {% if page_limit == 10 %}selected{% endif %}>표시 10개</option>
+                            <option value="{% url 'blog:index' %}{{ limit_15_qs }}" {% if page_limit == 15 %}selected{% endif %}>표시 15개</option>
+                            <option value="{% url 'blog:index' %}{{ limit_30_qs }}" {% if page_limit == 30 %}selected{% endif %}>표시 30개</option>
+                        </select>
                         {% if user.is_authenticated %}
-                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">내가 쓴글 보기</a>
+                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">{% if mine_only %}전체 글 보기{% else %}내가 쓴 글 보기{% endif %}</a>
                         {% endif %}
                     </div>
                 </div>
@@ -187,6 +187,44 @@
                     </p>
                     {% endfor %}
                 </div>
+
+                {% if feed_page.paginator.num_pages > 1 %}
+                <div class="mt-4 flex flex-wrap items-center justify-end gap-1.5">
+                    {% if feed_page.number > 1 %}
+                    <a href="{% url 'blog:index' %}{{ feed_first_qs }}#feed" data-preserve-scroll="1" class="h-9 rounded-full border border-black/[0.1] px-3 text-[12px] leading-[36px] text-[#1d1d1f]">처음</a>
+                    {% endif %}
+
+                    {% if feed_page.has_previous %}
+                    <a href="{% url 'blog:index' %}{{ feed_prev_qs }}#feed" data-preserve-scroll="1" class="h-9 rounded-full border border-black/[0.1] px-3 text-[12px] leading-[36px] text-[#1d1d1f]">이전</a>
+                    {% endif %}
+
+                    {% if feed_has_left_gap %}
+                    <a href="{% url 'blog:index' %}{{ feed_first_qs }}#feed" data-preserve-scroll="1" class="h-9 min-w-9 rounded-full border border-black/[0.1] px-2 text-center text-[12px] leading-[36px] text-[#1d1d1f]">1</a>
+                    <span class="px-1 text-[12px] text-[#8e8e93]">…</span>
+                    {% endif %}
+
+                    {% for num, page_qs in feed_page_links %}
+                        {% if num == feed_page.number %}
+                        <span class="h-9 min-w-9 rounded-full bg-[#0066cc] px-2 text-center text-[12px] font-semibold leading-[36px] text-white">{{ num }}</span>
+                        {% else %}
+                        <a href="{% url 'blog:index' %}{{ page_qs }}#feed" data-preserve-scroll="1" class="h-9 min-w-9 rounded-full border border-black/[0.1] px-2 text-center text-[12px] leading-[36px] text-[#1d1d1f]">{{ num }}</a>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if feed_has_right_gap %}
+                    <span class="px-1 text-[12px] text-[#8e8e93]">…</span>
+                    <a href="{% url 'blog:index' %}{{ feed_last_qs }}#feed" data-preserve-scroll="1" class="h-9 min-w-9 rounded-full border border-black/[0.1] px-2 text-center text-[12px] leading-[36px] text-[#1d1d1f]">{{ feed_page.paginator.num_pages }}</a>
+                    {% endif %}
+
+                    {% if feed_page.has_next %}
+                    <a href="{% url 'blog:index' %}{{ feed_next_qs }}#feed" data-preserve-scroll="1" class="h-9 rounded-full border border-black/[0.1] px-3 text-[12px] leading-[36px] text-[#1d1d1f]">다음</a>
+                    {% endif %}
+
+                    {% if feed_page.number < feed_page.paginator.num_pages %}
+                    <a href="{% url 'blog:index' %}{{ feed_last_qs }}#feed" data-preserve-scroll="1" class="h-9 rounded-full border border-black/[0.1] px-3 text-[12px] leading-[36px] text-[#1d1d1f]">마지막</a>
+                    {% endif %}
+                </div>
+                {% endif %}
             </section>
 
             <section class="grid gap-4 md:grid-cols-3">
@@ -400,6 +438,17 @@
             sessionStorage.setItem(FLAG_KEY, '1');
         });
     });
+
+    const feedLimitSelect = document.getElementById('feed-limit-select');
+    if (feedLimitSelect) {
+        feedLimitSelect.addEventListener('change', (e) => {
+            const url = e.target.value;
+            if (!url) return;
+            sessionStorage.setItem(SCROLL_KEY, String(window.scrollY || window.pageYOffset || 0));
+            sessionStorage.setItem(FLAG_KEY, '1');
+            window.location.href = url;
+        });
+    }
 })();
 </script>
 {% endblock %}
