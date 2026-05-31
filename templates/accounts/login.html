@@ -33,6 +33,7 @@
                       class="space-y-7">
 
                     {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ next_url|default:'' }}">
 
                     {% if error %}
                     <div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-500">

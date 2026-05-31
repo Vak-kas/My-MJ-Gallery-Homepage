@@ -43,6 +43,12 @@ def _can_manage_post(request, post: Post) -> bool:
 	)
 
 
+def _can_manage_comment(request, comment: Comment) -> bool:
+	return request.user.is_authenticated and (
+		request.user.is_superuser or comment.author_id == request.user.id
+	)
+
+
 def _serialize_post_form_data(post: Post):
 	return {
 		"draft_id": str(post.id),
@@ -348,10 +354,69 @@ def post_detail(request, slug: str):
 			author_name = request.user.get_username().strip()
 			content = (request.POST.get("content") or "").strip()
 			if author_name and content:
-				Comment.objects.create(post=post, author_name=author_name[:60], content=content[:1200])
+				Comment.objects.create(
+					post=post,
+					author=request.user,
+					author_name=author_name[:60],
+					content=content[:1200],
+				)
 				messages.success(request, "댓글이 등록되었습니다.")
 			else:
 				messages.error(request, "댓글 내용을 입력해 주세요.")
+			return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+		if action == "comment_edit":
+			if not request.user.is_authenticated:
+				messages.error(request, "댓글 수정은 로그인 후 사용할 수 있습니다.")
+				return redirect("accounts:login")
+
+			comment_id = (request.POST.get("comment_id") or "").strip()
+			content = (request.POST.get("content") or "").strip()
+
+			if not comment_id.isdigit():
+				messages.error(request, "잘못된 댓글 요청입니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			comment = post.comments.filter(id=int(comment_id), is_visible=True).first()
+			if not comment:
+				messages.error(request, "댓글을 찾을 수 없습니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			if not _can_manage_comment(request, comment):
+				messages.error(request, "본인 댓글만 수정할 수 있습니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			if not content:
+				messages.error(request, "수정할 댓글 내용을 입력해 주세요.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			comment.content = content[:1200]
+			comment.save(update_fields=["content", "updated_at"])
+			messages.success(request, "댓글이 수정되었습니다.")
+			return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+		if action == "comment_delete":
+			if not request.user.is_authenticated:
+				messages.error(request, "댓글 삭제는 로그인 후 사용할 수 있습니다.")
+				return redirect("accounts:login")
+
+			comment_id = (request.POST.get("comment_id") or "").strip()
+			if not comment_id.isdigit():
+				messages.error(request, "잘못된 댓글 요청입니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			comment = post.comments.filter(id=int(comment_id), is_visible=True).first()
+			if not comment:
+				messages.error(request, "댓글을 찾을 수 없습니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			if not _can_manage_comment(request, comment):
+				messages.error(request, "본인 댓글만 삭제할 수 있습니다.")
+				return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
+
+			comment.is_visible = False
+			comment.save(update_fields=["is_visible"])
+			messages.success(request, "댓글이 삭제되었습니다.")
 			return redirect(f"{reverse('blog:post_detail', args=[post.slug])}#comments")
 
 		if action == "comment_like":
@@ -405,6 +470,7 @@ def post_detail(request, slug: str):
 
 	for c in visible_comments:
 		c.user_liked = c.id in liked_comment_ids
+		c.can_manage = _can_manage_comment(request, c)
 
 	context = {
 		"post": post,

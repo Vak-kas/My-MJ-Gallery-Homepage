@@ -73,10 +73,18 @@ class PostLike(models.Model):
 
 class Comment(models.Model):
 	post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+	author = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name="blog_comments",
+	)
 	author_name = models.CharField(max_length=60)
 	content = models.TextField(max_length=1200)
 	is_visible = models.BooleanField(default=True, db_index=True)
 	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+	updated_at = models.DateTimeField(auto_now=True)
 
 	class Meta:
 		ordering = ["-created_at", "-id"]
