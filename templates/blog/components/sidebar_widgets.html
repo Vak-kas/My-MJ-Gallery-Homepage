@@ -5,8 +5,8 @@
             {% for post in popular_posts|slice:":5" %}
             <li class="flex gap-3 text-[13px]">
                 <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#f2f2f7] text-[11px] font-semibold text-[#0066cc]">{{ forloop.counter }}</span>
-                <div class="min-w-0">
-                    <a href="{% url 'blog:post_detail' post.slug %}" class="truncate font-medium text-[#1d1d1f] hover:text-[#0066cc]">{{ post.title }}</a>
+                <div class="min-w-0 flex-1">
+                    <a href="{% url 'blog:post_detail' post.slug %}" class="block truncate font-medium text-[#1d1d1f] hover:text-[#0066cc]">{{ post.title }}</a>
                     <p class="mt-1 text-[11px] text-[#8e8e93]">조회 {{ post.views|default:0 }} · 좋아요 {{ post.like_count|default:0 }}</p>
                 </div>
             </li>
