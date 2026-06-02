@@ -1,0 +1,19 @@
+<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
+        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
+        <nav class="flex items-center gap-2">
+            <a href="{% url 'main:home' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'home' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Home</a>
+            <a href="{% url 'blog:index' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'blog' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Blog</a>
+            {% if user.is_authenticated %}
+                {% if user.is_superuser %}
+                <a href="{% url 'studio:index' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'studio' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Studio</a>
+                {% endif %}
+                <a href="{% url 'main:photos' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'photo' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Gallery</a>
+                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+            {% else %}
+                <a href="{% url 'main:photos' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'photo' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Gallery</a>
+                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
+            {% endif %}
+        </nav>
+    </div>
+</header>

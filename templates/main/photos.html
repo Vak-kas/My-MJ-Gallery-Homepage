@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="photo" %}
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <div class="rounded-xl border border-black/[0.08] bg-white px-4 py-3 text-[13px] text-[#1d1d1f]">{{ message }}</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">GALLERY ARCHIVE</p>
+            <h1 class="apple-display mt-3 text-[48px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[60px]">Gallery.</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">지금까지의 활동 사진을 한눈에 모아보는 공간입니다.</p>
+        </div>
+    </div>
+
+    <section class="mt-6 rounded-[22px] border border-black/[0.08] bg-white p-5 lg:p-6">
+        <form method="get" class="flex flex-wrap items-center gap-2">
+            <input type="text" name="tag" value="{{ selected_tag|default:'' }}" placeholder="태그 검색 (예: #세미나, 여행)" class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc] sm:w-[320px]" />
+            <button type="submit" class="inline-flex h-10 items-center rounded-full bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+            {% if selected_tag %}
+            <a href="{% url 'main:photos' %}" class="inline-flex h-10 items-center rounded-full border border-black/[0.1] px-4 text-[13px] text-[#1d1d1f]">초기화</a>
+            {% endif %}
+        </form>
+
+        {% if popular_tags %}
+        <div class="mt-3 flex flex-wrap gap-2">
+            {% for item in popular_tags %}
+            <a href="{% url 'main:photos' %}?tag={{ item.name|urlencode }}" class="rounded-full border border-black/[0.08] px-3 py-1 text-[12px] text-[#6e6e73] hover:border-[#0066cc]/40 hover:text-[#0066cc]">#{{ item.name }} ({{ item.count }})</a>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </section>
+
+    {% if user.is_authenticated and user.is_superuser %}
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-5 lg:p-6">
+        <h2 class="text-[16px] font-semibold text-[#1d1d1f]">사진 업로드</h2>
+        <p class="mt-2 text-[13px] text-[#8e8e93]">여러 장 드래그&드롭 → 미리보기에서 삭제/정리 → 업로드 버튼으로 반영됩니다. (이미지당 최대 20MB)</p>
+        <form id="photo-upload-form" method="post" enctype="multipart/form-data" class="mt-4 grid gap-3 md:grid-cols-2">
+            {% csrf_token %}
+            <input id="photo-file-input" type="file" name="photos" accept="image/*" multiple required class="hidden" />
+            <input type="text" name="tags" maxlength="255" placeholder="태그 (쉼표로 구분) 예: 세미나, 2026, 발표" class="md:col-span-2 h-11 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+            <div id="photo-dropzone" class="md:col-span-2 rounded-2xl border border-dashed border-black/[0.14] bg-[#f8f8fa] px-5 py-8 text-center transition-colors">
+                <p class="text-[14px] font-semibold text-[#1d1d1f]">여기로 사진을 드래그해서 놓으세요</p>
+                <p id="photo-dropzone-help" class="mt-1 text-[12px] text-[#8e8e93]">드롭하면 미리보기에 추가됩니다. (자동 업로드 안 함)</p>
+            </div>
+
+            <div id="photo-preview-wrap" class="md:col-span-2 hidden rounded-2xl border border-black/[0.08] bg-[#fbfbfd] p-4">
+                <div class="mb-3 flex items-center justify-between">
+                    <p class="text-[13px] font-semibold text-[#1d1d1f]">업로드 예정 파일</p>
+                    <button id="photo-clear-all" type="button" class="text-[12px] font-semibold text-[#8e8e93] hover:text-[#1d1d1f]">전체 비우기</button>
+                </div>
+                <div id="photo-preview-list" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3"></div>
+            </div>
+
+            <div class="md:col-span-2">
+                <button id="photo-submit-btn" type="submit" disabled class="inline-flex h-10 items-center rounded-full bg-[#0066cc] px-5 text-[13px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#9ec2ea]">업로드</button>
+            </div>
+        </form>
+    </section>
+
+    <script>
+        (() => {
+            const form = document.getElementById("photo-upload-form");
+            const input = document.getElementById("photo-file-input");
+            const dropzone = document.getElementById("photo-dropzone");
+            const help = document.getElementById("photo-dropzone-help");
+            const previewWrap = document.getElementById("photo-preview-wrap");
+            const previewList = document.getElementById("photo-preview-list");
+            const clearAllBtn = document.getElementById("photo-clear-all");
+            const submitBtn = document.getElementById("photo-submit-btn");
+            if (!form || !input || !dropzone || !help || !previewWrap || !previewList || !clearAllBtn || !submitBtn) return;
+
+            const selectedFiles = [];
+
+            const syncFileInput = () => {
+                const dt = new DataTransfer();
+                selectedFiles.forEach((file) => dt.items.add(file));
+                input.files = dt.files;
+                submitBtn.disabled = selectedFiles.length === 0;
+            };
+
+            const removeAt = (idx) => {
+                selectedFiles.splice(idx, 1);
+                renderPreview();
+            };
+
+            const renderPreview = () => {
+                previewList.innerHTML = "";
+                if (!selectedFiles.length) {
+                    previewWrap.classList.add("hidden");
+                    help.textContent = "드롭하면 미리보기에 추가됩니다. (자동 업로드 안 함)";
+                    syncFileInput();
+                    return;
+                }
+
+                previewWrap.classList.remove("hidden");
+                help.textContent = `${selectedFiles.length}장 선택됨`;
+
+                selectedFiles.forEach((file, idx) => {
+                    const item = document.createElement("div");
+                    item.className = "overflow-hidden rounded-xl border border-black/[0.08] bg-white";
+
+                    const imageUrl = URL.createObjectURL(file);
+                    item.innerHTML = `
+                        <img src="${imageUrl}" alt="preview" class="block h-36 w-full object-cover" />
+                        <div class="flex items-center justify-between gap-2 px-3 py-2">
+                            <p class="min-w-0 truncate text-[12px] text-[#6e6e73]">${file.name}</p>
+                            <button type="button" class="shrink-0 rounded-full border border-black/[0.12] px-2 py-0.5 text-[11px] text-[#6e6e73] hover:text-[#1d1d1f]" data-remove="${idx}">삭제</button>
+                        </div>
+                    `;
+                    previewList.appendChild(item);
+                });
+
+                syncFileInput();
+            };
+
+            const preventDefaults = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            };
+
+            ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+                dropzone.addEventListener(eventName, preventDefaults);
+            });
+
+            ["dragenter", "dragover"].forEach((eventName) => {
+                dropzone.addEventListener(eventName, () => {
+                    dropzone.classList.add("border-[#0066cc]", "bg-[#eef3ff]");
+                });
+            });
+
+            ["dragleave", "drop"].forEach((eventName) => {
+                dropzone.addEventListener(eventName, () => {
+                    dropzone.classList.remove("border-[#0066cc]", "bg-[#eef3ff]");
+                });
+            });
+
+            dropzone.addEventListener("drop", (e) => {
+                const droppedFiles = e.dataTransfer?.files;
+                if (!droppedFiles || !droppedFiles.length) return;
+
+                const imageFiles = Array.from(droppedFiles).filter((file) =>
+                    file.type && file.type.startsWith("image/")
+                );
+
+                if (!imageFiles.length) {
+                    help.textContent = "이미지 파일만 업로드할 수 있습니다.";
+                    return;
+                }
+
+                imageFiles.forEach((file) => {
+                    const dup = selectedFiles.some(
+                        (x) => x.name === file.name && x.size === file.size && x.lastModified === file.lastModified
+                    );
+                    if (!dup) {
+                        selectedFiles.push(file);
+                    }
+                });
+                renderPreview();
+            });
+
+            previewList.addEventListener("click", (e) => {
+                const btn = e.target.closest("button[data-remove]");
+                if (!btn) return;
+                const idx = Number(btn.dataset.remove);
+                if (Number.isNaN(idx)) return;
+                removeAt(idx);
+            });
+
+            clearAllBtn.addEventListener("click", () => {
+                selectedFiles.length = 0;
+                renderPreview();
+            });
+
+            form.addEventListener("submit", (e) => {
+                if (!selectedFiles.length) {
+                    e.preventDefault();
+                    help.textContent = "먼저 업로드할 사진을 드래그해 주세요.";
+                }
+            });
+        })();
+    </script>
+    {% endif %}
+
+    <section class="mt-8">
+        {% if photos %}
+        {% if user.is_authenticated and user.is_superuser %}
+        <div class="mb-4 rounded-2xl border border-black/[0.08] bg-white p-4">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-[13px] text-[#6e6e73]">카드 클릭 또는 드래그 범위 선택으로 여러 장을 선택할 수 있습니다.</p>
+                <form id="photo-bulk-delete-form" method="post" action="{% url 'main:photo_bulk_delete' %}" class="flex items-center gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                    <div id="photo-bulk-delete-ids"></div>
+                    <span id="photo-selected-count" class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[12px] text-[#6e6e73]">선택 0장</span>
+                    <button id="photo-selection-clear-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[12px] text-[#6e6e73]">선택 해제</button>
+                    <button id="photo-bulk-delete-btn" type="submit" disabled class="rounded-full bg-[#ef4444] px-4 py-1.5 text-[12px] font-semibold text-white disabled:cursor-not-allowed disabled:bg-[#fca5a5]">선택 삭제</button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <div id="photo-gallery" class="relative columns-1 gap-5 sm:columns-2 lg:columns-3 xl:columns-4">
+            {% for photo in photos %}
+            <figure data-photo-id="{{ photo.id }}" class="photo-card relative mb-5 break-inside-avoid overflow-hidden rounded-[20px] border border-black/[0.08] bg-white shadow-[0_8px_20px_rgba(0,0,0,0.03)] transition">
+                {% if user.is_authenticated and user.is_superuser %}
+                <span class="photo-selected-badge pointer-events-none absolute left-2 top-2 z-10 hidden h-6 w-6 items-center justify-center rounded-full bg-[#0066cc] text-[12px] font-semibold text-white">✓</span>
+                <form method="post" action="{% url 'main:photo_delete' photo.id %}" class="absolute right-2 top-2 z-10">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}" />
+                    <button type="submit" onclick="return confirm('이 사진을 삭제할까요?');" class="inline-flex h-7 w-7 items-center justify-center rounded-full bg-black/55 text-[14px] font-semibold text-white backdrop-blur hover:bg-black/70" aria-label="사진 삭제">×</button>
+                </form>
+                {% endif %}
+                <img src="{{ photo.image.url }}" alt="{{ photo.title|default:'photo' }}" loading="lazy" decoding="async" class="block h-auto w-full object-cover" />
+                {% if photo.tag_list %}
+                <figcaption class="space-y-1 px-4 py-3">
+                    <div class="flex flex-wrap gap-1.5">
+                        {% for tag in photo.tag_list %}
+                        <a href="{% url 'main:photos' %}?tag={{ tag|urlencode }}" class="rounded-full border border-black/[0.08] px-2 py-0.5 text-[11px] text-[#6e6e73]">#{{ tag }}</a>
+                        {% endfor %}
+                    </div>
+                </figcaption>
+                {% endif %}
+            </figure>
+            {% endfor %}
+        </div>
+
+        {% if user.is_authenticated and user.is_superuser %}
+        <script>
+            (() => {
+                const gallery = document.getElementById("photo-gallery");
+                const bulkForm = document.getElementById("photo-bulk-delete-form");
+                const bulkIds = document.getElementById("photo-bulk-delete-ids");
+                const countBadge = document.getElementById("photo-selected-count");
+                const clearBtn = document.getElementById("photo-selection-clear-btn");
+                const deleteBtn = document.getElementById("photo-bulk-delete-btn");
+                if (!gallery || !bulkForm || !bulkIds || !countBadge || !clearBtn || !deleteBtn) return;
+
+                const cards = Array.from(gallery.querySelectorAll(".photo-card[data-photo-id]"));
+                const selected = new Set();
+
+                const refreshSelectionUI = () => {
+                    cards.forEach((card) => {
+                        const id = card.dataset.photoId;
+                        const selectedBadge = card.querySelector(".photo-selected-badge");
+                        const isSelected = selected.has(id);
+                        card.classList.toggle("ring-2", isSelected);
+                        card.classList.toggle("ring-[#0066cc]", isSelected);
+                        if (selectedBadge) {
+                            selectedBadge.classList.toggle("hidden", !isSelected);
+                            selectedBadge.classList.toggle("inline-flex", isSelected);
+                        }
+                    });
+
+                    bulkIds.innerHTML = "";
+                    selected.forEach((id) => {
+                        const hidden = document.createElement("input");
+                        hidden.type = "hidden";
+                        hidden.name = "photo_ids";
+                        hidden.value = id;
+                        bulkIds.appendChild(hidden);
+                    });
+
+                    countBadge.textContent = `선택 ${selected.size}장`;
+                    deleteBtn.disabled = selected.size === 0;
+                };
+
+                const clearSelection = () => {
+                    selected.clear();
+                    refreshSelectionUI();
+                };
+
+                cards.forEach((card) => {
+                    card.addEventListener("click", (e) => {
+                        if (e.target.closest("button") || e.target.closest("a") || e.target.closest("form")) {
+                            return;
+                        }
+                        const id = card.dataset.photoId;
+                        if (!id) return;
+                        if (selected.has(id)) selected.delete(id);
+                        else selected.add(id);
+                        refreshSelectionUI();
+                    });
+                });
+
+                let box = null;
+                let startX = 0;
+                let startY = 0;
+                let dragging = false;
+
+                const intersect = (a, b) => {
+                    return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+                };
+
+                gallery.addEventListener("mousedown", (e) => {
+                    if (e.button !== 0) return;
+                    if (e.target.closest("button") || e.target.closest("a") || e.target.closest("form")) return;
+
+                    dragging = true;
+                    startX = e.clientX;
+                    startY = e.clientY;
+
+                    if (!(e.shiftKey || e.metaKey || e.ctrlKey)) {
+                        clearSelection();
+                    }
+
+                    box = document.createElement("div");
+                    box.className = "fixed z-[60] border border-[#0066cc] bg-[#0066cc]/10 pointer-events-none";
+                    box.style.left = `${startX}px`;
+                    box.style.top = `${startY}px`;
+                    box.style.width = "0px";
+                    box.style.height = "0px";
+                    document.body.appendChild(box);
+                });
+
+                window.addEventListener("mousemove", (e) => {
+                    if (!dragging || !box) return;
+
+                    const x = Math.min(startX, e.clientX);
+                    const y = Math.min(startY, e.clientY);
+                    const w = Math.abs(e.clientX - startX);
+                    const h = Math.abs(e.clientY - startY);
+
+                    box.style.left = `${x}px`;
+                    box.style.top = `${y}px`;
+                    box.style.width = `${w}px`;
+                    box.style.height = `${h}px`;
+
+                    const rect = { left: x, top: y, right: x + w, bottom: y + h };
+                    cards.forEach((card) => {
+                        const id = card.dataset.photoId;
+                        if (!id) return;
+                        const cardRect = card.getBoundingClientRect();
+                        if (intersect(rect, cardRect)) {
+                            selected.add(id);
+                        }
+                    });
+                    refreshSelectionUI();
+                });
+
+                window.addEventListener("mouseup", () => {
+                    dragging = false;
+                    if (box) {
+                        box.remove();
+                        box = null;
+                    }
+                });
+
+                clearBtn.addEventListener("click", clearSelection);
+
+                bulkForm.addEventListener("submit", (e) => {
+                    if (!selected.size) {
+                        e.preventDefault();
+                        return;
+                    }
+                    if (!confirm(`선택한 ${selected.size}장을 삭제할까요?`)) {
+                        e.preventDefault();
+                    }
+                });
+            })();
+        </script>
+        {% endif %}
+
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="mt-6 flex flex-wrap items-center justify-center gap-2 text-[13px]">
+            {% if page_obj.has_previous %}
+            <a href="?page=1" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">처음</a>
+            <a href="?page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">이전</a>
+            {% endif %}
+
+            <span class="rounded-full bg-[#f2f2f7] px-3 py-1.5 text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">다음</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">마지막</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+        {% else %}
+        <div class="rounded-[20px] border border-dashed border-black/[0.08] bg-white px-5 py-10 text-center text-[14px] text-[#8e8e93]">등록된 사진이 아직 없습니다.</div>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}

@@ -2,23 +2,7 @@
 {% load blog_extras %}
 
 {% block content %}
-<header class="sticky top-0 z-40 border-b border-black/[0.08] bg-white/90 backdrop-blur">
-    <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
-        <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
-        <nav class="flex items-center gap-2">
-            <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
-            <a href="{% url 'blog:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Blog</a>
-            {% if user.is_authenticated %}
-                {% if user.is_superuser %}
-                <a href="{% url 'studio:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Studio</a>
-                {% endif %}
-                <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
-            {% else %}
-                <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
-            {% endif %}
-        </nav>
-    </div>
-</header>
+{% include "components/main_nav.html" with nav_active="blog" %}
 
 <main class="mx-auto max-w-[1320px] px-6 py-12 lg:py-16">
     <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
