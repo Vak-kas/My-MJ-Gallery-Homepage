@@ -131,7 +131,13 @@
                             <div class="flex items-start justify-between gap-3 lg:hidden">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex flex-wrap items-center gap-2">
-                                        <span class="rounded-full bg-[#eef3ff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0066cc]">{{ post.get_category_display }}</span>
+                                        <span class="rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]
+                                            {% if post.category == 'tech' %}bg-[#eef3ff] text-[#0066cc]
+                                            {% elif post.category == 'board' %}bg-[#fff3e8] text-[#f97316]
+                                            {% elif post.category == 'life' %}bg-[#ecfdf5] text-[#10b981]
+                                            {% elif post.category == 'secret' %}bg-red-50 text-red-600
+                                            {% else %}bg-[#f2f2f7] text-[#6e6e73]{% endif %}
+                                        ">{{ post.get_category_display }}</span>
                                         <span class="text-[12px] text-[#8e8e93]">조회 {{ post.views }}</span>
                                         <span class="text-[12px] text-[#8e8e93]">{{ post.published_at|date:"Y.m.d" }}</span>
                                     </div>
@@ -157,7 +163,13 @@
                             <div class="hidden grid-cols-[88px_110px_minmax(0,1.7fr)_130px_90px_120px] items-center gap-4 lg:grid">
                                 <div class="text-[13px] text-[#8e8e93]">{{ forloop.counter|stringformat:"02d" }}</div>
                                 <div>
-                                    <span class="inline-flex rounded-full bg-[#eef3ff] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#0066cc]">{{ post.get_category_display }}</span>
+                                    <span class="inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em]
+                                        {% if post.category == 'tech' %}bg-[#eef3ff] text-[#0066cc]
+                                        {% elif post.category == 'board' %}bg-[#fff3e8] text-[#f97316]
+                                        {% elif post.category == 'life' %}bg-[#ecfdf5] text-[#10b981]
+                                        {% elif post.category == 'secret' %}bg-red-50 text-red-600
+                                        {% else %}bg-[#f2f2f7] text-[#6e6e73]{% endif %}
+                                    ">{{ post.get_category_display }}</span>
                                 </div>
                                 <div class="min-w-0">
                                     <div class="truncate text-[15px] font-semibold text-[#1d1d1f]">{{ post.title }}</div>
