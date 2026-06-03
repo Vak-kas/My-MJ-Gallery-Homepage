@@ -12,7 +12,7 @@ from .models import Photo
 
 
 PHOTO_FEED_PAGE_SIZE = 24
-PHOTO_MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+PHOTO_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 def _normalize_tags(raw_tags: str) -> str:
@@ -153,7 +153,7 @@ def photos(request):
                 continue
 
             if f.size > PHOTO_MAX_UPLOAD_BYTES:
-                skipped.append(f"{f.name} (20MB 초과)")
+                skipped.append(f"{f.name} (10MB 초과)")
                 continue
 
             photo = Photo(

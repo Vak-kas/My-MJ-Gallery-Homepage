@@ -41,7 +41,7 @@
     {% if user.is_authenticated and user.is_superuser %}
     <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-5 lg:p-6">
         <h2 class="text-[16px] font-semibold text-[#1d1d1f]">사진 업로드</h2>
-        <p class="mt-2 text-[13px] text-[#8e8e93]">여러 장 드래그&드롭 → 미리보기에서 삭제/정리 → 업로드 버튼으로 반영됩니다. (이미지당 최대 20MB)</p>
+        <p class="mt-2 text-[13px] text-[#8e8e93]">여러 장 드래그&드롭 → 미리보기에서 삭제/정리 → 업로드 버튼으로 반영됩니다. (이미지당 최대 10MB)</p>
         <form id="photo-upload-form" method="post" enctype="multipart/form-data" class="mt-4 grid gap-3 md:grid-cols-2">
             {% csrf_token %}
             <input id="photo-file-input" type="file" name="photos" accept="image/*" multiple required class="hidden" />

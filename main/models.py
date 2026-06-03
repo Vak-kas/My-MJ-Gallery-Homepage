@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 
-PHOTO_MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+PHOTO_MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 PHOTO_MAX_DIMENSION = 2400
 PHOTO_JPEG_QUALITY = 82
 
@@ -56,7 +56,7 @@ class Photo(models.Model):
 	def clean(self):
 		super().clean()
 		if self.image and getattr(self.image, "size", 0) > PHOTO_MAX_UPLOAD_BYTES:
-			raise ValidationError({"image": "이미지 파일은 20MB 이하만 업로드할 수 있습니다."})
+			raise ValidationError({"image": "이미지 파일은 10MB 이하만 업로드할 수 있습니다."})
 
 	def save(self, *args, **kwargs):
 		update_fields = kwargs.get("update_fields")

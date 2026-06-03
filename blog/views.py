@@ -23,6 +23,7 @@ from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
 UNLOCK_MAX_ATTEMPTS = 5
 UNLOCK_WINDOW_SECONDS = 10 * 60
 UNLOCK_BLOCK_SECONDS = 10 * 60
+COVER_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 
 
 def _unlocked_post_ids(request):
@@ -689,6 +690,12 @@ def post_create(request):
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
+		if cover_image and getattr(cover_image, "size", 0) > COVER_IMAGE_MAX_BYTES:
+			messages.error(request, "커버 이미지는 10MB 이하만 업로드할 수 있습니다.")
+			form_data = dict(request.POST)
+			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
+			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
+
 		if existing_draft:
 			post = existing_draft
 			post.title = title
@@ -772,6 +779,10 @@ def post_edit(request, slug: str):
 
 		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
 			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
+			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
+
+		if cover_image and getattr(cover_image, "size", 0) > COVER_IMAGE_MAX_BYTES:
+			messages.error(request, "커버 이미지는 10MB 이하만 업로드할 수 있습니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
 		post.title = title

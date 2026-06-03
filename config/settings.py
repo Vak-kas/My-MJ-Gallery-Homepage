@@ -209,3 +209,12 @@ else:
 
 
 LOGIN_REDIRECT_URL = "/"
+
+
+# Upload limits (prevent 400 Bad Request on larger form/file payloads)
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv("DATA_UPLOAD_MAX_MEMORY_SIZE", str(30 * 1024 * 1024))
+)
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv("FILE_UPLOAD_MAX_MEMORY_SIZE", str(10 * 1024 * 1024))
+)
