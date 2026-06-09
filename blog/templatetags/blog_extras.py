@@ -180,7 +180,7 @@ def render_editorjs(content):
                 caption = d.get("caption", "")
                 html.append(
                     f'<figure class="my-5 overflow-hidden rounded-2xl border border-[#e5e5ea] bg-[#f9f9fb]">'
-                    f'<img src="{escape(url)}" alt="{escape(d.get("alt", ""))}" class="block w-full max-h-[520px] object-cover" />'
+                    f'<img src="{escape(url)}" alt="{escape(d.get("alt", ""))}" class="block w-full h-auto object-contain" />'
                     f'{f"<figcaption class=\"px-4 py-3 text-sm text-[#8e8e93]\">{escape(caption)}</figcaption>" if caption else ""}'
                     f'</figure>'
                 )
