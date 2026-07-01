@@ -1,9 +1,11 @@
 from datetime import timedelta
+from io import BytesIO
 
 import json as _json
 import re as _re
 
 import requests as _requests
+from PIL import Image, ImageOps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -24,6 +26,61 @@ UNLOCK_MAX_ATTEMPTS = 5
 UNLOCK_WINDOW_SECONDS = 10 * 60
 UNLOCK_BLOCK_SECONDS = 10 * 60
 COVER_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+MATH_OCR_MAX_BYTES = 8 * 1024 * 1024
+
+
+def _normalize_math_ocr_text_to_latex(text: str) -> str:
+	if not text:
+		return ""
+
+	t = text.strip()
+	t = t.replace("−", "-").replace("—", "-")
+	t = t.replace("×", r"\times ").replace("÷", r"\div ")
+	t = t.replace("·", r"\cdot ").replace("∙", r"\cdot ")
+	t = t.replace("≤", r"\le ").replace("≥", r"\ge ")
+	t = t.replace("≠", r"\neq ").replace("≈", r"\approx ")
+	t = t.replace("∞", r"\infty ")
+	t = t.replace("π", r"\pi ").replace("θ", r"\theta ").replace("λ", r"\lambda ")
+	t = t.replace("α", r"\alpha ").replace("β", r"\beta ").replace("γ", r"\gamma ")
+	t = t.replace("Σ", r"\sum ").replace("∑", r"\sum ")
+	t = t.replace("∫", r"\int ")
+	t = t.replace("√", r"\sqrt{}")
+	t = t.replace("→", r"\to ")
+	t = _re.sub(r"\s+", " ", t)
+
+	# q_u, x^2 형태를 q_{u}, x^{2}로 보정
+	t = _re.sub(r"([A-Za-z0-9])_([A-Za-z0-9])", r"\1_{\2}", t)
+	t = _re.sub(r"([A-Za-z0-9])\^([A-Za-z0-9])", r"\1^{\2}", t)
+
+	return t.strip()
+
+
+def _run_math_ocr(uploaded_file):
+	try:
+		import pytesseract
+	except Exception:
+		return "", "서버에 OCR 엔진이 준비되지 않았습니다. pytesseract/tesseract 설치가 필요합니다."
+
+	try:
+		raw = uploaded_file.read()
+		if not raw:
+			return "", "빈 파일입니다."
+
+		img = Image.open(BytesIO(raw)).convert("L")
+		img = ImageOps.autocontrast(img)
+		img = ImageOps.expand(img, border=16, fill=255)
+
+		ocr_text = pytesseract.image_to_string(
+			img,
+			lang="eng",
+			config="--oem 3 --psm 6",
+		)
+		latex = _normalize_math_ocr_text_to_latex(ocr_text)
+		if not latex:
+			return "", "수식 텍스트를 인식하지 못했습니다. 더 선명한 이미지를 사용해 주세요."
+		return latex, ""
+	except Exception:
+		return "", "수식 OCR 처리 중 오류가 발생했습니다."
 
 
 def _unlocked_post_ids(request):
@@ -433,6 +490,29 @@ def url_preview(request):
 		})
 	except Exception as e:
 		return JsonResponse({"error": str(e)[:120]}, status=200)
+
+
+@login_required
+def math_ocr(request):
+	if request.method != "POST":
+		return JsonResponse({"error": "method not allowed"}, status=405)
+
+	image = request.FILES.get("image")
+	if not image:
+		return JsonResponse({"error": "image file is required"}, status=400)
+
+	if getattr(image, "size", 0) > MATH_OCR_MAX_BYTES:
+		return JsonResponse({"error": "image is too large (max 8MB)"}, status=400)
+
+	content_type = (getattr(image, "content_type", "") or "").lower()
+	if content_type and not content_type.startswith("image/"):
+		return JsonResponse({"error": "only image files are allowed"}, status=400)
+
+	latex, err = _run_math_ocr(image)
+	if err:
+		return JsonResponse({"error": err}, status=200)
+
+	return JsonResponse({"latex": latex})
 
 
 def tech(request):

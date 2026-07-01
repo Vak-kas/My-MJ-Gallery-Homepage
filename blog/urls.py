@@ -15,4 +15,5 @@ urlpatterns = [
     path("life/", views.life, name="life"),
     path("secret/", views.secret, name="secret"),
     path("api/url-preview/", views.url_preview, name="url_preview"),
+    path("api/math-ocr/", views.math_ocr, name="math_ocr"),
 ]

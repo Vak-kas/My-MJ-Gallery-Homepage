@@ -278,6 +278,7 @@
         font-size: 12px;
         color: #6e6e73;
         display: -webkit-box;
+        line-clamp: 2;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         overflow: hidden;
@@ -825,6 +826,13 @@
     const blockButtons = document.querySelectorAll('.block-btn');
     const imageToolInstances = new Set();
     const URL_PREVIEW_API = "{% url 'blog:url_preview' %}";
+    const MATH_OCR_API = "{% url 'blog:math_ocr' %}";
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    let editorUndo = null;
+    let editorHistory = [];
+    let editorHistoryIndex = -1;
+    let historyTimer = null;
+    let isApplyingHistory = false;
 
     const svgIcon = (paths) => `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
     const TOOLBAR_ICON = {
@@ -1353,6 +1361,9 @@
             this.preview = null;
             this.error = null;
             this.displayCheck = null;
+            this.uploadInput = null;
+            this.uploadBtn = null;
+            this.uploadStatus = null;
         }
 
         _normalizeLatex(raw) {
@@ -1416,9 +1427,25 @@
             checkLabel.appendChild(this.displayCheck);
             checkLabel.appendChild(document.createTextNode('블록 수식'));
 
+            this.uploadBtn = document.createElement('button');
+            this.uploadBtn.type = 'button';
+            this.uploadBtn.className = 'mj-image-tool__cover-btn';
+            this.uploadBtn.textContent = '수식 이미지 OCR';
+
+            this.uploadInput = document.createElement('input');
+            this.uploadInput.type = 'file';
+            this.uploadInput.accept = 'image/*';
+            this.uploadInput.style.display = 'none';
+
+            this.uploadStatus = document.createElement('span');
+            this.uploadStatus.className = 'mj-math-tool__hint';
+
             row.appendChild(this.input);
             row.appendChild(hint);
             row.appendChild(checkLabel);
+            row.appendChild(this.uploadBtn);
+            row.appendChild(this.uploadInput);
+            row.appendChild(this.uploadStatus);
 
             this.preview = document.createElement('div');
             this.preview.className = 'mj-math-tool__preview';
@@ -1428,6 +1455,41 @@
 
             this.input.addEventListener('input', () => this._renderPreview());
             this.displayCheck.addEventListener('change', () => this._renderPreview());
+            this.uploadBtn.addEventListener('click', () => this.uploadInput?.click());
+            this.uploadInput.addEventListener('change', async () => {
+                const file = this.uploadInput?.files?.[0];
+                if (!file) return;
+
+                this.uploadBtn.disabled = true;
+                this.uploadStatus.textContent = '인식 중...';
+                if (this.error) this.error.textContent = '';
+
+                try {
+                    const fd = new FormData();
+                    fd.append('image', file);
+                    const resp = await fetch(MATH_OCR_API, {
+                        method: 'POST',
+                        body: fd,
+                        headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+                        credentials: 'same-origin',
+                    });
+                    const json = await resp.json();
+                    if (json.error) {
+                        this.uploadStatus.textContent = '인식 실패';
+                        if (this.error) this.error.textContent = json.error;
+                        return;
+                    }
+                    this.input.value = json.latex || '';
+                    this.uploadStatus.textContent = json.latex ? '완료' : '결과 없음';
+                    this._renderPreview();
+                } catch (_) {
+                    this.uploadStatus.textContent = '인식 실패';
+                    if (this.error) this.error.textContent = '수식 OCR 호출 중 오류가 발생했습니다.';
+                } finally {
+                    this.uploadBtn.disabled = false;
+                    this.uploadInput.value = '';
+                }
+            });
 
             this.wrapper.appendChild(row);
             this.wrapper.appendChild(this.preview);
@@ -1476,11 +1538,46 @@
             linkcard: { class: LinkCardTool },
             math: { class: MathTool },
         },
+        onChange: () => {
+            if (isApplyingHistory) return;
+            clearTimeout(historyTimer);
+            historyTimer = setTimeout(async () => {
+                try {
+                    const output = await editor.save();
+                    const snapshot = JSON.stringify(output);
+                    if (editorHistoryIndex >= 0 && editorHistory[editorHistoryIndex] === snapshot) return;
+
+                    if (editorHistoryIndex < editorHistory.length - 1) {
+                        editorHistory = editorHistory.slice(0, editorHistoryIndex + 1);
+                    }
+
+                    editorHistory.push(snapshot);
+                    if (editorHistory.length > 120) {
+                        editorHistory.shift();
+                    }
+                    editorHistoryIndex = editorHistory.length - 1;
+                } catch (_) {
+                    // ignore snapshot errors
+                }
+            }, 220);
+        },
         onReady: () => {
             // Undo/Redo 플러그인 (Cmd+Z / Ctrl+Z, Cmd+Shift+Z / Ctrl+Y)
             if (typeof Undo !== 'undefined') {
-                new Undo({ editor });
+                editorUndo = new Undo({ editor });
             }
+
+            // 초기 히스토리 스냅샷
+            setTimeout(async () => {
+                try {
+                    const initial = await editor.save();
+                    editorHistory = [JSON.stringify(initial)];
+                    editorHistoryIndex = 0;
+                } catch (_) {
+                    editorHistory = [];
+                    editorHistoryIndex = -1;
+                }
+            }, 0);
 
             const holder = document.getElementById('editor');
             let isConverting = false;
@@ -1818,6 +1915,82 @@
         },
     });
 
+    const isNativeInput = (el) => {
+        if (!el) return false;
+        const tag = (el.tagName || '').toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
+        return false;
+    };
+
+    const isSelectionInsideEditor = () => {
+        const sel = window.getSelection();
+        if (!sel || sel.rangeCount === 0) return false;
+        const range = sel.getRangeAt(0);
+        return !!editorHolder?.contains(range.commonAncestorContainer);
+    };
+
+    document.addEventListener('keydown', (e) => {
+        const key = (e.key || '').toLowerCase();
+        const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && key === 'z';
+        const isRedo = (e.metaKey || e.ctrlKey) && (key === 'y' || (e.shiftKey && key === 'z'));
+        if (!isUndo && !isRedo) return;
+
+        const active = document.activeElement;
+        if (isNativeInput(active)) return;
+
+        if (!isSelectionInsideEditor()) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const applyHistoryAt = async (nextIndex) => {
+            if (nextIndex < 0 || nextIndex >= editorHistory.length) return false;
+            const raw = editorHistory[nextIndex];
+            if (!raw) return false;
+            try {
+                const parsed = JSON.parse(raw);
+                isApplyingHistory = true;
+                await editor.blocks.render(parsed);
+                editorHistoryIndex = nextIndex;
+                setTimeout(() => { isApplyingHistory = false; }, 0);
+                return true;
+            } catch (_) {
+                isApplyingHistory = false;
+                return false;
+            }
+        };
+
+        // 1순위: 로컬 히스토리 (이미지/링크 블록 포함)
+        if (isUndo) {
+            applyHistoryAt(editorHistoryIndex - 1).then((ok) => {
+                if (ok) return;
+                try {
+                    if (editorUndo && typeof editorUndo.undo === 'function') {
+                        editorUndo.undo();
+                        return;
+                    }
+                    document.execCommand('undo');
+                } catch (_) {}
+            });
+            return;
+        }
+
+        if (isRedo) {
+            applyHistoryAt(editorHistoryIndex + 1).then((ok) => {
+                if (ok) return;
+                try {
+                    if (editorUndo && typeof editorUndo.redo === 'function') {
+                        editorUndo.redo();
+                        return;
+                    }
+                    document.execCommand('redo');
+                } catch (_) {}
+            });
+            return;
+        }
+
+    }, true);
+
     const applyFont = () => {
         const fontFamily = fontSelect.value;
         const zone = document.querySelector('.codex-editor');
@@ -2018,12 +2191,121 @@
         return output;
     };
 
+    const storageScope = (() => {
+        const draftId = (document.getElementById('draft_id')?.value || '').trim() || 'new';
+        const mode = "{{ editor_mode|default:'create' }}";
+        const path = location.pathname;
+        return `mj:blog:writer:${mode}:${path}:${draftId}`;
+    })();
+
+    let isDirty = false;
+    let autosaveTimer = null;
+
+    const setDirty = () => {
+        isDirty = true;
+    };
+
+    const collectSnapshot = async () => {
+        let output = await editor.save();
+        output = preserveInlineStyledHtml(output);
+        output = normalizeTextualFields(output);
+        return {
+            title: document.getElementById('title')?.value || '',
+            summary: document.getElementById('summary')?.value || '',
+            category: document.querySelector('select[name="category"]')?.value || '',
+            tags: document.getElementById('tags')?.value || '',
+            content: output,
+            savedAt: Date.now(),
+        };
+    };
+
+    const persistSnapshot = async () => {
+        try {
+            const snapshot = await collectSnapshot();
+            localStorage.setItem(storageScope, JSON.stringify(snapshot));
+        } catch (_) {
+            // ignore storage errors
+        }
+    };
+
+    const queueAutosave = () => {
+        setDirty();
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            persistSnapshot();
+        }, 900);
+    };
+
+    const applySnapshotToForm = (snapshot) => {
+        if (!snapshot || typeof snapshot !== 'object') return;
+
+        const titleEl = document.getElementById('title');
+        const summaryEl = document.getElementById('summary');
+        const tagsEl = document.getElementById('tags');
+        const categoryEl = document.querySelector('select[name="category"]');
+
+        if (titleEl && typeof snapshot.title === 'string') titleEl.value = snapshot.title;
+        if (summaryEl && typeof snapshot.summary === 'string') summaryEl.value = snapshot.summary;
+        if (tagsEl && typeof snapshot.tags === 'string') tagsEl.value = snapshot.tags;
+        if (categoryEl && typeof snapshot.category === 'string') categoryEl.value = snapshot.category;
+        if (snapshot.content && Array.isArray(snapshot.content.blocks)) {
+            contentInput.value = JSON.stringify(snapshot.content);
+        }
+    };
+
+    const tryRestoreSnapshot = async () => {
+        try {
+            const raw = localStorage.getItem(storageScope);
+            if (!raw) return;
+            const snapshot = JSON.parse(raw);
+            if (!snapshot || !snapshot.content) return;
+            const shouldRestore = window.confirm('이전 편집 내용이 있습니다. 복구할까요?');
+            if (!shouldRestore) return;
+            applySnapshotToForm(snapshot);
+            if (snapshot.content && Array.isArray(snapshot.content.blocks)) {
+                try {
+                    await editor.isReady;
+                    await editor.blocks.render(snapshot.content);
+                } catch (_) {
+                    // ignore render errors
+                }
+            }
+            setDirty();
+        } catch (_) {
+            // ignore parse errors
+        }
+    };
+
+    const clearSnapshot = () => {
+        try { localStorage.removeItem(storageScope); } catch (_) {}
+    };
+
+    window.addEventListener('beforeunload', (e) => {
+        if (!isDirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    tryRestoreSnapshot();
+
     const syncContent = async () => {
         let output = await editor.save();
         output = preserveInlineStyledHtml(output);
         output = normalizeTextualFields(output);
         contentInput.value = JSON.stringify(output);
     };
+
+    form.querySelectorAll('input, textarea, select').forEach((el) => {
+        el.addEventListener('input', queueAutosave);
+        el.addEventListener('change', queueAutosave);
+    });
+
+    const editorHolderWatch = document.getElementById('editor');
+    if (editorHolderWatch) {
+        editorHolderWatch.addEventListener('input', queueAutosave, true);
+        editorHolderWatch.addEventListener('paste', queueAutosave, true);
+        editorHolderWatch.addEventListener('click', queueAutosave, true);
+    }
 
     const showToast = (text, type = 'success') => {
         if (!toastContainer || !text) return;
@@ -2072,6 +2354,8 @@
         publishConfirmed = true;
         closePublishModal();
         await syncContent();
+        clearSnapshot();
+        isDirty = false;
         submitAction.value = 'publish';
         form.submit();
     });
@@ -2128,9 +2412,11 @@
 
     draftBtn.addEventListener('click', async () => {
         await syncContent();
+        await persistSnapshot();
         publishConfirmed = false;
         submitAction.value = 'draft';
         showToast('임시저장 중...');
+        isDirty = false;
         form.submit();
     });
 
@@ -2148,6 +2434,13 @@
         if (submitAction.value !== 'draft' && !publishConfirmed) {
             openPublishModal();
             return;
+        }
+
+        if (submitAction.value === 'draft') {
+            await persistSnapshot();
+        } else {
+            clearSnapshot();
+            isDirty = false;
         }
 
         form.submit();
