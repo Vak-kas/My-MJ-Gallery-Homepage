@@ -2,6 +2,7 @@
 {% load blog_extras %}
 
 {% block content %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 {% include "components/main_nav.html" with nav_active="blog" %}
 
 <main class="mx-auto max-w-[1320px] px-6 py-12 lg:py-16">
@@ -209,4 +210,27 @@
     </section>
     {% endif %}
 </main>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script>
+(() => {
+    const render = () => {
+        if (typeof katex === 'undefined') return;
+        document.querySelectorAll('.mj-katex').forEach((el) => {
+            const latex = el.getAttribute('data-latex') || '';
+            if (!latex) return;
+            const displayMode = el.getAttribute('data-display') === '1';
+            try {
+                katex.render(latex, el, { throwOnError: false, displayMode });
+            } catch (_) {
+                // fallback: 원문 유지
+            }
+        });
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', render, { once: true });
+    } else {
+        render();
+    }
+})();
+</script>
 {% endblock %}

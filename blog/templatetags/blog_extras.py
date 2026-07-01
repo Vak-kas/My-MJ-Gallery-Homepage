@@ -19,7 +19,7 @@ def _collect_block_text(block):
     d = block.get("data", {}) or {}
 
     if t in {"paragraph", "header", "h1", "h2", "h3", "quote"}:
-        return _strip_tags_text(d.get("text", ""))
+        return _strip_tags_text(d.get("html") or d.get("text", ""))
 
     if t in {"list", "nestedList"}:
         items = d.get("items", [])
@@ -42,6 +42,9 @@ def _collect_block_text(block):
 
     if t == "code":
         return d.get("code", "").strip()
+
+    if t == "math":
+        return d.get("latex", "").strip()
 
     if t == "table":
         rows = d.get("content", [])
@@ -112,13 +115,13 @@ def render_editorjs(content):
         d = block.get("data", {})
 
         if t == "paragraph":
-            text = d.get("text", "")
+            text = d.get("html") or d.get("text", "")
             align = d.get("alignment", "left")
             a_cls = f"text-{align}" if align in ("left", "center", "right", "justify") else ""
             html.append(f'<p class="mb-4 leading-[1.85] {a_cls}">{text}</p>')
 
         elif t in {"header", "h1", "h2", "h3"}:
-            text = d.get("text", "")
+            text = d.get("html") or d.get("text", "")
             level = 1 if t == "h1" else 2 if t == "h2" else 3 if t == "h3" else max(1, min(6, int(d.get("level", 2))))
             sizes = {
                 1: "text-[2rem] font-bold mt-10 mb-4 tracking-tight",
@@ -154,13 +157,23 @@ def render_editorjs(content):
             html.append(f'<ul class="mb-4 space-y-0.5">{"".join(rows)}</ul>')
 
         elif t == "quote":
-            text = d.get("text", "")
+            text = d.get("html") or d.get("text", "")
             caption = d.get("caption", "")
             cap = f'<footer class="mt-2 text-sm not-italic text-[#8e8e93]">— {caption}</footer>' if caption else ""
             html.append(
                 f'<blockquote class="border-l-4 border-[#d2d2d7] pl-5 py-1 italic text-[#6e6e73] my-5">'
                 f'{text}{cap}</blockquote>'
             )
+
+        elif t == "math":
+            latex = escape(d.get("latex", "").strip())
+            if latex:
+                display_mode = "1" if d.get("displayMode") else "0"
+                html.append(
+                    f'<div class="my-4 overflow-x-auto rounded-xl border border-[#e5e5ea] bg-[#fafafa] px-4 py-3">'
+                    f'<span class="mj-katex" data-latex="{latex}" data-display="{display_mode}">{latex}</span>'
+                    f'</div>'
+                )
 
         elif t == "code":
             code = escape(d.get("code", ""))
