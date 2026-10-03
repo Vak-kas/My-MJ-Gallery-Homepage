@@ -2175,11 +2175,13 @@
 
     const preserveInlineStyledHtml = (output) => {
         if (!output || !Array.isArray(output.blocks)) return output;
-        output.blocks.forEach((block, idx) => {
+        output.blocks.forEach((block) => {
             const type = block?.type;
             if (!['paragraph', 'header', 'h1', 'h2', 'h3', 'quote'].includes(type)) return;
-            const blockApi = editor.blocks.getBlockByIndex(idx);
-            const holder = blockApi?.holder;
+            // save()는 빈 블록을 제외하므로 index가 아닌 id로 매칭해야 내용이 밀리지 않음
+            const blockApi = block?.id ? editor.blocks.getById(block.id) : null;
+            if (!blockApi || blockApi.name !== type) return;
+            const holder = blockApi.holder;
             if (!holder) return;
             const richEl = holder.querySelector('.ce-paragraph, .ce-header, .cdx-quote__text');
             const html = richEl?.innerHTML?.trim();
