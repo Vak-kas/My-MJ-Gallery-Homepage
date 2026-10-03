@@ -1,5 +1,6 @@
 from datetime import timedelta
 from io import BytesIO
+from uuid import uuid4
 
 import json as _json
 import re as _re
@@ -9,6 +10,8 @@ from PIL import Image, ImageOps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
@@ -27,6 +30,8 @@ UNLOCK_WINDOW_SECONDS = 10 * 60
 UNLOCK_BLOCK_SECONDS = 10 * 60
 COVER_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 MATH_OCR_MAX_BYTES = 8 * 1024 * 1024
+INLINE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
+INLINE_IMAGE_MAX_SIDE = 2000
 
 
 def _normalize_math_ocr_text_to_latex(text: str) -> str:
@@ -513,6 +518,48 @@ def math_ocr(request):
 		return JsonResponse({"error": err}, status=200)
 
 	return JsonResponse({"latex": latex})
+
+
+@login_required
+def image_upload(request):
+	"""본문 이미지를 파일로 저장하고 URL을 반환 (base64로 본문에 박히면 글 용량이 폭증함)"""
+	if request.method != "POST":
+		return JsonResponse({"error": "method not allowed"}, status=405)
+
+	image = request.FILES.get("image")
+	if not image:
+		return JsonResponse({"error": "image file is required"}, status=400)
+
+	if getattr(image, "size", 0) > INLINE_IMAGE_MAX_BYTES:
+		return JsonResponse({"error": "이미지는 20MB 이하만 업로드할 수 있습니다."}, status=400)
+
+	try:
+		img = Image.open(image)
+		is_gif = (img.format or "").upper() == "GIF" and getattr(img, "is_animated", False)
+		if is_gif:
+			# 움짤은 재인코딩하면 애니메이션이 깨지므로 원본 그대로 저장
+			image.seek(0)
+			payload, ext = image.read(), "gif"
+		else:
+			img = ImageOps.exif_transpose(img)
+			img.thumbnail((INLINE_IMAGE_MAX_SIDE, INLINE_IMAGE_MAX_SIDE))
+			has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+			buf = BytesIO()
+			if has_alpha:
+				img.convert("RGBA").save(buf, format="PNG", optimize=True)
+				ext = "png"
+			else:
+				img.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
+				ext = "jpg"
+			payload = buf.getvalue()
+	except Exception:
+		return JsonResponse({"error": "이미지 파일을 읽을 수 없습니다."}, status=400)
+
+	name = default_storage.save(
+		f"blog/inline/{timezone.now():%Y/%m}/{uuid4().hex}.{ext}",
+		ContentFile(payload),
+	)
+	return JsonResponse({"url": default_storage.url(name)})
 
 
 def tech(request):
