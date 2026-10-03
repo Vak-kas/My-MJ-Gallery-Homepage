@@ -164,3 +164,5 @@ memo.txt
 media/
 .env*
 .DS_Store
+# 에디터 번들 빌드용 의존성 (빌드 결과는 static/editor/ 에 커밋)
+frontend/editor/node_modules/
