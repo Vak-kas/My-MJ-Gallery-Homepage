@@ -20,6 +20,23 @@
         padding: 28px 12px 0;
     }
 
+    .editor-help {
+        margin-top: 12px;
+        padding: 12px 16px;
+        border-radius: 12px;
+        background: var(--mj-bg-soft);
+        color: var(--mj-muted);
+        font-size: 12px;
+        line-height: 1.7;
+    }
+    .editor-help__title { font-weight: 600; color: var(--mj-fg); margin-bottom: 4px; }
+    .editor-help ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2px 20px; }
+    .editor-help kbd, .editor-help code {
+        display: inline-block; min-width: 20px; padding: 0 5px; margin-right: 2px; border-radius: 4px; text-align: center;
+        border: 1px solid var(--mj-border); background: var(--mj-bg); color: var(--mj-fg);
+        font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px;
+    }
+
     .mj-toast-container {
         position: fixed;
         right: 20px;
@@ -261,12 +278,29 @@
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p class="text-[13px] font-semibold text-[#1d1d1f]">본문</p>
-                    <p class="text-[12px] text-[#8e8e93]">'/' 로 블록 메뉴 · # ## ### - 1. [] &gt; ``` --- 마크다운 · $x^2$ 인라인 수식, 빈 줄에서 $$ + 스페이스 블록 수식 · 이미지는 붙여넣기/끌어놓기 · 텍스트 선택 시 서식 툴바 · ⌘Z 실행취소</p>
+                    <p class="text-[12px] text-[#8e8e93]">글은 줄마다 '블록'으로 나뉘어요. 블록에 마우스를 올리면 범위가 표시되고, 왼쪽 ⋮⋮ 로 옮기거나 메뉴를 열 수 있어요.</p>
                 </div>
-                <button id="add-block-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">+ 블록 추가</button>
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="flex cursor-pointer items-center gap-1.5 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">
+                        <input id="show-blocks-toggle" type="checkbox" data-no-autosave class="h-3.5 w-3.5 accent-[#0066cc]" />
+                        블록 경계 보기
+                    </label>
+                    <button id="add-block-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">+ 블록 추가</button>
+                </div>
             </div>
-            <div class="editor-shell">
+            <div id="editor-shell" class="editor-shell">
                 <div id="editor" class="editor-holder"></div>
+            </div>
+            <div class="editor-help">
+                <p class="editor-help__title">블록 추가하는 방법</p>
+                <ul>
+                    <li><kbd>/</kbd> 빈 줄에서 누르면 블록 메뉴 (예: <code>/표</code>, <code>/수식</code>, <code>/h1</code>)</li>
+                    <li><kbd>+</kbd> 블록 왼쪽 버튼 → 바로 아래에 새 블록</li>
+                    <li><kbd>⋮⋮</kbd> 끌어서 순서 이동 · 클릭하면 삭제/복제/전환</li>
+                    <li><kbd>Enter</kbd> 새 줄 · 마지막 블록 아래 빈 곳을 클릭해도 이어 쓰기</li>
+                    <li>마크다운: <code>#</code> <code>##</code> <code>-</code> <code>1.</code> <code>[]</code> <code>&gt;</code> <code>```</code> <code>---</code> + 스페이스</li>
+                    <li>수식: <code>$x^2$</code> 인라인 · 빈 줄에서 <code>$$</code> + 스페이스 블록 · 이미지는 붙여넣기/끌어놓기</li>
+                </ul>
             </div>
         </section>
 
@@ -415,12 +449,24 @@ window.addEventListener('DOMContentLoaded', () => {
         e.returnValue = '';
     });
 
-    form.querySelectorAll('input, textarea, select').forEach((el) => {
+    form.querySelectorAll('input:not([data-no-autosave]), textarea, select').forEach((el) => {
         el.addEventListener('input', queueAutosave);
         el.addEventListener('change', queueAutosave);
     });
 
     fontSelect?.addEventListener('change', () => mj.setFontFamily(fontSelect.value));
+
+    // 블록 경계 보기 (화면 전용 설정이라 이 브라우저에만 기억)
+    const showBlocksToggle = document.getElementById('show-blocks-toggle');
+    const editorShell = document.getElementById('editor-shell');
+    const SHOW_BLOCKS_KEY = 'mj:writer:showBlocks';
+    const applyShowBlocks = (on) => editorShell?.classList.toggle('mj-show-blocks', on);
+    try { showBlocksToggle.checked = localStorage.getItem(SHOW_BLOCKS_KEY) === '1'; } catch (_) {}
+    applyShowBlocks(showBlocksToggle.checked);
+    showBlocksToggle?.addEventListener('change', (e) => {
+        applyShowBlocks(showBlocksToggle.checked);
+        try { localStorage.setItem(SHOW_BLOCKS_KEY, showBlocksToggle.checked ? '1' : '0'); } catch (_) {}
+    });
     addBlockBtn?.addEventListener('click', () => mj.openBlockMenu());
 
     // ── 저장 ───────────────────────────────────────────────

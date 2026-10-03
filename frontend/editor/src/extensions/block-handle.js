@@ -1,9 +1,12 @@
 // 블록 왼쪽 핸들: [+] 아래에 블록 추가, [⋮⋮] 끌어서 이동 / 클릭하면 블록 메뉴(삭제·복제·전환)
 import { Extension } from '@tiptap/core';
 import { DOMSerializer } from '@tiptap/pm/model';
+import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state';
 import { dismissOnOutside, h, placeFloating } from '../dom.js';
 import { BLOCK_ITEMS, runBlockItem } from './slash-menu.js';
+
+const HANDLE_KEY = new PluginKey('mjBlockHandle');
 
 const TURN_INTO = ['paragraph', 'h1', 'h2', 'h3', 'bullet', 'ordered', 'todo', 'quote', 'code'];
 
@@ -85,7 +88,26 @@ export const BlockHandle = Extension.create({
         const editor = this.editor;
         return [
             new Plugin({
-                key: new PluginKey('mjBlockHandle'),
+                key: HANDLE_KEY,
+                // 마우스가 올라간 블록 위치 → 데코레이션으로 배경을 칠해 블록 범위를 보여줌
+                state: {
+                    init: () => null,
+                    apply: (tr, value) => {
+                        const meta = tr.getMeta(HANDLE_KEY);
+                        if (meta !== undefined) return meta;
+                        if (value === null) return null;
+                        const mapped = tr.mapping.mapResult(value);
+                        return mapped.deleted ? null : mapped.pos;
+                    },
+                },
+                props: {
+                    decorations: (state) => {
+                        const pos = HANDLE_KEY.getState(state);
+                        const node = pos === null ? null : state.doc.nodeAt(pos);
+                        if (!node) return null;
+                        return DecorationSet.create(state.doc, [Decoration.node(pos, pos + node.nodeSize, { class: 'mj-block-hover' })]);
+                    },
+                },
                 view: (view) => {
                     const plusBtn = h('button', { type: 'button', class: 'mj-handle__btn', title: '아래에 블록 추가', text: '+' });
                     const dragBtn = h('button', { type: 'button', class: 'mj-handle__btn mj-handle__drag', title: '끌어서 이동 · 클릭하면 메뉴', draggable: 'true', text: '⋮⋮' });
@@ -97,12 +119,20 @@ export const BlockHandle = Extension.create({
                     let current = null;
                     let frame = 0;
 
+                    // 마우스가 올라간 블록에 배경을 옅게 칠해 블록 범위를 보여줌
+                    const setHovered = (pos) => {
+                        if (HANDLE_KEY.getState(view.state) === pos) return;
+                        view.dispatch(view.state.tr.setMeta(HANDLE_KEY, pos).setMeta('addToHistory', false));
+                    };
+
                     const hide = () => {
                         handle.classList.remove('is-visible');
+                        setHovered(null);
                         current = null;
                     };
 
                     const show = (block) => {
+                        setHovered(block.pos);
                         current = block;
                         const hostRect = host.getBoundingClientRect();
                         const rect = block.dom.getBoundingClientRect();
@@ -111,7 +141,7 @@ export const BlockHandle = Extension.create({
                         const paddingTop = parseFloat(style.paddingTop) || 0;
                         const firstLine = Math.min(rect.height, lineHeight + paddingTop);
                         handle.style.top = `${rect.top - hostRect.top + firstLine / 2 - 12}px`;
-                        handle.style.left = `${Math.max(0, rect.left - hostRect.left - 52)}px`;
+                        handle.style.left = `${Math.max(0, rect.left - hostRect.left - 60)}px`;
                         handle.classList.add('is-visible');
                     };
 
@@ -175,7 +205,11 @@ export const BlockHandle = Extension.create({
 
                     return {
                         update: () => {
-                            if (current && !current.dom.isConnected) hide();
+                            // 뷰 업데이트 중에는 dispatch 하면 안 되므로 핸들만 숨김 (강조 위치는 state 가 매핑/정리)
+                            if (current && !current.dom.isConnected) {
+                                handle.classList.remove('is-visible');
+                                current = null;
+                            }
                         },
                         destroy: () => {
                             host.removeEventListener('mousemove', onMove);
