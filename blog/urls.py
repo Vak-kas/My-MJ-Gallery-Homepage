@@ -16,4 +16,5 @@ urlpatterns = [
     path("secret/", views.secret, name="secret"),
     path("api/url-preview/", views.url_preview, name="url_preview"),
     path("api/math-ocr/", views.math_ocr, name="math_ocr"),
+    path("api/image-upload/", views.image_upload, name="image_upload"),
 ]

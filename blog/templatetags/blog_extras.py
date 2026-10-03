@@ -5,6 +5,15 @@ from django import template
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
+from blog.content import (
+    TIPTAP_FORMAT,
+    parse_content,
+    render_linkcard,
+    render_tiptap_html,
+    tiptap_cover_image,
+    tiptap_plain_text,
+)
+
 register = template.Library()
 
 
@@ -77,6 +86,9 @@ def _render_list_items(items, style):
 def _extract_cover_image_url(content):
     if not content:
         return ""
+    kind, doc = parse_content(content)
+    if kind == TIPTAP_FORMAT:
+        return tiptap_cover_image(doc)
     try:
         data = json.loads(content)
         blocks = data.get("blocks", []) if isinstance(data, dict) else []
@@ -100,9 +112,12 @@ def _extract_cover_image_url(content):
 
 @register.filter
 def render_editorjs(content):
-    """Editor.js JSON → HTML 렌더링. 일반 텍스트면 단락으로 폴백."""
+    """본문 JSON → HTML 렌더링 (Tiptap / 예전 Editor.js). 일반 텍스트면 단락으로 폴백."""
     if not content:
         return mark_safe("")
+    kind, doc = parse_content(content)
+    if kind == TIPTAP_FORMAT:
+        return mark_safe(render_tiptap_html(doc))
     try:
         data = json.loads(content)
         blocks = data.get("blocks", [])
@@ -243,53 +258,15 @@ def render_editorjs(content):
             )
 
         elif t == "linkcard":
-            url = escape(d.get("url", ""))
-            title = escape(d.get("title", "") or url)
-            desc = escape(d.get("description", ""))
-            image = escape(d.get("image", ""))
-            site = escape(d.get("site_name", ""))
-            favicon = escape(d.get("favicon", ""))
-            mode = d.get("mode", "card")
-
-            fav_html = f'<img src="{favicon}" alt="" class="h-4 w-4 rounded" onerror="this.style.display=\'none\'" />' if favicon else ""
-            desc_html = f'<p class="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">{desc}</p>' if desc else ""
-
-            if mode == "mention":
-                html.append(
-                    f'<p class="my-2"><a href="{url}" target="_blank" rel="noopener noreferrer" '
-                    f'class="inline-flex items-center gap-1.5 rounded-full border border-[#e5e5ea] bg-[#f5f5f7] px-3 py-1.5 text-[13px] font-medium text-[#1d1d1f] no-underline hover:bg-[#eef3ff] hover:border-[#0066cc]/40">'
-                    f'🔗 {title}</a></p>'
-                )
-            elif mode == "preview":
-                cover_html = (
-                    f'<div class="w-full h-44 overflow-hidden bg-[#f5f5f7]">'
-                    f'<img src="{image}" alt="" class="h-full w-full object-cover" /></div>'
-                ) if image else ""
-                html.append(
-                    f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-                    f'class="my-4 block overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white no-underline transition hover:shadow-md">'
-                    f'{cover_html}'
-                    f'<div class="p-4">'
-                    f'<div class="flex items-center gap-2 text-[12px] text-[#8e8e93]">{fav_html}<span>{site}</span></div>'
-                    f'<p class="mt-2 text-[17px] font-bold text-[#1d1d1f]">{title}</p>'
-                    f'{desc_html}'
-                    f'<p class="mt-2 truncate text-[12px] text-[#0066cc]">{url}</p>'
-                    f'</div></a>'
-                )
-            else:  # card
-                img_html = f'<img src="{image}" alt="" class="absolute inset-0 h-full w-full object-cover" />' if image else ""
-                html.append(
-                    f'<a href="{url}" target="_blank" rel="noopener noreferrer" '
-                    f'class="my-4 flex overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white no-underline transition hover:shadow-md block">'
-                    f'<div class="flex-1 min-w-0 p-4">'
-                    f'<div class="flex items-center gap-2 text-[12px] text-[#8e8e93]">{fav_html}<span>{site}</span></div>'
-                    f'<p class="mt-1.5 truncate text-[15px] font-semibold text-[#1d1d1f]">{title}</p>'
-                    f'{desc_html}'
-                    f'<p class="mt-2 truncate text-[12px] text-[#0066cc]">{url}</p>'
-                    f'</div>'
-                    + (f'<div class="relative h-auto w-[140px] shrink-0 overflow-hidden border-l border-[#e5e5ea] bg-[#f5f5f7]">{img_html}</div>' if image else "")
-                    + f'</a>'
-                )
+            html.append(render_linkcard(
+                d.get("url", ""),
+                title=d.get("title", ""),
+                description=d.get("description", ""),
+                image=d.get("image", ""),
+                site_name=d.get("site_name", ""),
+                favicon=d.get("favicon", ""),
+                mode=d.get("mode", "card"),
+            ))
 
         elif t == "linkembed":
             url = escape(d.get("url", ""))
@@ -307,7 +284,10 @@ def render_editorjs(content):
 def editorjs_excerpt(content, max_chars=180):
     """Editor.js JSON 또는 HTML/텍스트에서 요약 문자열 추출"""
     text = ""
-    if content:
+    kind, doc = parse_content(content)
+    if kind == TIPTAP_FORMAT:
+        text = tiptap_plain_text(doc)
+    elif content:
         try:
             data = json.loads(content)
             blocks = data.get("blocks", []) if isinstance(data, dict) else []

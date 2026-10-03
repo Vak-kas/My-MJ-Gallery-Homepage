@@ -1,432 +1,23 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ editor_heading|default:"글쓰기" }} — Blog{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="{% static 'editor/mj-editor.css' %}">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap');
 
     .editor-shell {
-        border: 1px solid rgba(0, 0, 0, 0.08);
+        border: 1px solid var(--mj-border);
         border-radius: 16px;
-        background: #fff;
-    }
-
-    .editor-toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 10px 12px;
-        border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-        background: #fbfbfd;
-        border-radius: 16px 16px 0 0;
-    }
-
-    .editor-toolbar button {
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 9999px;
-        font-size: 12px;
-        padding: 4px 10px;
+        background: var(--mj-bg);
     }
 
     .editor-holder {
         min-height: 560px;
-        padding: 14px 8px;
-    }
-
-    .ce-block__content,
-    .ce-toolbar__content {
-        max-width: 760px;
-    }
-
-    /* Tailwind preflight 리셋을 덮어쓰는 강제 헤더 스타일 */
-    .ce-header[data-level="1"],
-    h1.ce-header {
-        font-size: 2em !important;
-        font-weight: 800 !important;
-        line-height: 1.25 !important;
-        letter-spacing: -0.03em !important;
-        margin: 0.5em 0 0.25em !important;
-        color: #1a1a1a !important;
-    }
-
-    .ce-header[data-level="2"],
-    h2.ce-header {
-        font-size: 1.5em !important;
-        font-weight: 700 !important;
-        line-height: 1.3 !important;
-        letter-spacing: -0.02em !important;
-        margin: 0.5em 0 0.2em !important;
-        color: #1a1a1a !important;
-    }
-
-    .ce-header[data-level="3"],
-    h3.ce-header {
-        font-size: 1.2em !important;
-        font-weight: 600 !important;
-        line-height: 1.35 !important;
-        margin: 0.4em 0 0.15em !important;
-        color: #1a1a1a !important;
-    }
-
-    .ce-paragraph {
-        font-size: 15px !important;
-        line-height: 1.8 !important;
-    }
-
-    .mj-toggle-tool,
-    .mj-image-tool {
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        border-radius: 16px;
-        background: #fff;
-        padding: 14px;
-    }
-
-    .mj-toggle-tool__title,
-    .mj-image-tool input,
-    .mj-image-tool textarea {
-        width: 100%;
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 12px;
-        background: #f9f9fb;
-        padding: 10px 12px;
-        outline: none;
-    }
-
-    .mj-toggle-tool__title:focus,
-    .mj-image-tool input:focus,
-    .mj-image-tool textarea:focus {
-        border-color: #0066cc;
-    }
-
-    .mj-toggle-tool__content,
-    .mj-image-tool__caption {
-        margin-top: 10px;
-    }
-
-    .mj-image-tool__preview {
-        margin-top: 12px;
-        border-radius: 14px;
-        overflow: hidden;
-        background: #f5f5f7;
-    }
-
-    .mj-image-tool__preview img {
-        display: block;
-        width: 100%;
-        max-height: none;
-        object-fit: contain;
-    }
-
-    .mj-image-tool__hint {
-        margin-top: 8px;
-        font-size: 12px;
-        color: #8e8e93;
-    }
-
-    .mj-image-tool__header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 10px;
-    }
-
-    .mj-image-tool__badge {
-        font-size: 11px;
-        color: #8e8e93;
-        letter-spacing: 0.02em;
-    }
-
-    .mj-image-tool__cover-btn {
-        border: 1px solid rgba(0, 0, 0, 0.1);
-        border-radius: 9999px;
-        padding: 6px 12px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #1d1d1f;
-        background: #fff;
-        transition: all 0.2s ease;
-    }
-
-    .mj-image-tool__cover-btn.is-active {
-        border-color: #0066cc;
-        background: #0066cc;
-        color: #fff;
-    }
-
-    .mj-image-tool__url.is-data-url {
-        font-size: 12px;
-        color: #6e6e73;
-    }
-
-    .mj-delimiter-tool {
-        padding: 18px 0;
-    }
-
-    .mj-delimiter-tool hr {
-        border: 0;
-        border-top: 1px solid #d2d2d7;
-        margin: 0;
-    }
-
-    /* URL 임베드 피커 */
-    .mj-url-picker {
-        position: fixed;
-        z-index: 9999;
-        background: #fff;
-        border: 1px solid rgba(0,0,0,0.1);
-        border-radius: 18px;
-        box-shadow: 0 12px 36px rgba(0,0,0,0.13);
-        padding: 14px;
-        width: 320px;
-        display: none;
-    }
-    .mj-url-picker.is-visible { display: block; }
-    .mj-url-picker__title {
-        font-size: 12px;
-        font-weight: 700;
-        color: #8e8e93;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-bottom: 10px;
-    }
-    .mj-url-picker__url {
-        font-size: 12px;
-        color: #6e6e73;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        margin-bottom: 10px;
-        padding: 6px 10px;
-        background: #f5f5f7;
-        border-radius: 10px;
-    }
-    .mj-url-picker__options {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-    .mj-url-picker__opt {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border-radius: 12px;
-        border: 1px solid rgba(0,0,0,0.08);
-        background: #fafafa;
-        cursor: pointer;
-        transition: background 0.15s;
-        width: 100%;
-        text-align: left;
-    }
-    .mj-url-picker__opt:hover { background: #eef3ff; border-color: rgba(0,102,204,0.25); }
-    .mj-url-picker__opt-icon { font-size: 18px; line-height: 1; }
-    .mj-url-picker__opt-info { display: flex; flex-direction: column; gap: 2px; }
-    .mj-url-picker__opt-label { font-size: 13px; font-weight: 600; color: #1d1d1f; }
-    .mj-url-picker__opt-desc { font-size: 11px; color: #8e8e93; }
-    .mj-url-picker__cancel {
-        width: 100%;
-        margin-top: 8px;
-        padding: 7px;
-        border-radius: 10px;
-        font-size: 12px;
-        color: #8e8e93;
-        background: transparent;
-        border: none;
-        cursor: pointer;
-    }
-    .mj-url-picker__cancel:hover { background: #f5f5f7; }
-
-    /* 링크카드 블록 */
-    .mj-linkcard-tool {
-        border: 1px solid rgba(0,0,0,0.08);
-        border-radius: 18px;
-        background: #fff;
-        overflow: hidden;
-    }
-    .mj-linkcard-preview {
-        display: flex;
-        align-items: stretch;
-        gap: 0;
-        text-decoration: none;
-    }
-    .mj-linkcard-preview__body {
-        flex: 1;
-        min-width: 0;
-        padding: 14px 16px;
-    }
-    .mj-linkcard-preview__site {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 11px;
-        color: #8e8e93;
-    }
-    .mj-linkcard-preview__title {
-        margin-top: 4px;
-        font-size: 15px;
-        font-weight: 600;
-        color: #1d1d1f;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .mj-linkcard-preview__desc {
-        margin-top: 4px;
-        font-size: 12px;
-        color: #6e6e73;
-        display: -webkit-box;
-        line-clamp: 2;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .mj-linkcard-preview__url {
-        margin-top: 6px;
-        font-size: 11px;
-        color: #0066cc;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .mj-linkcard-preview__img {
-        width: 120px;
-        flex-shrink: 0;
-        background: #f5f5f7;
-        border-left: 1px solid rgba(0,0,0,0.06);
-        overflow: hidden;
-    }
-    .mj-linkcard-preview__img img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-    }
-    .mj-linkcard-loading {
-        padding: 20px;
-        text-align: center;
-        font-size: 13px;
-        color: #8e8e93;
-    }
-    .mj-linkembed-tool {
-        border: 1px solid rgba(0,0,0,0.08);
-        border-radius: 14px;
-        background: #f5f5f7;
-        padding: 10px 14px;
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-    .mj-linkembed-tool a {
-        font-size: 13px;
-        color: #1d1d1f;
-        font-weight: 600;
-        text-decoration: none;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .mj-linkembed-tool a:hover { color: #0066cc; }
-
-    .mj-math-tool {
-        border: 1px solid rgba(0, 0, 0, 0.08);
-        border-radius: 14px;
-        background: #fff;
-        padding: 12px;
-    }
-
-    .mj-math-tool__row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        align-items: center;
-    }
-
-    .mj-math-tool__input {
-        flex: 1;
-        min-width: 220px;
-        border: 1px solid rgba(0, 0, 0, 0.12);
-        border-radius: 10px;
-        padding: 8px 10px;
-        font-size: 13px;
-        background: #fafafa;
-        outline: none;
-    }
-
-    .mj-math-tool__input:focus { border-color: #0066cc; }
-
-    .mj-math-tool__hint {
-        font-size: 11px;
-        color: #8e8e93;
-    }
-
-    .mj-math-tool__preview {
-        margin-top: 10px;
-        min-height: 24px;
-        border-radius: 10px;
-        background: #f8f8fa;
-        border: 1px dashed rgba(0, 0, 0, 0.08);
-        padding: 10px 12px;
-        overflow-x: auto;
-    }
-
-    .mj-math-tool__error {
-        margin-top: 6px;
-        font-size: 12px;
-        color: #b91c1c;
-    }
-
-    /* 텍스트 선택 플로팅 스타일 툴바 */
-    .mj-inline-style-bubble {
-        position: fixed;
-        z-index: 10020;
-        display: none;
-        align-items: center;
-        gap: 6px;
-        padding: 7px 8px;
-        border-radius: 12px;
-        border: 1px solid rgba(0,0,0,0.1);
-        background: #fff;
-        box-shadow: 0 12px 30px rgba(0,0,0,0.12);
-    }
-    .mj-inline-style-bubble.is-visible { display: inline-flex; }
-    .mj-inline-style-bubble select,
-    .mj-inline-style-bubble button,
-    .mj-inline-style-bubble label {
-        border: 1px solid rgba(0,0,0,0.1);
-        border-radius: 9999px;
-        background: #fff;
-        color: #1d1d1f;
-        font-size: 12px;
-        line-height: 1;
-        height: 28px;
-    }
-    .mj-inline-style-bubble select,
-    .mj-inline-style-bubble button {
-        padding: 0 10px;
-    }
-    .mj-inline-style-bubble button:hover { background: #f5f5f7; }
-    .mj-inline-style-bubble label {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 0 8px;
-    }
-    .mj-inline-style-bubble input[type="color"] {
-        width: 16px;
-        height: 16px;
-        border: 0;
-        padding: 0;
-        background: transparent;
-        cursor: pointer;
-    }
-    .mj-inline-style-bubble__sep {
-        width: 1px;
-        height: 16px;
-        background: rgba(0,0,0,0.12);
-        margin: 0 2px;
+        padding: 28px 12px 0;
     }
 
     .mj-toast-container {
@@ -564,70 +155,7 @@
         gap: 8px;
         background: #fff;
     }
-
-    /* 기본 Editor.js 인라인 툴바는 숨기고 커스텀 툴바로 통합 */
-    .ce-inline-toolbar,
-    .ce-conversion-toolbar {
-        display: none !important;
-    }
 </style>
-
-<!-- URL 임베드 피커 -->
-<div id="mj-url-picker" class="mj-url-picker" role="dialog" aria-modal="true">
-    <div class="mj-url-picker__title">하이퍼링크 삽입</div>
-    <div class="mj-url-picker__url" id="mj-url-picker-url"></div>
-    <div class="mj-url-picker__options">
-        <button type="button" class="mj-url-picker__opt" data-mode="mention">
-            <span class="mj-url-picker__opt-icon">🔗</span>
-            <span class="mj-url-picker__opt-info">
-                <span class="mj-url-picker__opt-label">멘션</span>
-                <span class="mj-url-picker__opt-desc">링크를 인라인 텍스트로 삽입</span>
-            </span>
-        </button>
-        <button type="button" class="mj-url-picker__opt" data-mode="card">
-            <span class="mj-url-picker__opt-icon">📰</span>
-            <span class="mj-url-picker__opt-info">
-                <span class="mj-url-picker__opt-label">카드</span>
-                <span class="mj-url-picker__opt-desc">사이트 제목으로 팬카드 표시</span>
-            </span>
-        </button>
-        <button type="button" class="mj-url-picker__opt" data-mode="preview">
-            <span class="mj-url-picker__opt-icon">🖼️</span>
-            <span class="mj-url-picker__opt-info">
-                <span class="mj-url-picker__opt-label">페이지 미리보기</span>
-                <span class="mj-url-picker__opt-desc">OG 이미지 + 설명 쿠버 카드</span>
-            </span>
-        </button>
-    </div>
-    <button type="button" class="mj-url-picker__cancel" id="mj-url-picker-cancel">취소</button>
-</div>
-
-<div id="inline-style-bubble" class="mj-inline-style-bubble" role="toolbar" aria-label="선택 텍스트 스타일">
-    <select id="inline-font-family">
-        <option value="">글씨체</option>
-        <option value="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">기본</option>
-        <option value="'Noto Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Noto Sans KR (OFL)</option>
-        <option value="'Nanum Gothic', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">Nanum Gothic (OFL)</option>
-        <option value="'IBM Plex Sans KR', -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif">IBM Plex Sans KR (OFL)</option>
-        <option value="Pretendard, -apple-system, sans-serif">Pretendard (OFL)</option>
-        <option value="'Noto Serif KR', serif">Noto Serif KR (OFL)</option>
-        <option value="Georgia, Times New Roman, serif">Serif</option>
-        <option value="Courier New, SFMono-Regular, Menlo, monospace">Monospace</option>
-    </select>
-    <label data-color-target="text" tabindex="0" role="button" aria-label="글자색 선택">
-        글자색
-        <input id="inline-text-color" type="color" value="#1d1d1f" />
-    </label>
-    <label data-color-target="bg" tabindex="0" role="button" aria-label="배경색 선택">
-        배경
-        <input id="inline-bg-color" type="color" value="#fff59d" />
-    </label>
-    <span class="mj-inline-style-bubble__sep" aria-hidden="true"></span>
-    <button id="inline-link" type="button" aria-label="링크">링크</button>
-    <button id="inline-bold" type="button" aria-label="굵게">굵게</button>
-    <button id="inline-italic" type="button" aria-label="기울임">기울임</button>
-    <button id="inline-clear-style" type="button">해제</button>
-</div>
 
 <div id="toast-container" class="mj-toast-container" aria-live="polite" aria-atomic="true">
     {% if messages %}
@@ -661,7 +189,7 @@
         <div>
             <p class="text-[11px] uppercase tracking-[0.16em] text-[#0066cc]">Blog Editor</p>
             <h1 class="mt-1 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">{{ editor_heading|default:"새 글 작성" }}</h1>
-            <p class="mt-2 text-[13px] text-[#8e8e93]">바로 적용되는 WYSIWYG · 헤더/체크리스트/코드/인용/구분선</p>
+            <p class="mt-2 text-[13px] text-[#8e8e93]">노션처럼 쓰기 · '/' 로 블록 추가 · $수식$ · 블록 왼쪽 ⋮⋮ 로 이동</p>
         </div>
         <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7] transition-colors">← 허브로</a>
     </div>
@@ -733,39 +261,11 @@
             <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
                 <div>
                     <p class="text-[13px] font-semibold text-[#1d1d1f]">본문</p>
-                    <p class="text-[12px] text-[#8e8e93]">노션처럼 바로 적용됩니다. 예: #, ##, ###, /제목1, /표, /토글, /이미지, /수식, /구분선 · 이미지 블록 오른쪽 위에서 대표이미지 1개 선택 · -&gt; 는 → 로 저장됩니다.</p>
+                    <p class="text-[12px] text-[#8e8e93]">'/' 로 블록 메뉴 · # ## ### - 1. [] &gt; ``` --- 마크다운 · $x^2$ 인라인 수식, 빈 줄에서 $$ + 스페이스 블록 수식 · 이미지는 붙여넣기/끌어놓기 · 텍스트 선택 시 서식 툴바 · ⌘Z 실행취소</p>
                 </div>
+                <button id="add-block-btn" type="button" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">+ 블록 추가</button>
             </div>
-            <div class="mb-3 flex flex-wrap items-center gap-2 text-[12px]">
-                <span class="text-[#8e8e93]">슬래시 커맨드:</span>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h1">/제목1</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h2">/제목2</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="h3">/제목3</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="table">/표</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="toggle">/토글</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="image">/이미지</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="math">/수식</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="divider">/구분선</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="code">/코드</button>
-                <button type="button" class="slash-btn rounded-full border border-black/[0.1] px-3 py-1 text-[#1d1d1f]" data-cmd="linkcard">/링크</button>
-            </div>
-            <p class="mb-3 text-[12px] text-[#8e8e93]">텍스트를 드래그 선택하면 스타일 툴바가 떠요.</p>
             <div class="editor-shell">
-                <div class="editor-toolbar">
-                    <button type="button" class="block-btn" data-block="paragraph">문단</button>
-                    <button type="button" class="block-btn" data-block="h1">제목1</button>
-                    <button type="button" class="block-btn" data-block="h2">제목2</button>
-                    <button type="button" class="block-btn" data-block="h3">제목3</button>
-                    <button type="button" class="block-btn" data-block="list">리스트</button>
-                    <button type="button" class="block-btn" data-block="checklist">체크</button>
-                    <button type="button" class="block-btn" data-block="quote">인용</button>
-                    <button type="button" class="block-btn" data-block="code">코드</button>
-                    <button type="button" class="block-btn" data-block="table">표</button>
-                    <button type="button" class="block-btn" data-block="toggle">토글</button>
-                    <button type="button" class="block-btn" data-block="image">이미지</button>
-                    <button type="button" class="block-btn" data-block="math">수식</button>
-                    <button type="button" class="block-btn" data-block="divider">구분선</button>
-                </div>
                 <div id="editor" class="editor-holder"></div>
             </div>
         </section>
@@ -789,1529 +289,30 @@
     </div>
 </main>
 
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/editorjs@2.30.6"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/header@2.8.8"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/list@1.10.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/checklist@1.6.0"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/quote@2.7.6"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/delimiter@1.4.2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/code@2.9.3"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/table@2.4.4"></script>
-<script src="https://cdn.jsdelivr.net/npm/@editorjs/undo@1.1.3"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="{% static 'editor/mj-editor.js' %}"></script>
 <script>
-(() => {
+window.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('writer-form');
     const contentInput = document.getElementById('content');
-    const fontSelect = document.getElementById('editor-font');
     const submitAction = document.getElementById('submit_action');
     const draftBtn = document.getElementById('draft-btn');
     const publishBtn = document.getElementById('publish-btn');
-    const inlineStyleBubble = document.getElementById('inline-style-bubble');
+    const fontSelect = document.getElementById('editor-font');
+    const addBlockBtn = document.getElementById('add-block-btn');
     const toastContainer = document.getElementById('toast-container');
-    const publishConfirmModal = document.getElementById('publish-confirm-modal');
-    const publishModalCloseBtn = document.getElementById('publish-modal-close');
-    const publishModalCancelBtn = document.getElementById('publish-modal-cancel');
-    const publishModalConfirmBtn = document.getElementById('publish-modal-confirm');
-    const inlineFontFamily = document.getElementById('inline-font-family');
-    const inlineTextColor = document.getElementById('inline-text-color');
-    const inlineBgColor = document.getElementById('inline-bg-color');
-    const inlineTextColorLabel = inlineStyleBubble?.querySelector('[data-color-target="text"]');
-    const inlineBgColorLabel = inlineStyleBubble?.querySelector('[data-color-target="bg"]');
-    const inlineLinkBtn = document.getElementById('inline-link');
-    const inlineBoldBtn = document.getElementById('inline-bold');
-    const inlineItalicBtn = document.getElementById('inline-italic');
-    const inlineClearStyleBtn = document.getElementById('inline-clear-style');
-    const slashButtons = document.querySelectorAll('.slash-btn');
-    const blockButtons = document.querySelectorAll('.block-btn');
-    const imageToolInstances = new Set();
-    const URL_PREVIEW_API = "{% url 'blog:url_preview' %}";
-    const MATH_OCR_API = "{% url 'blog:math_ocr' %}";
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-    let editorUndo = null;
-    let editorHistory = [];
-    let editorHistoryIndex = -1;
-    let historyTimer = null;
-    let isApplyingHistory = false;
-
-    const svgIcon = (paths) => `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`;
-    const TOOLBAR_ICON = {
-        toggle: svgIcon('<path d="M6 4l5 5-5 5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'),
-        image: svgIcon('<path d="M3 4h12v10H3V4Zm2 7 2.2-2.2 2 2L12 8l3 3" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><circle cx="7" cy="7" r="1" fill="currentColor"/>'),
-        math: svgIcon('<path d="M3 9h4M11 9h4M9 5v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M5.5 12.5 8.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>'),
-    };
-
-    const wrapTool = (BaseTool, title) => class extends BaseTool {
-        static get toolbox() {
-            const base = typeof BaseTool.toolbox === 'function' ? BaseTool.toolbox() : (BaseTool.toolbox || {});
-            return { ...base, title };
-        }
-    };
-
-    const KoreanHeader = wrapTool(Header, '제목');
-    const KoreanHeader1 = wrapTool(Header, '제목1');
-    const KoreanHeader2 = wrapTool(Header, '제목2');
-    const KoreanHeader3 = wrapTool(Header, '제목3');
-    const KoreanList = wrapTool(List, '리스트');
-    const KoreanChecklist = wrapTool(Checklist, '체크');
-    const KoreanQuote = wrapTool(Quote, '인용');
-    const KoreanCode = wrapTool(CodeTool, '코드');
-    const KoreanTable = wrapTool(Table, '표');
-
-    class LineDelimiterTool {
-        static get toolbox() {
-            return {
-                title: '구분선',
-                icon: `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M3 9h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>`,
-            };
-        }
-
-        render() {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'mj-delimiter-tool';
-            wrapper.innerHTML = '<hr />';
-            return wrapper;
-        }
-
-        save() {
-            return {};
-        }
-
-        static get isReadOnlySupported() {
-            return true;
-        }
-    }
-
-    class ToggleTool {
-        static get toolbox() {
-            return { title: '토글', icon: TOOLBAR_ICON.toggle };
-        }
-
-        constructor({ data, api }) {
-            this.api = api;
-            this.data = {
-                title: data?.title || '',
-                items: Array.isArray(data?.items) ? data.items : (data?.content ? [data.content] : []),
-            };
-            this.wrapper = null;
-            this.titleInput = null;
-            this.contentInput = null;
-        }
-
-        render() {
-            this.wrapper = document.createElement('div');
-            this.wrapper.className = 'mj-toggle-tool';
-
-            this.titleInput = document.createElement('input');
-            this.titleInput.className = 'mj-toggle-tool__title';
-            this.titleInput.type = 'text';
-            this.titleInput.placeholder = '토글 제목';
-            this.titleInput.value = this.data.title || '';
-
-            this.contentInput = document.createElement('textarea');
-            this.contentInput.className = 'mj-toggle-tool__content';
-            this.contentInput.rows = 4;
-            this.contentInput.placeholder = '토글 내용 (줄바꿈으로 여러 줄 가능)';
-            this.contentInput.value = (this.data.items || []).join('\n');
-
-            this.wrapper.appendChild(this.titleInput);
-            this.wrapper.appendChild(this.contentInput);
-
-            window.setTimeout(() => this.titleInput?.focus(), 0);
-            return this.wrapper;
-        }
-
-        save() {
-            return {
-                title: this.titleInput?.value?.trim() || '',
-                items: (this.contentInput?.value || '')
-                    .split('\n')
-                    .map((line) => line.trim())
-                    .filter(Boolean),
-            };
-        }
-
-        validate(savedData) {
-            return Boolean(savedData?.title || (savedData?.items && savedData.items.length));
-        }
-
-        static get isReadOnlySupported() {
-            return true;
-        }
-    }
-
-    class ImageTool {
-        static get toolbox() {
-            return { title: '이미지', icon: TOOLBAR_ICON.image };
-        }
-
-        constructor({ data, api }) {
-            this.api = api;
-            this.data = {
-                url: data?.url || data?.file?.url || '',
-                caption: data?.caption || '',
-                alt: data?.alt || '',
-            };
-            this.wrapper = null;
-            this.urlInput = null;
-            this.captionInput = null;
-            this.preview = null;
-            this.coverButton = null;
-            this.isCover = Boolean(data?.isCover);
-        }
-
-        setCoverState(isCover) {
-            this.isCover = Boolean(isCover);
-            if (this.coverButton) {
-                this.coverButton.classList.toggle('is-active', this.isCover);
-                this.coverButton.textContent = this.isCover ? '대표이미지 선택됨' : '대표로 선택';
-            }
-        }
-
-        static clearOtherCovers(activeInstance) {
-            imageToolInstances.forEach((instance) => {
-                instance.setCoverState(instance === activeInstance);
-            });
-        }
-
-        render() {
-            this.wrapper = document.createElement('div');
-            this.wrapper.className = 'mj-image-tool';
-
-            const header = document.createElement('div');
-            header.className = 'mj-image-tool__header';
-
-            const badge = document.createElement('div');
-            badge.className = 'mj-image-tool__badge';
-            badge.textContent = '본문 이미지';
-
-            this.coverButton = document.createElement('button');
-            this.coverButton.type = 'button';
-            this.coverButton.className = 'mj-image-tool__cover-btn';
-            this.coverButton.addEventListener('click', () => {
-                ImageTool.clearOtherCovers(this);
-            });
-
-            header.appendChild(badge);
-            header.appendChild(this.coverButton);
-
-            this.urlInput = document.createElement('input');
-            this.urlInput.type = 'url';
-            this.urlInput.className = 'mj-image-tool__url';
-            this.urlInput.placeholder = '이미지 URL 붙여넣기';
-            this.urlInput.value = this.data.url || '';
-
-            this.captionInput = document.createElement('input');
-            this.captionInput.className = 'mj-image-tool__caption';
-            this.captionInput.type = 'text';
-            this.captionInput.placeholder = '캡션 (선택)';
-            this.captionInput.value = this.data.caption || '';
-
-            this.preview = document.createElement('div');
-            this.preview.className = 'mj-image-tool__preview';
-
-            const hint = document.createElement('div');
-            hint.className = 'mj-image-tool__hint';
-            hint.textContent = '이미지 주소를 넣으면 바로 미리보기됩니다.';
-
-            const updatePreview = () => {
-                const url = this.urlInput.value.trim();
-                this.urlInput.classList.toggle('is-data-url', url.startsWith('data:image/'));
-                this.urlInput.title = url;
-                if (url) {
-                    this.preview.innerHTML = `<img src="${url}" alt="${this.captionInput.value.trim() || ''}" />`;
-                } else {
-                    this.preview.innerHTML = '';
-                }
-            };
-
-            this.urlInput.addEventListener('input', updatePreview);
-            this.captionInput.addEventListener('input', updatePreview);
-
-            this.wrapper.appendChild(header);
-            this.wrapper.appendChild(this.urlInput);
-            this.wrapper.appendChild(this.captionInput);
-            this.wrapper.appendChild(this.preview);
-            this.wrapper.appendChild(hint);
-
-            imageToolInstances.add(this);
-            this.setCoverState(this.isCover);
-            if (this.isCover) {
-                ImageTool.clearOtherCovers(this);
-            }
-            updatePreview();
-            window.setTimeout(() => this.urlInput?.focus(), 0);
-            return this.wrapper;
-        }
-
-        save() {
-            return {
-                url: this.urlInput?.value?.trim() || '',
-                caption: this.captionInput?.value?.trim() || '',
-                alt: this.captionInput?.value?.trim() || '',
-                isCover: this.isCover,
-            };
-        }
-
-        validate(savedData) {
-            return true;
-        }
-
-        static get isReadOnlySupported() {
-            return true;
-        }
-    }
-
-    const parseInitialData = () => {
-        if (!contentInput.value) {
-            return { blocks: [{ type: 'paragraph', data: { text: '' } }] };
-        }
-
-        try {
-            const parsed = JSON.parse(contentInput.value);
-            if (parsed && Array.isArray(parsed.blocks)) return parsed;
-        } catch (e) {
-            // old html fallback
-        }
-
-        const temp = document.createElement('div');
-        temp.innerHTML = contentInput.value;
-        const plain = (temp.textContent || '').trim();
-        return {
-            blocks: [{ type: 'paragraph', data: { text: plain } }],
-        };
-    };
-
-    // ── LinkCardTool ────────────────────────────────────────────
-    class LinkCardTool {
-        static get toolbox() {
-            return { title: '링크 카드', icon: '<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 3.5 L14.5 3.5 L14.5 7.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M7.5 10.5 L14.5 3.5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M12 10v4H4V6h4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>' };
-        }
-
-        constructor({ data, api }) {
-            this.api = api;
-            this.data = {
-                url: data?.url || '',
-                title: data?.title || '',
-                description: data?.description || '',
-                image: data?.image || '',
-                favicon: data?.favicon || '',
-                site_name: data?.site_name || '',
-                mode: data?.mode || 'card',  // card | mention
-            };
-            this.wrapper = null;
-        }
-
-        render() {
-            this.wrapper = document.createElement('div');
-            this.wrapper.className = 'mj-linkcard-tool';
-
-            if (this.data.title && this.data.url) {
-                this._renderCard();
-            } else {
-                this._renderInput();
-            }
-            return this.wrapper;
-        }
-
-        _renderInput() {
-            this.wrapper.innerHTML = '';
-            const inner = document.createElement('div');
-            inner.style.cssText = 'padding:14px;display:flex;gap:8px;align-items:center;';
-
-            const urlInput = document.createElement('input');
-            urlInput.type = 'url';
-            urlInput.className = 'mj-linkcard-tool__url-input';
-            urlInput.placeholder = 'URL을 입력하세요 (예: https://example.com)';
-            urlInput.value = this.data.url || '';
-            urlInput.style.cssText = 'flex:1;border:1px solid rgba(0,0,0,0.12);border-radius:10px;padding:8px 12px;font-size:13px;outline:none;background:#fafafa;';
-            urlInput.addEventListener('focus', () => { urlInput.style.borderColor = '#0066cc'; });
-            urlInput.addEventListener('blur', () => { urlInput.style.borderColor = 'rgba(0,0,0,0.12)'; });
-
-            // Cmd+Z / Ctrl+Z 가 undo 플러그인에 잡히지 않도록 버블링 차단
-            // → 브라우저 기본 input undo 동작이 살아남
-            urlInput.addEventListener('keydown', (e) => {
-                const isUndo = (e.metaKey || e.ctrlKey) && e.key === 'z';
-                const isRedo = (e.metaKey || e.ctrlKey) && (e.key === 'y' || (e.shiftKey && e.key === 'z'));
-                if (isUndo || isRedo) e.stopPropagation();
-            });
-
-            const fetchBtn = document.createElement('button');
-            fetchBtn.type = 'button';
-            fetchBtn.textContent = '미리보기 가져오기';
-            fetchBtn.style.cssText = 'flex-shrink:0;background:#0066cc;color:#fff;border:none;border-radius:10px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;';
-
-            const status = document.createElement('div');
-            status.style.cssText = 'padding:8px 14px;font-size:12px;color:#8e8e93;display:none;';
-
-            const doFetch = async () => {
-                const url = urlInput.value.trim();
-                if (!url) return;
-                this.data.url = url;
-
-                fetchBtn.disabled = true;
-                fetchBtn.textContent = '가져오는 중...';
-                status.style.display = 'block';
-                status.textContent = '';
-
-                try {
-                    const resp = await fetch(`${URL_PREVIEW_API}?url=${encodeURIComponent(url)}`);
-                    const json = await resp.json();
-                    if (json.error) throw new Error(json.error);
-
-                    this.data.title = json.title || url;
-                    this.data.description = json.description || '';
-                    this.data.image = json.image || '';
-                    this.data.favicon = json.favicon || '';
-                    this.data.site_name = json.site_name || '';
-                    this._renderCard();
-                } catch (err) {
-                    // 메타 없이 URL만 저장
-                    this.data.title = url;
-                    this._renderCard();
-                } finally {
-                    fetchBtn.disabled = false;
-                    fetchBtn.textContent = '미리보기 가져오기';
-                }
-            };
-
-            fetchBtn.addEventListener('click', doFetch);
-            urlInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') { e.preventDefault(); doFetch(); }
-            });
-
-            inner.appendChild(urlInput);
-            inner.appendChild(fetchBtn);
-            this.wrapper.appendChild(inner);
-            this.wrapper.appendChild(status);
-
-            window.setTimeout(() => urlInput.focus(), 0);
-        }
-
-        _renderCard() {
-            this.wrapper.innerHTML = '';
-            const d = this.data;
-
-            const modeBar = document.createElement('div');
-            modeBar.style.cssText = 'padding:10px 14px 6px;display:flex;gap:6px;align-items:center;';
-
-            const modeLabel = document.createElement('span');
-            modeLabel.textContent = '표시 방식:';
-            modeLabel.style.cssText = 'font-size:11px;color:#8e8e93;margin-right:4px;';
-
-            const modes = [{ key: 'card', label: '카드' }, { key: 'preview', label: '페이지미리보기' }, { key: 'mention', label: '멘션' }];
-            modes.forEach(({ key, label }) => {
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.textContent = label;
-                btn.dataset.mode = key;
-                btn.style.cssText = `border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;border:1px solid rgba(0,0,0,0.12);cursor:pointer;background:${d.mode === key ? '#0066cc' : '#fff'};color:${d.mode === key ? '#fff' : '#1d1d1f'};`;
-                btn.addEventListener('click', () => {
-                    d.mode = key;
-                    this._renderCard();
-                });
-                modeBar.appendChild(btn);
-            });
-
-            const editBtn = document.createElement('button');
-            editBtn.type = 'button';
-            editBtn.textContent = '✎ 수정';
-            editBtn.style.cssText = 'margin-left:auto;font-size:11px;color:#8e8e93;background:transparent;border:none;cursor:pointer;';
-            editBtn.addEventListener('click', () => this._renderInput());
-
-            modeBar.insertBefore(modeLabel, modeBar.firstChild);
-            modeBar.appendChild(editBtn);
-
-            let preview;
-            if (d.mode === 'mention') {
-                preview = document.createElement('div');
-                preview.className = 'mj-linkembed-tool';
-                preview.style.cssText = 'margin:0 14px 14px;';
-                preview.innerHTML = `<span>🔗</span><a href="${d.url}" target="_blank" rel="noopener">${d.title || d.url}</a>`;
-            } else if (d.mode === 'preview') {
-                // 페이지 미리보기: OG 이미지를 상단 전체넓비로, 하단에 정보
-                preview = document.createElement('a');
-                preview.href = d.url;
-                preview.target = '_blank';
-                preview.rel = 'noopener';
-                preview.style.cssText = 'display:block;text-decoration:none;';
-                if (d.image) {
-                    const coverImg = document.createElement('div');
-                    coverImg.style.cssText = 'width:100%;height:180px;overflow:hidden;background:#f5f5f7;';
-                    const img = document.createElement('img');
-                    img.src = d.image;
-                    img.alt = d.title || '';
-                    img.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-                    coverImg.appendChild(img);
-                    preview.appendChild(coverImg);
-                }
-                const infoBox = document.createElement('div');
-                infoBox.style.cssText = 'padding:14px 16px;';
-                const siteRow2 = document.createElement('div');
-                siteRow2.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:11px;color:#8e8e93;margin-bottom:4px;';
-                if (d.favicon) {
-                    const fav2 = document.createElement('img');
-                    fav2.src = d.favicon; fav2.width = 14; fav2.height = 14;
-                    fav2.style.borderRadius = '3px';
-                    siteRow2.appendChild(fav2);
-                }
-                const sn2 = document.createElement('span');
-                try { sn2.textContent = d.site_name || new URL(d.url).hostname.replace('www.', ''); } catch(_) { sn2.textContent = d.site_name || d.url; }
-                siteRow2.appendChild(sn2);
-                const t2 = document.createElement('div');
-                t2.style.cssText = 'font-size:16px;font-weight:700;color:#1d1d1f;';
-                t2.textContent = d.title || d.url;
-                const desc2 = document.createElement('div');
-                if (d.description) {
-                    desc2.style.cssText = 'margin-top:4px;font-size:13px;color:#6e6e73;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;';
-                    desc2.textContent = d.description;
-                }
-                const url2 = document.createElement('div');
-                url2.style.cssText = 'margin-top:8px;font-size:11px;color:#0066cc;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-                url2.textContent = d.url;
-                infoBox.appendChild(siteRow2);
-                infoBox.appendChild(t2);
-                if (d.description) infoBox.appendChild(desc2);
-                infoBox.appendChild(url2);
-                preview.appendChild(infoBox);
-            } else {
-                preview = document.createElement('a');
-                preview.className = 'mj-linkcard-preview';
-                preview.href = d.url;
-                preview.target = '_blank';
-                preview.rel = 'noopener';
-                preview.style.cssText = 'display:flex;text-decoration:none;margin:0 0 0 0;';
-
-                const body = document.createElement('div');
-                body.className = 'mj-linkcard-preview__body';
-
-                const siteRow = document.createElement('div');
-                siteRow.className = 'mj-linkcard-preview__site';
-                if (d.favicon) {
-                    const fav = document.createElement('img');
-                    fav.src = d.favicon;
-                    fav.width = 14;
-                    fav.height = 14;
-                    fav.style.borderRadius = '3px';
-                    siteRow.appendChild(fav);
-                }
-                const siteName = document.createElement('span');
-                siteName.textContent = d.site_name || new URL(d.url).hostname.replace('www.', '');
-                siteRow.appendChild(siteName);
-
-                const title = document.createElement('div');
-                title.className = 'mj-linkcard-preview__title';
-                title.textContent = d.title || d.url;
-
-                body.appendChild(siteRow);
-                body.appendChild(title);
-
-                if (d.description) {
-                    const desc = document.createElement('div');
-                    desc.className = 'mj-linkcard-preview__desc';
-                    desc.textContent = d.description;
-                    body.appendChild(desc);
-                }
-
-                const urlEl = document.createElement('div');
-                urlEl.className = 'mj-linkcard-preview__url';
-                urlEl.textContent = d.url;
-                body.appendChild(urlEl);
-
-                preview.appendChild(body);
-
-                if (d.image) {
-                    const imgWrap = document.createElement('div');
-                    imgWrap.className = 'mj-linkcard-preview__img';
-                    const img = document.createElement('img');
-                    img.src = d.image;
-                    img.alt = d.title || '';
-                    imgWrap.appendChild(img);
-                    preview.appendChild(imgWrap);
-                }
-            }
-
-            this.wrapper.appendChild(modeBar);
-            this.wrapper.appendChild(preview);
-        }
-
-        save() {
-            return { ...this.data };
-        }
-
-        validate(savedData) {
-            return Boolean(savedData?.url);
-        }
-
-        static get isReadOnlySupported() { return true; }
-    }
-
-    class MathTool {
-        static get toolbox() {
-            return { title: '수식', icon: TOOLBAR_ICON.math };
-        }
-
-        constructor({ data }) {
-            this.data = {
-                latex: data?.latex || data?.text || '',
-                displayMode: Boolean(data?.displayMode),
-            };
-            this.wrapper = null;
-            this.input = null;
-            this.preview = null;
-            this.error = null;
-            this.displayCheck = null;
-            this.uploadInput = null;
-            this.uploadBtn = null;
-            this.uploadStatus = null;
-        }
-
-        _normalizeLatex(raw) {
-            const s = String(raw || '').trim();
-            if (!s) return '';
-            return s
-                .replace(/([A-Za-z0-9])_([A-Za-z0-9])/g, '$1_{$2}')
-                .replace(/([A-Za-z0-9])\^([A-Za-z0-9])/g, '$1^{$2}');
-        }
-
-        _renderPreview() {
-            if (!this.preview) return;
-            const raw = this.input?.value || '';
-            const latex = this._normalizeLatex(raw);
-            if (!latex) {
-                this.preview.textContent = '미리보기';
-                if (this.error) this.error.textContent = '';
-                return;
-            }
-            if (typeof katex === 'undefined') {
-                this.preview.textContent = latex;
-                if (this.error) this.error.textContent = '';
-                return;
-            }
-            try {
-                katex.render(latex, this.preview, {
-                    throwOnError: true,
-                    displayMode: Boolean(this.displayCheck?.checked),
-                });
-                if (this.error) this.error.textContent = '';
-            } catch (err) {
-                this.preview.textContent = latex;
-                if (this.error) this.error.textContent = `수식 오류: ${err.message || '입력을 확인해 주세요.'}`;
-            }
-        }
-
-        render() {
-            this.wrapper = document.createElement('div');
-            this.wrapper.className = 'mj-math-tool';
-
-            const row = document.createElement('div');
-            row.className = 'mj-math-tool__row';
-
-            this.input = document.createElement('input');
-            this.input.type = 'text';
-            this.input.className = 'mj-math-tool__input';
-            this.input.placeholder = '예: q_u, x^2, \\frac{a}{b}, \\int_0^1 x dx';
-            this.input.value = this.data.latex || '';
-
-            const hint = document.createElement('span');
-            hint.className = 'mj-math-tool__hint';
-            hint.textContent = 'q_u / x^2 자동 보정';
-
-            const checkLabel = document.createElement('label');
-            checkLabel.className = 'mj-math-tool__hint';
-            checkLabel.style.cursor = 'pointer';
-            this.displayCheck = document.createElement('input');
-            this.displayCheck.type = 'checkbox';
-            this.displayCheck.checked = this.data.displayMode;
-            this.displayCheck.style.marginRight = '4px';
-            checkLabel.appendChild(this.displayCheck);
-            checkLabel.appendChild(document.createTextNode('블록 수식'));
-
-            this.uploadBtn = document.createElement('button');
-            this.uploadBtn.type = 'button';
-            this.uploadBtn.className = 'mj-image-tool__cover-btn';
-            this.uploadBtn.textContent = '수식 이미지 OCR';
-
-            this.uploadInput = document.createElement('input');
-            this.uploadInput.type = 'file';
-            this.uploadInput.accept = 'image/*';
-            this.uploadInput.style.display = 'none';
-
-            this.uploadStatus = document.createElement('span');
-            this.uploadStatus.className = 'mj-math-tool__hint';
-
-            row.appendChild(this.input);
-            row.appendChild(hint);
-            row.appendChild(checkLabel);
-            row.appendChild(this.uploadBtn);
-            row.appendChild(this.uploadInput);
-            row.appendChild(this.uploadStatus);
-
-            this.preview = document.createElement('div');
-            this.preview.className = 'mj-math-tool__preview';
-
-            this.error = document.createElement('div');
-            this.error.className = 'mj-math-tool__error';
-
-            this.input.addEventListener('input', () => this._renderPreview());
-            this.displayCheck.addEventListener('change', () => this._renderPreview());
-            this.uploadBtn.addEventListener('click', () => this.uploadInput?.click());
-            this.uploadInput.addEventListener('change', async () => {
-                const file = this.uploadInput?.files?.[0];
-                if (!file) return;
-
-                this.uploadBtn.disabled = true;
-                this.uploadStatus.textContent = '인식 중...';
-                if (this.error) this.error.textContent = '';
-
-                try {
-                    const fd = new FormData();
-                    fd.append('image', file);
-                    const resp = await fetch(MATH_OCR_API, {
-                        method: 'POST',
-                        body: fd,
-                        headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
-                        credentials: 'same-origin',
-                    });
-                    const json = await resp.json();
-                    if (json.error) {
-                        this.uploadStatus.textContent = '인식 실패';
-                        if (this.error) this.error.textContent = json.error;
-                        return;
-                    }
-                    this.input.value = json.latex || '';
-                    this.uploadStatus.textContent = json.latex ? '완료' : '결과 없음';
-                    this._renderPreview();
-                } catch (_) {
-                    this.uploadStatus.textContent = '인식 실패';
-                    if (this.error) this.error.textContent = '수식 OCR 호출 중 오류가 발생했습니다.';
-                } finally {
-                    this.uploadBtn.disabled = false;
-                    this.uploadInput.value = '';
-                }
-            });
-
-            this.wrapper.appendChild(row);
-            this.wrapper.appendChild(this.preview);
-            this.wrapper.appendChild(this.error);
-
-            this._renderPreview();
-            window.setTimeout(() => this.input?.focus(), 0);
-            return this.wrapper;
-        }
-
-        save() {
-            const latex = this._normalizeLatex(this.input?.value || '');
-            return {
-                latex,
-                displayMode: Boolean(this.displayCheck?.checked),
-            };
-        }
-
-        validate(savedData) {
-            return Boolean(savedData?.latex);
-        }
-
-        static get isReadOnlySupported() {
-            return true;
-        }
-    }
-
-    const editor = new EditorJS({
-        holder: 'editor',
-        autofocus: true,
-        placeholder: '여기에 글을 작성하세요...',
-        data: parseInitialData(),
-        tools: {
-            header: { class: KoreanHeader, inlineToolbar: true, config: { levels: [1, 2, 3], defaultLevel: 2 } },
-            h1: { class: KoreanHeader1, inlineToolbar: true, config: { levels: [1], defaultLevel: 1 } },
-            h2: { class: KoreanHeader2, inlineToolbar: true, config: { levels: [2], defaultLevel: 2 } },
-            h3: { class: KoreanHeader3, inlineToolbar: true, config: { levels: [3], defaultLevel: 3 } },
-            list: { class: KoreanList, inlineToolbar: true },
-            checklist: { class: KoreanChecklist, inlineToolbar: true },
-            quote: { class: KoreanQuote, inlineToolbar: true },
-            delimiter: { class: LineDelimiterTool },
-            code: KoreanCode,
-            table: { class: KoreanTable, inlineToolbar: true },
-            toggle: { class: ToggleTool, inlineToolbar: true },
-            image: { class: ImageTool, inlineToolbar: true },
-            linkcard: { class: LinkCardTool },
-            math: { class: MathTool },
-        },
-        onChange: () => {
-            if (isApplyingHistory) return;
-            clearTimeout(historyTimer);
-            historyTimer = setTimeout(async () => {
-                try {
-                    const output = await editor.save();
-                    const snapshot = JSON.stringify(output);
-                    if (editorHistoryIndex >= 0 && editorHistory[editorHistoryIndex] === snapshot) return;
-
-                    if (editorHistoryIndex < editorHistory.length - 1) {
-                        editorHistory = editorHistory.slice(0, editorHistoryIndex + 1);
-                    }
-
-                    editorHistory.push(snapshot);
-                    if (editorHistory.length > 120) {
-                        editorHistory.shift();
-                    }
-                    editorHistoryIndex = editorHistory.length - 1;
-                } catch (_) {
-                    // ignore snapshot errors
-                }
-            }, 220);
-        },
-        onReady: () => {
-            // Undo/Redo 플러그인 (Cmd+Z / Ctrl+Z, Cmd+Shift+Z / Ctrl+Y)
-            if (typeof Undo !== 'undefined') {
-                editorUndo = new Undo({ editor });
-            }
-
-            // 초기 히스토리 스냅샷
-            setTimeout(async () => {
-                try {
-                    const initial = await editor.save();
-                    editorHistory = [JSON.stringify(initial)];
-                    editorHistoryIndex = 0;
-                } catch (_) {
-                    editorHistory = [];
-                    editorHistoryIndex = -1;
-                }
-            }, 0);
-
-            const holder = document.getElementById('editor');
-            let isConverting = false;
-            let convertTimer = null;
-
-            // 현재 포커스된 paragraph 블록 정보 반환
-            const getFocusedParaInfo = () => {
-                // .ce-block--focused 우선, 없으면 activeElement 기반
-                let paraEl = holder.querySelector('.ce-block--focused .ce-paragraph');
-                if (!paraEl) {
-                    const act = document.activeElement;
-                    const blk = act ? act.closest('.ce-block') : null;
-                    paraEl = blk ? blk.querySelector('.ce-paragraph') : null;
-                }
-                if (!paraEl) return null;
-
-                const blockEl = paraEl.closest('.ce-block');
-                if (!blockEl) return null;
-                const idx = Array.from(holder.querySelectorAll('.ce-block')).indexOf(blockEl);
-                if (idx < 0) return null;
-
-                const raw = (paraEl.textContent || '')
-                    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-                    .replace(/\u00A0/g, ' ');
-
-                return { idx, raw, paraEl };
-            };
-
-            // 텍스트 패턴 → 커맨드 매핑 (공백 포함 패턴만, prefix-only 제외)
-            const parseShortcut = (raw) => {
-                const s = (raw || '').trimStart();
-                if (s.startsWith('## ')) return { command: 'h2', text: s.slice(3).trimStart() };
-                if (s.startsWith('### ')) return { command: 'h3', text: s.slice(4).trimStart() };
-                if (s.startsWith('# '))  return { command: 'h1', text: s.slice(2).trimStart() };
-                if (s.startsWith('- '))  return { command: 'list', text: s.slice(2).trimStart() };
-                if (s.startsWith('* '))  return { command: 'list', text: s.slice(2).trimStart() };
-                if (s.startsWith('> '))  return { command: 'quote', text: s.slice(2).trimStart() };
-                if (s.startsWith('/제목1 ')) return { command: 'h1', text: s.slice(5).trimStart() };
-                if (s.startsWith('/제목2 ')) return { command: 'h2', text: s.slice(5).trimStart() };
-                if (s.startsWith('/제목3 ')) return { command: 'h3', text: s.slice(5).trimStart() };
-                if (s.startsWith('/h1 ')) return { command: 'h1', text: s.slice(4).trimStart() };
-                if (s.startsWith('/h2 ')) return { command: 'h2', text: s.slice(4).trimStart() };
-                if (s.startsWith('/h3 ')) return { command: 'h3', text: s.slice(4).trimStart() };
-                if (s.startsWith('/todo ')) return { command: 'todo', text: s.slice(6).trimStart() };
-                if (s.startsWith('/표 ')) return { command: 'table', text: s.slice(3).trimStart() };
-                if (s.startsWith('/토글 ')) return { command: 'toggle', text: s.slice(4).trimStart() };
-                if (s.startsWith('/이미지 ')) return { command: 'image', text: s.slice(5).trimStart() };
-                if (s.startsWith('/수식 ')) return { command: 'math', text: s.slice(4).trimStart() };
-                if (s.startsWith('/math ')) return { command: 'math', text: s.slice(6).trimStart() };
-                if (s.startsWith('/코드 ')) return { command: 'code', text: s.slice(4).trimStart() };
-                if (s.startsWith('/링크 ')) return { command: 'linkcard', text: s.slice(4).trimStart() };
-                const t = s.trim();
-                if (t === '/divider' || t === '/구분선') return { command: 'divider', text: '' };
-                if (t === '/표') return { command: 'table', text: '' };
-                if (t === '/토글') return { command: 'toggle', text: '' };
-                if (t === '/이미지') return { command: 'image', text: '' };
-                if (t === '/수식' || t === '/math') return { command: 'math', text: '' };
-                if (t === '/코드') return { command: 'code', text: '' };
-                if (t === '/링크') return { command: 'linkcard', text: '' };
-                return null;
-            };
-
-            // prefix-only 패턴 (Enter 전용)
-            const parsePrefixShortcut = (raw) => {
-                const t = (raw || '').trim();
-                if (t === '#')    return { command: 'h1', text: '' };
-                if (t === '##')   return { command: 'h2', text: '' };
-                if (t === '###')  return { command: 'h3', text: '' };
-                if (t === '-')    return { command: 'list', text: '' };
-                if (t === '>')    return { command: 'quote', text: '' };
-                if (t === '/h1')  return { command: 'h1', text: '' };
-                if (t === '/h2')  return { command: 'h2', text: '' };
-                if (t === '/h3')  return { command: 'h3', text: '' };
-                if (t === '/todo') return { command: 'todo', text: '' };
-                if (t === '/표') return { command: 'table', text: '' };
-                if (t === '/토글') return { command: 'toggle', text: '' };
-                if (t === '/이미지') return { command: 'image', text: '' };
-                if (t === '/수식' || t === '/math') return { command: 'math', text: '' };
-                return null;
-            };
-
-            const applyCommand = (idx, command, text = '') => {
-                if (idx < 0) return;
-                const blk = editor.blocks.getBlockByIndex(idx);
-                if (!blk || blk.name !== 'paragraph') return;
-
-                // 변환 중 플래그 — MutationObserver 재진입 방지
-                isConverting = true;
-                clearTimeout(convertTimer);
-
-                editor.blocks.delete(idx);
-
-                if (command === 'h1') {
-                    editor.blocks.insert('h1', { text, level: 1 }, undefined, idx, true);
-                } else if (command === 'h2') {
-                    editor.blocks.insert('h2', { text, level: 2 }, undefined, idx, true);
-                } else if (command === 'h3') {
-                    editor.blocks.insert('h3', { text, level: 3 }, undefined, idx, true);
-                } else if (command === 'list') {
-                    editor.blocks.insert('list', { style: 'unordered', items: [text || ''] }, undefined, idx, true);
-                } else if (command === 'quote') {
-                    editor.blocks.insert('quote', { text, caption: '' }, undefined, idx, true);
-                } else if (command === 'todo') {
-                    editor.blocks.insert('checklist', { items: [{ text: text || '', checked: false }] }, undefined, idx, true);
-                } else if (command === 'table') {
-                    editor.blocks.insert('table', {
-                        withHeadings: false,
-                        content: [
-                            ['', ''],
-                            ['', ''],
-                        ],
-                    }, undefined, idx, true);
-                } else if (command === 'toggle') {
-                    editor.blocks.insert('toggle', { title: text || '토글 제목', items: ['토글 내용을 작성하세요.'] }, undefined, idx, true);
-                } else if (command === 'image') {
-                    editor.blocks.insert('image', { url: text || '', caption: '', alt: '' }, undefined, idx, true);
-                } else if (command === 'math') {
-                    editor.blocks.insert('math', { latex: text || '' }, undefined, idx, true);
-                } else if (command === 'divider') {
-                    editor.blocks.insert('delimiter', {}, undefined, idx, false);
-                    editor.blocks.insert('paragraph', { text: '' }, undefined, idx + 1, true);
-                } else if (command === 'code') {
-                    editor.blocks.insert('code', { code: text || '' }, undefined, idx, true);
-                } else if (command === 'linkcard') {
-                    editor.blocks.insert('linkcard', { url: text || '' }, undefined, idx, true);
-                }
-
-                // 변환 후 커서를 해당 블록으로 명시적 이동
-                window.requestAnimationFrame(() => {
-                    if (command === 'toggle') {
-                        const toggleTitle = holder.querySelector('.mj-toggle-tool__title');
-                        if (toggleTitle) toggleTitle.focus();
-                        return;
-                    }
-                    if (command === 'image') {
-                        const imageUrl = holder.querySelector('.mj-image-tool input[type="url"]');
-                        if (imageUrl) imageUrl.focus();
-                        return;
-                    }
-                    if (command === 'math') {
-                        const mathInput = holder.querySelector('.mj-math-tool__input');
-                        if (mathInput) mathInput.focus();
-                        return;
-                    }
-                    if (command === 'linkcard') {
-                        const lcInput = holder.querySelector('.mj-linkcard-tool__url-input');
-                        if (lcInput) lcInput.focus();
-                        return;
-                    }
-                    if (command === 'table' || command === 'code') return;
-                    try { editor.caret.setToBlock(idx, 'end'); } catch (_) {}
-                });
-
-                // 변환 완료 후 플래그 해제 (충분한 딜레이)
-                convertTimer = setTimeout(() => { isConverting = false; }, 400);
-            };
-
-            const readClipboardImageAsDataUrl = (file) => new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(String(reader.result || ''));
-                reader.onerror = () => reject(reader.error || new Error('이미지를 읽을 수 없습니다.'));
-                reader.readAsDataURL(file);
-            });
-
-            const insertClipboardImage = async (file) => {
-                if (!file || !file.type || !file.type.startsWith('image/')) return;
-                const info = getFocusedParaInfo();
-                if (!info) return;
-
-                isConverting = true;
-                clearTimeout(convertTimer);
-
-                let targetIndex = info.idx + 1;
-                if ((info.raw || '').trim() === '') {
-                    editor.blocks.delete(info.idx);
-                    targetIndex = info.idx;
-                }
-
-                const dataUrl = await readClipboardImageAsDataUrl(file);
-                editor.blocks.insert('image', {
-                    url: dataUrl,
-                    caption: '',
-                    alt: file.name || '',
-                }, undefined, targetIndex, true);
-                editor.blocks.insert('paragraph', { text: '' }, undefined, targetIndex + 1, true);
-
-                window.requestAnimationFrame(() => {
-                    try { editor.caret.setToBlock(targetIndex + 1, 'end'); } catch (_) {}
-                });
-
-                convertTimer = setTimeout(() => { isConverting = false; }, 400);
-            };
-
-            // ── URL 임베드 피커 ─────────────────────────────────
-            let _pendingUrl = null;
-            const _pickerEl = document.getElementById('mj-url-picker');
-            const _pickerUrlEl = document.getElementById('mj-url-picker-url');
-            const _pickerCancelEl = document.getElementById('mj-url-picker-cancel');
-
-            const _hideUrlPicker = () => {
-                _pickerEl.classList.remove('is-visible');
-                _pendingUrl = null;
-            };
-
-            const _showUrlPicker = (url, info) => {
-                _pickerUrlEl.textContent = url.length > 60 ? url.slice(0, 57) + '...' : url;
-                // 코너 클리핑 망기 (editor 중앙 상단)
-                const editorRect = holder.getBoundingClientRect();
-                _pickerEl.style.left = (editorRect.left + editorRect.width / 2 - 160) + 'px';
-                _pickerEl.style.top = (window.scrollY + editorRect.top + 40) + 'px';
-                _pickerEl.classList.add('is-visible');
-            };
-
-            _pickerCancelEl.addEventListener('click', _hideUrlPicker);
-
-            _pickerEl.querySelectorAll('.mj-url-picker__opt').forEach((btn) => {
-                btn.addEventListener('click', async () => {
-                    if (!_pendingUrl) { _hideUrlPicker(); return; }
-                    const { text: url, info } = _pendingUrl;
-                    const mode = btn.dataset.mode;
-                    _hideUrlPicker();
-
-                    isConverting = true;
-                    clearTimeout(convertTimer);
-
-                    // 빈 paragraph이면 삭제
-                    const targetIdx = info.idx;
-                    if ((info.raw || '').trim() === '') {
-                        editor.blocks.delete(targetIdx);
-                    }
-
-                    if (mode === 'mention') {
-                        editor.blocks.insert('paragraph', { text: `<a href="${url}">${url}</a>` }, undefined, targetIdx, true);
-                    } else {
-                        // card 또는 preview: linkcard 블록 삽입, 다음에 fetch
-                        editor.blocks.insert('linkcard', { url, mode: mode === 'preview' ? 'preview' : 'card' }, undefined, targetIdx, true);
-                        // 자동으로 OG 데이터 fetch
-                        try {
-                            const resp = await fetch(`${URL_PREVIEW_API}?url=${encodeURIComponent(url)}`);
-                            const json = await resp.json();
-                            if (!json.error) {
-                                const blk = editor.blocks.getBlockByIndex(targetIdx);
-                                if (blk) {
-                                    // 블록을 새 데이터로 교체
-                                    editor.blocks.delete(targetIdx);
-                                    editor.blocks.insert('linkcard', {
-                                        url,
-                                        title: json.title || url,
-                                        description: json.description || '',
-                                        image: json.image || '',
-                                        favicon: json.favicon || '',
-                                        site_name: json.site_name || '',
-                                        mode: mode === 'preview' ? 'preview' : 'card',
-                                    }, undefined, targetIdx, true);
-                                }
-                            }
-                        } catch (_) {}
-                    }
-
-                    convertTimer = setTimeout(() => { isConverting = false; }, 400);
-                });
-            });
-
-            // ESC로 피커 닫기
-            document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape' && _pickerEl.classList.contains('is-visible')) {
-                    e.preventDefault();
-                    _hideUrlPicker();
-                }
-            });
-
-            // ── MutationObserver: 공백 입력 패턴 감지 ──────────────────
-            const observer = new MutationObserver(() => {
-                if (isConverting) return;
-                window.requestAnimationFrame(() => {
-                    if (isConverting) return;
-                    const info = getFocusedParaInfo();
-                    if (!info) return;
-                    const sc = parseShortcut(info.raw);
-                    if (sc) applyCommand(info.idx, sc.command, sc.text);
-                });
-            });
-
-            observer.observe(holder, { subtree: true, childList: true, characterData: true });
-
-            holder.addEventListener('paste', async (e) => {
-                if (isConverting) return;
-                const items = Array.from(e.clipboardData?.items || []);
-                const imageItem = items.find((item) => item.kind === 'file' && item.type.startsWith('image/'));
-                if (!imageItem) {
-                    // URL 임베드 감지
-                    const text = e.clipboardData?.getData('text/plain')?.trim() || '';
-                    if (/^https?:\/\/\S+$/i.test(text)) {
-                        const info = getFocusedParaInfo();
-                        if (info && (info.raw || '').trim() === '') {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            _pendingUrl = { text, info };
-                            _showUrlPicker(text, info);
-                            return;
-                        }
-                    }
-                    return;
-                }
-
-                const file = imageItem.getAsFile();
-                if (!file) return;
-
-                e.preventDefault();
-                e.stopPropagation();
-
-                try {
-                    await insertClipboardImage(file);
-                } catch (err) {
-                    console.error(err);
-                }
-            }, true);
-
-            // ── keydown: Enter 전용 (prefix-only 변환 + 일반 Enter 정상 동작) ──
-            holder.addEventListener('keydown', (e) => {
-                if (e.isComposing) return;
-                if (e.key !== 'Enter') return;
-                if (isConverting) return;
-
-                const info = getFocusedParaInfo();
-                if (!info) return;
-
-                const sc = parsePrefixShortcut(info.raw);
-                if (!sc) return; // 패턴 없으면 Editor.js 기본 Enter 동작
-
-                e.preventDefault();
-                e.stopPropagation();
-                applyCommand(info.idx, sc.command, sc.text);
-            }, true);
-        },
-    });
-
-    const isNativeInput = (el) => {
-        if (!el) return false;
-        const tag = (el.tagName || '').toLowerCase();
-        if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
-        return false;
-    };
-
-    const isSelectionInsideEditor = () => {
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return false;
-        const range = sel.getRangeAt(0);
-        return !!editorHolder?.contains(range.commonAncestorContainer);
-    };
-
-    document.addEventListener('keydown', (e) => {
-        const key = (e.key || '').toLowerCase();
-        const isUndo = (e.metaKey || e.ctrlKey) && !e.shiftKey && key === 'z';
-        const isRedo = (e.metaKey || e.ctrlKey) && (key === 'y' || (e.shiftKey && key === 'z'));
-        if (!isUndo && !isRedo) return;
-
-        const active = document.activeElement;
-        if (isNativeInput(active)) return;
-
-        if (!isSelectionInsideEditor()) return;
-
-        e.preventDefault();
-        e.stopPropagation();
-
-        const applyHistoryAt = async (nextIndex) => {
-            if (nextIndex < 0 || nextIndex >= editorHistory.length) return false;
-            const raw = editorHistory[nextIndex];
-            if (!raw) return false;
-            try {
-                const parsed = JSON.parse(raw);
-                isApplyingHistory = true;
-                await editor.blocks.render(parsed);
-                editorHistoryIndex = nextIndex;
-                setTimeout(() => { isApplyingHistory = false; }, 0);
-                return true;
-            } catch (_) {
-                isApplyingHistory = false;
-                return false;
-            }
-        };
-
-        // 1순위: 로컬 히스토리 (이미지/링크 블록 포함)
-        if (isUndo) {
-            applyHistoryAt(editorHistoryIndex - 1).then((ok) => {
-                if (ok) return;
-                try {
-                    if (editorUndo && typeof editorUndo.undo === 'function') {
-                        editorUndo.undo();
-                        return;
-                    }
-                    document.execCommand('undo');
-                } catch (_) {}
-            });
-            return;
-        }
-
-        if (isRedo) {
-            applyHistoryAt(editorHistoryIndex + 1).then((ok) => {
-                if (ok) return;
-                try {
-                    if (editorUndo && typeof editorUndo.redo === 'function') {
-                        editorUndo.redo();
-                        return;
-                    }
-                    document.execCommand('redo');
-                } catch (_) {}
-            });
-            return;
-        }
-
-    }, true);
-
-    const applyFont = () => {
-        const fontFamily = fontSelect.value;
-        const zone = document.querySelector('.codex-editor');
-        if (zone) zone.style.fontFamily = fontFamily;
-    };
-    fontSelect.addEventListener('change', applyFont);
-    setTimeout(applyFont, 0);
-
-    let inlineStyleRange = null;
-    const editorHolder = document.getElementById('editor');
-
-    const hideInlineStyleBubble = () => {
-        inlineStyleBubble?.classList.remove('is-visible');
-    };
-
-    const isRangeInsideEditor = (range) => {
-        if (!range || !editorHolder) return false;
-        return editorHolder.contains(range.commonAncestorContainer);
-    };
-
-    const updateInlineStyleBubble = () => {
-        if (!inlineStyleBubble) return;
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
-            hideInlineStyleBubble();
-            return;
-        }
-        const range = sel.getRangeAt(0);
-        if (!isRangeInsideEditor(range)) {
-            hideInlineStyleBubble();
-            return;
-        }
-
-        inlineStyleRange = range.cloneRange();
-
-        const rect = range.getBoundingClientRect();
-        if (!rect || (!rect.width && !rect.height)) {
-            hideInlineStyleBubble();
-            return;
-        }
-
-        const bubbleW = inlineStyleBubble.offsetWidth || 330;
-        const left = Math.max(8, Math.min(window.innerWidth - bubbleW - 8, rect.left + rect.width / 2 - bubbleW / 2));
-        const top = Math.max(8, rect.top - 46);
-        inlineStyleBubble.style.left = `${left}px`;
-        inlineStyleBubble.style.top = `${top}px`;
-        inlineStyleBubble.classList.add('is-visible');
-    };
-
-    const applyInlineStyle = (action, value) => {
-        const sel = window.getSelection();
-        if (!sel) return;
-
-        let targetRange = null;
-        if (sel.rangeCount > 0 && !sel.isCollapsed) {
-            targetRange = sel.getRangeAt(0);
-        } else if (inlineStyleRange) {
-            targetRange = inlineStyleRange;
-            sel.removeAllRanges();
-            sel.addRange(targetRange);
-        }
-
-        if (!targetRange || targetRange.collapsed || !isRangeInsideEditor(targetRange)) return;
-
-        // Editor.js contentEditable에 직접 적용 (브라우저 기본 동작)
-        document.execCommand(action, false, value);
-        inlineStyleRange = sel.rangeCount ? sel.getRangeAt(0).cloneRange() : inlineStyleRange;
-        window.requestAnimationFrame(updateInlineStyleBubble);
-    };
-
-    document.addEventListener('selectionchange', () => {
-        window.requestAnimationFrame(updateInlineStyleBubble);
-    });
-
-    document.addEventListener('scroll', () => {
-        if (inlineStyleBubble?.classList.contains('is-visible')) {
-            window.requestAnimationFrame(updateInlineStyleBubble);
-        }
-    }, true);
-
-    window.addEventListener('resize', () => {
-        if (inlineStyleBubble?.classList.contains('is-visible')) {
-            window.requestAnimationFrame(updateInlineStyleBubble);
-        }
-    });
-
-    document.addEventListener('mousedown', (e) => {
-        if (!inlineStyleBubble?.classList.contains('is-visible')) return;
-        const t = e.target;
-        if (inlineStyleBubble.contains(t) || editorHolder?.contains(t)) return;
-        hideInlineStyleBubble();
-    });
-
-    inlineFontFamily?.addEventListener('change', () => {
-        if (!inlineFontFamily.value) return;
-        applyInlineStyle('fontName', inlineFontFamily.value);
-        inlineFontFamily.value = '';
-    });
-
-    inlineTextColor?.addEventListener('input', () => {
-        applyInlineStyle('foreColor', inlineTextColor.value);
-    });
-
-    inlineBgColor?.addEventListener('input', () => {
-        applyInlineStyle('hiliteColor', inlineBgColor.value);
-    });
-
-    inlineClearStyleBtn?.addEventListener('click', () => {
-        applyInlineStyle('removeFormat');
-    });
-
-    inlineBoldBtn?.addEventListener('click', () => {
-        applyInlineStyle('bold');
-    });
-
-    inlineItalicBtn?.addEventListener('click', () => {
-        applyInlineStyle('italic');
-    });
-
-    inlineLinkBtn?.addEventListener('click', () => {
-        const url = window.prompt('링크 URL을 입력하세요', 'https://');
-        if (!url) return;
-        applyInlineStyle('createLink', url.trim());
-    });
-
-    const bindColorPickerTrigger = (labelEl, inputEl) => {
-        if (!labelEl || !inputEl) return;
-        const open = () => {
-            try { inputEl.focus({ preventScroll: true }); } catch (_) {}
-            if (typeof inputEl.showPicker === 'function') {
-                inputEl.showPicker();
-            } else {
-                inputEl.click();
-            }
-        };
-        labelEl.addEventListener('pointerdown', (e) => {
-            if (e.target === inputEl) return;
-            e.preventDefault();
-            e.stopPropagation();
-            open();
-        });
-        labelEl.addEventListener('click', (e) => {
-            if (e.target === inputEl) return;
-            e.preventDefault();
-            open();
-        });
-        labelEl.addEventListener('keydown', (e) => {
-            if (e.key !== 'Enter' && e.key !== ' ') return;
-            e.preventDefault();
-            open();
-        });
-    };
-
-    bindColorPickerTrigger(inlineTextColorLabel, inlineTextColor);
-    bindColorPickerTrigger(inlineBgColorLabel, inlineBgColor);
-
-    const normalizeArrowInText = (value) => String(value || '').replace(/->/g, '→');
-
-    const normalizeTextualFields = (output) => {
-        if (!output || !Array.isArray(output.blocks)) return output;
-        output.blocks.forEach((block) => {
-            const data = block?.data;
-            if (!data || typeof data !== 'object') return;
-
-            ['text', 'title', 'caption', 'alt', 'code', 'latex', 'html'].forEach((k) => {
-                if (typeof data[k] === 'string') data[k] = normalizeArrowInText(data[k]);
-            });
-
-            if (Array.isArray(data.items)) {
-                data.items = data.items.map((item) => {
-                    if (typeof item === 'string') return normalizeArrowInText(item);
-                    if (item && typeof item === 'object') {
-                        if (typeof item.text === 'string') item.text = normalizeArrowInText(item.text);
-                        if (typeof item.content === 'string') item.content = normalizeArrowInText(item.content);
-                    }
-                    return item;
-                });
-            }
-        });
-        return output;
-    };
-
-    const preserveInlineStyledHtml = (output) => {
-        if (!output || !Array.isArray(output.blocks)) return output;
-        output.blocks.forEach((block, idx) => {
-            const type = block?.type;
-            if (!['paragraph', 'header', 'h1', 'h2', 'h3', 'quote'].includes(type)) return;
-            const blockApi = editor.blocks.getBlockByIndex(idx);
-            const holder = blockApi?.holder;
-            if (!holder) return;
-            const richEl = holder.querySelector('.ce-paragraph, .ce-header, .cdx-quote__text');
-            const html = richEl?.innerHTML?.trim();
-            if (!html) return;
-            block.data = block.data || {};
-            block.data.html = html;
-            block.data.text = html;
-        });
-        return output;
-    };
-
-    const storageScope = (() => {
-        const draftId = (document.getElementById('draft_id')?.value || '').trim() || 'new';
-        const mode = "{{ editor_mode|default:'create' }}";
-        const path = location.pathname;
-        return `mj:blog:writer:${mode}:${path}:${draftId}`;
-    })();
-
-    let isDirty = false;
-    let autosaveTimer = null;
-
-    const setDirty = () => {
-        isDirty = true;
-    };
-
-    const collectSnapshot = async () => {
-        let output = await editor.save();
-        output = preserveInlineStyledHtml(output);
-        output = normalizeTextualFields(output);
-        return {
-            title: document.getElementById('title')?.value || '',
-            summary: document.getElementById('summary')?.value || '',
-            category: document.querySelector('select[name="category"]')?.value || '',
-            tags: document.getElementById('tags')?.value || '',
-            content: output,
-            savedAt: Date.now(),
-        };
-    };
-
-    const persistSnapshot = async () => {
-        try {
-            const snapshot = await collectSnapshot();
-            localStorage.setItem(storageScope, JSON.stringify(snapshot));
-        } catch (_) {
-            // ignore storage errors
-        }
-    };
-
-    const queueAutosave = () => {
-        setDirty();
-        clearTimeout(autosaveTimer);
-        autosaveTimer = setTimeout(() => {
-            persistSnapshot();
-        }, 900);
-    };
-
-    const applySnapshotToForm = (snapshot) => {
-        if (!snapshot || typeof snapshot !== 'object') return;
-
-        const titleEl = document.getElementById('title');
-        const summaryEl = document.getElementById('summary');
-        const tagsEl = document.getElementById('tags');
-        const categoryEl = document.querySelector('select[name="category"]');
-
-        if (titleEl && typeof snapshot.title === 'string') titleEl.value = snapshot.title;
-        if (summaryEl && typeof snapshot.summary === 'string') summaryEl.value = snapshot.summary;
-        if (tagsEl && typeof snapshot.tags === 'string') tagsEl.value = snapshot.tags;
-        if (categoryEl && typeof snapshot.category === 'string') categoryEl.value = snapshot.category;
-        if (snapshot.content && Array.isArray(snapshot.content.blocks)) {
-            contentInput.value = JSON.stringify(snapshot.content);
-        }
-    };
-
-    const tryRestoreSnapshot = async () => {
-        try {
-            const raw = localStorage.getItem(storageScope);
-            if (!raw) return;
-            const snapshot = JSON.parse(raw);
-            if (!snapshot || !snapshot.content) return;
-            const shouldRestore = window.confirm('이전 편집 내용이 있습니다. 복구할까요?');
-            if (!shouldRestore) return;
-            applySnapshotToForm(snapshot);
-            if (snapshot.content && Array.isArray(snapshot.content.blocks)) {
-                try {
-                    await editor.isReady;
-                    await editor.blocks.render(snapshot.content);
-                } catch (_) {
-                    // ignore render errors
-                }
-            }
-            setDirty();
-        } catch (_) {
-            // ignore parse errors
-        }
-    };
-
-    const clearSnapshot = () => {
-        try { localStorage.removeItem(storageScope); } catch (_) {}
-    };
-
-    window.addEventListener('beforeunload', (e) => {
-        if (!isDirty) return;
-        e.preventDefault();
-        e.returnValue = '';
-    });
-
-    tryRestoreSnapshot();
-
-    const syncContent = async () => {
-        let output = await editor.save();
-        output = preserveInlineStyledHtml(output);
-        output = normalizeTextualFields(output);
-        contentInput.value = JSON.stringify(output);
-    };
-
-    form.querySelectorAll('input, textarea, select').forEach((el) => {
-        el.addEventListener('input', queueAutosave);
-        el.addEventListener('change', queueAutosave);
-    });
-
-    const editorHolderWatch = document.getElementById('editor');
-    if (editorHolderWatch) {
-        editorHolderWatch.addEventListener('input', queueAutosave, true);
-        editorHolderWatch.addEventListener('paste', queueAutosave, true);
-        editorHolderWatch.addEventListener('click', queueAutosave, true);
-    }
 
     const showToast = (text, type = 'success') => {
         if (!toastContainer || !text) return;
         const item = document.createElement('div');
         item.className = `mj-toast ${type === 'error' ? 'is-error' : ''}`.trim();
-        item.innerHTML = `<div class="mj-toast__title">${type === 'error' ? '오류' : '알림'}</div><div>${text}</div>`;
+        const title = document.createElement('div');
+        title.className = 'mj-toast__title';
+        title.textContent = type === 'error' ? '오류' : '알림';
+        const body = document.createElement('div');
+        body.textContent = text;
+        item.append(title, body);
         toastContainer.appendChild(item);
         requestAnimationFrame(() => item.classList.add('is-visible'));
         setTimeout(() => {
@@ -2330,89 +331,140 @@
         });
     }
 
-    const openPublishModal = () => {
-        if (!publishConfirmModal) return;
-        publishConfirmModal.classList.add('is-visible');
-        publishConfirmModal.setAttribute('aria-hidden', 'false');
+    // ── 자동저장 (localStorage) ─────────────────────────────
+    const storageScope = (() => {
+        const draftId = (document.getElementById('draft_id')?.value || '').trim() || 'new';
+        const mode = "{{ editor_mode|default:'create' }}";
+        return `mj:blog:writer:${mode}:${location.pathname}:${draftId}`;
+    })();
+
+    let isDirty = false;
+    let autosaveTimer = null;
+
+    const queueAutosave = () => {
+        isDirty = true;
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => persistSnapshot(), 900);
     };
 
-    const closePublishModal = () => {
-        if (!publishConfirmModal) return;
-        publishConfirmModal.classList.remove('is-visible');
-        publishConfirmModal.setAttribute('aria-hidden', 'true');
-    };
-
-    publishConfirmModal?.addEventListener('click', (e) => {
-        const t = e.target;
-        if (t?.dataset?.modalClose === '1') closePublishModal();
+    const mj = window.MjEditor.create({
+        element: document.getElementById('editor'),
+        content: contentInput.value,
+        api: {
+            uploadUrl: "{% url 'blog:image_upload' %}",
+            urlPreviewUrl: "{% url 'blog:url_preview' %}",
+            mathOcrUrl: "{% url 'blog:math_ocr' %}",
+            csrfToken,
+        },
+        notify: showToast,
+        onChange: queueAutosave,
     });
-    publishModalCloseBtn?.addEventListener('click', closePublishModal);
-    publishModalCancelBtn?.addEventListener('click', closePublishModal);
+
+    const collectSnapshot = () => ({
+        title: document.getElementById('title')?.value || '',
+        summary: document.getElementById('summary')?.value || '',
+        category: document.querySelector('select[name="category"]')?.value || '',
+        tags: document.getElementById('tags')?.value || '',
+        content: mj.getContent(),
+        savedAt: Date.now(),
+    });
+
+    const persistSnapshot = () => {
+        try {
+            localStorage.setItem(storageScope, JSON.stringify(collectSnapshot()));
+        } catch (_) {
+            // ignore storage errors
+        }
+    };
+
+    const tryRestoreSnapshot = () => {
+        try {
+            const raw = localStorage.getItem(storageScope);
+            if (!raw) return;
+            const snapshot = JSON.parse(raw);
+            if (!snapshot || !snapshot.content) return;
+            if (!window.confirm('이전 편집 내용이 있습니다. 복구할까요?')) return;
+            const fields = { title: 'title', summary: 'summary', tags: 'tags' };
+            Object.entries(fields).forEach(([key, id]) => {
+                const el = document.getElementById(id);
+                if (el && typeof snapshot[key] === 'string') el.value = snapshot[key];
+            });
+            const categoryEl = document.querySelector('select[name="category"]');
+            if (categoryEl && typeof snapshot.category === 'string') categoryEl.value = snapshot.category;
+            mj.setContent(JSON.stringify(snapshot.content));
+            isDirty = true;
+        } catch (_) {
+            // ignore parse errors
+        }
+    };
+
+    // 저장 성공이 확인될 때까지 자동저장본을 지우지 않음 (base.html 에서 다른 페이지로 이동 확인 후 삭제)
+    const PENDING_CLEAR_KEY = 'mj:writer:pendingClear';
+    try { sessionStorage.removeItem(PENDING_CLEAR_KEY); } catch (_) {}
+    const markPendingClear = () => {
+        try {
+            sessionStorage.setItem(PENDING_CLEAR_KEY, JSON.stringify({ scope: storageScope, path: location.pathname }));
+        } catch (_) {}
+    };
+
+    tryRestoreSnapshot();
+
+    window.addEventListener('beforeunload', (e) => {
+        if (!isDirty) return;
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    form.querySelectorAll('input, textarea, select').forEach((el) => {
+        el.addEventListener('input', queueAutosave);
+        el.addEventListener('change', queueAutosave);
+    });
+
+    fontSelect?.addEventListener('change', () => mj.setFontFamily(fontSelect.value));
+    addBlockBtn?.addEventListener('click', () => mj.openBlockMenu());
+
+    // ── 저장 ───────────────────────────────────────────────
+    const syncContentOrWarn = async () => {
+        try {
+            contentInput.value = JSON.stringify(await mj.prepareForSave());
+            return true;
+        } catch (err) {
+            showToast(`이미지 업로드 실패로 저장하지 못했습니다: ${err.message}`, 'error');
+            return false;
+        }
+    };
+
+    const publishConfirmModal = document.getElementById('publish-confirm-modal');
+    const openPublishModal = () => {
+        publishConfirmModal?.classList.add('is-visible');
+        publishConfirmModal?.setAttribute('aria-hidden', 'false');
+    };
+    const closePublishModal = () => {
+        publishConfirmModal?.classList.remove('is-visible');
+        publishConfirmModal?.setAttribute('aria-hidden', 'true');
+    };
+    publishConfirmModal?.addEventListener('click', (e) => {
+        if (e.target?.dataset?.modalClose === '1') closePublishModal();
+    });
+    document.getElementById('publish-modal-close')?.addEventListener('click', closePublishModal);
+    document.getElementById('publish-modal-cancel')?.addEventListener('click', closePublishModal);
 
     let publishConfirmed = false;
-    publishModalConfirmBtn?.addEventListener('click', async () => {
+
+    document.getElementById('publish-modal-confirm')?.addEventListener('click', async () => {
         publishConfirmed = true;
         closePublishModal();
-        await syncContent();
-        clearSnapshot();
+        if (!(await syncContentOrWarn())) return;
+        persistSnapshot();
+        markPendingClear();
         isDirty = false;
         submitAction.value = 'publish';
         form.submit();
     });
 
-    slashButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const cmd = btn.dataset.cmd;
-            if (cmd === 'h1') {
-                editor.blocks.insert('h1', { text: '', level: 1 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'h2') {
-                editor.blocks.insert('h2', { text: '', level: 2 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'h3') {
-                editor.blocks.insert('h3', { text: '', level: 3 }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'todo') {
-                editor.blocks.insert('checklist', { items: [{ text: '', checked: false }] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'table') {
-                editor.blocks.insert('table', { withHeadings: false, content: [['', ''], ['', '']] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'divider') {
-                editor.blocks.insert('delimiter', {}, undefined, editor.blocks.getCurrentBlockIndex() + 1, false);
-                editor.blocks.insert('paragraph', { text: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 2, true);
-            } else if (cmd === 'toggle') {
-                editor.blocks.insert('toggle', { title: '토글 제목', items: ['토글 내용을 작성하세요.'] }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'image') {
-                editor.blocks.insert('image', { url: '', caption: '', alt: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'math') {
-                editor.blocks.insert('math', { latex: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'code') {
-                editor.blocks.insert('code', { code: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            } else if (cmd === 'link' || cmd === 'linkcard') {
-                editor.blocks.insert('linkcard', { url: '' }, undefined, editor.blocks.getCurrentBlockIndex() + 1, true);
-            }
-        });
-    });
-
-    blockButtons.forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const type = btn.dataset.block;
-            const at = editor.blocks.getCurrentBlockIndex() + 1;
-            if (type === 'paragraph') editor.blocks.insert('paragraph', { text: '' }, undefined, at, true);
-            if (type === 'h1') editor.blocks.insert('h1', { text: '', level: 1 }, undefined, at, true);
-            if (type === 'h2') editor.blocks.insert('h2', { text: '', level: 2 }, undefined, at, true);
-            if (type === 'h3') editor.blocks.insert('h3', { text: '', level: 3 }, undefined, at, true);
-            if (type === 'list') editor.blocks.insert('list', { style: 'unordered', items: [''] }, undefined, at, true);
-            if (type === 'checklist') editor.blocks.insert('checklist', { items: [{ text: '', checked: false }] }, undefined, at, true);
-            if (type === 'quote') editor.blocks.insert('quote', { text: '', caption: '' }, undefined, at, true);
-            if (type === 'code') editor.blocks.insert('code', { code: '' }, undefined, at, true);
-            if (type === 'table') editor.blocks.insert('table', { withHeadings: false, content: [['', ''], ['', '']] }, undefined, at, true);
-            if (type === 'toggle') editor.blocks.insert('toggle', { title: '', items: [''] }, undefined, at, true);
-            if (type === 'image') editor.blocks.insert('image', { url: '', caption: '', alt: '' }, undefined, at, true);
-            if (type === 'math') editor.blocks.insert('math', { latex: '' }, undefined, at, true);
-            if (type === 'divider') editor.blocks.insert('delimiter', {}, undefined, at, true);
-        });
-    });
-
     draftBtn.addEventListener('click', async () => {
-        await syncContent();
-        await persistSnapshot();
+        if (!(await syncContentOrWarn())) return;
+        persistSnapshot();
         publishConfirmed = false;
         submitAction.value = 'draft';
         showToast('임시저장 중...');
@@ -2420,8 +472,7 @@
         form.submit();
     });
 
-    publishBtn.addEventListener('click', async () => {
-        await syncContent();
+    publishBtn.addEventListener('click', () => {
         submitAction.value = 'publish';
         publishConfirmed = false;
         openPublishModal();
@@ -2429,22 +480,18 @@
 
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
-        await syncContent();
-
         if (submitAction.value !== 'draft' && !publishConfirmed) {
             openPublishModal();
             return;
         }
-
-        if (submitAction.value === 'draft') {
-            await persistSnapshot();
-        } else {
-            clearSnapshot();
+        if (!(await syncContentOrWarn())) return;
+        persistSnapshot();
+        if (submitAction.value !== 'draft') {
+            markPendingClear();
             isDirty = false;
         }
-
         form.submit();
     });
-})();
+});
 </script>
 {% endblock %}

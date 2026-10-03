@@ -168,6 +168,19 @@
     </button>
 
     <script>
+        // 글 저장 후 에디터가 아닌 페이지로 넘어왔다면 저장 성공 → 에디터 자동저장본 정리
+        (() => {
+            try {
+                const pending = JSON.parse(sessionStorage.getItem("mj:writer:pendingClear") || "null");
+                if (!pending || pending.path === location.pathname) return;
+                localStorage.removeItem(pending.scope);
+                sessionStorage.removeItem("mj:writer:pendingClear");
+            } catch (e) {
+                // ignore storage errors
+            }
+        })();
+    </script>
+    <script>
         (() => {
             const btn = document.getElementById("theme-toggle-btn");
             const icon = document.getElementById("theme-toggle-icon");

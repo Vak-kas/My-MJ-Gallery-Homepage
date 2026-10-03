@@ -1,0 +1,28 @@
+{
+  "name": "mj-editor",
+  "private": true,
+  "version": "1.0.0",
+  "description": "MjGallery 블로그 노션형 에디터 (Tiptap). 빌드 결과는 static/editor/ 에 커밋됨",
+  "scripts": {
+    "build": "esbuild src/index.js --bundle --minify --format=iife --target=es2020 --outfile=../../static/editor/mj-editor.js --alias:katex=./src/katex-shim.js",
+    "watch": "esbuild src/index.js --bundle --format=iife --target=es2020 --outfile=../../static/editor/mj-editor.js --alias:katex=./src/katex-shim.js --watch"
+  },
+  "dependencies": {
+    "@floating-ui/dom": "1.8.0",
+    "@tiptap/core": "3.31.4",
+    "@tiptap/extension-bubble-menu": "3.31.4",
+    "@tiptap/extension-details": "3.31.4",
+    "@tiptap/extension-drag-handle": "3.31.4",
+    "@tiptap/extension-list": "3.31.4",
+    "@tiptap/extension-mathematics": "3.31.4",
+    "@tiptap/extension-table": "3.31.4",
+    "@tiptap/extension-text-style": "3.31.4",
+    "@tiptap/extensions": "3.31.4",
+    "@tiptap/pm": "3.31.4",
+    "@tiptap/starter-kit": "3.31.4",
+    "@tiptap/suggestion": "3.31.4"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}
