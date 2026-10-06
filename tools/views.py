@@ -11,3 +11,7 @@ def index(request):
 
 def duplex(request):
 	return render(request, "tools/duplex.html")
+
+
+def subnet(request):
+	return render(request, "tools/subnet.html")
