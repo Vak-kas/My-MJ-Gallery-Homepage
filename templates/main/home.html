@@ -6,9 +6,10 @@
     <nav class="mx-auto flex w-full max-w-[1320px] items-center justify-between rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur">
         <a href="{% url 'main:home' %}" class="quick-nav-link rounded-full border border-transparent px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-white/20">MJ GALLERY</a>
 
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
             <a href="{% url 'main:home' %}" id="home-link" aria-current="page" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-white/20">Home</a>
             <a href="{% url 'blog:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Blog</a>
+            <a href="{% url 'tools:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Tool</a>
 
             {% if user.is_authenticated %}
                 {% if user.is_superuser %}

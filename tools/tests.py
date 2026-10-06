@@ -19,3 +19,7 @@ class ToolPagesTests(TestCase):
 	def test_nav_has_tool_link(self):
 		resp = self.client.get(reverse("tools:index"))
 		self.assertContains(resp, f'href="{reverse("tools:index")}"')
+
+	def test_home_quick_nav_has_tool_link(self):
+		resp = self.client.get(reverse("main:home"))
+		self.assertContains(resp, f'href="{reverse("tools:index")}"')
