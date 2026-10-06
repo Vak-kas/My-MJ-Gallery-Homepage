@@ -15,3 +15,7 @@ def duplex(request):
 
 def subnet(request):
 	return render(request, "tools/subnet.html")
+
+
+def speedtest(request):
+	return render(request, "tools/speedtest.html")

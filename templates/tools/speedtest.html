@@ -1,0 +1,440 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .st-gauge-value { font-variant-numeric: tabular-nums; }
+    .st-chart line.grid { stroke: rgba(0, 0, 0, 0.06); }
+    .st-chart text { fill: #8e8e93; font-size: 10px; }
+    .st-progress { height: 4px; border-radius: 999px; background: #f2f2f7; overflow: hidden; }
+    .st-progress > span { display: block; height: 100%; width: 0; background: #0066cc; transition: width 0.2s linear; }
+    .st-phase { color: #8e8e93; }
+    .st-phase.is-active { color: #0066cc; font-weight: 600; }
+    .st-phase.is-done { color: #1d1d1f; }
+    html.theme-dark .st-chart line.grid { stroke: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .st-progress { background: #2a2a2e; }
+    html.theme-dark .st-phase.is-done { color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · LIVE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Speed Test.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            지금 쓰는 인터넷으로 이 사이트 서버와 실제 데이터를 주고받아 지연(ping), 다운로드, 업로드 속도를 측정합니다.
+        </p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
+                <span class="st-phase" data-phase="ping">① 지연</span>
+                <span class="st-phase" data-phase="download">② 다운로드</span>
+                <span class="st-phase" data-phase="upload">③ 업로드</span>
+            </div>
+
+            <div class="mt-6 flex flex-wrap items-end gap-x-3">
+                <span id="st-value" class="st-gauge-value text-[64px] font-semibold leading-none tracking-[-0.03em] text-[#1d1d1f]">0</span>
+                <span id="st-unit" class="pb-2 text-[18px] text-[#6e6e73]">Mbps</span>
+            </div>
+            <p id="st-status" class="mt-2 min-h-[20px] text-[13px] text-[#6e6e73]">시작 버튼을 누르면 측정을 시작합니다. (약 20초)</p>
+            <div class="st-progress mt-4"><span id="st-progress"></span></div>
+
+            <svg id="st-chart" class="st-chart mt-5 w-full" viewBox="0 0 600 200" preserveAspectRatio="none" aria-label="실시간 처리량 그래프"></svg>
+            <div class="mt-2 flex items-center gap-4 text-[12px] text-[#6e6e73]">
+                <span class="flex items-center gap-1.5"><span class="inline-block h-2 w-4 rounded-full bg-[#0066cc]"></span>다운로드</span>
+                <span class="flex items-center gap-1.5"><span class="inline-block h-2 w-4 rounded-full bg-[#d9730d]"></span>업로드</span>
+            </div>
+
+            <div class="mt-6 flex flex-wrap gap-2">
+                <button id="st-start" type="button" class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white disabled:opacity-50">측정 시작</button>
+                <button id="st-stop" type="button" class="hidden rounded-full border border-black/[0.12] px-5 py-2.5 text-[14px] text-[#1d1d1f]">중지</button>
+            </div>
+        </section>
+
+        <section class="min-w-0 space-y-5">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#0066cc]">다운로드</p>
+                    <p class="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-[#1d1d1f]"><span id="st-down">-</span> <span class="text-[13px] font-normal text-[#8e8e93]">Mbps</span></p>
+                </div>
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#d9730d]">업로드</p>
+                    <p class="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-[#1d1d1f]"><span id="st-up">-</span> <span class="text-[13px] font-normal text-[#8e8e93]">Mbps</span></p>
+                </div>
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#6e6e73]">지연 (Ping)</p>
+                    <p class="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-[#1d1d1f]"><span id="st-ping">-</span> <span class="text-[13px] font-normal text-[#8e8e93]">ms</span></p>
+                </div>
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#6e6e73]">지터</p>
+                    <p class="mt-2 text-[26px] font-semibold tracking-[-0.02em] text-[#1d1d1f]"><span id="st-jitter">-</span> <span class="text-[13px] font-normal text-[#8e8e93]">ms</span></p>
+                </div>
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">측정 정보</h2>
+                <dl class="mt-3 space-y-2 text-[13px]" id="st-info"></dl>
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">최근 측정</h2>
+                    <button id="st-clear" type="button" class="text-[12px] text-[#8e8e93] hover:text-[#1d1d1f]">기록 지우기</button>
+                </div>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">이 브라우저에만 저장됩니다.</p>
+                <div class="mt-3 overflow-x-auto">
+                    <table class="w-full text-[13px]">
+                        <thead><tr class="text-left text-[11px] text-[#8e8e93]"><th class="py-1.5 font-semibold">시각</th><th class="font-semibold">다운</th><th class="font-semibold">업</th><th class="font-semibold">Ping</th></tr></thead>
+                        <tbody id="st-history"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <details class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <summary class="cursor-pointer text-[16px] font-semibold text-[#1d1d1f]">어떻게 측정하나요?</summary>
+        <div class="mt-4 space-y-3 text-[13px] leading-relaxed text-[#6e6e73]">
+            <p><b class="text-[#1d1d1f]">지연</b>: 아주 작은 요청을 12번 보내 왕복 시간을 잽니다. 첫 번째(연결 준비)는 빼고 중앙값이 Ping, 연속된 측정값 차이의 평균이 지터입니다.</p>
+            <p><b class="text-[#1d1d1f]">다운로드 / 업로드</b>: 연결 4개로 동시에 약 8초 동안 데이터를 주고받으며 실제로 오간 바이트를 0.2초마다 셉니다. 속도가 올라가는 처음 1초는 결과에서 뺍니다.
+                전송 크기는 1MB부터 시작해 빨리 끝나면 2배씩(최대 25MB) 늘려서, 빠른 회선도 꽉 채우도록 합니다.</p>
+            <p><b class="text-[#1d1d1f]">한계</b>: 이 사이트 서버까지의 속도라서 서버 회선이나 거리 때문에 통신사 속도 측정보다 낮게 나올 수 있습니다.
+                한 번 측정에 수십~수백 MB 데이터를 쓰므로 모바일 데이터에서는 주의하세요. 같은 IP 에서 10분 동안 쓸 수 있는 양에 제한이 있습니다.</p>
+        </div>
+    </details>
+</main>
+
+<script>
+(() => {
+    const API = {
+        ping: "{% url 'tools:speedtest_ping' %}",
+        download: "{% url 'tools:speedtest_download' %}",
+        upload: "{% url 'tools:speedtest_upload' %}",
+    };
+    const PHASE_MS = 8000;
+    const WARMUP_MS = 1000;
+    const STREAMS = 4;
+    const MB = 1024 * 1024;
+    const MAX_REQUEST = 25 * MB;
+    const DOWN_CAP = 200 * MB;
+    const UP_CAP = 100 * MB;
+    const HISTORY_KEY = 'mj:speedtest:history';
+
+    const $ = (id) => document.getElementById(id);
+    const mbps = (bytes, ms) => (ms > 0 ? (bytes * 8) / (ms / 1000) / 1e6 : 0);
+    const fmt = (v) => (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2));
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    let running = false;
+    let aborters = [];
+    let usedBytes = 0;
+    const series = { download: [], upload: [] };
+
+    class StopError extends Error {}
+    class LimitError extends Error {}
+
+    // ── 화면 ─────────────────────────────────────
+    const setPhase = (phase) => {
+        const order = ['ping', 'download', 'upload'];
+        document.querySelectorAll('.st-phase').forEach((el) => {
+            const idx = order.indexOf(el.dataset.phase);
+            const cur = order.indexOf(phase);
+            el.classList.toggle('is-active', el.dataset.phase === phase);
+            el.classList.toggle('is-done', cur > idx || phase === 'done');
+        });
+    };
+    const setGauge = (value, unit = 'Mbps') => {
+        $('st-value').textContent = value === null ? '0' : fmt(value);
+        $('st-unit').textContent = unit;
+    };
+    const setProgress = (ratio) => { $('st-progress').style.width = `${Math.min(100, Math.max(0, ratio * 100))}%`; };
+
+    const drawChart = () => {
+        const svg = $('st-chart');
+        const all = [...series.download, ...series.upload].map((p) => p.v);
+        const peak = Math.max(10, ...all);
+        const nice = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000].find((n) => n >= peak) || peak;
+        const x = (t) => 30 + (t / PHASE_MS) * 565;
+        const y = (v) => 190 - (v / nice) * 175;
+        const grid = [0, 0.5, 1].map((r) => `
+            <line class="grid" x1="30" x2="595" y1="${y(nice * r)}" y2="${y(nice * r)}" />
+            <text x="0" y="${y(nice * r) + 3}">${Math.round(nice * r)}</text>`).join('');
+        const line = (pts, color) => (pts.length > 1
+            ? `<polyline fill="none" stroke="${color}" stroke-width="2.5" stroke-linejoin="round" points="${pts.map((p) => `${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ')}" />`
+            : '');
+        svg.innerHTML = grid + line(series.download, '#0066cc') + line(series.upload, '#d9730d');
+    };
+
+    const renderInfo = (extra = {}) => {
+        const conn = navigator.connection || {};
+        const rows = [
+            ['측정 서버', location.host],
+            ['사용한 데이터', `${(usedBytes / MB).toFixed(1)} MB`],
+            ['동시 연결 수', `${STREAMS}개`],
+            conn.effectiveType ? ['브라우저가 추정한 회선', `${conn.effectiveType}${conn.downlink ? ` · 약 ${conn.downlink} Mbps` : ''}`] : null,
+            ...Object.entries(extra),
+        ].filter(Boolean);
+        $('st-info').innerHTML = rows.map(([k, v]) => `
+            <div class="flex items-baseline justify-between gap-3 border-b border-black/[0.06] pb-2">
+                <dt class="text-[#6e6e73]">${k}</dt><dd class="font-semibold text-[#1d1d1f]">${v}</dd>
+            </div>`).join('');
+    };
+
+    // ── 기록 ─────────────────────────────────────
+    const loadHistory = () => {
+        try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]'); } catch (_) { return []; }
+    };
+    const renderHistory = () => {
+        const list = loadHistory();
+        $('st-history').innerHTML = list.length
+            ? list.map((h) => `<tr class="border-t border-black/[0.06]">
+                <td class="py-1.5 text-[#6e6e73]">${new Date(h.at).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                <td class="font-semibold text-[#0066cc]">${fmt(h.down)}</td>
+                <td class="font-semibold text-[#d9730d]">${fmt(h.up)}</td>
+                <td class="text-[#1d1d1f]">${h.ping.toFixed(0)}ms</td></tr>`).join('')
+            : '<tr><td colspan="4" class="py-2 text-[#8e8e93]">아직 기록이 없습니다.</td></tr>';
+    };
+    const saveHistory = (entry) => {
+        try { localStorage.setItem(HISTORY_KEY, JSON.stringify([entry, ...loadHistory()].slice(0, 10))); } catch (_) {}
+        renderHistory();
+    };
+
+    // ── 지연 ─────────────────────────────────────
+    const measurePing = async () => {
+        const samples = [];
+        for (let i = 0; i < 12; i += 1) {
+            if (!running) throw new StopError();
+            const url = `${API.ping}?r=${Math.random()}`;
+            const t0 = performance.now();
+            const resp = await fetch(url, { cache: 'no-store' });
+            await resp.arrayBuffer();
+            let rtt = performance.now() - t0;
+            // 가능하면 브라우저의 정밀 측정값(요청 시작 → 첫 응답 바이트)을 사용
+            const entry = performance.getEntriesByName(new URL(url, location.href).href).pop();
+            if (entry && entry.responseStart > 0 && entry.requestStart > 0) rtt = entry.responseStart - entry.requestStart;
+            if (i > 0) samples.push(rtt);
+            setGauge(rtt, 'ms');
+            setProgress((i + 1) / 12);
+            await sleep(60);
+        }
+        const sorted = [...samples].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        const jitter = samples.slice(1).reduce((sum, v, i) => sum + Math.abs(v - samples[i]), 0) / Math.max(1, samples.length - 1);
+        return { ping: median, jitter };
+    };
+
+    // ── 처리량 공통: 0.2초마다 누적 바이트를 기록해 실시간/최종 속도 계산 ──
+    const runPhase = async (phase, cap, startStreams) => {
+        const state = { bytes: 0, requested: 0, cap, stop: false, size: MB, error: null };
+        const t0 = performance.now();
+        const points = series[phase];
+        const ticks = [{ t: 0, bytes: 0 }];
+        points.push({ t: 0, v: 0 });
+        aborters = [];
+
+        const ticker = setInterval(() => {
+            const t = performance.now() - t0;
+            ticks.push({ t, bytes: state.bytes });
+            // 최근 1초 구간 속도 = 실시간 값
+            const ref = ticks.find((p) => p.t >= t - 1000) || ticks[0];
+            const live = mbps(state.bytes - ref.bytes, t - ref.t);
+            points.push({ t, v: live });
+            setGauge(live);
+            setProgress(t / PHASE_MS);
+            drawChart();
+            if (t >= PHASE_MS || state.bytes >= cap || !running) {
+                state.stop = true;
+                aborters.forEach((a) => a.abort());
+            }
+        }, 200);
+
+        try {
+            await Promise.all(startStreams(state));
+        } finally {
+            clearInterval(ticker);
+        }
+        // 끝난 시점도 기록 (타이머가 늦게 돌아도 그래프·결과가 마지막 값을 반영하도록)
+        const tEnd = performance.now() - t0;
+        const last = ticks[ticks.length - 1];
+        if (tEnd - last.t > 50) {
+            ticks.push({ t: tEnd, bytes: state.bytes });
+            points.push({ t: tEnd, v: mbps(state.bytes - last.bytes, tEnd - last.t) });
+            drawChart();
+        }
+        if (state.error) throw state.error;
+        if (!running) throw new StopError();
+
+        const end = ticks[ticks.length - 1];
+        const warm = ticks.find((p) => p.t >= WARMUP_MS) || ticks[0];
+        usedBytes += state.bytes;
+        return end.t - warm.t > 300 ? mbps(end.bytes - warm.bytes, end.t - warm.t) : mbps(end.bytes, end.t);
+    };
+
+    // 이번 측정에서 아직 요청할 수 있는 크기 (요청 총량이 cap 을 넘지 않게) — 0 이면 그만
+    const nextSize = (state) => {
+        const size = Math.min(state.size, state.cap - state.requested);
+        if (size < 64 * 1024) return 0;
+        state.requested += size;
+        return size;
+    };
+
+    const growSize = (state, elapsedMs) => {
+        if (elapsedMs < 1500 && state.size < MAX_REQUEST) state.size = Math.min(MAX_REQUEST, state.size * 2);
+    };
+
+    const downloadStreams = (state) => Array.from({ length: STREAMS }, async () => {
+        while (!state.stop) {
+            const size = nextSize(state);
+            if (!size) return;
+            const ctrl = new AbortController();
+            aborters.push(ctrl);
+            const started = performance.now();
+            try {
+                const resp = await fetch(`${API.download}?bytes=${size}&r=${Math.random()}`, { cache: 'no-store', signal: ctrl.signal });
+                if (resp.status === 429) throw new LimitError((await resp.json()).error);
+                if (!resp.ok) throw new Error(`다운로드 실패 (${resp.status})`);
+                const reader = resp.body.getReader();
+                for (;;) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    state.bytes += value.length;
+                }
+            } catch (err) {
+                if (err.name === 'AbortError' || state.stop) return;
+                state.error = err;
+                state.stop = true;
+                return;
+            }
+            growSize(state, performance.now() - started);
+        }
+    });
+
+    let uploadPayload = null;
+    const getPayload = (size) => {
+        if (!uploadPayload) {
+            // 압축되지 않도록 랜덤 1MB 를 만들어 반복 사용
+            const buf = new Uint8Array(MB);
+            for (let i = 0; i < buf.length; i += 65536) crypto.getRandomValues(buf.subarray(i, i + 65536));
+            uploadPayload = buf;
+        }
+        return new Blob(Array.from({ length: Math.max(1, Math.round(size / MB)) }, () => uploadPayload), { type: 'application/octet-stream' });
+    };
+
+    const uploadStreams = (state) => Array.from({ length: STREAMS }, async () => {
+        while (!state.stop) {
+            const size = nextSize(state);
+            if (!size) return;
+            const started = performance.now();
+            const ok = await new Promise((resolve) => {
+                const xhr = new XMLHttpRequest();
+                let sent = 0;
+                const ctrl = { abort: () => xhr.abort() };
+                aborters.push(ctrl);
+                xhr.open('POST', `${API.upload}?r=${Math.random()}`);
+                xhr.upload.onprogress = (e) => {
+                    state.bytes += e.loaded - sent;
+                    sent = e.loaded;
+                };
+                xhr.onload = () => {
+                    if (xhr.status === 429) {
+                        try { state.error = new LimitError(JSON.parse(xhr.responseText).error); } catch (_) { state.error = new LimitError('측정 한도를 넘었습니다.'); }
+                        state.stop = true;
+                        resolve(false);
+                        return;
+                    }
+                    if (xhr.status >= 400) {
+                        state.error = new Error(`업로드 실패 (${xhr.status})`);
+                        state.stop = true;
+                    }
+                    resolve(xhr.status < 400);
+                };
+                xhr.onerror = () => {
+                    if (!state.stop) {
+                        state.error = new Error('업로드 중 네트워크 오류');
+                        state.stop = true;
+                    }
+                    resolve(false);
+                };
+                xhr.onabort = () => resolve(false);
+                xhr.send(getPayload(size));
+            });
+            if (!ok) return;
+            growSize(state, performance.now() - started);
+        }
+    });
+
+    // ── 실행 ─────────────────────────────────────
+    const reset = () => {
+        series.download = [];
+        series.upload = [];
+        usedBytes = 0;
+        ['st-down', 'st-up', 'st-ping', 'st-jitter'].forEach((id) => { $(id).textContent = '-'; });
+        drawChart();
+        setGauge(null);
+        setProgress(0);
+    };
+
+    const finishUi = () => {
+        running = false;
+        $('st-start').disabled = false;
+        $('st-start').textContent = '다시 측정';
+        $('st-stop').classList.add('hidden');
+    };
+
+    const start = async () => {
+        if (running) return;
+        running = true;
+        reset();
+        $('st-start').disabled = true;
+        $('st-stop').classList.remove('hidden');
+        try {
+            setPhase('ping');
+            $('st-status').textContent = '지연(ping) 측정 중…';
+            const { ping, jitter } = await measurePing();
+            $('st-ping').textContent = ping.toFixed(0);
+            $('st-jitter').textContent = jitter.toFixed(1);
+
+            setPhase('download');
+            $('st-status').textContent = '다운로드 측정 중…';
+            const down = await runPhase('download', DOWN_CAP, downloadStreams);
+            $('st-down').textContent = fmt(down);
+
+            setPhase('upload');
+            $('st-status').textContent = '업로드 측정 중…';
+            const up = await runPhase('upload', UP_CAP, uploadStreams);
+            $('st-up').textContent = fmt(up);
+
+            setPhase('done');
+            setGauge(down);
+            setProgress(1);
+            $('st-status').textContent = `완료 · 다운로드 ${fmt(down)} / 업로드 ${fmt(up)} Mbps · Ping ${ping.toFixed(0)}ms`;
+            renderInfo({ '측정 시각': new Date().toLocaleTimeString('ko-KR') });
+            saveHistory({ at: Date.now(), down, up, ping, jitter });
+        } catch (err) {
+            setPhase(null);
+            $('st-status').textContent = err instanceof StopError ? '측정을 중지했습니다.' : (err.message || '측정 중 오류가 발생했습니다.');
+            renderInfo();
+        } finally {
+            finishUi();
+        }
+    };
+
+    $('st-start').addEventListener('click', start);
+    $('st-stop').addEventListener('click', () => {
+        running = false;
+        aborters.forEach((a) => a.abort());
+    });
+    $('st-clear').addEventListener('click', () => {
+        try { localStorage.removeItem(HISTORY_KEY); } catch (_) {}
+        renderHistory();
+    });
+
+    drawChart();
+    renderInfo();
+    renderHistory();
+})();
+</script>
+{% endblock %}

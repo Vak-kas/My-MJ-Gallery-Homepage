@@ -9,6 +9,14 @@
 
 TOOLS = [
 	{
+		"slug": "speedtest",
+		"url_name": "tools:speedtest",
+		"icon": "⚡",
+		"title": "인터넷 속도 측정",
+		"description": "지금 내 인터넷으로 이 서버와 실제 데이터를 주고받아 다운로드·업로드 속도와 지연(ping)을 실시간 그래프로 측정합니다.",
+		"tags": ["네트워크", "실시간 측정"],
+	},
+	{
 		"slug": "duplex",
 		"url_name": "tools:duplex",
 		"icon": "⇄",
