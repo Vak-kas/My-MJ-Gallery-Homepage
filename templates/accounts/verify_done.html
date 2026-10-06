@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7]">
+    <div class="flex min-h-screen items-center justify-center px-6 py-20">
+        <div class="w-full max-w-[520px] text-center">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">MJGALLERY</p>
+            <h1 class="apple-display mt-5 text-[48px] font-semibold leading-[1.05] tracking-[-0.04em] text-[#1d1d1f]">인증 완료!</h1>
+            <p class="mt-5 text-[17px] leading-[1.6] text-[#6e6e73]">
+                <span class="font-semibold text-[#1d1d1f]">{{ username }}</span> 님, 가입이 완료되어 로그인되었습니다.
+            </p>
+            <div class="mt-10 flex flex-wrap justify-center gap-3">
+                <a href="{% url 'main:home' %}" class="rounded-full bg-[#0066cc] px-6 py-3 text-[15px] font-semibold text-white">홈으로</a>
+                <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-6 py-3 text-[15px] text-[#1d1d1f] hover:bg-white">블로그 보기</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
