@@ -79,6 +79,24 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
         onUpdate: () => onChange(),
     });
 
+    // 마지막 블록 아래 빈 곳을 클릭하면 이어 쓰기 (마지막이 빈 문단이 아니면 새 줄을 만듦)
+    const continueAtEnd = (event) => {
+        const { view } = editor;
+        const last = view.dom.lastElementChild;
+        if (!last || event.button !== 0) return;
+        if (event.target !== view.dom && event.target !== view.dom.parentElement) return;
+        if (event.clientY <= last.getBoundingClientRect().bottom) return;
+        event.preventDefault();
+        const { doc } = editor.state;
+        const lastNode = doc.lastChild;
+        if (lastNode && lastNode.type.name === 'paragraph' && lastNode.content.size === 0) {
+            editor.commands.focus('end');
+        } else {
+            editor.chain().insertContentAt(doc.content.size, { type: 'paragraph' }).focus('end').run();
+        }
+    };
+    editor.view.dom.parentElement.addEventListener('mousedown', continueAtEnd);
+
     const getContent = () => {
         const doc = mapDoc(editor.getJSON(), (node) => {
             if (node.type === 'image' && node.attrs) node.attrs = finalizeImageAttrs(node.attrs);
