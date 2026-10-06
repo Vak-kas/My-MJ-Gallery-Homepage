@@ -72,7 +72,7 @@ INSTALLED_APPS = [
     'studio',
     'main',
     'blog',
-    
+    'tools',
 ]
 
 MIDDLEWARE = [
