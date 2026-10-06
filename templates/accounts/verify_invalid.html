@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7]">
+    <div class="flex min-h-screen items-center justify-center px-6 py-20">
+        <div class="w-full max-w-[520px] text-center">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">MJGALLERY</p>
+            <h1 class="apple-display mt-5 text-[44px] font-semibold leading-[1.05] tracking-[-0.04em] text-[#1d1d1f]">링크가 유효하지 않아요.</h1>
+            <p class="mt-5 text-[17px] leading-[1.6] text-[#6e6e73]">
+                인증 링크가 만료되었거나 잘못되었습니다.<br>
+                가입한 아이디로 로그인하면 인증 메일을 다시 받을 수 있어요.
+            </p>
+            <div class="mt-10">
+                <a href="{% url 'accounts:login' %}" class="rounded-full bg-[#0066cc] px-6 py-3 text-[15px] font-semibold text-white">로그인하러 가기</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

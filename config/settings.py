@@ -210,6 +210,28 @@ else:
 
 LOGIN_REDIRECT_URL = "/"
 
+# nginx 가 HTTPS 를 받고 X-Forwarded-Proto 를 넘겨줌 → 인증 메일 링크가 https:// 로 만들어지도록
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+
+# 이메일 (회원가입 인증 메일). EMAIL_HOST 가 없으면 메일을 보내지 않고 콘솔(서버 로그)에 출력
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", "True")
+EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
+EMAIL_TIMEOUT = 15
+EMAIL_BACKEND = (
+    "django.core.mail.backends.smtp.EmailBackend"
+    if EMAIL_HOST
+    else "django.core.mail.backends.console.EmailBackend"
+)
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@smjgallery.kr")
+
+# 이메일 인증 링크 유효 시간 (비밀번호 재설정 토큰과 같은 설정을 씀)
+PASSWORD_RESET_TIMEOUT = 24 * 60 * 60
+
 
 # Upload limits (prevent 400 Bad Request on larger form/file payloads)
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
