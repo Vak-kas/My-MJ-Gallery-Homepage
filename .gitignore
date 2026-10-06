@@ -166,3 +166,6 @@ media/
 .DS_Store
 # 에디터 번들 빌드용 의존성 (빌드 결과는 static/editor/ 에 커밋)
 frontend/editor/node_modules/
+
+# 관리 명령이 만드는 백업 파일
+backups/

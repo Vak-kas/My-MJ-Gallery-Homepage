@@ -48,13 +48,20 @@
         </div>
 
         {% if request.resolver_match.url_name == 'index' %}
-        <form method="post" action="{% url 'blog:index' %}" class="mt-4 space-y-2">
-            {% csrf_token %}
-            <input type="text" name="author_name" maxlength="60" required placeholder="이름" class="h-9 w-full rounded-lg border border-black/[0.08] px-3 text-[13px] outline-none focus:border-[#0066cc]">
-            <textarea name="message" rows="3" maxlength="1000" required placeholder="메시지를 남겨주세요" class="w-full rounded-lg border border-black/[0.08] px-3 py-2 text-[13px] outline-none focus:border-[#0066cc]"></textarea>
-            <p class="text-[11px] text-[#8e8e93]">작성한 방명록은 다른 방문자에게 공개됩니다.</p>
-            <button type="submit" class="h-9 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white">남기기</button>
-        </form>
+            {% if user.is_authenticated %}
+            <form method="post" action="{% url 'blog:index' %}" class="mt-4 space-y-2">
+                {% csrf_token %}
+                <p class="text-[12px] text-[#6e6e73]"><span class="font-semibold text-[#1d1d1f]">{{ user.get_username }}</span> 으로 남깁니다</p>
+                <textarea name="message" rows="3" maxlength="1000" required placeholder="메시지를 남겨주세요" class="w-full rounded-lg border border-black/[0.08] px-3 py-2 text-[13px] outline-none focus:border-[#0066cc]"></textarea>
+                <p class="text-[11px] text-[#8e8e93]">작성한 방명록은 다른 방문자에게 공개됩니다.</p>
+                <button type="submit" class="h-9 rounded-full bg-[#0066cc] px-4 text-[12px] font-semibold text-white">남기기</button>
+            </form>
+            {% else %}
+            <div class="mt-4 rounded-lg border border-dashed border-black/[0.12] px-3 py-3 text-[12px] text-[#6e6e73]">
+                방명록은 로그인 후 남길 수 있어요.
+                <a href="{% url 'accounts:login' %}?next={% url 'blog:index' %}%23guestbook" class="ml-1 font-semibold text-[#0066cc]">로그인 →</a>
+            </div>
+            {% endif %}
         {% endif %}
 
         <ul class="mt-4 space-y-3">
