@@ -41,7 +41,10 @@
                 <button type="button" data-preset="fast" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">100Mbps</button>
                 <button type="button" data-preset="hub" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">10Mbps 허브</button>
                 <button type="button" data-preset="wifi" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Wi-Fi 5</button>
+                <button type="button" data-preset="wifi6" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Wi-Fi 6</button>
+                <button type="button" data-preset="wifi7" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Wi-Fi 7</button>
             </div>
+            <p id="dx-preset-note" class="mt-2 min-h-[16px] text-[11px] leading-relaxed text-[#8e8e93]">프리셋을 누르면 해당 조건이 채워집니다.</p>
 
             <div class="mt-5 space-y-4">
                 <div class="dx-field">
@@ -171,11 +174,16 @@
         return Number.isFinite(v) ? v : fallback;
     };
 
+    // Wi-Fi 는 휴대폰·노트북에 흔한 2×2 MIMO 기준 최대 PHY 속도.
+    // 무선은 매체가 하나라 본질적으로 반이중 → 손실·전환 시간이 유선보다 큼.
+    // 새 규격일수록 A-MPDU 로 한 번에 묶어 보내는 양이 늘고(OFDMA·MLO) 경합 손실이 줄어듦.
     const PRESETS = {
-        gigabit: { rate: 1, unit: '1e9', turn: 1, burst: 8, loss: 5 },
-        fast: { rate: 100, unit: '1e6', turn: 2, burst: 4, loss: 10 },
-        hub: { rate: 10, unit: '1e6', turn: 10, burst: 1, loss: 30 },
-        wifi: { rate: 433, unit: '1e6', turn: 50, burst: 16, loss: 35 },
+        gigabit: { rate: 1, unit: '1e9', turn: 1, burst: 8, loss: 5, note: '유선 기가비트 이더넷 (스위치 연결, 보통 전이중)' },
+        fast: { rate: 100, unit: '1e6', turn: 2, burst: 4, loss: 10, note: '패스트 이더넷 100BASE-TX' },
+        hub: { rate: 10, unit: '1e6', turn: 10, burst: 1, loss: 30, note: '구형 허브 10BASE-T: 충돌 도메인을 공유하는 반이중 환경' },
+        wifi: { rate: 867, unit: '1e6', turn: 50, burst: 16, loss: 35, note: 'Wi-Fi 5 (802.11ac): 2×2, 80MHz, 256-QAM → 최대 867Mbps' },
+        wifi6: { rate: 1201, unit: '1e6', turn: 40, burst: 32, loss: 25, note: 'Wi-Fi 6 (802.11ax): 2×2, 80MHz, 1024-QAM → 최대 1,201Mbps · OFDMA 로 경합 감소' },
+        wifi7: { rate: 2882, unit: '1e6', turn: 30, burst: 64, loss: 20, note: 'Wi-Fi 7 (802.11be): 2×2, 160MHz, 4096-QAM → 최대 2,882Mbps (320MHz 면 5,765Mbps) · MLO 로 지연 감소' },
     };
 
     const fmtRate = (bps) => {
@@ -275,6 +283,12 @@
     document.querySelectorAll('#dx-presets [data-preset]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const preset = PRESETS[btn.dataset.preset];
+            document.querySelectorAll('#dx-presets [data-preset]').forEach((b) => {
+                const on = b === btn;
+                b.classList.toggle('border-[#0066cc]', on);
+                b.classList.toggle('text-[#0066cc]', on);
+            });
+            $('dx-preset-note').textContent = preset.note;
             $('dx-rate').value = preset.rate;
             $('dx-rate-unit').value = preset.unit;
             $('dx-turn').value = preset.turn;
