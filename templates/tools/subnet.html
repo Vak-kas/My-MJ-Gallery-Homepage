@@ -1,0 +1,270 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sn-input {
+        width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb;
+        padding: 0 14px; font-size: 16px; outline: none; color: #1d1d1f; font-family: SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .sn-input:focus { border-color: #0066cc; }
+    .sn-input.is-error { border-color: #d44c47; }
+    .sn-range { accent-color: #0066cc; width: 100%; }
+    .sn-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .sn-bits span { display: inline-block; }
+    .sn-bits .is-net { color: #0066cc; font-weight: 700; }
+    .sn-bits .is-host { color: #d9730d; }
+    .sn-table th, .sn-table td { padding: 8px 10px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); text-align: left; white-space: nowrap; }
+    .sn-table th { font-size: 11px; color: #8e8e93; font-weight: 600; }
+    .sn-table tr.is-current td { background: #f0f7ff; }
+    html.theme-dark .sn-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .sn-table tr.is-current td { background: rgba(78, 161, 255, 0.15); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · IPv4</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Subnet.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            IP 주소와 서브넷(CIDR 또는 마스크)을 넣으면 네트워크 주소, 브로드캐스트, 사용 가능한 호스트 범위를 계산하고 더 작은 서브넷으로 나눠 봅니다.
+        </p>
+    </div>
+
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <div>
+                <label for="sn-input" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">IP 주소 / 서브넷</label>
+                <input id="sn-input" class="sn-input" type="text" value="192.168.10.37/26" spellcheck="false" autocomplete="off" />
+                <p id="sn-error" class="mt-1.5 min-h-[18px] text-[12px] text-[#d44c47]"></p>
+                <div class="mt-1 flex flex-wrap gap-2" id="sn-examples">
+                    <button type="button" data-example="192.168.0.1/24" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">192.168.0.1/24</button>
+                    <button type="button" data-example="10.0.0.0 255.0.0.0" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">10.0.0.0 255.0.0.0</button>
+                    <button type="button" data-example="172.16.5.130/30" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">172.16.5.130/30</button>
+                    <button type="button" data-example="8.8.8.8/32" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">8.8.8.8/32</button>
+                </div>
+                <p class="mt-2 text-[11px] text-[#8e8e93]">입력 예: <span class="sn-mono">192.168.1.10/24</span>, <span class="sn-mono">192.168.1.10 255.255.255.0</span>, 접두사 없이 IP만 넣으면 아래 슬라이더 값을 씁니다.</p>
+            </div>
+            <div>
+                <label for="sn-prefix" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">접두사 길이 <span id="sn-prefix-label" class="sn-mono font-normal text-[#0066cc]"></span></label>
+                <input id="sn-prefix" class="sn-range" type="range" min="0" max="32" step="1" value="26" />
+                <div class="mt-1 flex justify-between text-[11px] text-[#8e8e93] sn-mono"><span>/0</span><span>/8</span><span>/16</span><span>/24</span><span>/32</span></div>
+            </div>
+        </div>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">결과</h2>
+            <dl class="mt-4 grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2" id="sn-result"></dl>
+        </section>
+
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">2진수로 보기</h2>
+            <p class="mt-1 text-[12px] text-[#8e8e93]"><span class="font-semibold text-[#0066cc]">파란색</span> = 네트워크 부분, <span class="text-[#d9730d]">주황색</span> = 호스트 부분</p>
+            <div class="mt-4 space-y-2 overflow-x-auto text-[13px]" id="sn-binary"></div>
+        </section>
+    </div>
+
+    <section class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <div class="flex flex-wrap items-end justify-between gap-3">
+            <div>
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">서브넷 나누기</h2>
+                <p class="mt-1 text-[12px] text-[#8e8e93]">현재 네트워크를 더 긴 접두사로 쪼갭니다. 입력한 IP가 속한 서브넷은 강조됩니다.</p>
+            </div>
+            <label class="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
+                새 접두사
+                <select id="sn-split" class="h-9 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-3 text-[13px] sn-mono"></select>
+            </label>
+        </div>
+        <p id="sn-split-summary" class="mt-4 text-[13px] text-[#6e6e73]"></p>
+        <div class="mt-3 max-h-[480px] overflow-auto">
+            <table class="sn-table w-full text-[13px] sn-mono">
+                <thead><tr><th>#</th><th>네트워크</th><th>사용 가능 범위</th><th>브로드캐스트</th><th>호스트</th></tr></thead>
+                <tbody id="sn-split-body"></tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const MAX_ROWS = 256;
+
+    const toInt = (ip) => {
+        const parts = ip.trim().split('.');
+        if (parts.length !== 4) return null;
+        let value = 0;
+        for (const part of parts) {
+            if (!/^\d{1,3}$/.test(part)) return null;
+            const n = Number(part);
+            if (n > 255) return null;
+            value = value * 256 + n;
+        }
+        return value >>> 0;
+    };
+    const toIp = (n) => [24, 16, 8, 0].map((s) => (n >>> s) & 255).join('.');
+    const maskOf = (prefix) => (prefix === 0 ? 0 : (0xffffffff << (32 - prefix)) >>> 0);
+    const prefixOfMask = (mask) => {
+        const bits = mask.toString(2).padStart(32, '0');
+        return /^1*0*$/.test(bits) ? bits.indexOf('0') === -1 ? 32 : bits.indexOf('0') : null;
+    };
+    const fmt = (n) => n.toLocaleString('ko-KR');
+
+    // "IP/24", "IP 255.255.255.0", "IP/255.255.255.0", "IP"
+    const parse = (raw, fallbackPrefix) => {
+        const text = raw.trim();
+        const m = text.match(/^([\d.]+)\s*(?:[\/\s]\s*([\d.]+))?$/);
+        if (!m) return { error: 'IP 주소 형식이 올바르지 않습니다.' };
+        const ip = toInt(m[1]);
+        if (ip === null) return { error: 'IP 주소는 0~255 숫자 4개를 점으로 구분해 주세요.' };
+        if (!m[2]) return { ip, prefix: fallbackPrefix };
+        if (/^\d{1,2}$/.test(m[2])) {
+            const prefix = Number(m[2]);
+            if (prefix > 32) return { error: '접두사는 0~32 사이여야 합니다.' };
+            return { ip, prefix };
+        }
+        const mask = toInt(m[2]);
+        if (mask === null) return { error: '서브넷 마스크 형식이 올바르지 않습니다.' };
+        const prefix = prefixOfMask(mask);
+        if (prefix === null) return { error: '서브넷 마스크는 1이 연속된 형태여야 합니다 (예: 255.255.255.0).' };
+        return { ip, prefix };
+    };
+
+    const classify = (ip) => {
+        const a = ip >>> 24;
+        const b = (ip >>> 16) & 255;
+        const cls = a < 128 ? 'A' : a < 192 ? 'B' : a < 224 ? 'C' : a < 240 ? 'D (멀티캐스트)' : 'E (예약)';
+        let scope = '공인 (Public)';
+        if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) scope = '사설 (Private, RFC 1918)';
+        else if (a === 127) scope = '루프백 (Loopback)';
+        else if (a === 169 && b === 254) scope = '링크 로컬 (APIPA)';
+        else if (a === 100 && b >= 64 && b <= 127) scope = 'CGNAT 공유 (RFC 6598)';
+        else if (a >= 224 && a < 240) scope = '멀티캐스트';
+        else if (a === 0) scope = '현재 네트워크 (0.0.0.0/8)';
+        else if (a >= 240) scope = '예약 / 브로드캐스트';
+        return { cls, scope };
+    };
+
+    const info = (ip, prefix) => {
+        const mask = maskOf(prefix);
+        const network = (ip & mask) >>> 0;
+        const size = 2 ** (32 - prefix);
+        const broadcast = (network + size - 1) >>> 0;
+        let first; let last; let usable;
+        if (prefix === 32) { first = network; last = network; usable = 1; }
+        else if (prefix === 31) { first = network; last = broadcast; usable = 2; }
+        else { first = network + 1; last = broadcast - 1; usable = size - 2; }
+        return { mask, network, broadcast, first, last, usable, size, wildcard: (~mask) >>> 0 };
+    };
+
+    const bits = (n, prefix) => {
+        const s = n.toString(2).padStart(32, '0');
+        return [0, 8, 16, 24].map((start) => s.slice(start, start + 8).split('').map((bit, i) => {
+            const cls = start + i < prefix ? 'is-net' : 'is-host';
+            return `<span class="${cls}">${bit}</span>`;
+        }).join('')).join('<span class="text-[#c7c7cc]">.</span>');
+    };
+
+    const row = (k, v, note = '') => `
+        <div class="flex items-baseline justify-between gap-3 border-b border-black/[0.06] pb-2">
+            <dt class="text-[#6e6e73]">${k}</dt>
+            <dd class="text-right"><span class="sn-mono font-semibold text-[#1d1d1f]">${v}</span>${note ? `<span class="block text-[11px] text-[#8e8e93]">${note}</span>` : ''}</dd>
+        </div>`;
+
+    const render = () => {
+        const parsed = parse($('sn-input').value, Number($('sn-prefix').value));
+        $('sn-input').classList.toggle('is-error', !!parsed.error);
+        $('sn-error').textContent = parsed.error || '';
+        if (parsed.error) return;
+        const { ip, prefix } = parsed;
+        $('sn-prefix').value = prefix;
+        $('sn-prefix-label').textContent = `/${prefix}`;
+        const r = info(ip, prefix);
+        const { cls, scope } = classify(ip);
+        const hostNote = prefix === 31 ? '/31: 점대점 링크용 (RFC 3021), 두 주소 모두 사용' : prefix === 32 ? '/32: 단일 호스트' : '네트워크·브로드캐스트 주소 제외';
+
+        $('sn-result').innerHTML = [
+            row('입력 IP', toIp(ip)),
+            row('CIDR 표기', `${toIp(r.network)}/${prefix}`),
+            row('네트워크 주소', toIp(r.network)),
+            row('브로드캐스트 주소', prefix >= 31 ? '없음' : toIp(r.broadcast)),
+            row('사용 가능 첫 주소', toIp(r.first)),
+            row('사용 가능 마지막 주소', toIp(r.last)),
+            row('사용 가능 호스트 수', fmt(r.usable), hostNote),
+            row('전체 주소 수', fmt(r.size)),
+            row('서브넷 마스크', toIp(r.mask)),
+            row('와일드카드 마스크', toIp(r.wildcard), 'ACL·OSPF 설정용'),
+            row('주소 클래스', cls),
+            row('주소 종류', scope),
+            row('16진수', `0x${ip.toString(16).padStart(8, '0').toUpperCase()}`),
+            row('정수', fmt(ip)),
+        ].join('');
+
+        $('sn-binary').innerHTML = [
+            ['IP', ip], ['마스크', r.mask], ['네트워크', r.network], ['브로드캐스트', r.broadcast],
+        ].map(([label, n]) => `
+            <div class="flex items-center gap-3">
+                <span class="w-[76px] shrink-0 text-[12px] text-[#6e6e73]">${label}</span>
+                <span class="sn-mono sn-bits whitespace-nowrap">${bits(n, prefix)}</span>
+            </div>`).join('');
+
+        // 서브넷 나누기
+        const split = $('sn-split');
+        // 같은 네트워크 크기에서 고른 값은 유지하고, 접두사가 바뀌면 기본값(+2)으로 초기화
+        const previous = Number(split.dataset.basePrefix) === prefix ? Number(split.value) : -1;
+        split.dataset.basePrefix = String(prefix);
+        const options = [];
+        for (let p = prefix; p <= 32; p += 1) options.push(p);
+        split.innerHTML = options.map((p) => `<option value="${p}">/${p} (${fmt(2 ** (p - prefix))}개)</option>`).join('');
+        const next = previous > prefix && previous <= 32 ? previous : Math.min(32, prefix + 2);
+        split.value = String(next);
+        renderSplit(ip, prefix, next, r);
+    };
+
+    const renderSplit = (ip, prefix, newPrefix, parent) => {
+        const count = 2 ** (newPrefix - prefix);
+        const size = 2 ** (32 - newPrefix);
+        const sub = info(parent.network, newPrefix);
+        $('sn-split-summary').textContent = `${toIp(parent.network)}/${prefix} → /${newPrefix} 서브넷 ${fmt(count)}개, 각각 주소 ${fmt(size)}개 (사용 가능 ${fmt(sub.usable)}개)`
+            + (count > MAX_ROWS ? ` · 처음 ${MAX_ROWS}개만 표시` : '');
+        const rows = [];
+        for (let i = 0; i < Math.min(count, MAX_ROWS); i += 1) {
+            const net = (parent.network + i * size) >>> 0;
+            const s = info(net, newPrefix);
+            const current = ip >= s.network && ip <= s.broadcast;
+            rows.push(`<tr class="${current ? 'is-current' : ''}">
+                <td class="text-[#8e8e93]">${i + 1}</td>
+                <td>${toIp(s.network)}/${newPrefix}</td>
+                <td>${toIp(s.first)} – ${toIp(s.last)}</td>
+                <td>${newPrefix >= 31 ? '-' : toIp(s.broadcast)}</td>
+                <td>${fmt(s.usable)}</td>
+            </tr>`);
+        }
+        $('sn-split-body').innerHTML = rows.join('');
+    };
+
+    $('sn-input').addEventListener('input', render);
+    $('sn-prefix').addEventListener('input', () => {
+        // 슬라이더를 움직이면 입력창의 접두사도 맞춰서 바꿈
+        const ipPart = $('sn-input').value.trim().split(/[\/\s]/)[0];
+        $('sn-input').value = `${ipPart}/${$('sn-prefix').value}`;
+        render();
+    });
+    $('sn-split').addEventListener('change', () => {
+        const parsed = parse($('sn-input').value, Number($('sn-prefix').value));
+        if (parsed.error) return;
+        renderSplit(parsed.ip, parsed.prefix, Number($('sn-split').value), info(parsed.ip, parsed.prefix));
+    });
+    document.querySelectorAll('#sn-examples [data-example]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            $('sn-input').value = btn.dataset.example;
+            render();
+        });
+    });
+    render();
+})();
+</script>
+{% endblock %}

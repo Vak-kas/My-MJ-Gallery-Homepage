@@ -1,0 +1,293 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .dx-field label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #1d1d1f; }
+    .dx-field small { display: block; margin-top: 4px; font-size: 11px; color: #8e8e93; line-height: 1.5; }
+    .dx-input {
+        width: 100%; height: 40px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb;
+        padding: 0 12px; font-size: 14px; outline: none; color: #1d1d1f;
+    }
+    .dx-input:focus { border-color: #0066cc; }
+    .dx-row { display: flex; gap: 6px; }
+    .dx-row .dx-input:first-child { flex: 1 1 auto; min-width: 0; }
+    .dx-row select.dx-input { flex: 0 0 92px; }
+    .dx-bar { height: 12px; border-radius: 999px; background: #f2f2f7; overflow: hidden; }
+    .dx-bar > span { display: block; height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+    .dx-split { accent-color: #0066cc; width: 100%; }
+    html.theme-dark .dx-field label { color: #e8e8ea; }
+    html.theme-dark .dx-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .dx-bar { background: #2a2a2e; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · THROUGHPUT</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Full / Half Duplex.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            같은 회선이라도 전이중(Full Duplex)은 보내기와 받기를 동시에, 반이중(Half Duplex)은 한 번에 한 방향만 씁니다.
+            조건을 바꿔 가며 실제로 쓸 수 있는 처리량이 얼마나 차이 나는지 비교해 보세요.
+        </p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[400px_minmax(0,1fr)]">
+        <!-- 입력 -->
+        <section class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div class="flex flex-wrap gap-2" id="dx-presets">
+                <button type="button" data-preset="gigabit" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">유선 1Gbps</button>
+                <button type="button" data-preset="fast" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">100Mbps</button>
+                <button type="button" data-preset="hub" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">10Mbps 허브</button>
+                <button type="button" data-preset="wifi" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Wi-Fi 5</button>
+            </div>
+
+            <div class="mt-5 space-y-4">
+                <div class="dx-field">
+                    <label for="dx-rate">회선 속도 (한 방향)</label>
+                    <div class="dx-row">
+                        <input id="dx-rate" class="dx-input" type="number" min="0" step="any" value="1000" />
+                        <select id="dx-rate-unit" class="dx-input">
+                            <option value="1e3">Kbps</option>
+                            <option value="1e6" selected>Mbps</option>
+                            <option value="1e9">Gbps</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="dx-field">
+                        <label for="dx-mtu">프레임 데이터 (B)</label>
+                        <input id="dx-mtu" class="dx-input" type="number" min="1" step="1" value="1500" />
+                        <small>MTU. 이더넷 기본 1500</small>
+                    </div>
+                    <div class="dx-field">
+                        <label for="dx-overhead">프레임 오버헤드 (B)</label>
+                        <input id="dx-overhead" class="dx-input" type="number" min="0" step="1" value="38" />
+                        <small>프리앰블 8 + 헤더 14 + FCS 4 + IFG 12</small>
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-2 text-[13px] text-[#1d1d1f]">
+                    <input id="dx-tcp" type="checkbox" checked class="h-4 w-4 accent-[#0066cc]" />
+                    TCP/IP 헤더(40B) 제외한 실제 데이터 기준
+                </label>
+
+                <div class="dx-field">
+                    <label for="dx-split">트래픽 방향 비율 <span id="dx-split-label" class="font-normal text-[#6e6e73]"></span></label>
+                    <input id="dx-split" class="dx-split" type="range" min="0" max="100" step="1" value="50" />
+                    <small>A→B 가 차지하는 비율. 50%면 양쪽이 같은 양을 주고받고, 100%면 한쪽으로만 보냄</small>
+                </div>
+
+                <div class="rounded-2xl bg-[#f9f9fb] p-4">
+                    <p class="text-[12px] font-semibold text-[#6e6e73]">반이중 전용 조건</p>
+                    <div class="mt-3 grid grid-cols-2 gap-3">
+                        <div class="dx-field">
+                            <label for="dx-turn">방향 전환 시간 (µs)</label>
+                            <input id="dx-turn" class="dx-input" type="number" min="0" step="any" value="1" />
+                        </div>
+                        <div class="dx-field">
+                            <label for="dx-burst">한 번에 보내는 프레임</label>
+                            <input id="dx-burst" class="dx-input" type="number" min="1" step="1" value="4" />
+                        </div>
+                    </div>
+                    <div class="dx-field mt-3">
+                        <label for="dx-loss">경합·충돌 손실 (%)</label>
+                        <input id="dx-loss" class="dx-input" type="number" min="0" max="99" step="any" value="5" />
+                        <small>매체를 차지하려고 기다리거나 충돌로 다시 보내느라 잃는 시간 비율 (허브·Wi-Fi 에서 큼)</small>
+                    </div>
+                </div>
+
+                <div class="dx-field">
+                    <label for="dx-size">주고받을 데이터 총량 (전송 시간 계산용)</label>
+                    <div class="dx-row">
+                        <input id="dx-size" class="dx-input" type="number" min="0" step="any" value="10" />
+                        <select id="dx-size-unit" class="dx-input">
+                            <option value="1e6">MB</option>
+                            <option value="1e9" selected>GB</option>
+                            <option value="1e12">TB</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 결과 -->
+        <section class="space-y-5">
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#0066cc]">Full Duplex 합계</p>
+                    <p id="dx-full-total" class="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">-</p>
+                    <p id="dx-full-time" class="mt-1 text-[12px] text-[#8e8e93]">-</p>
+                </div>
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#d9730d]">Half Duplex 합계</p>
+                    <p id="dx-half-total" class="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">-</p>
+                    <p id="dx-half-time" class="mt-1 text-[12px] text-[#8e8e93]">-</p>
+                </div>
+                <div class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                    <p class="text-[12px] font-semibold text-[#6e6e73]">Full ÷ Half</p>
+                    <p id="dx-ratio" class="mt-2 text-[28px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">-</p>
+                    <p id="dx-ratio-note" class="mt-1 text-[12px] text-[#8e8e93]">-</p>
+                </div>
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">방향별 처리량</h2>
+                    <p class="text-[12px] text-[#8e8e93]">막대 길이 = 회선 이론 최대치(한 방향) 대비</p>
+                </div>
+                <div class="mt-5 space-y-5" id="dx-bars"></div>
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">어디서 줄어드나</h2>
+                <dl class="mt-4 grid gap-x-6 gap-y-3 text-[13px] sm:grid-cols-2" id="dx-breakdown"></dl>
+            </div>
+
+            <details class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <summary class="cursor-pointer text-[16px] font-semibold text-[#1d1d1f]">계산 방법</summary>
+                <div class="mt-4 space-y-3 text-[13px] leading-relaxed text-[#6e6e73]">
+                    <p><b class="text-[#1d1d1f]">프레임 효율</b> = 실제 데이터 ÷ (프레임 데이터 + 오버헤드). TCP/IP 헤더 제외를 켜면 실제 데이터 = 프레임 데이터 − 40B.</p>
+                    <p><b class="text-[#1d1d1f]">Full Duplex</b>: 두 방향이 각자 회선 속도를 다 씁니다. 트래픽이 많은 쪽 방향이 먼저 꽉 차므로
+                        합계 = 회선 속도 × 프레임 효율 ÷ max(A→B 비율, B→A 비율). 50:50 이면 회선 속도의 2배까지 나옵니다.</p>
+                    <p><b class="text-[#1d1d1f]">Half Duplex</b>: 한 번에 한 방향만 보내므로 합계가 회선 속도를 넘지 못합니다.
+                        방향을 바꿀 때마다 전환 시간이 들고(양쪽이 번갈아 보낼수록 자주 바뀜: 전환 빈도 = 2 × min(비율)),
+                        경합·충돌 손실만큼 더 줄어듭니다.
+                        합계 = 회선 속도 × 프레임 효율 × 버스트 시간 ÷ (버스트 시간 + 전환 빈도 × 전환 시간) × (1 − 손실).</p>
+                    <p>실제 장비에서는 TCP 혼잡 제어, 지연(RTT), 버퍼 크기 등도 영향을 주므로 이 값은 "링크가 낼 수 있는 상한"으로 보시면 됩니다.</p>
+                </div>
+            </details>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const num = (id, fallback = 0) => {
+        const v = parseFloat($(id).value);
+        return Number.isFinite(v) ? v : fallback;
+    };
+
+    const PRESETS = {
+        gigabit: { rate: 1, unit: '1e9', turn: 1, burst: 8, loss: 5 },
+        fast: { rate: 100, unit: '1e6', turn: 2, burst: 4, loss: 10 },
+        hub: { rate: 10, unit: '1e6', turn: 10, burst: 1, loss: 30 },
+        wifi: { rate: 433, unit: '1e6', turn: 50, burst: 16, loss: 35 },
+    };
+
+    const fmtRate = (bps) => {
+        if (!Number.isFinite(bps) || bps <= 0) return '0 bps';
+        const units = [['Tbps', 1e12], ['Gbps', 1e9], ['Mbps', 1e6], ['Kbps', 1e3]];
+        for (const [label, size] of units) {
+            if (bps >= size) return `${(bps / size).toLocaleString('ko-KR', { maximumFractionDigits: bps / size >= 100 ? 0 : 2 })} ${label}`;
+        }
+        return `${bps.toFixed(0)} bps`;
+    };
+
+    const fmtTime = (sec) => {
+        if (!Number.isFinite(sec)) return '-';
+        if (sec < 1) return `${(sec * 1000).toFixed(1)} ms`;
+        if (sec < 60) return `${sec.toFixed(1)} 초`;
+        if (sec < 3600) return `${Math.floor(sec / 60)}분 ${Math.round(sec % 60)}초`;
+        return `${Math.floor(sec / 3600)}시간 ${Math.round((sec % 3600) / 60)}분`;
+    };
+
+    const pct = (v) => `${(v * 100).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}%`;
+
+    const bar = (label, value, max, color) => {
+        const width = max > 0 ? Math.min(100, (value / max) * 100) : 0;
+        return `
+            <div>
+                <div class="flex items-baseline justify-between text-[13px]">
+                    <span class="text-[#1d1d1f]">${label}</span>
+                    <span class="font-semibold text-[#1d1d1f]">${fmtRate(value)}</span>
+                </div>
+                <div class="dx-bar mt-1.5"><span style="width:${width}%;background:${color}"></span></div>
+            </div>`;
+    };
+
+    const compute = () => {
+        const rate = num('dx-rate') * parseFloat($('dx-rate-unit').value);
+        const mtu = Math.max(1, num('dx-mtu', 1500));
+        const overhead = Math.max(0, num('dx-overhead', 38));
+        const tcp = $('dx-tcp').checked;
+        const p = num('dx-split', 50) / 100;
+        const turnSec = Math.max(0, num('dx-turn')) / 1e6;
+        const burst = Math.max(1, Math.round(num('dx-burst', 1)));
+        const loss = Math.min(0.99, Math.max(0, num('dx-loss') / 100));
+        const totalBits = Math.max(0, num('dx-size')) * parseFloat($('dx-size-unit').value) * 8;
+
+        const useful = Math.max(0, mtu - (tcp ? 40 : 0));
+        const frameEff = useful / (mtu + overhead);
+        const usable = rate * frameEff;
+
+        // Full Duplex: 많은 쪽 방향이 먼저 포화
+        const heavier = Math.max(p, 1 - p);
+        const fullTotal = heavier > 0 ? usable / heavier : 0;
+        const fullAB = fullTotal * p;
+        const fullBA = fullTotal * (1 - p);
+
+        // Half Duplex: 방향 전환 + 경합 손실
+        const frameTime = rate > 0 ? ((mtu + overhead) * 8) / rate : 0;
+        const burstTime = frameTime * burst;
+        const switchRate = 2 * Math.min(p, 1 - p);
+        const turnEff = burstTime > 0 ? burstTime / (burstTime + switchRate * turnSec) : 0;
+        const halfTotal = usable * turnEff * (1 - loss);
+        const halfAB = halfTotal * p;
+        const halfBA = halfTotal * (1 - p);
+
+        $('dx-split-label').textContent = `A→B ${Math.round(p * 100)}% : B→A ${Math.round((1 - p) * 100)}%`;
+        $('dx-full-total').textContent = fmtRate(fullTotal);
+        $('dx-half-total').textContent = fmtRate(halfTotal);
+        $('dx-full-time').textContent = totalBits > 0 ? `${$('dx-size').value} ${$('dx-size-unit').selectedOptions[0].text} → ${fmtTime(totalBits / fullTotal)}` : '-';
+        $('dx-half-time').textContent = totalBits > 0 ? `${$('dx-size').value} ${$('dx-size-unit').selectedOptions[0].text} → ${fmtTime(totalBits / halfTotal)}` : '-';
+
+        const ratio = halfTotal > 0 ? fullTotal / halfTotal : Infinity;
+        $('dx-ratio').textContent = Number.isFinite(ratio) ? `${ratio.toFixed(2)}×` : '-';
+        $('dx-ratio-note').textContent = Number.isFinite(ratio)
+            ? (ratio >= 1.05 ? `전이중이 ${pct(ratio - 1)} 더 많이 처리` : '거의 차이 없음 (한 방향 위주 트래픽)')
+            : '-';
+
+        $('dx-bars').innerHTML = [
+            bar('Full · A→B', fullAB, rate, '#0066cc'),
+            bar('Full · B→A', fullBA, rate, '#5aa2e6'),
+            bar('Half · A→B', halfAB, rate, '#d9730d'),
+            bar('Half · B→A', halfBA, rate, '#f0a964'),
+        ].join('');
+
+        const rows = [
+            ['회선 이론 최대치 (한 방향)', fmtRate(rate)],
+            ['프레임 효율 (헤더·간격 제외)', pct(frameEff)],
+            ['프레임 하나 전송 시간', fmtTime(frameTime)],
+            ['반이중 방향 전환 효율', pct(turnEff)],
+            ['반이중 경합·충돌 후 남는 비율', pct(1 - loss)],
+            ['반이중 회선 사용률 (합계 ÷ 회선)', pct(rate > 0 ? halfTotal / rate : 0)],
+        ];
+        $('dx-breakdown').innerHTML = rows.map(([k, v]) => `
+            <div class="flex items-baseline justify-between gap-3 border-b border-black/[0.06] pb-2">
+                <dt class="text-[#6e6e73]">${k}</dt><dd class="font-semibold text-[#1d1d1f]">${v}</dd>
+            </div>`).join('');
+    };
+
+    document.querySelectorAll('#dx-presets [data-preset]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const preset = PRESETS[btn.dataset.preset];
+            $('dx-rate').value = preset.rate;
+            $('dx-rate-unit').value = preset.unit;
+            $('dx-turn').value = preset.turn;
+            $('dx-burst').value = preset.burst;
+            $('dx-loss').value = preset.loss;
+            compute();
+        });
+    });
+    document.querySelectorAll('main input, main select').forEach((el) => {
+        el.addEventListener('input', compute);
+        el.addEventListener('change', compute);
+    });
+    compute();
+})();
+</script>
+{% endblock %}
