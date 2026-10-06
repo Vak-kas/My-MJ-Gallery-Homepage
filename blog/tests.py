@@ -1,7 +1,9 @@
 import json
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
 
+from blog.models import GuestbookEntry
 from blog.content import parse_content, render_tiptap_html, tiptap_cover_image, tiptap_plain_text
 from blog.templatetags.blog_extras import editorjs_cover_image, editorjs_excerpt, render_editorjs
 
@@ -142,3 +144,74 @@ class LegacyEditorJsTests(SimpleTestCase):
 	def test_legacy_linkcard_blocks_javascript_url(self):
 		content = json.dumps({"blocks": [{"type": "linkcard", "data": {"url": "javascript:alert(1)", "title": "x"}}]})
 		self.assertNotIn("javascript:", str(render_editorjs(content)))
+
+
+class GuestbookTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		self.user = get_user_model().objects.create_user(username="visitor", password="pw-for-tests-only")
+		self.url = reverse("blog:index")
+
+	def test_anonymous_cannot_post(self):
+		resp = self.client.post(self.url, {"author_name": "555", "message": "-1' OR 2+457-457-1=0+0+0+1"})
+		self.assertEqual(resp.status_code, 302)
+		self.assertIn(reverse("accounts:login"), resp["Location"])
+		self.assertFalse(GuestbookEntry.objects.exists())
+
+	def test_anonymous_sees_login_prompt_not_form(self):
+		resp = self.client.get(self.url)
+		self.assertContains(resp, "방명록은 로그인 후 남길 수 있어요")
+		self.assertNotContains(resp, 'name="message"')
+
+	def test_logged_in_post_uses_account_name(self):
+		self.client.force_login(self.user)
+		self.client.post(self.url, {"author_name": "가짜이름", "message": "안녕하세요"})
+		entry = GuestbookEntry.objects.get()
+		self.assertEqual(entry.author, self.user)
+		self.assertEqual(entry.author_name, "visitor")
+
+	def test_rate_limit_one_per_minute(self):
+		self.client.force_login(self.user)
+		self.client.post(self.url, {"message": "첫 번째"})
+		self.client.post(self.url, {"message": "두 번째"})
+		self.assertEqual(GuestbookEntry.objects.count(), 1)
+
+	def test_daily_limit(self):
+		from datetime import timedelta
+		from django.utils import timezone
+		for i in range(10):
+			entry = GuestbookEntry.objects.create(author=self.user, author_name="visitor", message=str(i))
+			GuestbookEntry.objects.filter(pk=entry.pk).update(created_at=timezone.now() - timedelta(minutes=10 + i))
+		self.client.force_login(self.user)
+		self.client.post(self.url, {"message": "11번째"})
+		self.assertEqual(GuestbookEntry.objects.count(), 10)
+
+	def test_attack_strings_are_stored_as_plain_text(self):
+		payload = "<script>alert(1)</script> -1' OR 3*2<(0+5+20-20) --"
+		GuestbookEntry.objects.create(author_name=payload, message=payload)
+		resp = self.client.get(self.url)
+		self.assertNotContains(resp, "<script>alert(1)</script>")
+		self.assertContains(resp, "&lt;script&gt;")
+
+
+class ClearGuestbookCommandTests(TestCase):
+	def test_dry_run_keeps_entries_and_yes_backs_up_then_deletes(self):
+		import json
+		import tempfile
+		from io import StringIO
+		from pathlib import Path
+
+		from django.core.management import call_command
+
+		GuestbookEntry.objects.create(author_name="555", message="-1' OR 2+457-457-1=0+0+0+1")
+		GuestbookEntry.objects.create(author_name="a", message="b")
+
+		call_command("clear_guestbook", stdout=StringIO())
+		self.assertEqual(GuestbookEntry.objects.count(), 2)
+
+		with tempfile.TemporaryDirectory() as tmp:
+			call_command("clear_guestbook", "--yes", f"--backup-dir={tmp}", stdout=StringIO())
+			self.assertEqual(GuestbookEntry.objects.count(), 0)
+			backups = list(Path(tmp).glob("guestbook-*.json"))
+			self.assertEqual(len(backups), 1)
+			self.assertEqual(len(json.loads(backups[0].read_text(encoding="utf-8"))), 2)

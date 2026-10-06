@@ -141,6 +141,14 @@ class CommentLike(models.Model):
 
 
 class GuestbookEntry(models.Model):
+	# 로그인한 사용자만 작성 (예전 익명 글은 author 가 비어 있음)
+	author = models.ForeignKey(
+		settings.AUTH_USER_MODEL,
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name="guestbook_entries",
+	)
 	author_name = models.CharField(max_length=60)
 	message = models.TextField(max_length=1000)
 	is_visible = models.BooleanField(default=True, db_index=True)

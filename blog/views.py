@@ -30,6 +30,7 @@ UNLOCK_WINDOW_SECONDS = 10 * 60
 UNLOCK_BLOCK_SECONDS = 10 * 60
 COVER_IMAGE_MAX_BYTES = 10 * 1024 * 1024
 MATH_OCR_MAX_BYTES = 8 * 1024 * 1024
+GUESTBOOK_DAILY_LIMIT = 10
 INLINE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
 INLINE_IMAGE_MAX_SIDE = 2000
 
@@ -307,18 +308,40 @@ def _category_page(request, category: str, page_title: str):
 	return context
 
 
+def _guestbook_rate_limited(user):
+	"""같은 계정의 연속 작성/도배 방지: 1분에 1개, 하루 10개."""
+	now = timezone.now()
+	recent = GuestbookEntry.objects.filter(author=user)
+	if recent.filter(created_at__gte=now - timedelta(minutes=1)).exists():
+		return "방명록은 1분에 한 번만 남길 수 있습니다."
+	if recent.filter(created_at__gte=now - timedelta(days=1)).count() >= GUESTBOOK_DAILY_LIMIT:
+		return "방명록은 하루에 최대 10개까지 남길 수 있습니다."
+	return None
+
+
 def index(request):
 	if request.method == "POST":
-		author_name = (request.POST.get("author_name") or "").strip()
+		# 방명록은 로그인한 사용자만 작성 (이름은 계정에서 가져옴)
+		if not request.user.is_authenticated:
+			messages.error(request, "방명록은 로그인 후 남길 수 있습니다.")
+			return redirect(f"{reverse('accounts:login')}?{urlencode({'next': reverse('blog:index') + '#guestbook'})}")
+
 		message = (request.POST.get("message") or "").strip()
-
-		if author_name and message:
-			GuestbookEntry.objects.create(author_name=author_name[:60], message=message[:1000])
-			messages.success(request, "방명록이 등록되었습니다.")
+		if not message:
+			messages.error(request, "메시지를 입력해 주세요.")
 		else:
-			messages.error(request, "이름과 메시지를 모두 입력해 주세요.")
+			limited = _guestbook_rate_limited(request.user)
+			if limited:
+				messages.error(request, limited)
+			else:
+				GuestbookEntry.objects.create(
+					author=request.user,
+					author_name=request.user.get_username()[:60],
+					message=message[:1000],
+				)
+				messages.success(request, "방명록이 등록되었습니다.")
 
-		return redirect("blog:index")
+		return redirect(f"{reverse('blog:index')}#guestbook")
 
 	search_query = (request.GET.get("q") or "").strip()
 	current_sort = (request.GET.get("sort") or "latest").strip()
