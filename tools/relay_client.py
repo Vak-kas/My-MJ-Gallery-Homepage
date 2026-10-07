@@ -49,3 +49,8 @@ def create_room(payload):
 
 def close_room(room_id):
 	return _call("DELETE", f"/rooms/{room_id}")
+
+
+def join_room(room_id, role, token, ip):
+	"""role(sender/receiver) 링크를 연 네트워크의 IP 를 등록."""
+	return _call("POST", f"/rooms/{room_id}/join", {"role": role, "token": token, "ip": ip})

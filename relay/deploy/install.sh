@@ -6,6 +6,7 @@
 #   3) systemd 서비스 등록·시작
 #   4) nginx 사이트 설정에 WebSocket 프록시 include 추가 → 설정 검사 후 reload
 #   5) deploy.sh 에 mj-relay 재시작 줄 추가 (배포 때 새 코드 반영)
+#   6) gunicorn 재시작 (사이트가 새 키를 읽도록)
 set -euo pipefail
 
 PROJECT=/home/ubuntu/projects/smjgallery
@@ -61,6 +62,9 @@ if [ -f deploy.sh ] && ! grep -q "mj-relay" deploy.sh; then
 else
 	echo "변경 없음"
 fi
+
+echo "== 6) 사이트 재시작 (.env 의 RELAY_API_KEY 를 다시 읽도록)"
+systemctl restart gunicorn
 
 echo
 echo "완료. health: $(curl -s http://127.0.0.1:8090/health)"

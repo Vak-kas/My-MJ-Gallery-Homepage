@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -12,6 +12,7 @@ from django.views.decorators.http import require_POST
 from . import relay_client
 from .permissions import can_manage_streams
 from .registry import TOOLS
+from .speedtest import _client_ip
 
 
 def index(request):
@@ -104,27 +105,76 @@ def stream_list(request):
 	})
 
 
+TOKEN_KEYS = ("token", "sender_token", "receiver_token")
+
+
+def _token_role(room, token):
+	for role, key in (("admin", "token"), ("sender", "sender_token"), ("receiver", "receiver_token")):
+		if token and hmac.compare_digest(token, room.get(key, "")):
+			return role
+	return None
+
+
+def _load_room(room_id, token):
+	room = relay_client.get_room(room_id)
+	role = _token_role(room, token) if room else None
+	if role is None:
+		raise Http404("방이 없거나 링크가 올바르지 않습니다.")
+	return room, role
+
+
 def stream_room(request, room_id):
-	"""방 화면. 방 토큰이 있는 링크면 누구나(받는 사람) 볼 수 있고, 닫기는 관리자만."""
+	"""방 화면. 링크 토큰으로 역할을 정함.
+
+	- 관리자 링크: 보내는 쪽·받는 쪽 링크를 나눠 줄 수 있고 방을 닫을 수 있음
+	- 보내는 쪽 / 받는 쪽 링크: 연 순간 이 네트워크의 공인 IP 가 그 역할로 등록됨 → 그 IP 에서만 포트 접속 가능
+	"""
+	token = request.GET.get("token", "")
 	try:
-		room = relay_client.get_room(room_id)
+		room, role = _load_room(room_id, token)
+		my_ip = _client_ip(request)
+		if role in ("sender", "receiver"):
+			room = relay_client.join_room(room_id, role, token, my_ip) or room
 	except relay_client.RelayError as exc:
 		return render(request, "tools/stream_room.html", {"relay_error": str(exc)}, status=503)
-	token = request.GET.get("token", "")
-	if room is None or not hmac.compare_digest(token, room.get("token", "")):
-		raise Http404("방이 없거나 링크가 올바르지 않습니다.")
 
 	ws_base = settings.RELAY_WS_URL or f"{'wss' if request.is_secure() else 'ws'}://{request.get_host()}"
-	room_view = {k: v for k, v in room.items() if k != "token"}
-	return render(request, "tools/stream_room.html", {
+	base_url = request.build_absolute_uri(reverse("tools:stream_room", args=[room_id]))
+	room_view = {k: v for k, v in room.items() if k not in TOKEN_KEYS}
+	context = {
 		"room": room_view,
 		"room_json": room_view,
-		"share_url": request.build_absolute_uri(),
+		"role": role,
+		"my_ip": my_ip,
 		"ws_url": f"{ws_base.rstrip('/')}/relay/ws/{room_id}?token={token}",
+		"join_url": f"{reverse('tools:stream_join', args=[room_id])}?token={token}",
 		"public_host": settings.RELAY_PUBLIC_HOST,
-		"can_manage": can_manage_streams(request.user),
-		"token": token,
-	})
+		"can_manage": role == "admin" and can_manage_streams(request.user),
+	}
+	if role == "admin":
+		context["sender_link"] = f"{base_url}?token={room['sender_token']}"
+		context["receiver_link"] = f"{base_url}?token={room['receiver_token']}"
+	return render(request, "tools/stream_room.html", context)
+
+
+@require_POST
+def stream_join(request, room_id):
+	"""링크 페이지가 열려 있는 동안 주기적으로 호출: IP 가 바뀌어도 다시 등록."""
+	token = request.GET.get("token", "")
+	role = request.GET.get("role", "")
+	try:
+		room, token_role = _load_room(room_id, token)
+		if token_role == "admin" and role in ("sender", "receiver"):
+			pass  # 관리자는 "이 컴퓨터를 보내는/받는 쪽으로 등록" 가능
+		elif token_role in ("sender", "receiver"):
+			role = token_role
+		else:
+			return JsonResponse({"error": "역할을 정할 수 없습니다."}, status=400)
+		ip = _client_ip(request)
+		relay_client.join_room(room_id, role, token, ip)
+	except relay_client.RelayError as exc:
+		return JsonResponse({"error": str(exc)}, status=503)
+	return JsonResponse({"role": role, "ip": ip})
 
 
 @require_POST

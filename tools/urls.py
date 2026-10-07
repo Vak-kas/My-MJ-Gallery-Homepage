@@ -15,4 +15,5 @@ urlpatterns = [
     path("stream/", views.stream_list, name="stream"),
     path("stream/<str:room_id>/", views.stream_room, name="stream_room"),
     path("stream/<str:room_id>/close/", views.stream_close, name="stream_close"),
+    path("stream/<str:room_id>/join/", views.stream_join, name="stream_join"),
 ]

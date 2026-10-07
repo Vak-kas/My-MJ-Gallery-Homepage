@@ -52,13 +52,20 @@ class RelayTestCase(unittest.IsolatedAsyncioTestCase):
 		sock.connect(f"tcp://127.0.0.1:{room.out_port}")
 		return sock
 
+	async def open_room(self, payload, join=("sender", "receiver")):
+		"""방을 만들고 이 테스트(127.0.0.1)를 보내는/받는 쪽으로 입장시킴."""
+		room = await self.relay.create_room(payload)
+		for role in join:
+			self.relay.join(room.id, role, getattr(room, f"{role}_token"), "127.0.0.1")
+		return room
+
 	async def recv(self, sock, timeout=2.0):
 		return await asyncio.wait_for(sock.recv_multipart(), timeout)
 
 
 class RoomRelayTests(RelayTestCase):
 	async def test_iq_bytes_and_multipart_pass_through_unchanged(self):
-		room = await self.relay.create_room({"kind": "iq", "meta": {"format": "fc32", "sample_rate": 2e6}})
+		room = await self.open_room({"kind": "iq", "meta": {"format": "fc32", "sample_rate": 2e6}})
 		rx = self.receiver(room)
 		tx = self.sender(room)
 		await asyncio.sleep(0.3)  # SUB 구독이 전달될 시간
@@ -71,7 +78,7 @@ class RoomRelayTests(RelayTestCase):
 		self.assertEqual(len(room.snapshot), mj_relay.SNAPSHOT_SAMPLES * 8)
 
 	async def test_multiple_receivers_get_same_stream(self):
-		room = await self.relay.create_room({"kind": "raw"})
+		room = await self.open_room({"kind": "raw"})
 		rx1, rx2 = self.receiver(room), self.receiver(room)
 		tx = self.sender(room)
 		await asyncio.sleep(0.3)
@@ -80,7 +87,7 @@ class RoomRelayTests(RelayTestCase):
 		self.assertEqual(await self.recv(rx2), [b"hello"])
 
 	async def test_file_room_uses_push_and_tracks_progress(self):
-		room = await self.relay.create_room({"kind": "file", "meta": {"filename": "cap.iq"}})
+		room = await self.open_room({"kind": "file", "meta": {"filename": "cap.iq"}})
 		rx = self.receiver(room, zmq.PULL)
 		tx = self.sender(room)
 		header = json.dumps({"name": "cap.iq", "size": 6}).encode()
@@ -94,7 +101,7 @@ class RoomRelayTests(RelayTestCase):
 		self.assertTrue(room.file_info["done"])
 
 	async def test_rate_limit_drops_excess_for_realtime(self):
-		room = await self.relay.create_room({"kind": "raw", "rate_limit": 64 * 1024})
+		room = await self.open_room({"kind": "raw", "rate_limit": 64 * 1024})
 		tx = self.sender(room)
 		chunk = b"x" * 16 * 1024
 		for _ in range(20):  # 320KB 를 한 번에 → 1초 분량(64KB) 넘는 건 버려져야 함
@@ -104,7 +111,7 @@ class RoomRelayTests(RelayTestCase):
 		self.assertLessEqual(room.bytes_in, 64 * 1024 + len(chunk))
 
 	async def test_total_limit_closes_room_and_frees_ports(self):
-		room = await self.relay.create_room({"kind": "raw", "total_limit": 1024 * 1024})
+		room = await self.open_room({"kind": "raw", "total_limit": 1024 * 1024})
 		ports = {room.in_port, room.out_port}
 		tx = self.sender(room)
 		for _ in range(20):
@@ -124,22 +131,87 @@ class RoomRelayTests(RelayTestCase):
 		await asyncio.sleep(1.3)
 		self.assertNotIn(room.id, self.relay.rooms)
 
-	async def test_ip_allowlist_blocks_other_senders(self):
-		blocked = await self.relay.create_room({"kind": "raw", "allow_ips": ["10.0.0.1"]})
+	async def test_not_joined_cannot_send_or_receive(self):
+		room = await self.relay.create_room({"kind": "raw"})  # 아무도 입장 안 함
+		rx = self.receiver(room)
+		tx = self.sender(room)
+		await asyncio.sleep(0.3)
+		await tx.send(b"nobody joined")
+		with self.assertRaises(asyncio.TimeoutError):
+			await self.recv(rx, timeout=0.8)
+		self.assertEqual(room.bytes_in, 0)
+
+	async def test_clients_started_before_join_connect_after_join(self):
+		"""GNU Radio 를 먼저 켜 두고 나중에 링크로 입장해도 자동으로 붙어야 함."""
+		room = await self.relay.create_room({"kind": "raw"})
+		rx = self.receiver(room)
+		tx = self.sender(room)
+		await asyncio.sleep(0.8)  # 입장 전: 거절당하며 재시도 중
+		self.assertEqual(room.bytes_in, 0)
+		for role in ("sender", "receiver"):
+			self.relay.join(room.id, role, getattr(room, f"{role}_token"), "127.0.0.1")
+		for _ in range(100):  # 입장 후 최대 ~2초(handshake_ivl) 안에 재접속
+			if room.stats()["ready"]:
+				break
+			await asyncio.sleep(0.05)
+		self.assertTrue(room.stats()["ready"])
+		await asyncio.sleep(0.3)  # SUB 구독 전달
+		await tx.send(b"after join")
+		self.assertEqual(await self.recv(rx), [b"after join"])
+
+	async def test_join_sender_only_still_blocks_receiver(self):
+		room = await self.open_room({"kind": "raw"}, join=("sender",))
+		rx = self.receiver(room)
+		tx = self.sender(room)
+		await asyncio.sleep(0.3)
+		await tx.send(b"data")
+		await asyncio.sleep(0.3)
+		self.assertEqual(room.bytes_in, 4)  # 보내는 쪽은 들어옴
+		with self.assertRaises(asyncio.TimeoutError):
+			await self.recv(rx, timeout=0.8)  # 입장 안 한 받는 쪽은 못 받음
+		self.assertEqual(room.receivers, 0)
+
+	async def test_static_allow_ips_work_for_sender_without_join(self):
+		blocked = await self.open_room({"kind": "raw", "allow_ips": ["10.0.0.1"]}, join=("receiver",))
 		rx = self.receiver(blocked)
 		tx = self.sender(blocked)
 		await asyncio.sleep(0.3)
 		await tx.send(b"should not pass")
 		with self.assertRaises(asyncio.TimeoutError):
 			await self.recv(rx, timeout=0.8)
-		self.assertEqual(blocked.bytes_in, 0)
 
-		allowed = await self.relay.create_room({"kind": "raw", "allow_ips": ["127.0.0.0/8"]})
+		allowed = await self.open_room({"kind": "raw", "allow_ips": ["127.0.0.0/8"]}, join=("receiver",))
 		rx2 = self.receiver(allowed)
 		tx2 = self.sender(allowed)
 		await asyncio.sleep(0.3)
 		await tx2.send(b"ok")
 		self.assertEqual(await self.recv(rx2), [b"ok"])
+
+	async def test_join_checks_role_token_and_expires(self):
+		room = await self.relay.create_room({"kind": "raw"})
+		with self.assertRaises(mj_relay.RoomError) as ctx:
+			self.relay.join(room.id, "sender", room.receiver_token, "1.2.3.4")  # 다른 역할 토큰
+		self.assertEqual(ctx.exception.status, 403)
+		with self.assertRaises(mj_relay.RoomError):
+			self.relay.join(room.id, "sender", room.sender_token, "not-an-ip")
+		self.relay.join(room.id, "sender", room.sender_token, "1.2.3.4")
+		self.relay.join(room.id, "receiver", room.token, "5.6.7.8")  # 관리자 토큰은 어느 역할이든 가능
+		self.assertTrue(room.allows("sender", "1.2.3.4"))
+		self.assertFalse(room.allows("receiver", "1.2.3.4"))
+		self.assertTrue(room.allows("receiver", "5.6.7.8"))
+		room.joined["sender"]["1.2.3.4"] -= mj_relay.JOIN_TTL + 1  # 오래된 등록
+		self.assertFalse(room.allows("sender", "1.2.3.4"))
+
+	async def test_ready_when_both_sides_connected(self):
+		room = await self.open_room({"kind": "raw"})
+		self.assertFalse(room.stats()["ready"])
+		self.receiver(room)
+		self.sender(room)
+		for _ in range(30):
+			if room.stats()["ready"]:
+				break
+			await asyncio.sleep(0.05)
+		self.assertTrue(room.stats()["ready"])
 
 	async def test_room_count_and_validation(self):
 		with self.assertRaises(mj_relay.RoomError):
@@ -183,14 +255,24 @@ class ApiTests(RelayTestCase):
 		self.assertEqual(resp.status, 200)
 		self.assertEqual(self.relay.rooms, {})
 
+	async def test_join_endpoint(self):
+		headers = {"X-Relay-Key": API_KEY}
+		room = await self.relay.create_room({"kind": "raw"})
+		resp = await self.client.post(f"/rooms/{room.id}/join", json={"role": "sender", "token": "wrong", "ip": "1.2.3.4"}, headers=headers)
+		self.assertEqual(resp.status, 403)
+		resp = await self.client.post(f"/rooms/{room.id}/join", json={"role": "sender", "token": room.sender_token, "ip": "1.2.3.4"}, headers=headers)
+		self.assertEqual(resp.status, 200)
+		self.assertEqual((await resp.json())["joined"]["sender"], ["1.2.3.4"])
+
 	async def test_websocket_needs_room_token_and_streams_stats(self):
-		room = await self.relay.create_room({"kind": "iq"})
+		room = await self.open_room({"kind": "iq"})
 		resp = await self.client.get(f"/relay/ws/{room.id}?token=wrong")
 		self.assertEqual(resp.status, 404)
-		ws = await self.client.ws_connect(f"/relay/ws/{room.id}?token={room.token}")
+		ws = await self.client.ws_connect(f"/relay/ws/{room.id}?token={room.receiver_token}")
 		hello = await ws.receive_json(timeout=2)
 		self.assertEqual(hello["type"], "hello")
-		self.assertNotIn("token", hello)
+		for key in ("token", "sender_token", "receiver_token"):
+			self.assertNotIn(key, hello)
 		tx = self.sender(room)
 		await tx.send(os.urandom(8 * 2048))
 		got_stats = got_snapshot = False

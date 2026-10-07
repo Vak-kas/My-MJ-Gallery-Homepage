@@ -23,7 +23,8 @@
         <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SDR · ZMQ RELAY</p>
         <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Data Stream.</h1>
         <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
-            방을 열면 이 서버에 <b>보내는 포트</b>와 <b>받는 포트</b>가 생깁니다. 보내는 쪽(HackRF + GNU Radio ZMQ PUSH Sink, 또는 CLI)이 데이터를 보내면
+            방을 열면 이 서버에 <b>보내는 포트</b>와 <b>받는 포트</b>, 그리고 <b>보내는 쪽·받는 쪽 링크</b>가 생깁니다.
+            각자 자기 링크를 열어 "입장"하면 그 네트워크에서만 접속할 수 있고, 보내는 쪽(HackRF + GNU Radio ZMQ PUSH Sink, 또는 CLI)이 보내면
             받는 쪽(GNU Radio ZMQ SUB Source, CLI, 웹 화면)이 실시간으로 받습니다.
         </p>
     </div>
@@ -80,9 +81,10 @@
                 </div>
 
                 <div>
-                    <label class="sr-label" for="allow_ips">보내는 쪽 IP 허용 목록 (선택, 권장)</label>
+                    <label class="sr-label" for="allow_ips">보내는 쪽 고정 IP (선택)</label>
                     <textarea id="allow_ips" name="allow_ips" rows="2" class="sr-input" placeholder="203.230.0.10&#10;10.0.0.0/8"></textarea>
-                    <p class="sr-hint">적으면 이 IP 에서만 보낼 수 있어요(한 줄에 하나, CIDR 가능). 비우면 포트 번호를 아는 누구나 보낼 수 있습니다.</p>
+                    <p class="sr-hint">비워 두면 됩니다. 방을 열면 <b>보내는 쪽·받는 쪽 링크</b>가 생기고, 링크를 연 네트워크만 접속할 수 있어요(고정 IP 불필요).
+                        링크 없이 항상 허용할 고정 IP 가 있을 때만 적으세요(한 줄에 하나, CIDR 가능).</p>
                 </div>
 
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">

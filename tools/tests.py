@@ -101,10 +101,11 @@ class SpeedtestApiTests(TestCase):
 
 class StreamViewTests(TestCase):
 	ROOM = {
-		"id": "abc123", "token": "secret-token", "kind": "iq",
+		"id": "abc123", "token": "secret-token", "sender_token": "send-token", "receiver_token": "recv-token", "kind": "iq",
 		"meta": {"format": "sc8", "sample_rate": 2000000.0, "center_freq": 433920000.0, "label": "연구실"},
 		"allow_ips": ["203.0.113.5/32"], "in_port": 5550, "out_port": 5551, "out_socket": "PUB",
 		"rate_limit": 16 * 1024 * 1024, "total_limit": 20 * 1024 ** 3, "created_at": 0, "expires_at": 0, "expires_in": 3600,
+		"joined": {"sender": [], "receiver": []},
 		"stats": {"bytes_in": 0, "bytes_dropped": 0, "messages": 0, "rate_bps": 0, "senders": 0, "receivers": 0, "viewers": 0, "idle_seconds": None, "file": None, "closed": None},
 	}
 
@@ -150,18 +151,57 @@ class StreamViewTests(TestCase):
 			resp = self.client.get(reverse("tools:stream"))
 		self.assertContains(resp, "mj-relay")
 
-	def test_room_page_needs_token_and_hides_it_from_json(self):
+	def _room_json(self, resp):
+		return resp.content.decode().split('id="sr-room" type="application/json">')[1].split("</script>")[0]
+
+	def test_room_page_needs_valid_token(self):
 		from unittest import mock
 		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM):
 			self.assertEqual(self.client.get(reverse("tools:stream_room", args=["abc123"])).status_code, 404)
 			self.assertEqual(self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "wrong"}).status_code, 404)
+
+	def test_admin_link_shows_both_role_links_without_joining(self):
+		from unittest import mock
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room") as join:
 			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "secret-token"})
-		self.assertEqual(resp.status_code, 200)
-		self.assertContains(resp, "tcp://smjgallery.kr:5550")
+		join.assert_not_called()
+		self.assertContains(resp, "?token=send-token")
+		self.assertContains(resp, "?token=recv-token")
+		self.assertContains(resp, "방 닫기")
+		for secret in ("secret-token", "send-token", "recv-token"):
+			self.assertNotIn(secret, self._room_json(resp))
+
+	def test_sender_link_registers_ip_and_shows_only_sender_side(self):
+		from unittest import mock
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room", return_value=self.ROOM) as join:
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "send-token"}, HTTP_X_REAL_IP="198.51.100.7")
+		join.assert_called_once_with("abc123", "sender", "send-token", "198.51.100.7")
+		self.assertContains(resp, "198.51.100.7")
+		self.assertContains(resp, "ZMQ PUSH Sink")
+		self.assertNotContains(resp, "ZMQ SUB Source")
+		self.assertNotContains(resp, "recv-token")
+		self.assertNotContains(resp, "방 닫기")
+
+	def test_receiver_link_registers_as_receiver(self):
+		from unittest import mock
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room", return_value=self.ROOM) as join:
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"}, HTTP_X_REAL_IP="198.51.100.8")
+		join.assert_called_once_with("abc123", "receiver", "recv-token", "198.51.100.8")
 		self.assertContains(resp, "ZMQ SUB Source")
-		self.assertNotContains(resp, "방 닫기")  # 링크로 들어온 사람은 닫을 수 없음
-		room_json = resp.content.decode().split('id="sr-room" type="application/json">')[1].split("</script>")[0]
-		self.assertNotIn("secret-token", room_json)
+		self.assertNotContains(resp, "ZMQ PUSH Sink")
+		self.assertNotContains(resp, "send-token")
+
+	def test_join_heartbeat_uses_token_role(self):
+		from unittest import mock
+		url = reverse("tools:stream_join", args=["abc123"])
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room") as join:
+			resp = self.client.post(f"{url}?token=recv-token&role=sender", HTTP_X_REAL_IP="198.51.100.9")
+			self.assertEqual(resp.json(), {"role": "receiver", "ip": "198.51.100.9"})  # 토큰 역할이 우선
+			resp = self.client.post(f"{url}?token=secret-token&role=sender", HTTP_X_REAL_IP="198.51.100.10")
+			self.assertEqual(resp.json()["role"], "sender")  # 관리자는 역할 선택 가능
+			self.assertEqual(self.client.post(f"{url}?token=nope").status_code, 404)
+		self.assertEqual(join.call_count, 2)
 
 	def test_only_admin_can_close(self):
 		from unittest import mock
