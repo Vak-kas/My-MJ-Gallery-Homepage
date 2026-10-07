@@ -9,11 +9,16 @@ class ToolPagesTests(TestCase):
 		resp = self.client.get(reverse("tools:index"))
 		self.assertEqual(resp.status_code, 200)
 		for tool in TOOLS:
+			if tool.get("admin_only"):
+				self.assertNotContains(resp, tool["title"])
+				continue
 			self.assertContains(resp, tool["title"])
 			self.assertContains(resp, reverse(tool["url_name"]))
 
 	def test_tool_pages_are_public(self):
 		for tool in TOOLS:
+			if tool.get("admin_only"):
+				continue
 			self.assertEqual(self.client.get(reverse(tool["url_name"])).status_code, 200)
 
 	def test_nav_has_tool_link(self):
@@ -92,3 +97,77 @@ class SpeedtestApiTests(TestCase):
 
 	def test_speedtest_page_is_public(self):
 		self.assertEqual(self.client.get(reverse("tools:speedtest")).status_code, 200)
+
+
+class StreamViewTests(TestCase):
+	ROOM = {
+		"id": "abc123", "token": "secret-token", "kind": "iq",
+		"meta": {"format": "sc8", "sample_rate": 2000000.0, "center_freq": 433920000.0, "label": "연구실"},
+		"allow_ips": ["203.0.113.5/32"], "in_port": 5550, "out_port": 5551, "out_socket": "PUB",
+		"rate_limit": 16 * 1024 * 1024, "total_limit": 20 * 1024 ** 3, "created_at": 0, "expires_at": 0, "expires_in": 3600,
+		"stats": {"bytes_in": 0, "bytes_dropped": 0, "messages": 0, "rate_bps": 0, "senders": 0, "receivers": 0, "viewers": 0, "idle_seconds": None, "file": None, "closed": None},
+	}
+
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
+		self.member = User.objects.create_user("member", "member@example.com", "pw-for-tests-only")
+
+	def test_anonymous_is_sent_to_login_and_member_is_forbidden(self):
+		resp = self.client.get(reverse("tools:stream"))
+		self.assertEqual(resp.status_code, 302)
+		self.assertIn(reverse("accounts:login"), resp["Location"])
+		self.client.force_login(self.member)
+		self.assertEqual(self.client.get(reverse("tools:stream")).status_code, 403)
+		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "iq"}).status_code, 403)
+
+	def test_hub_shows_stream_card_only_to_admin(self):
+		self.assertNotContains(self.client.get(reverse("tools:index")), "실시간 데이터 스트림")
+		self.client.force_login(self.admin)
+		self.assertContains(self.client.get(reverse("tools:index")), "실시간 데이터 스트림")
+
+	def test_admin_creates_room_with_parsed_options(self):
+		from unittest import mock
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.create_room", return_value=self.ROOM) as create:
+			resp = self.client.post(reverse("tools:stream"), {
+				"kind": "iq", "format": "sc8", "sample_rate": "2000000", "center_freq": "433920000",
+				"label": "연구실", "allow_ips": "203.0.113.5\n10.0.0.0/8", "ttl_minutes": "30", "rate_mb": "8", "total_gb": "1",
+			})
+		payload = create.call_args.args[0]
+		self.assertEqual(payload["kind"], "iq")
+		self.assertEqual(payload["meta"]["format"], "sc8")
+		self.assertEqual(payload["allow_ips"], ["203.0.113.5", "10.0.0.0/8"])
+		self.assertEqual(payload["ttl"], 1800)
+		self.assertEqual(payload["rate_limit"], 8 * 1024 * 1024)
+		self.assertEqual(payload["total_limit"], 1024 ** 3)
+		self.assertEqual(resp["Location"], f"{reverse('tools:stream_room', args=['abc123'])}?token=secret-token")
+
+	def test_list_shows_friendly_error_when_relay_is_down(self):
+		self.client.force_login(self.admin)
+		with self.settings(RELAY_API_URL="http://127.0.0.1:1", RELAY_API_KEY="k"):
+			resp = self.client.get(reverse("tools:stream"))
+		self.assertContains(resp, "mj-relay")
+
+	def test_room_page_needs_token_and_hides_it_from_json(self):
+		from unittest import mock
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM):
+			self.assertEqual(self.client.get(reverse("tools:stream_room", args=["abc123"])).status_code, 404)
+			self.assertEqual(self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "wrong"}).status_code, 404)
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "secret-token"})
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, "tcp://smjgallery.kr:5550")
+		self.assertContains(resp, "ZMQ SUB Source")
+		self.assertNotContains(resp, "방 닫기")  # 링크로 들어온 사람은 닫을 수 없음
+		room_json = resp.content.decode().split('id="sr-room" type="application/json">')[1].split("</script>")[0]
+		self.assertNotIn("secret-token", room_json)
+
+	def test_only_admin_can_close(self):
+		from unittest import mock
+		with mock.patch("tools.relay_client.close_room") as close:
+			self.client.force_login(self.member)
+			self.assertEqual(self.client.post(reverse("tools:stream_close", args=["abc123"])).status_code, 403)
+			self.client.force_login(self.admin)
+			self.client.post(reverse("tools:stream_close", args=["abc123"]))
+		close.assert_called_once_with("abc123")

@@ -10,3 +10,7 @@ sqlparse==0.5.5
 
 # PostgreSQL 사용 시 필요
 psycopg2-binary==2.9.10
+
+# 실시간 스트림 중계 데몬 (relay/mj_relay.py)
+pyzmq==26.4.0
+aiohttp==3.11.18

@@ -210,6 +210,12 @@ else:
 
 LOGIN_REDIRECT_URL = "/"
 
+# 실시간 데이터 스트림 중계 데몬 (relay/mj_relay.py)
+RELAY_API_URL = os.getenv("RELAY_API_URL", "http://127.0.0.1:8090")
+RELAY_API_KEY = os.getenv("RELAY_API_KEY", "")
+RELAY_PUBLIC_HOST = os.getenv("RELAY_PUBLIC_HOST", "smjgallery.kr")  # 보내는/받는 쪽이 접속할 주소
+RELAY_WS_URL = os.getenv("RELAY_WS_URL", "")  # 비우면 같은 사이트의 /relay/ws/ (nginx 프록시)
+
 
 # Upload limits (prevent 400 Bad Request on larger form/file payloads)
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
