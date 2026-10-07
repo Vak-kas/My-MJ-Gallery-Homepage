@@ -32,4 +32,13 @@ TOOLS = [
 		"description": "IP/CIDR 이나 서브넷 마스크를 넣으면 네트워크·브로드캐스트·호스트 범위를 계산하고, 2진수로 보여주고, 더 작은 서브넷으로 나눠 줍니다.",
 		"tags": ["네트워크", "계산기"],
 	},
+	{
+		"slug": "stream",
+		"url_name": "tools:stream",
+		"icon": "📡",
+		"title": "실시간 데이터 스트림",
+		"description": "방(포트)을 열어 두면 HackRF·GNU Radio(ZMQ)나 파일로 보낸 데이터를 받는 쪽이 실시간으로 받습니다. 웹에서 스펙트럼·처리량도 볼 수 있어요.",
+		"tags": ["SDR", "관리자"],
+		"admin_only": True,  # 권한은 tools/permissions.py 의 can_manage_streams
+	},
 ]

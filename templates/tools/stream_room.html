@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sr-code { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+    .sr-copy { position: relative; display: flex; align-items: center; gap: 8px; border-radius: 12px; background: #f5f5f7; padding: 10px 12px; }
+    .sr-copy code { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; }
+    .sr-copy button { flex: 0 0 auto; border-radius: 999px; border: 1px solid rgba(0,0,0,.1); background: #fff; padding: 2px 10px; font-size: 11px; color: #1d1d1f; }
+    .sr-table td { padding: 6px 0; border-bottom: 1px solid rgba(0,0,0,.06); vertical-align: top; }
+    .sr-table td:first-child { color: #6e6e73; padding-right: 12px; white-space: nowrap; }
+    .sr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #c7c7cc; }
+    .sr-dot.is-live { background: #34c759; box-shadow: 0 0 0 4px rgba(52,199,89,.18); }
+    canvas.sr-canvas { display: block; width: 100%; border-radius: 12px; background: #0b0f17; }
+    html.theme-dark .sr-copy { background: #2a2a2e; }
+    html.theme-dark .sr-copy button { background: #1f1f22; color: #e8e8ea; border-color: rgba(255,255,255,.14); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    {% if relay_error %}
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">{{ relay_error }}</div>
+    {% else %}
+    <a href="{% if can_manage %}{% url 'tools:stream' %}{% else %}{% url 'tools:index' %}{% endif %}" class="text-[13px] text-[#0066cc]">← {% if can_manage %}방 목록{% else %}Tool 목록{% endif %}</a>
+
+    <div class="mt-4 flex flex-wrap items-end justify-between gap-4">
+        <div>
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">STREAM ROOM · {{ room.kind|upper }}</p>
+            <h1 class="apple-display mt-3 text-[36px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[44px]">{{ room.meta.label|default:room.id }}</h1>
+            <p class="mt-2 flex items-center gap-2 text-[13px] text-[#6e6e73]"><span id="sr-live" class="sr-dot"></span><span id="sr-conn">연결 중…</span> · <span id="sr-expire"></span></p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" data-copy="{{ share_url }}" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">받는 사람에게 링크 복사</button>
+            {% if can_manage %}
+            <form method="post" action="{% url 'tools:stream_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 연결된 송수신이 모두 끊깁니다.')">
+                {% csrf_token %}
+                <button type="submit" class="rounded-full bg-[#d44c47] px-4 py-2 text-[13px] font-semibold text-white">방 닫기</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+        <!-- 접속 정보 -->
+        <section class="min-w-0 space-y-5">
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">① 보내는 쪽 (A)</h2>
+                <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.in_port }}">복사</button></div>
+                <table class="sr-table mt-4 w-full text-[13px]">
+                    <tr><td>GNU Radio 블록</td><td><b>ZMQ PUSH Sink</b></td></tr>
+                    <tr><td>Address</td><td class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</td></tr>
+                    <tr><td>Bind</td><td><b>No</b> (서버로 접속)</td></tr>
+                    {% if room.kind == 'iq' %}<tr><td>IO Type</td><td>{% if room.meta.format == 'fc32' %}Complex{% else %}Byte / Short (원본 형식 그대로){% endif %}</td></tr>{% endif %}
+                    <tr><td>Pass Tags</td><td>Off 권장 (켜도 그대로 전달)</td></tr>
+                    {% if room.allow_ips %}<tr><td>허용 IP</td><td class="sr-code">{{ room.allow_ips|join:", " }}</td></tr>{% endif %}
+                </table>
+                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">또는 CLI (<a href="https://github.com/Vak-kas/My-MJ-Gallery-Homepage/blob/main/relay/mj_stream.py" class="text-[#0066cc]" target="_blank" rel="noopener">mj_stream.py</a>, <span class="sr-code">pip install pyzmq</span>)</p>
+                {% if room.kind == 'iq' %}
+                <div class="sr-copy mt-2"><code class="sr-code">hackrf_transfer -r - -s {{ room.meta.sample_rate|default:2000000|floatformat:0 }} -f {{ room.meta.center_freq|default:433920000|floatformat:0 }} | python mj_stream.py send tcp://{{ public_host }}:{{ room.in_port }} --stdin</code><button type="button" data-copy-prev>복사</button></div>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">hackrf_transfer 출력은 sc8 형식입니다. 방 형식이 sc8 일 때 웹 스펙트럼이 맞게 보여요.</p>
+                <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py send tcp://{{ public_host }}:{{ room.in_port }} --input capture.{{ room.meta.format }} --sample-rate {{ room.meta.sample_rate|default:2000000|floatformat:0 }} --format {{ room.meta.format }}</code><button type="button" data-copy-prev>복사</button></div>
+                {% elif room.kind == 'file' %}
+                <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py send tcp://{{ public_host }}:{{ room.in_port }} --input 보낼파일 --file</code><button type="button" data-copy-prev>복사</button></div>
+                {% else %}
+                <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py send tcp://{{ public_host }}:{{ room.in_port }} --stdin</code><button type="button" data-copy-prev>복사</button></div>
+                {% endif %}
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">② 받는 쪽 (B)</h2>
+                <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.out_port }}">복사</button></div>
+                <table class="sr-table mt-4 w-full text-[13px]">
+                    <tr><td>GNU Radio 블록</td><td><b>{% if room.out_socket == 'PUSH' %}ZMQ PULL Source{% else %}ZMQ SUB Source{% endif %}</b></td></tr>
+                    <tr><td>Address</td><td class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</td></tr>
+                    <tr><td>Bind</td><td><b>No</b></td></tr>
+                    {% if room.kind == 'iq' %}<tr><td>IO Type</td><td>보내는 쪽과 같게</td></tr>{% endif %}
+                </table>
+                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">또는 CLI</p>
+                {% if room.kind == 'file' %}
+                <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py recv tcp://{{ public_host }}:{{ room.out_port }} --output . --file</code><button type="button" data-copy-prev>복사</button></div>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">파일 방은 받는 쪽을 먼저 실행해 두세요. 끝나면 SHA-256 으로 무결성을 확인합니다.</p>
+                {% else %}
+                <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py recv tcp://{{ public_host }}:{{ room.out_port }} --output received.{% if room.kind == 'iq' %}{{ room.meta.format }}{% else %}bin{% endif %}</code><button type="button" data-copy-prev>복사</button></div>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">실시간 방은 받는 쪽이 접속한 뒤부터의 데이터만 받으며, 받는 쪽이 느리면 일부가 버려집니다.</p>
+                {% endif %}
+            </div>
+        </section>
+
+        <!-- 실시간 상태 -->
+        <section class="min-w-0 space-y-5">
+            <div class="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div class="rounded-[18px] border border-black/[0.08] bg-white p-4"><p class="text-[11px] font-semibold text-[#0066cc]">처리량</p><p id="st-rate" class="mt-1 text-[20px] font-semibold text-[#1d1d1f]">-</p></div>
+                <div class="rounded-[18px] border border-black/[0.08] bg-white p-4"><p class="text-[11px] font-semibold text-[#6e6e73]">누적</p><p id="st-total" class="mt-1 text-[20px] font-semibold text-[#1d1d1f]">-</p></div>
+                <div class="rounded-[18px] border border-black/[0.08] bg-white p-4"><p class="text-[11px] font-semibold text-[#6e6e73]">보내는 / 받는 연결</p><p id="st-peers" class="mt-1 text-[20px] font-semibold text-[#1d1d1f]">-</p></div>
+                <div class="rounded-[18px] border border-black/[0.08] bg-white p-4"><p class="text-[11px] font-semibold text-[#d44c47]">버린 데이터</p><p id="st-drop" class="mt-1 text-[20px] font-semibold text-[#1d1d1f]">-</p></div>
+            </div>
+
+            {% if room.kind == 'iq' %}
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">스펙트럼 · 워터폴</h2>
+                    <p class="text-[12px] text-[#8e8e93] sr-code">{{ room.meta.format }} · {% if room.meta.sample_rate %}{{ room.meta.sample_rate|floatformat:0 }} Sps{% endif %} · {% if room.meta.center_freq %}{{ room.meta.center_freq|floatformat:0 }} Hz{% endif %}</p>
+                </div>
+                <canvas id="sr-spectrum" class="sr-canvas mt-4" width="1024" height="220"></canvas>
+                <canvas id="sr-waterfall" class="sr-canvas mt-2" width="1024" height="200"></canvas>
+                <div class="mt-2 flex justify-between text-[11px] text-[#8e8e93] sr-code" id="sr-axis"></div>
+                <p class="mt-2 text-[11px] text-[#8e8e93]">서버가 받은 데이터 중 일부(1024 샘플, 초당 약 8회)만 보여주는 미리보기입니다. 원본은 GNU Radio/CLI 로 받으세요.</p>
+            </div>
+            {% elif room.kind == 'file' %}
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">파일 전송</h2>
+                <p id="sr-file-name" class="mt-3 text-[14px] text-[#1d1d1f]">보내는 쪽을 기다리는 중…</p>
+                <div class="mt-3 h-3 overflow-hidden rounded-full bg-[#f2f2f7]"><span id="sr-file-bar" class="block h-full w-0 rounded-full bg-[#0066cc] transition-all"></span></div>
+                <p id="sr-file-note" class="mt-2 text-[12px] text-[#8e8e93]"></p>
+            </div>
+            {% endif %}
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">처리량 기록 (최근 60초)</h2>
+                <canvas id="sr-rate-chart" class="mt-4 w-full" width="1000" height="160"></canvas>
+                <p class="mt-2 text-[12px] text-[#8e8e93]">속도 상한 {{ room.rate_limit|filesizeformat }}/s · 총량 상한 {{ room.total_limit|filesizeformat }}{% if room.kind != 'file' %} · 상한을 넘는 데이터는 버려집니다{% else %} · 상한에 맞춰 천천히 보냅니다{% endif %}</p>
+            </div>
+        </section>
+    </div>
+    {{ room_json|json_script:"sr-room" }}
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const room = JSON.parse(document.getElementById('sr-room').textContent);
+    const WS_URL = "{{ ws_url|escapejs }}";
+    const $ = (id) => document.getElementById(id);
+    const fmtBytes = (n) => {
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let i = 0;
+        while (n >= 1024 && i < units.length - 1) { n /= 1024; i += 1; }
+        return `${n.toFixed(i ? 1 : 0)} ${units[i]}`;
+    };
+    const fmtRate = (bps) => (bps * 8 >= 1e6 ? `${(bps * 8 / 1e6).toFixed(1)} Mbps` : `${(bps * 8 / 1e3).toFixed(0)} kbps`);
+    const fmtHz = (hz) => (Math.abs(hz) >= 1e9 ? `${(hz / 1e9).toFixed(3)}G` : Math.abs(hz) >= 1e6 ? `${(hz / 1e6).toFixed(3)}M` : `${(hz / 1e3).toFixed(1)}k`);
+
+    // 복사 버튼
+    document.querySelectorAll('[data-copy], [data-copy-prev]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const text = btn.dataset.copy ?? btn.previousElementSibling.textContent;
+            try { await navigator.clipboard.writeText(text); } catch (_) { return; }
+            const old = btn.textContent;
+            btn.textContent = '복사됨';
+            setTimeout(() => { btn.textContent = old; }, 1200);
+        });
+    });
+
+    // 남은 시간
+    let expiresAt = Date.now() + room.expires_in * 1000;
+    const tickExpire = () => {
+        const left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+        $('sr-expire').textContent = left > 0 ? `${Math.floor(left / 60)}분 ${left % 60}초 뒤 자동 종료` : '종료됨';
+    };
+    setInterval(tickExpire, 1000);
+    tickExpire();
+
+    // 처리량 기록
+    const history = [];
+    const drawRate = () => {
+        const c = $('sr-rate-chart');
+        const g = c.getContext('2d');
+        g.clearRect(0, 0, c.width, c.height);
+        const max = Math.max(room.rate_limit, ...history.map((h) => h.v), 1);
+        g.strokeStyle = 'rgba(0,0,0,0.08)';
+        g.beginPath(); g.moveTo(0, 10); g.lineTo(c.width, 10); g.stroke();
+        g.fillStyle = '#8e8e93'; g.font = '11px sans-serif'; g.fillText(fmtRate(max), 4, 22);
+        if (history.length < 2) return;
+        const now = Date.now();
+        g.strokeStyle = '#0066cc'; g.lineWidth = 2; g.beginPath();
+        history.forEach((h, i) => {
+            const x = c.width - ((now - h.t) / 60000) * c.width;
+            const y = c.height - 4 - (h.v / max) * (c.height - 14);
+            if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+        });
+        g.stroke();
+    };
+
+    const applyStats = (s) => {
+        const st = s.stats;
+        $('st-rate').textContent = fmtRate(st.rate_bps);
+        $('st-total').textContent = fmtBytes(st.bytes_in);
+        $('st-peers').textContent = `${st.senders} / ${st.receivers}`;
+        $('st-drop').textContent = fmtBytes(st.bytes_dropped);
+        $('sr-live').classList.toggle('is-live', st.rate_bps > 0);
+        $('sr-conn').textContent = st.rate_bps > 0 ? '데이터 수신 중' : (st.senders ? '보내는 쪽 연결됨 · 데이터 대기' : '보내는 쪽을 기다리는 중');
+        expiresAt = Date.now() + s.expires_in * 1000;
+        history.push({ t: Date.now(), v: st.rate_bps });
+        while (history.length && history[0].t < Date.now() - 60000) history.shift();
+        drawRate();
+        if (room.kind === 'file' && st.file) {
+            const f = st.file;
+            $('sr-file-name').textContent = `${f.name || '이름 없음'}${f.size ? ` · ${fmtBytes(f.size)}` : ''}`;
+            const pct = f.size ? Math.min(100, (f.received / f.size) * 100) : 0;
+            $('sr-file-bar').style.width = `${f.done ? 100 : pct}%`;
+            $('sr-file-note').textContent = f.done ? '전송 완료 (받는 쪽에서 무결성 확인)' : `${fmtBytes(f.received || 0)} 중계됨${f.size ? ` (${pct.toFixed(1)}%)` : ''}`;
+        }
+    };
+
+    // ── IQ 스펙트럼 / 워터폴 ─────────────────
+    const N = 1024;
+    const win = Float32Array.from({ length: N }, (_, i) => 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (N - 1)));
+    const rev = new Uint32Array(N);
+    for (let i = 0, bits = Math.log2(N); i < N; i += 1) {
+        let r = 0;
+        for (let b = 0; b < bits; b += 1) r = (r << 1) | ((i >> b) & 1);
+        rev[i] = r;
+    }
+    const fft = (re, im) => {
+        for (let i = 0; i < N; i += 1) {
+            const j = rev[i];
+            if (j > i) { [re[i], re[j]] = [re[j], re[i]]; [im[i], im[j]] = [im[j], im[i]]; }
+        }
+        for (let size = 2; size <= N; size <<= 1) {
+            const half = size >> 1;
+            const step = (-2 * Math.PI) / size;
+            for (let start = 0; start < N; start += size) {
+                for (let k = 0; k < half; k += 1) {
+                    const wr = Math.cos(step * k); const wi = Math.sin(step * k);
+                    const a = start + k; const b = a + half;
+                    const tr = re[b] * wr - im[b] * wi; const ti = re[b] * wi + im[b] * wr;
+                    re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+                }
+            }
+        }
+    };
+    const toIQ = (buf) => {
+        const fmt = room.meta.format || 'fc32';
+        let arr; let scale = 1;
+        if (fmt === 'sc8') { arr = new Int8Array(buf); scale = 1 / 128; } else if (fmt === 'sc16') { arr = new Int16Array(buf.slice(0, buf.byteLength - (buf.byteLength % 2))); scale = 1 / 32768; } else { arr = new Float32Array(buf.slice(0, buf.byteLength - (buf.byteLength % 4))); }
+        const n = Math.min(N, Math.floor(arr.length / 2));
+        const re = new Float32Array(N); const im = new Float32Array(N);
+        for (let i = 0; i < n; i += 1) { re[i] = arr[2 * i] * scale * win[i]; im[i] = arr[2 * i + 1] * scale * win[i]; }
+        return { re, im };
+    };
+    const spec = $('sr-spectrum'); const fall = $('sr-waterfall');
+    const avg = new Float32Array(N).fill(-120);
+    const color = (t) => {  // 0..1 → 어두운 파랑 → 청록 → 노랑 → 빨강
+        const stops = [[11, 15, 40], [0, 120, 200], [0, 220, 180], [250, 230, 60], [240, 60, 40]];
+        const x = Math.max(0, Math.min(0.9999, t)) * (stops.length - 1);
+        const i = Math.floor(x); const f = x - i;
+        return stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * f));
+    };
+    const drawSpectrum = (buf) => {
+        if (!spec) return;
+        const { re, im } = toIQ(buf);
+        fft(re, im);
+        const db = new Float32Array(N);
+        for (let i = 0; i < N; i += 1) {
+            const k = (i + N / 2) % N;  // fftshift: 가운데가 중심 주파수
+            const p = (re[k] * re[k] + im[k] * im[k]) / N;
+            db[i] = 10 * Math.log10(p + 1e-12);
+            avg[i] = avg[i] * 0.7 + db[i] * 0.3;
+        }
+        const lo = -100; const hi = 0;
+        const g = spec.getContext('2d');
+        g.fillStyle = '#0b0f17'; g.fillRect(0, 0, spec.width, spec.height);
+        g.strokeStyle = 'rgba(255,255,255,0.08)';
+        for (let d = lo; d <= hi; d += 20) { const y = spec.height * (1 - (d - lo) / (hi - lo)); g.beginPath(); g.moveTo(0, y); g.lineTo(spec.width, y); g.stroke(); g.fillStyle = 'rgba(255,255,255,0.4)'; g.font = '11px sans-serif'; g.fillText(`${d} dB`, 4, y - 2); }
+        g.strokeStyle = '#4ea1ff'; g.lineWidth = 1.5; g.beginPath();
+        for (let i = 0; i < N; i += 1) { const y = spec.height * (1 - (avg[i] - lo) / (hi - lo)); if (i === 0) g.moveTo(i, y); else g.lineTo(i, y); }
+        g.stroke();
+        const w = fall.getContext('2d');
+        w.drawImage(fall, 0, 0, fall.width, fall.height - 1, 0, 1, fall.width, fall.height - 1);
+        const row = w.createImageData(N, 1);
+        for (let i = 0; i < N; i += 1) { const [r, gg, b] = color((db[i] - lo) / (hi - lo)); row.data.set([r, gg, b, 255], i * 4); }
+        w.putImageData(row, 0, 0);
+    };
+    if (spec) {
+        const sr = room.meta.sample_rate; const fc = room.meta.center_freq || 0;
+        $('sr-axis').innerHTML = sr ? [-0.5, -0.25, 0, 0.25, 0.5].map((r) => `<span>${fmtHz(fc + r * sr)}${r === 0 && fc ? 'Hz' : ''}</span>`).join('') : '<span>-fs/2</span><span>0</span><span>+fs/2</span>';
+        const g = fall.getContext('2d'); g.fillStyle = '#0b0f17'; g.fillRect(0, 0, fall.width, fall.height);
+    }
+
+    // ── WebSocket ─────────────────────────
+    let retry = 0;
+    const connect = () => {
+        const ws = new WebSocket(WS_URL);
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = () => { retry = 0; $('sr-conn').textContent = '연결됨'; };
+        ws.onmessage = (ev) => {
+            if (typeof ev.data !== 'string') { drawSpectrum(ev.data); return; }
+            const msg = JSON.parse(ev.data);
+            if (msg.type === 'stats' || msg.type === 'hello') applyStats(msg);
+            if (msg.type === 'closed') { $('sr-conn').textContent = `방이 닫혔습니다: ${msg.reason}`; $('sr-live').classList.remove('is-live'); retry = -1; }
+        };
+        ws.onclose = () => {
+            if (retry < 0) return;
+            $('sr-conn').textContent = '연결이 끊겼습니다 · 다시 연결 중…';
+            retry = Math.min(retry + 1, 5);
+            setTimeout(connect, retry * 1000);
+        };
+    };
+    connect();
+    drawRate();
+})();
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sr-input { width: 100%; height: 40px; border-radius: 12px; border: 1px solid rgba(0,0,0,.1); background: #f9f9fb; padding: 0 12px; font-size: 14px; outline: none; color: #1d1d1f; }
+    .sr-input:focus { border-color: #0066cc; }
+    textarea.sr-input { height: auto; padding: 10px 12px; }
+    .sr-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #1d1d1f; }
+    .sr-hint { margin-top: 4px; font-size: 11px; color: #8e8e93; line-height: 1.5; }
+    .sr-kind input { position: absolute; opacity: 0; }
+    .sr-kind span { display: block; border: 1px solid rgba(0,0,0,.1); border-radius: 14px; padding: 12px 14px; cursor: pointer; }
+    .sr-kind input:checked + span { border-color: #0066cc; background: #f0f7ff; }
+    html.theme-dark .sr-input { background: #2a2a2e; border-color: rgba(255,255,255,.14); color: #e8e8ea; }
+    html.theme-dark .sr-label { color: #e8e8ea; }
+    html.theme-dark .sr-kind input:checked + span { background: rgba(78,161,255,.15); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SDR · ZMQ RELAY</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Data Stream.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
+            방을 열면 이 서버에 <b>보내는 포트</b>와 <b>받는 포트</b>가 생깁니다. 보내는 쪽(HackRF + GNU Radio ZMQ PUSH Sink, 또는 CLI)이 데이터를 보내면
+            받는 쪽(GNU Radio ZMQ SUB Source, CLI, 웹 화면)이 실시간으로 받습니다.
+        </p>
+    </div>
+
+    {% for message in messages %}
+    <div class="mt-6 rounded-xl border {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-600{% else %}border-black/[0.08] bg-white text-[#1d1d1f]{% endif %} px-4 py-3 text-[13px]">{{ message }}</div>
+    {% endfor %}
+    {% if relay_error %}
+    <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] text-amber-800">{{ relay_error }}</div>
+    {% endif %}
+
+    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">새 방 만들기</h2>
+            <form method="post" class="mt-5 space-y-5" id="sr-form">
+                {% csrf_token %}
+                <div>
+                    <span class="sr-label">보낼 데이터 종류</span>
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="iq" checked><span><b class="block text-[14px] text-[#1d1d1f]">📡 IQ 실시간</b><small class="text-[12px] text-[#6e6e73]">HackRF 캡처 → 스펙트럼</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="file"><span><b class="block text-[14px] text-[#1d1d1f]">📁 파일</b><small class="text-[12px] text-[#6e6e73]">손실 없이 전송</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="raw"><span><b class="block text-[14px] text-[#1d1d1f]">⇢ 일반 바이트</b><small class="text-[12px] text-[#6e6e73]">아무 데이터나 실시간</small></span></label>
+                    </div>
+                </div>
+
+                <div data-for="iq" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                        <label class="sr-label" for="format">샘플 형식</label>
+                        <select id="format" name="format" class="sr-input">
+                            <option value="fc32">fc32 · complex float32 (GNU Radio)</option>
+                            <option value="sc8">sc8 · int8 (hackrf_transfer)</option>
+                            <option value="sc16">sc16 · int16</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="sr-label" for="sample_rate">샘플레이트 (Sps)</label>
+                        <input id="sample_rate" name="sample_rate" class="sr-input" type="number" step="any" value="2000000">
+                    </div>
+                    <div>
+                        <label class="sr-label" for="center_freq">중심 주파수 (Hz)</label>
+                        <input id="center_freq" name="center_freq" class="sr-input" type="number" step="any" value="433920000">
+                    </div>
+                </div>
+
+                <div data-for="file" hidden>
+                    <label class="sr-label" for="filename">파일 설명 (선택)</label>
+                    <input id="filename" name="filename" class="sr-input" maxlength="200" placeholder="예: 2026-10-07 433MHz 캡처">
+                    <p class="sr-hint">파일 이름과 크기는 보내는 CLI 가 자동으로 알려줍니다. 받는 쪽을 먼저 실행해 두세요.</p>
+                </div>
+
+                <div>
+                    <label class="sr-label" for="label">방 이름 (선택)</label>
+                    <input id="label" name="label" class="sr-input" maxlength="80" placeholder="예: 연구실 안테나 → 집">
+                </div>
+
+                <div>
+                    <label class="sr-label" for="allow_ips">보내는 쪽 IP 허용 목록 (선택, 권장)</label>
+                    <textarea id="allow_ips" name="allow_ips" rows="2" class="sr-input" placeholder="203.230.0.10&#10;10.0.0.0/8"></textarea>
+                    <p class="sr-hint">적으면 이 IP 에서만 보낼 수 있어요(한 줄에 하나, CIDR 가능). 비우면 포트 번호를 아는 누구나 보낼 수 있습니다.</p>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                        <label class="sr-label" for="ttl_minutes">유효 시간 (분)</label>
+                        <input id="ttl_minutes" name="ttl_minutes" class="sr-input" type="number" min="1" max="360" value="60">
+                    </div>
+                    <div>
+                        <label class="sr-label" for="rate_mb">속도 상한 (MB/s)</label>
+                        <input id="rate_mb" name="rate_mb" class="sr-input" type="number" min="0.1" max="64" step="any" value="16">
+                    </div>
+                    <div>
+                        <label class="sr-label" for="total_gb">총량 상한 (GB)</label>
+                        <input id="total_gb" name="total_gb" class="sr-input" type="number" min="0.01" max="200" step="any" value="20">
+                    </div>
+                </div>
+                <p id="sr-traffic" class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]"></p>
+
+                <button type="submit" class="h-11 rounded-full bg-[#0066cc] px-6 text-[14px] font-semibold text-white">방 열기</button>
+            </form>
+        </section>
+
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">열린 방</h2>
+            <div class="mt-4 space-y-3">
+                {% for room in rooms %}
+                <a href="{% url 'tools:stream_room' room.id %}?token={{ room.token }}" class="block rounded-2xl border border-black/[0.08] p-4 transition hover:border-[#0066cc]/40">
+                    <div class="flex flex-wrap items-baseline justify-between gap-2">
+                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ room.meta.label|default:room.id }}</p>
+                        <span class="rounded-full bg-[#f0f7ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#0066cc]">{{ room.kind|upper }}</span>
+                    </div>
+                    <p class="mt-1 font-mono text-[12px] text-[#6e6e73]">IN :{{ room.in_port }} → OUT :{{ room.out_port }} ({{ room.out_socket }})</p>
+                    <p class="mt-1 text-[12px] text-[#8e8e93]">보냄 {{ room.stats.senders }} · 받음 {{ room.stats.receivers }} · 누적 {{ room.stats.bytes_in|filesizeformat }} · {{ room.expires_in|floatformat:0 }}초 남음</p>
+                </a>
+                {% empty %}
+                <p class="rounded-2xl border border-dashed border-black/[0.12] p-6 text-[13px] text-[#8e8e93]">열린 방이 없습니다.</p>
+                {% endfor %}
+            </div>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const form = document.getElementById('sr-form');
+    const sync = () => {
+        const kind = form.querySelector('input[name="kind"]:checked').value;
+        form.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for !== kind; });
+        const bps = { fc32: 8, sc16: 4, sc8: 2 }[form.format.value] || 8;
+        const rate = parseFloat(form.rate_mb.value) || 0;
+        const iqRate = (parseFloat(form.sample_rate.value) || 0) * bps / 1048576;
+        const used = kind === 'iq' ? Math.min(rate, iqRate) : rate;
+        const hour = used * 3600 * 2 / 1024;  // 받고 + 보내기
+        document.getElementById('sr-traffic').innerHTML = (kind === 'iq'
+            ? `이 설정의 IQ 데이터는 초당 약 <b>${iqRate.toFixed(1)} MB</b> 입니다${iqRate > rate ? ` (속도 상한 ${rate} MB/s 를 넘는 만큼은 버려집니다)` : ''}. `
+            : '') + `최대 속도로 1시간 보내면 서버 트래픽이 약 <b>${hour.toFixed(0)} GB</b>(받기+보내기) 쓰입니다. Lightsail 월 전송량에 주의하세요.`;
+    };
+    form.addEventListener('input', sync);
+    form.addEventListener('change', sync);
+    sync();
+})();
+</script>
+{% endblock %}
