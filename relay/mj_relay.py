@@ -162,7 +162,8 @@ class Room:
 			"bytes_in": self.bytes_in,
 			"bytes_dropped": self.bytes_dropped,
 			"messages": self.messages,
-			"rate_bps": round(self.rate_bps, 1),
+			# 1초 넘게 안 들어오면 처리량 0 (마지막 값이 남아 보이지 않게)
+			"rate_bps": round(self.rate_bps, 1) if self.last_rx and time.time() - self.last_rx < 1.5 else 0,
 			"senders": self.senders,
 			"receivers": self.receivers,
 			"viewers": len(self.viewers),
