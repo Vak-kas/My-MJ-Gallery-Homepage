@@ -26,12 +26,11 @@
 
     <div class="mt-4 flex flex-wrap items-end justify-between gap-4">
         <div>
-            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">STREAM ROOM · {{ room.kind|upper }}</p>
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">STREAM ROOM · {{ room.kind|upper }} · {% if role == 'admin' %}관리자{% elif role == 'sender' %}보내는 쪽{% else %}받는 쪽{% endif %}</p>
             <h1 class="apple-display mt-3 text-[36px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[44px]">{{ room.meta.label|default:room.id }}</h1>
             <p class="mt-2 flex items-center gap-2 text-[13px] text-[#6e6e73]"><span id="sr-live" class="sr-dot"></span><span id="sr-conn">연결 중…</span> · <span id="sr-expire"></span></p>
         </div>
         <div class="flex flex-wrap gap-2">
-            <button type="button" data-copy="{{ share_url }}" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">받는 사람에게 링크 복사</button>
             {% if can_manage %}
             <form method="post" action="{% url 'tools:stream_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 연결된 송수신이 모두 끊깁니다.')">
                 {% csrf_token %}
@@ -41,9 +40,42 @@
         </div>
     </div>
 
-    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+    <div id="sr-ready" class="mt-6 hidden rounded-2xl border border-[#34c759]/30 bg-[#34c759]/10 px-5 py-3 text-[14px] font-semibold text-[#1d1d1f]">✅ 연결 완료 · 보내는 쪽과 받는 쪽이 모두 접속했습니다. 데이터를 보내면 바로 전달돼요.</div>
+
+    {% if role == 'admin' %}
+    <section class="mt-6 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <h2 class="text-[16px] font-semibold text-[#1d1d1f]">링크 나눠 주기</h2>
+        <p class="mt-1 text-[13px] leading-relaxed text-[#6e6e73]">
+            고정 IP 가 없어도 됩니다. 각 사람이 <b>GNU Radio 를 돌릴 컴퓨터(같은 인터넷 연결)</b>에서 자기 링크를 열면, 그 네트워크의 공인 IP 가 자동으로 등록되고
+            <b>등록된 곳에서만</b> 포트에 접속할 수 있어요. 링크 페이지를 열어 두면 IP 가 바뀌어도 30초마다 다시 등록됩니다.
+        </p>
+        <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+                <p class="text-[12px] font-semibold text-[#0066cc]">① 보내는 쪽(A) 링크</p>
+                <div class="sr-copy mt-2"><code class="sr-code">{{ sender_link }}</code><button type="button" data-copy="{{ sender_link }}">복사</button></div>
+                <p class="mt-2 text-[12px] text-[#6e6e73]">등록된 IP: <span id="sr-joined-sender" class="sr-code">-</span></p>
+                <button type="button" data-join="sender" class="mt-2 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">이 컴퓨터를 보내는 쪽으로 등록</button>
+            </div>
+            <div>
+                <p class="text-[12px] font-semibold text-[#0066cc]">② 받는 쪽(B) 링크</p>
+                <div class="sr-copy mt-2"><code class="sr-code">{{ receiver_link }}</code><button type="button" data-copy="{{ receiver_link }}">복사</button></div>
+                <p class="mt-2 text-[12px] text-[#6e6e73]">등록된 IP: <span id="sr-joined-receiver" class="sr-code">-</span></p>
+                <button type="button" data-join="receiver" class="mt-2 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">이 컴퓨터를 받는 쪽으로 등록</button>
+            </div>
+        </div>
+    </section>
+    {% else %}
+    <div class="mt-6 rounded-2xl border border-[#0066cc]/20 bg-[#f0f7ff] px-5 py-4 text-[14px] leading-relaxed text-[#1d1d1f]">
+        이 네트워크(<b class="sr-code" id="sr-my-ip">{{ my_ip }}</b>)를 <b>{% if role == 'sender' %}보내는 쪽{% else %}받는 쪽{% endif %}</b>으로 등록했어요.
+        이제 <b>이 인터넷 연결을 쓰는 컴퓨터</b>의 GNU Radio/CLI 로 아래 주소에 접속하면 됩니다.
+        <span class="block text-[12px] text-[#6e6e73]">이 페이지를 열어 두면 IP 가 바뀌어도 30초마다 자동으로 다시 등록돼요. VPN 을 브라우저에만 켜 두면 IP 가 달라 접속이 안 될 수 있어요.</span>
+    </div>
+    {% endif %}
+
+    <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <!-- 접속 정보 -->
         <section class="min-w-0 space-y-5">
+            {% if role != 'receiver' %}
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">① 보내는 쪽 (A)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.in_port }}">복사</button></div>
@@ -53,7 +85,7 @@
                     <tr><td>Bind</td><td><b>No</b> (서버로 접속)</td></tr>
                     {% if room.kind == 'iq' %}<tr><td>IO Type</td><td>{% if room.meta.format == 'fc32' %}Complex{% else %}Byte / Short (원본 형식 그대로){% endif %}</td></tr>{% endif %}
                     <tr><td>Pass Tags</td><td>Off 권장 (켜도 그대로 전달)</td></tr>
-                    {% if room.allow_ips %}<tr><td>허용 IP</td><td class="sr-code">{{ room.allow_ips|join:", " }}</td></tr>{% endif %}
+                    {% if room.allow_ips %}<tr><td>고정 허용 IP</td><td class="sr-code">{{ room.allow_ips|join:", " }}</td></tr>{% endif %}
                 </table>
                 <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">또는 CLI (<a href="https://github.com/Vak-kas/My-MJ-Gallery-Homepage/blob/main/relay/mj_stream.py" class="text-[#0066cc]" target="_blank" rel="noopener">mj_stream.py</a>, <span class="sr-code">pip install pyzmq</span>)</p>
                 {% if room.kind == 'iq' %}
@@ -67,6 +99,9 @@
                 {% endif %}
             </div>
 
+            {% endif %}
+
+            {% if role != 'sender' %}
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">② 받는 쪽 (B)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.out_port }}">복사</button></div>
@@ -85,6 +120,7 @@
                 <p class="mt-1 text-[11px] text-[#8e8e93]">실시간 방은 받는 쪽이 접속한 뒤부터의 데이터만 받으며, 받는 쪽이 느리면 일부가 버려집니다.</p>
                 {% endif %}
             </div>
+            {% endif %}
         </section>
 
         <!-- 실시간 상태 -->
@@ -153,6 +189,26 @@
         });
     });
 
+    // 링크로 입장한 네트워크 등록 유지 (IP 가 바뀌어도 다시 등록)
+    const ROLE = "{{ role }}";
+    const JOIN_URL = "{{ join_url|escapejs }}";
+    const csrf = "{{ csrf_token }}";  // 받는 사람은 폼이 없어서 쿠키 대신 템플릿에서 전달
+    const join = async (role) => {
+        try {
+            const resp = await fetch(`${JOIN_URL}&role=${role}`, { method: 'POST', headers: { 'X-CSRFToken': csrf }, credentials: 'same-origin' });
+            const data = await resp.json();
+            if (data.ip && $('sr-my-ip')) $('sr-my-ip').textContent = data.ip;
+            return data;
+        } catch (_) { return null; }
+    };
+    if (ROLE === 'sender' || ROLE === 'receiver') setInterval(() => join(ROLE), 30000);
+    document.querySelectorAll('[data-join]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const data = await join(btn.dataset.join);
+            btn.textContent = data && data.ip ? `등록됨 (${data.ip})` : '등록 실패';
+        });
+    });
+
     // 남은 시간
     let expiresAt = Date.now() + room.expires_in * 1000;
     const tickExpire = () => {
@@ -190,6 +246,11 @@
         $('st-peers').textContent = `${st.senders} / ${st.receivers}`;
         $('st-drop').textContent = fmtBytes(st.bytes_dropped);
         $('sr-live').classList.toggle('is-live', st.rate_bps > 0);
+        $('sr-ready').classList.toggle('hidden', !st.ready);
+        ['sender', 'receiver'].forEach((r) => {
+            const el = $(`sr-joined-${r}`);
+            if (el && s.joined) el.textContent = s.joined[r].length ? s.joined[r].join(', ') : '아직 없음';
+        });
         $('sr-conn').textContent = st.rate_bps > 0 ? '데이터 수신 중' : (st.senders ? '보내는 쪽 연결됨 · 데이터 대기' : '보내는 쪽을 기다리는 중');
         expiresAt = Date.now() + s.expires_in * 1000;
         history.push({ t: Date.now(), v: st.rate_bps });

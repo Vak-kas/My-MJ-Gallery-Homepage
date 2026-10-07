@@ -9,6 +9,11 @@
     속도 상한을 넘는 데이터는 버림
   - 파일 → OUT 은 PUSH: 받는 쪽이 없거나 느리면 기다림(데이터 손실 없음), 속도 상한은 늦춰서 지킴
 
+접속 허용 (고정 IP 가 없어도 되도록):
+  방마다 보내는 쪽·받는 쪽 링크(역할 토큰)가 있고, 그 링크를 연 네트워크의 공인 IP 가
+  해당 역할로 "입장" 등록된다. 등록된 IP(또는 방을 만들 때 적은 고정 IP)만 포트에 접속할 수 있다.
+  등록은 JOIN_TTL 동안 유지되고, 링크 페이지가 열려 있는 동안 주기적으로 갱신된다.
+
 제어 API 는 127.0.0.1 에서만 열고 공유 비밀키(X-Relay-Key)로 보호한다 (Django 가 호출).
 웹 화면은 /relay/ws/<room>?token= WebSocket 으로 통계와 IQ 스냅샷(저대역)만 받는다.
 """
@@ -39,6 +44,8 @@ SNAPSHOT_SAMPLES = 1024
 STATS_INTERVAL = 0.25
 SNAPSHOT_INTERVAL = 0.125
 MAX_VIEWERS_PER_ROOM = 5
+JOIN_TTL = 15 * 60  # 링크로 입장한 IP 등록 유지 시간 (페이지가 열려 있으면 계속 갱신)
+ROLES = ("sender", "receiver")
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -114,7 +121,9 @@ class TokenBucket:
 @dataclass
 class Room:
 	id: str
-	token: str
+	token: str  # 관리자 화면용
+	sender_token: str
+	receiver_token: str
 	kind: str
 	meta: dict
 	allow_ips: list
@@ -134,15 +143,32 @@ class Room:
 	closed_reason: str = ""
 	file_info: dict = field(default_factory=dict)
 	snapshot: bytes = b""
+	joined: dict = field(default_factory=lambda: {"sender": {}, "receiver": {}})  # 역할 → {ip: 마지막 갱신 시각}
 	viewers: set = field(default_factory=set)
 	tasks: list = field(default_factory=list)
 	sockets: list = field(default_factory=list)
 
-	def public(self):
+	def joined_ips(self, role):
 		now = time.time()
-		return {
+		return [ip for ip, seen in self.joined[role].items() if now - seen < JOIN_TTL]
+
+	def allows(self, role, address):
+		"""role 쪽 포트에 address 가 접속해도 되는지 (고정 IP 는 보내는 쪽에만 적용)."""
+		allowed = list(self.joined_ips(role))
+		if role == "sender":
+			allowed += self.allow_ips
+		return _ip_allowed(address, allowed)
+
+	def token_role(self, token):
+		for role, value in (("admin", self.token), ("sender", self.sender_token), ("receiver", self.receiver_token)):
+			if token and hmac.compare_digest(token, value):
+				return role
+		return None
+
+	def public(self, with_tokens=True):
+		now = time.time()
+		data = {
 			"id": self.id,
-			"token": self.token,
 			"kind": self.kind,
 			"meta": self.meta,
 			"allow_ips": self.allow_ips,
@@ -154,8 +180,12 @@ class Room:
 			"created_at": self.created_at,
 			"expires_at": self.expires_at,
 			"expires_in": max(0, int(self.expires_at - now)),
+			"joined": {role: self.joined_ips(role) for role in ROLES},
 			"stats": self.stats(),
 		}
+		if with_tokens:
+			data.update(token=self.token, sender_token=self.sender_token, receiver_token=self.receiver_token)
+		return data
 
 	def stats(self):
 		return {
@@ -167,6 +197,7 @@ class Room:
 			"senders": self.senders,
 			"receivers": self.receivers,
 			"viewers": len(self.viewers),
+			"ready": self.senders > 0 and self.receivers > 0,
 			"idle_seconds": round(time.time() - self.last_rx, 1) if self.last_rx else None,
 			"file": self.file_info or None,
 			"closed": self.closed_reason or None,
@@ -231,16 +262,20 @@ class Relay:
 		while True:
 			frames = await self._zap.recv_multipart()
 			version, request_id, domain, address = frames[0], frames[1], frames[2], frames[3]
-			room = self.rooms.get(domain.decode(errors="ignore"))
-			ok = room is not None and (not room.allow_ips or _ip_allowed(address.decode(errors="ignore"), room.allow_ips))
-			if not ok:
-				log.info("ZAP 거부: room=%s ip=%s", domain, address)
-			await self._zap.send_multipart([
-				version, request_id,
-				b"200" if ok else b"400",
-				b"OK" if ok else b"IP not allowed",
-				b"", b"",
-			])
+			room_id, _, side = domain.decode(errors="ignore").partition(":")
+			room = self.rooms.get(room_id)
+			role = "sender" if side == "in" else "receiver"
+			if room is None:
+				status, text = b"400", b"no such room"
+			elif room.allows(role, address.decode(errors="ignore")):
+				status, text = b"200", b"OK"
+			else:
+				# 300(일시적 거절) + handshake_ivl: 2초마다 끊고 다시 확인 → GNU Radio 를 먼저 켜 두고
+				# 나중에 링크로 입장해도 자동으로 붙음. 400 이면 클라이언트가 재접속을 포기함.
+				status, text = b"300", b"not joined yet"
+			if status != b"200":
+				log.info("ZAP 거부(%s): room=%s ip=%s", status.decode(), domain, address)
+			await self._zap.send_multipart([version, request_id, status, text, b"", b""])
 
 	# ── 방 만들기 / 닫기 ─────────────────────────
 	def _bind_free_port(self, sock, used):
@@ -280,7 +315,12 @@ class Relay:
 		for sock in (pull, out):
 			sock.linger = 0
 			sock.rcvhwm = sock.sndhwm = 1000
-		pull.zap_domain = room_id.encode()  # 연결할 때마다 ZAP 으로 IP 확인
+			# 입장 전 연결은 ZAP 300 으로 붙잡혀 있다가 2초 뒤 끊김 → 클라이언트가 재접속하며 다시 확인받음
+			# (400 으로 거절하면 GNU Radio 등 ZMQ 클라이언트가 재접속을 영영 포기함)
+			sock.handshake_ivl = 2000
+		# 연결할 때마다 ZAP 으로 IP 확인 (보내는 쪽 / 받는 쪽 따로)
+		pull.zap_domain = f"{room_id}:in".encode()
+		out.zap_domain = f"{room_id}:out".encode()
 		try:
 			in_port = self._bind_free_port(pull, used)
 			out_port = self._bind_free_port(out, used)
@@ -292,6 +332,8 @@ class Relay:
 		room = Room(
 			id=room_id,
 			token=secrets.token_urlsafe(16),
+			sender_token=secrets.token_urlsafe(16),
+			receiver_token=secrets.token_urlsafe(16),
 			kind=kind,
 			meta=meta,
 			allow_ips=allow_ips,
@@ -304,13 +346,34 @@ class Relay:
 			sockets=[pull, out],
 		)
 		self.rooms[room_id] = room
+		# 감시는 지금 바로 켬: 태스크가 돌기 전에 들어온 연결도 놓치지 않도록
+		events = zmq.EVENT_HANDSHAKE_SUCCEEDED | zmq.EVENT_DISCONNECTED
+		in_mon = pull.get_monitor_socket(events)
+		out_mon = out.get_monitor_socket(events)
 		room.tasks = [
 			asyncio.create_task(self._pump(room, pull, out)),
-			asyncio.create_task(self._monitor(room, pull, "senders")),
-			asyncio.create_task(self._monitor(room, out, "receivers")),
+			asyncio.create_task(self._monitor(room, in_mon, "senders")),
+			asyncio.create_task(self._monitor(room, out_mon, "receivers")),
 			asyncio.create_task(self._broadcast(room)),
 		]
 		log.info("방 생성 %s kind=%s in=%s out=%s", room_id, kind, in_port, out_port)
+		return room
+
+	def join(self, room_id, role, token, ip):
+		"""역할 링크를 연 네트워크의 IP 를 등록 (같은 IP 면 시각만 갱신)."""
+		room = self.rooms.get(room_id)
+		if room is None:
+			raise RoomError("방이 없습니다.", status=404)
+		if role not in ROLES or room.token_role(token) not in (role, "admin"):
+			raise RoomError("링크가 올바르지 않습니다.", status=403)
+		try:
+			ipaddress.ip_address(ip)
+		except ValueError as exc:
+			raise RoomError("IP 를 확인할 수 없습니다.") from exc
+		room.joined[role][ip] = time.time()
+		# 오래된 등록 정리
+		room.joined[role] = {k: v for k, v in room.joined[role].items() if time.time() - v < JOIN_TTL}
+		log.info("입장 room=%s role=%s ip=%s", room_id, role, ip)
 		return room
 
 	async def close_room(self, room_id, reason="닫힘"):
@@ -393,16 +456,17 @@ class Relay:
 				asyncio.create_task(self.close_room(room.id, "총 전송량 한도에 도달했습니다"))
 				return
 
-	async def _monitor(self, room, sock, attr):
-		"""소켓 연결/끊김 이벤트로 접속한 송신자·수신자 수를 셈."""
-		mon = sock.get_monitor_socket(zmq.EVENT_ACCEPTED | zmq.EVENT_DISCONNECTED)
+	async def _monitor(self, room, mon, attr):
+		"""인증(ZAP)까지 통과한 연결만 송신자·수신자 수로 셈 (거절돼 재시도 중인 연결은 제외)."""
+		live = set()  # 연결별 fd
 		try:
 			while True:
 				event = parse_monitor_message(await mon.recv_multipart())
-				if event["event"] == zmq.EVENT_ACCEPTED:
-					setattr(room, attr, getattr(room, attr) + 1)
+				if event["event"] == zmq.EVENT_HANDSHAKE_SUCCEEDED:
+					live.add(event["value"])
 				elif event["event"] == zmq.EVENT_DISCONNECTED:
-					setattr(room, attr, max(0, getattr(room, attr) - 1))
+					live.discard(event["value"])
+				setattr(room, attr, len(live))
 		finally:
 			mon.close(0)
 
@@ -417,8 +481,7 @@ class Relay:
 			stats = None
 			if now - last_stats >= STATS_INTERVAL:
 				last_stats = now
-				stats = {"type": "stats", **room.public()}
-				stats.pop("token", None)
+				stats = {"type": "stats", **room.public(with_tokens=False)}
 			snap = room.snapshot if room.kind == "iq" else b""
 			for ws in list(room.viewers):
 				try:
@@ -464,6 +527,17 @@ def build_app(relay: Relay):
 			return web.json_response({"error": "방이 없습니다."}, status=404)
 		return web.json_response(room.public())
 
+	async def join(request):
+		try:
+			payload = await request.json()
+		except json.JSONDecodeError:
+			payload = {}
+		try:
+			room = relay.join(request.match_info["room_id"], payload.get("role"), payload.get("token", ""), payload.get("ip", ""))
+		except RoomError as exc:
+			return web.json_response({"error": str(exc)}, status=exc.status)
+		return web.json_response(room.public())
+
 	async def delete(request):
 		ok = await relay.close_room(request.match_info["room_id"], "관리자가 닫았습니다")
 		return web.json_response({"closed": ok}, status=200 if ok else 404)
@@ -471,7 +545,7 @@ def build_app(relay: Relay):
 	async def viewer(request):
 		room = relay.rooms.get(request.match_info["room_id"])
 		token = request.query.get("token", "")
-		if room is None or not hmac.compare_digest(token, room.token):
+		if room is None or room.token_role(token) is None:
 			return web.Response(status=404)
 		if len(room.viewers) >= MAX_VIEWERS_PER_ROOM:
 			return web.Response(status=429, text="too many viewers")
@@ -479,9 +553,7 @@ def build_app(relay: Relay):
 		await ws.prepare(request)
 		room.viewers.add(ws)
 		try:
-			public = room.public()
-			public.pop("token", None)
-			await ws.send_json({"type": "hello", **public})
+			await ws.send_json({"type": "hello", **room.public(with_tokens=False)})
 			async for msg in ws:  # 화면 → 서버 메시지는 쓰지 않음 (연결 유지용)
 				if msg.type == WSMsgType.ERROR:
 					break
@@ -496,6 +568,7 @@ def build_app(relay: Relay):
 	app.router.add_get("/rooms", listing)
 	app.router.add_get("/rooms/{room_id}", detail)
 	app.router.add_delete("/rooms/{room_id}", delete)
+	app.router.add_post("/rooms/{room_id}/join", join)
 	app.router.add_get("/relay/ws/{room_id}", viewer)
 	app.router.add_get("/health", health)
 	return app

@@ -31,8 +31,16 @@ python mj_stream.py recv tcp://smjgallery.kr:5551 --output live.iq
 python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 ```
 
+## 입장 (고정 IP 불필요)
+- 방을 열면 **보내는 쪽 링크**와 **받는 쪽 링크**가 생김. 각자 GNU Radio 를 돌릴 컴퓨터(같은 인터넷 연결)에서 자기 링크를 열면
+  그 네트워크의 공인 IP 가 역할별로 등록되고, **등록된 IP 만** 해당 포트에 접속 가능 (ZMQ ZAP)
+- 링크 페이지를 열어 두면 30초마다 다시 등록 → 와이파이 이동 등으로 IP 가 바뀌어도 유지. 등록은 15분 유지
+- GNU Radio 를 먼저 켜 둬도 됨: 입장 전 연결은 2초마다 끊고 재확인(ZAP 300 + handshake_ivl) → 입장하면 2초 안에 자동 연결
+- 보내는 쪽·받는 쪽이 모두 연결되면 방 화면에 "연결 완료" 표시
+- 링크 없이 항상 허용할 **고정 IP**(보내는 쪽)를 방 만들 때 적을 수도 있음
+
 ## 보안·제한
-- 방마다 **보내는 쪽 IP 허용 목록**(ZMQ ZAP) — GNU Radio ZMQ 블록은 암호화(CURVE)를 지원하지 않으므로 IP 제한을 권장
+- GNU Radio ZMQ 블록은 암호화(CURVE)를 지원하지 않으므로 접속은 IP(링크 입장) 기준으로만 제한
 - 유효 시간(기본 1시간·최대 6시간), 속도 상한(기본 16MB/s), 총량 상한(기본 20GB), 동시 방 5개
 - 제어 API(`/rooms`)는 127.0.0.1 + `RELAY_API_KEY` 로만 접근, nginx 는 `/relay/ws/` 만 프록시
 - 데몬을 재시작하면(배포 포함) 열린 방은 모두 닫힘
@@ -41,7 +49,7 @@ python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 1. **Lightsail 콘솔 → 인스턴스 → 네트워킹 → IPv4 방화벽**: 사용자 지정 TCP `5550-5599` 추가
 2. 배포 후 서버에서: `cd /home/ubuntu/projects/smjgallery && sudo bash relay/deploy/install.sh`
    - `.env` 에 `RELAY_API_KEY` 생성, 의존성 설치, `mj-relay` systemd 서비스 등록,
-     nginx 에 WebSocket 프록시 include(백업 생성 후 `nginx -t` 검사), `deploy.sh` 에 재시작 줄 추가
+     nginx 에 WebSocket 프록시 include(백업 생성 후 `nginx -t` 검사), `deploy.sh` 에 재시작 줄 추가, gunicorn 재시작
 3. 확인: `systemctl status mj-relay`, `curl -s 127.0.0.1:8090/health`
 
 ## 설정 (`.env`)
