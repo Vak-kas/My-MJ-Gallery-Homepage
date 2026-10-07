@@ -1,0 +1,20 @@
+[Unit]
+Description=MJ Gallery stream relay (mj-relay)
+After=network.target
+
+[Service]
+User=ubuntu
+Group=www-data
+WorkingDirectory=/home/ubuntu/projects/smjgallery
+ExecStart=/home/ubuntu/projects/smjgallery/venv/bin/python relay/mj_relay.py --env-file /home/ubuntu/projects/smjgallery/.env
+Restart=always
+RestartSec=3
+# 중계만 하므로 파일 쓰기·권한 상승이 필요 없음
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target
