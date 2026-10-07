@@ -57,12 +57,38 @@ class SpeedtestApiTests(TestCase):
 	def test_quota_per_ip(self):
 		url = reverse("tools:speedtest_download")
 		size = 25 * 1024 * 1024
-		# 다운로드 한도 1GB / 10분 → 25MB 요청 40번까지 허용
-		statuses = [self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4").status_code for _ in range(41)]
-		self.assertEqual(statuses[:40], [200] * 40)
-		self.assertEqual(statuses[40], 429)
+		# 다운로드 한도 2GB / 10분 → 25MB 요청 81번까지 허용
+		statuses = [self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4").status_code for _ in range(82)]
+		self.assertEqual(statuses[:81], [200] * 81)
+		self.assertEqual(statuses[81], 429)
+		blocked = self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4")
+		self.assertIn("분 뒤", blocked.json()["error"])
+		self.assertGreater(int(blocked["Retry-After"]), 0)
 		# 다른 IP 는 영향 없음
 		self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="5.6.7.8").status_code, 200)
+
+	def test_quota_window_is_fixed_from_first_request(self):
+		from unittest import mock
+		url = reverse("tools:speedtest_download")
+		size = 25 * 1024 * 1024
+		with mock.patch("tools.speedtest.time.time", return_value=1000.0):
+			for _ in range(81):
+				self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9")
+		# 첫 요청 9분 59초 뒤: 아직 막힘
+		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 599):
+			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 429)
+		# 첫 요청 10분 뒤: 막힌 동안 요청을 계속 보냈어도 풀림
+		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 600):
+			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 200)
+
+	def test_superuser_has_no_quota(self):
+		from django.contrib.auth import get_user_model
+		admin = get_user_model().objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
+		self.client.force_login(admin)
+		url = reverse("tools:speedtest_download")
+		size = 25 * 1024 * 1024
+		statuses = {self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4").status_code for _ in range(90)}
+		self.assertEqual(statuses, {200})
 
 	def test_speedtest_page_is_public(self):
 		self.assertEqual(self.client.get(reverse("tools:speedtest")).status_code, 200)
