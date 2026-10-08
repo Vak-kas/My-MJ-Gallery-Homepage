@@ -9,6 +9,15 @@
 
 TOOLS = [
 	{
+		"slug": "clipboard",
+		"url_name": "tools:clipboard",
+		"icon": "📋",
+		"title": "내 클립보드",
+		"description": "로그인한 계정에 텍스트·이미지·파일을 붙여넣어 두고, 휴대폰·노트북 등 다른 기기에서 바로 복사하거나 내려받습니다.",
+		"tags": ["기기 간 공유", "로그인"],
+		"login_required": True,
+	},
+	{
 		"slug": "speedtest",
 		"url_name": "tools:speedtest",
 		"icon": "⚡",

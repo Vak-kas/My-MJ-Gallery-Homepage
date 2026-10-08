@@ -1,0 +1,271 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .cb-drop { border: 2px dashed rgba(0,0,0,.12); border-radius: 22px; transition: border-color .15s, background .15s; }
+    .cb-drop.is-over { border-color: #0066cc; background: #f0f7ff; }
+    .cb-text { width: 100%; min-height: 96px; resize: vertical; border: 0; outline: none; background: transparent; font-size: 15px; line-height: 1.6; color: #1d1d1f; }
+    .cb-item pre { white-space: pre-wrap; word-break: break-word; font-family: inherit; }
+    .cb-item.is-pinned { border-color: rgba(0,102,204,.35); }
+    .cb-btn { border-radius: 999px; border: 1px solid rgba(0,0,0,.1); padding: 4px 12px; font-size: 12px; color: #1d1d1f; background: #fff; }
+    .cb-btn:hover { background: #f5f5f7; }
+    .cb-btn.is-primary { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .cb-clamp { display: -webkit-box; -webkit-line-clamp: 8; -webkit-box-orient: vertical; overflow: hidden; }
+    html.theme-dark .cb-drop.is-over { background: rgba(78,161,255,.12); }
+    html.theme-dark .cb-text { color: #e8e8ea; }
+    html.theme-dark .cb-btn { background: #1f1f22; color: #e8e8ea; border-color: rgba(255,255,255,.14); }
+</style>
+
+<main class="mx-auto max-w-[960px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MY CLIPBOARD</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Clipboard.</h1>
+        <p class="mt-3 text-[15px] leading-relaxed text-[#6e6e73]">
+            <b class="text-[#1d1d1f]">{{ user.get_username }}</b> 님만 볼 수 있는 클립보드예요. 여기에 붙여넣으면 휴대폰·노트북 등 같은 계정으로 로그인한 다른 기기에 바로 나타나요.
+        </p>
+    </div>
+
+    <section id="cb-drop" class="cb-drop mt-8 bg-white p-5">
+        <textarea id="cb-text" class="cb-text" placeholder="여기에 ⌘V(Ctrl+V)로 붙여넣거나 입력하세요. 이미지·파일은 끌어놓아도 돼요."></textarea>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p class="text-[12px] text-[#8e8e93]">텍스트는 ⌘Enter 로 저장 · 이미지·파일 최대 {{ max_file_mb }}MB · 계정당 {{ max_user_mb }}MB</p>
+            <div class="flex flex-wrap items-center gap-2">
+                <label class="cb-btn cursor-pointer">파일 선택<input id="cb-file" type="file" multiple hidden></label>
+                <button id="cb-save" type="button" class="cb-btn is-primary">저장</button>
+            </div>
+        </div>
+        <p id="cb-status" class="mt-2 min-h-[18px] text-[12px] text-[#6e6e73]"></p>
+    </section>
+
+    <div class="mt-8 flex flex-wrap items-center justify-between gap-3">
+        <h2 class="text-[16px] font-semibold text-[#1d1d1f]">저장된 항목 <span id="cb-usage" class="ml-1 text-[12px] font-normal text-[#8e8e93]"></span></h2>
+        <div class="flex items-center gap-2">
+            <span id="cb-sync" class="text-[11px] text-[#8e8e93]">동기화 중…</span>
+            <button id="cb-clear" type="button" class="cb-btn">고정 안 한 항목 비우기</button>
+        </div>
+    </div>
+    <ul id="cb-list" class="mt-4 space-y-3"></ul>
+</main>
+
+{% csrf_token %}
+<script>
+(() => {
+    const API = {
+        list: "{% url 'tools:clipboard_list' %}",
+        add: "{% url 'tools:clipboard_add' %}",
+        clear: "{% url 'tools:clipboard_clear' %}",
+        pin: (id) => `{% url 'tools:clipboard_list' %}${id}/pin/`,
+        del: (id) => `{% url 'tools:clipboard_list' %}${id}/delete/`,
+    };
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)}MB` : n >= 1024 ? `${(n / 1024).toFixed(0)}KB` : `${n}B`);
+    const fmtTime = (iso) => {
+        const d = new Date(iso); const diff = (Date.now() - d) / 1000;
+        if (diff < 60) return '방금';
+        if (diff < 3600) return `${Math.floor(diff / 60)}분 전`;
+        if (diff < 86400) return `${Math.floor(diff / 3600)}시간 전`;
+        return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    };
+    const setStatus = (text, error = false) => {
+        $('cb-status').textContent = text;
+        $('cb-status').style.color = error ? '#d44c47' : '';
+    };
+
+    let version = '';
+    let items = [];
+
+    const post = async (url, body) => {
+        const resp = await fetch(url, { method: 'POST', body, headers: { 'X-CSRFToken': csrf }, credentials: 'same-origin' });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) throw new Error(data.error || `오류 (${resp.status})`);
+        return data;
+    };
+
+    // ── 그리기 ─────────────────────────────
+    const render = () => {
+        const list = $('cb-list');
+        if (!items.length) {
+            list.innerHTML = '<li class="rounded-2xl border border-dashed border-black/[0.12] p-8 text-center text-[13px] text-[#8e8e93]">아직 저장된 항목이 없어요. 위에 붙여넣어 보세요.</li>';
+            return;
+        }
+        list.innerHTML = items.map((it) => {
+            const meta = `<span class="text-[11px] text-[#8e8e93]">${it.pinned ? '📌 ' : ''}${fmtTime(it.created_at)} · ${fmtSize(it.size)}</span>`;
+            let body = '';
+            let actions = '';
+            if (it.kind === 'text') {
+                body = `<pre class="cb-clamp text-[14px] leading-relaxed text-[#1d1d1f]">${esc(it.text)}</pre>`;
+                actions = `<button class="cb-btn is-primary" data-act="copy" data-id="${it.id}">복사</button>`;
+            } else if (it.kind === 'image') {
+                body = `<img src="${it.url}?inline=1" alt="${esc(it.filename)}" loading="lazy" class="max-h-[280px] rounded-xl border border-black/[0.06]">`;
+                actions = `<button class="cb-btn is-primary" data-act="copy-image" data-id="${it.id}">이미지 복사</button><a class="cb-btn" href="${it.url}">다운로드</a>`;
+            } else {
+                body = `<p class="flex items-center gap-2 text-[14px] text-[#1d1d1f]"><span class="text-[20px]">📄</span><span class="break-all">${esc(it.filename)}</span></p>`;
+                actions = `<a class="cb-btn is-primary" href="${it.url}">다운로드</a>`;
+            }
+            return `<li class="cb-item ${it.pinned ? 'is-pinned' : ''} rounded-2xl border border-black/[0.08] bg-white p-4">
+                ${body}
+                <div class="mt-3 flex flex-wrap items-center justify-between gap-2">
+                    ${meta}
+                    <div class="flex flex-wrap gap-2">${actions}
+                        <button class="cb-btn" data-act="pin" data-id="${it.id}">${it.pinned ? '고정 해제' : '고정'}</button>
+                        <button class="cb-btn" data-act="delete" data-id="${it.id}">삭제</button>
+                    </div>
+                </div>
+            </li>`;
+        }).join('');
+    };
+
+    // ── 동기화 ─────────────────────────────
+    const refresh = async (force = false) => {
+        try {
+            const resp = await fetch(`${API.list}${force ? '' : `?since=${version}`}`, { credentials: 'same-origin' });
+            if (resp.status === 403 || resp.redirected) { $('cb-sync').textContent = '로그인이 필요해요'; return; }
+            const data = await resp.json();
+            $('cb-sync').textContent = `동기화됨 ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`;
+            if (data.unchanged) return;
+            version = data.version;
+            items = data.items;
+            const u = data.usage;
+            $('cb-usage').textContent = `${u.count}/${u.max_count}개 · ${fmtSize(u.bytes)} / ${fmtSize(u.max_bytes)}`;
+            render();
+        } catch (_) {
+            $('cb-sync').textContent = '연결이 끊겼어요 · 다시 시도 중';
+        }
+    };
+    setInterval(() => { if (!document.hidden) refresh(); }, 5000);
+    window.addEventListener('focus', () => refresh());
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+
+    // ── 저장 ─────────────────────────────
+    const saveText = async (text) => {
+        if (!text.trim()) return;
+        const body = new FormData();
+        body.append('text', text);
+        setStatus('저장 중…');
+        try {
+            await post(API.add, body);
+            setStatus('저장했어요.');
+            $('cb-text').value = '';
+            refresh(true);
+        } catch (err) { setStatus(err.message, true); }
+    };
+    const saveFiles = async (files) => {
+        for (const file of files) {
+            const body = new FormData();
+            body.append('file', file, file.name || (file.type.startsWith('image/') ? `screenshot.${file.type.split('/')[1] || 'png'}` : 'file'));
+            setStatus(`${file.name || '이미지'} 올리는 중… (${fmtSize(file.size)})`);
+            try {
+                await post(API.add, body);
+                setStatus('저장했어요.');
+            } catch (err) { setStatus(err.message, true); return; }
+        }
+        refresh(true);
+    };
+
+    $('cb-save').addEventListener('click', () => saveText($('cb-text').value));
+    $('cb-text').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveText($('cb-text').value); }
+    });
+    $('cb-file').addEventListener('change', (e) => { saveFiles([...e.target.files]); e.target.value = ''; });
+
+    // 페이지 어디서든 붙여넣기: 파일·이미지는 바로 저장, 텍스트는 입력칸 밖이면 바로 저장
+    document.addEventListener('paste', (e) => {
+        const files = [...(e.clipboardData?.files || [])];
+        if (files.length) {
+            e.preventDefault();
+            saveFiles(files);
+            return;
+        }
+        if (document.activeElement !== $('cb-text')) {
+            const text = e.clipboardData?.getData('text/plain') || '';
+            if (text) { e.preventDefault(); saveText(text); }
+        }
+    });
+
+    const drop = $('cb-drop');
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+    drop.addEventListener('drop', (e) => {
+        const files = [...(e.dataTransfer?.files || [])];
+        if (files.length) saveFiles(files);
+        else { const text = e.dataTransfer?.getData('text/plain'); if (text) saveText(text); }
+    });
+
+    // ── 항목 동작 ─────────────────────────
+    const toPng = (blob) => new Promise((resolve, reject) => {
+        if (blob.type === 'image/png') { resolve(blob); return; }
+        const img = new Image();
+        img.onload = () => {
+            const c = document.createElement('canvas');
+            c.width = img.naturalWidth; c.height = img.naturalHeight;
+            c.getContext('2d').drawImage(img, 0, 0);
+            c.toBlob((b) => (b ? resolve(b) : reject(new Error('변환 실패'))), 'image/png');
+            URL.revokeObjectURL(img.src);
+        };
+        img.onerror = () => reject(new Error('이미지를 읽지 못했어요'));
+        img.src = URL.createObjectURL(blob);
+    });
+
+    // 텍스트 복사: 최신 Clipboard API → 안 되면(포커스·권한 문제) 예전 방식으로
+    const copyText = async (text) => {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch (_) {
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.setAttribute('readonly', '');
+            ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+            document.body.appendChild(ta);
+            ta.select();
+            const ok = document.execCommand('copy');
+            ta.remove();
+            return ok;
+        }
+    };
+
+    $('cb-list').addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const id = Number(btn.dataset.id);
+        const item = items.find((it) => it.id === id);
+        const flash = (text) => { const old = btn.textContent; btn.textContent = text; setTimeout(() => { btn.textContent = old; }, 1300); };
+        try {
+            if (btn.dataset.act === 'copy') {
+                flash((await copyText(item.text)) ? '복사됨' : '복사 실패 · 길게 눌러 선택해 주세요');
+            } else if (btn.dataset.act === 'copy-image') {
+                // Safari 는 사용자 동작 안에서 Promise 를 넘겨야 해서 ClipboardItem 에 Promise 를 전달
+                const blobPromise = fetch(`${item.url}?inline=1`, { credentials: 'same-origin' }).then((r) => r.blob()).then(toPng);
+                await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+                flash('복사됨');
+            } else if (btn.dataset.act === 'pin') {
+                await post(API.pin(id), new FormData());
+                refresh(true);
+            } else if (btn.dataset.act === 'delete') {
+                await post(API.del(id), new FormData());
+                refresh(true);
+            }
+        } catch (err) {
+            if (btn.dataset.act === 'copy-image') { flash('복사 불가 · 다운로드로 받아 주세요'); return; }
+            setStatus(err.message || '처리하지 못했어요', true);
+        }
+    });
+
+    $('cb-clear').addEventListener('click', async () => {
+        if (!confirm('고정하지 않은 항목을 모두 지울까요? (되돌릴 수 없어요)')) return;
+        try {
+            const data = await post(API.clear, new FormData());
+            setStatus(`${data.deleted}개를 지웠어요.`);
+            refresh(true);
+        } catch (err) { setStatus(err.message, true); }
+    });
+
+    refresh(true);
+})();
+</script>
+{% endblock %}

@@ -169,6 +169,8 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_ROOT = BASE_DIR / 'media'
+# 비공개 파일(클립보드·맡겨둔 파일): nginx 가 서빙하지 않고 Django 가 권한 확인 후 내려줌
+PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
 
 if USE_S3:
     INSTALLED_APPS.append('storages')

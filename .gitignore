@@ -169,3 +169,6 @@ frontend/editor/node_modules/
 
 # 관리 명령이 만드는 백업 파일
 backups/
+
+# 비공개 업로드 (클립보드·맡겨둔 파일)
+private_media/

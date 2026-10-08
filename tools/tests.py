@@ -17,7 +17,7 @@ class ToolPagesTests(TestCase):
 
 	def test_tool_pages_are_public(self):
 		for tool in TOOLS:
-			if tool.get("admin_only"):
+			if tool.get("admin_only") or tool.get("login_required"):
 				continue
 			self.assertEqual(self.client.get(reverse(tool["url_name"])).status_code, 200)
 
@@ -211,3 +211,108 @@ class StreamViewTests(TestCase):
 			self.client.force_login(self.admin)
 			self.client.post(reverse("tools:stream_close", args=["abc123"]))
 		close.assert_called_once_with("abc123")
+
+
+import shutil
+import tempfile
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import override_settings
+
+_PRIVATE = tempfile.mkdtemp(prefix="mj-private-test-")
+
+
+@override_settings(PRIVATE_MEDIA_ROOT=_PRIVATE)
+class ClipboardTests(TestCase):
+	@classmethod
+	def tearDownClass(cls):
+		super().tearDownClass()
+		shutil.rmtree(_PRIVATE, ignore_errors=True)
+
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		User = get_user_model()
+		self.alice = User.objects.create_user("alice", "a@example.com", "pw-for-tests-only")
+		self.bob = User.objects.create_user("bob", "b@example.com", "pw-for-tests-only")
+		self.client.force_login(self.alice)
+
+	def add_text(self, text="hello"):
+		return self.client.post(reverse("tools:clipboard_add"), {"text": text})
+
+	def add_file(self, name="pic.png", content=b"\x89PNG fake", mime="image/png"):
+		return self.client.post(reverse("tools:clipboard_add"), {"file": SimpleUploadedFile(name, content, content_type=mime)})
+
+	def test_requires_login(self):
+		self.client.logout()
+		for name in ("tools:clipboard", "tools:clipboard_list"):
+			resp = self.client.get(reverse(name))
+			self.assertEqual(resp.status_code, 302)
+			self.assertIn(reverse("accounts:login"), resp["Location"])
+
+	def test_text_image_file_round_trip(self):
+		self.assertEqual(self.add_text("복사할 글").status_code, 201)
+		img = self.add_file().json()["item"]
+		doc = self.add_file("report.pdf", b"%PDF-1.4 data", "application/pdf").json()["item"]
+		self.assertEqual(img["kind"], "image")
+		self.assertEqual(doc["kind"], "file")
+		data = self.client.get(reverse("tools:clipboard_list")).json()
+		self.assertEqual([i["kind"] for i in data["items"]], ["file", "image", "text"])
+		self.assertEqual(data["items"][2]["text"], "복사할 글")
+		resp = self.client.get(doc["url"])
+		self.assertEqual(b"".join(resp.streaming_content), b"%PDF-1.4 data")
+		self.assertIn("attachment", resp["Content-Disposition"])
+		inline = self.client.get(img["url"] + "?inline=1")
+		self.assertNotIn("attachment", inline["Content-Disposition"])
+
+	def test_items_are_private_per_user(self):
+		item = self.add_file().json()["item"]
+		self.add_text("alice secret")
+		self.client.force_login(self.bob)
+		self.assertEqual(self.client.get(reverse("tools:clipboard_list")).json()["items"], [])
+		self.assertEqual(self.client.get(item["url"]).status_code, 404)
+		self.assertEqual(self.client.post(reverse("tools:clipboard_delete", args=[item["id"]])).status_code, 404)
+
+	def test_files_are_not_in_public_media(self):
+		from django.conf import settings
+		from tools.models import ClipItem
+		self.add_file()
+		path = ClipItem.objects.get().file.path
+		self.assertTrue(path.startswith(str(_PRIVATE)))
+		self.assertFalse(path.startswith(str(settings.MEDIA_ROOT)))
+
+	def test_version_detects_changes(self):
+		first = self.client.get(reverse("tools:clipboard_list")).json()
+		same = self.client.get(reverse("tools:clipboard_list"), {"since": first["version"]}).json()
+		self.assertTrue(same["unchanged"])
+		self.add_text()
+		changed = self.client.get(reverse("tools:clipboard_list"), {"since": first["version"]}).json()
+		self.assertNotIn("unchanged", changed)
+		self.assertEqual(len(changed["items"]), 1)
+
+	def test_pin_delete_and_clear_keep_pinned(self):
+		from tools.models import ClipItem
+		keep = self.add_text("keep").json()["item"]
+		self.add_text("drop")
+		file_item = self.add_file().json()["item"]
+		self.client.post(reverse("tools:clipboard_pin", args=[keep["id"]]))
+		path = ClipItem.objects.get(pk=file_item["id"]).file.path
+		resp = self.client.post(reverse("tools:clipboard_clear"))
+		self.assertEqual(resp.json()["deleted"], 2)
+		self.assertEqual(list(ClipItem.objects.values_list("text", flat=True)), ["keep"])
+		import os
+		self.assertFalse(os.path.exists(path))  # 파일도 지워짐
+
+	def test_limits(self):
+		from unittest import mock
+		self.assertEqual(self.add_text("   ").status_code, 400)
+		with mock.patch("tools.clipboard_views.MAX_TEXT_CHARS", 5):
+			self.assertEqual(self.add_text("123456").status_code, 400)
+		with mock.patch("tools.clipboard_views.MAX_FILE_BYTES", 4):
+			self.assertEqual(self.add_file(content=b"12345").status_code, 400)
+		with mock.patch("tools.clipboard_views.MAX_USER_ITEMS", 1):
+			self.add_text("one")
+			self.assertEqual(self.add_text("two").status_code, 400)
+
+	def test_hub_card_visible_and_page_renders(self):
+		self.assertContains(self.client.get(reverse("tools:index")), "내 클립보드")
+		self.assertContains(self.client.get(reverse("tools:clipboard")), "alice")
