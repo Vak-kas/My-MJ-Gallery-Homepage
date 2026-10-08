@@ -7,11 +7,13 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
+from django.core.cache import cache
 from django.urls import reverse
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import relay_client
-from .permissions import can_manage_streams
+from .permissions import MEMBER_STREAM_LIMITS, can_create_streams, can_manage_streams, owns_room
 from .registry import TOOLS
 from .speedtest import _client_ip
 
@@ -48,13 +50,26 @@ MB = 1024 * 1024
 GB = 1024 * MB
 
 
-def _require_stream_admin(request):
+def _require_stream_member(request):
 	"""권한이 없으면 응답(로그인 이동/403)을, 있으면 None 을 돌려줌."""
 	if not request.user.is_authenticated:
 		return redirect(f"{reverse('accounts:login')}?{urlencode({'next': request.get_full_path()})}")
-	if not can_manage_streams(request.user):
-		raise PermissionDenied("스트림 방은 관리자만 만들 수 있습니다.")
+	if not can_create_streams(request.user):
+		raise PermissionDenied("데이터 전송 방은 회원만 만들 수 있습니다.")
 	return None
+
+
+def _daily_room_key(user):
+	return f"stream:rooms:{user.id}:{timezone.localdate().isoformat()}"
+
+
+def _apply_member_limits(payload):
+	"""회원이 만드는 방은 유효 시간·속도·총량을 한도 안으로 줄임."""
+	lim = MEMBER_STREAM_LIMITS
+	caps = {"ttl": lim["ttl_minutes"] * 60, "rate_limit": int(lim["rate_mb"] * MB), "total_limit": int(lim["total_gb"] * GB)}
+	for key, cap in caps.items():
+		payload[key] = min(payload.get(key, cap), cap)
+	return payload
 
 
 def _float_or_none(value):
@@ -88,15 +103,34 @@ def _room_payload(post):
 
 
 def stream_list(request):
-	denied = _require_stream_admin(request)
+	denied = _require_stream_member(request)
 	if denied:
 		return denied
+	user = request.user
+	is_admin = can_manage_streams(user)
+	lim = MEMBER_STREAM_LIMITS
+
 	if request.method == "POST":
+		payload = _room_payload(request.POST)
+		payload["meta"]["owner_id"] = user.id
+		payload["meta"]["owner"] = user.username
 		try:
-			room = relay_client.create_room(_room_payload(request.POST))
+			if not is_admin:
+				mine = [r for r in relay_client.list_rooms() if owns_room(user, r)]
+				if len(mine) >= lim["max_open_rooms"]:
+					messages.error(request, f"방은 동시에 {lim['max_open_rooms']}개까지 열 수 있어요. 쓰던 방을 닫고 다시 만들어 주세요.")
+					return redirect("tools:stream")
+				if cache.get(_daily_room_key(user), 0) >= lim["rooms_per_day"]:
+					messages.error(request, f"방은 하루에 {lim['rooms_per_day']}개까지 만들 수 있어요. 내일 다시 시도해 주세요.")
+					return redirect("tools:stream")
+				_apply_member_limits(payload)
+			room = relay_client.create_room(payload)
 		except relay_client.RelayError as exc:
 			messages.error(request, str(exc))
 			return redirect("tools:stream")
+		if not is_admin:
+			key = _daily_room_key(user)
+			cache.set(key, cache.get(key, 0) + 1, 24 * 60 * 60)
 		return redirect(f"{reverse('tools:stream_room', args=[room['id']])}?token={room['token']}")
 
 	error_message = None
@@ -104,10 +138,14 @@ def stream_list(request):
 		rooms = relay_client.list_rooms()
 	except relay_client.RelayError as exc:
 		rooms, error_message = [], str(exc)
+	if not is_admin:
+		rooms = [r for r in rooms if owns_room(user, r)]  # 회원은 자기 방만
 	return render(request, "tools/stream_list.html", {
 		"rooms": rooms,
 		"relay_error": error_message,
 		"public_host": settings.RELAY_PUBLIC_HOST,
+		"is_admin": is_admin,
+		"limits": None if is_admin else lim,
 	})
 
 
@@ -157,7 +195,8 @@ def stream_room(request, room_id):
 		"ws_recv_url": f"{ws_base.rstrip('/')}/relay/ws/{room_id}/recv?token={token}",
 		"join_url": f"{reverse('tools:stream_join', args=[room_id])}?token={token}",
 		"public_host": settings.RELAY_PUBLIC_HOST,
-		"can_manage": role == "admin" and can_manage_streams(request.user),
+		"can_manage": role == "admin" and (can_manage_streams(request.user) or owns_room(request.user, room)),
+		"can_share": can_manage_streams(request.user),
 	}
 	if role == "admin":
 		context["sender_link"] = f"{base_url}?token={room['sender_token']}"
@@ -187,10 +226,15 @@ def stream_join(request, room_id):
 
 @require_POST
 def stream_close(request, room_id):
-	denied = _require_stream_admin(request)
+	denied = _require_stream_member(request)
 	if denied:
 		return denied
 	try:
+		room = relay_client.get_room(room_id)
+		if not room:
+			raise Http404
+		if not (can_manage_streams(request.user) or owns_room(request.user, room)):
+			raise PermissionDenied("내가 만든 방만 닫을 수 있습니다.")
 		relay_client.close_room(room_id)
 		messages.success(request, "방을 닫았습니다.")
 	except relay_client.RelayError as exc:

@@ -146,18 +146,81 @@ class StreamViewTests(TestCase):
 		self.admin = User.objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
 		self.member = User.objects.create_user("member", "member@example.com", "pw-for-tests-only")
 
-	def test_anonymous_is_sent_to_login_and_member_is_forbidden(self):
+	def setUp_cache(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_anonymous_is_sent_to_login(self):
 		resp = self.client.get(reverse("tools:stream"))
 		self.assertEqual(resp.status_code, 302)
 		self.assertIn(reverse("accounts:login"), resp["Location"])
-		self.client.force_login(self.member)
-		self.assertEqual(self.client.get(reverse("tools:stream")).status_code, 403)
-		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "iq"}).status_code, 403)
+		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "file"}).status_code, 302)
 
-	def test_hub_shows_stream_card_only_to_admin(self):
-		self.assertNotContains(self.client.get(reverse("tools:index")), "데이터 전송")
-		self.client.force_login(self.admin)
+	def test_hub_shows_stream_card_to_everyone_with_login_tag(self):
 		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
+		self.client.force_login(self.member)
+		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
+
+	def _member_room(self, room_id="mem1", owner=None):
+		owner = owner or self.member
+		return {**self.ROOM, "id": room_id, "token": f"{room_id}-admin", "meta": {"owner_id": owner.id, "owner": owner.username}}
+
+	def test_member_creates_room_with_limits_and_owner(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[]), \
+				mock.patch("tools.relay_client.create_room", return_value=self._member_room()) as create:
+			resp = self.client.post(reverse("tools:stream"), {
+				"kind": "file", "ttl_minutes": "360", "rate_mb": "64", "total_gb": "200",
+			})
+		payload = create.call_args.args[0]
+		self.assertEqual(payload["meta"]["owner_id"], self.member.id)
+		self.assertEqual(payload["ttl"], 60 * 60)
+		self.assertEqual(payload["rate_limit"], 8 * 1024 * 1024)
+		self.assertEqual(payload["total_limit"], 3 * 1024 ** 3)
+		self.assertEqual(resp.status_code, 302)
+
+	def test_member_one_open_room_and_daily_limit(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[self._member_room()]), \
+				mock.patch("tools.relay_client.create_room") as create:
+			self.client.post(reverse("tools:stream"), {"kind": "file"})
+		create.assert_not_called()  # 이미 방 1개 열려 있음
+		with mock.patch("tools.relay_client.list_rooms", return_value=[]), \
+				mock.patch("tools.relay_client.create_room", return_value=self._member_room()) as create:
+			for _ in range(4):
+				self.client.post(reverse("tools:stream"), {"kind": "file"})
+		self.assertEqual(create.call_count, 3)  # 하루 3개
+
+	def test_member_sees_and_closes_only_own_rooms(self):
+		from unittest import mock
+		self.setUp_cache()
+		mine, theirs = self._member_room("mem1"), self._member_room("adm1", owner=self.admin)
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[mine, theirs]):
+			resp = self.client.get(reverse("tools:stream"))
+		self.assertContains(resp, "mem1-admin")
+		self.assertNotContains(resp, "adm1-admin")
+		with mock.patch("tools.relay_client.get_room", return_value=theirs), mock.patch("tools.relay_client.close_room") as close:
+			self.assertEqual(self.client.post(reverse("tools:stream_close", args=["adm1"])).status_code, 403)
+		close.assert_not_called()
+		with mock.patch("tools.relay_client.get_room", return_value=mine), mock.patch("tools.relay_client.close_room") as close:
+			self.client.post(reverse("tools:stream_close", args=["mem1"]))
+		close.assert_called_once_with("mem1")
+
+	def test_admin_has_no_member_limits(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[self._member_room("a", owner=self.admin)] * 3), \
+				mock.patch("tools.relay_client.create_room", return_value=self.ROOM) as create:
+			for _ in range(5):
+				self.client.post(reverse("tools:stream"), {"kind": "file", "total_gb": "100"})
+		self.assertEqual(create.call_count, 5)
+		self.assertEqual(create.call_args.args[0]["total_limit"], 100 * 1024 ** 3)
 
 	def test_admin_creates_room_with_parsed_options(self):
 		from unittest import mock
@@ -247,9 +310,9 @@ class StreamViewTests(TestCase):
 			self.assertEqual(self.client.post(f"{url}?token=nope").status_code, 404)
 		self.assertEqual(join.call_count, 2)
 
-	def test_only_admin_can_close(self):
+	def test_member_cannot_close_others_room_but_admin_can(self):
 		from unittest import mock
-		with mock.patch("tools.relay_client.close_room") as close:
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.close_room") as close:
 			self.client.force_login(self.member)
 			self.assertEqual(self.client.post(reverse("tools:stream_close", args=["abc123"])).status_code, 403)
 			self.client.force_login(self.admin)

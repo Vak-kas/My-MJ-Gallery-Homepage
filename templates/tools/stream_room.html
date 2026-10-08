@@ -106,7 +106,7 @@
             </div>
             <p id="fx-nopeer" class="mt-3 hidden rounded-xl bg-amber-50 px-4 py-3 text-[12px] leading-relaxed text-amber-800">
                 받는 사람이 아직 접속하지 않았어요. 받는 쪽 링크를 열어 달라고 하거나,
-                {% if can_manage %}<a href="{% url 'tools:share' %}" class="font-semibold underline">맡겨두기</a>로 링크를 보내세요.{% else %}관리자에게 맡겨두기를 요청하세요.{% endif %}
+                {% if can_share %}<a href="{% url 'tools:share' %}" class="font-semibold underline">맡겨두기</a>로 링크를 보내세요.{% else %}받는 사람이 링크를 연 다음 다시 보내 주세요.{% endif %}
             </p>
             <ul id="fx-out" class="mt-4 space-y-3"></ul>
         </section>
