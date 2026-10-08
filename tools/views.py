@@ -147,6 +147,8 @@ def stream_room(request, room_id):
 		"role": role,
 		"my_ip": my_ip,
 		"ws_url": f"{ws_base.rstrip('/')}/relay/ws/{room_id}?token={token}",
+		"ws_send_url": f"{ws_base.rstrip('/')}/relay/ws/{room_id}/send?token={token}",
+		"ws_recv_url": f"{ws_base.rstrip('/')}/relay/ws/{room_id}/recv?token={token}",
 		"join_url": f"{reverse('tools:stream_join', args=[room_id])}?token={token}",
 		"public_host": settings.RELAY_PUBLIC_HOST,
 		"can_manage": role == "admin" and can_manage_streams(request.user),

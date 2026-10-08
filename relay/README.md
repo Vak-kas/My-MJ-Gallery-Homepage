@@ -1,4 +1,4 @@
-# mj-relay — 실시간 데이터 스트림 중계
+# mj-relay — 데이터 전송 중계 (파일 · 실시간 스트리밍 · GNU Radio ZMQ)
 
 HackRF 등으로 캡처한 IQ 데이터(GNU Radio ZMQ)나 파일을 서버의 "방"을 거쳐 실시간으로 전달합니다.
 웹 화면: `https://smjgallery.kr/tools/stream/` (방 만들기는 관리자만, 방 화면은 토큰 링크로 공유)
@@ -9,6 +9,13 @@ HackRF 등으로 캡처한 IQ 데이터(GNU Radio ZMQ)나 파일을 서버의 "�
 [B] GNU Radio ─ ZMQ SUB Source (Bind: No) ◀────────── tcp://smjgallery.kr:OUT
 [웹] 방 화면 ◀── wss://smjgallery.kr/relay/ws/<방>?token=…  (처리량·스펙트럼 미리보기)
 ```
+
+## 브라우저 파일 전송
+- 파일 방에서 보내는 쪽 링크 페이지에 파일을 끌어놓으면, 받는 쪽 링크 페이지로 **서버 저장 없이** 바로 전달
+  (`/relay/ws/<방>/send` → `/relay/ws/<방>/recv`, 1MB 조각, 조각마다 ack 로 받는 쪽 속도에 맞춤)
+- 같은 방의 CLI·GNU Radio 수신자에게도 함께 전달되고, CLI 로 보낸 파일도 브라우저에서 받을 수 있음
+- 받는 쪽은 Chrome·Edge 에서 저장 폴더를 고르면 디스크에 바로 저장, 아니면 다 받은 뒤 저장
+- 받는 사람이 없으면 **맡겨두기**(`/tools/share/`, Django): 서버에 잠시 올려두고 링크로 다운로드, 유효시간 뒤 자동 삭제
 
 ## 방 종류
 | 종류 | OUT 소켓 | 받는 쪽 | 특징 |

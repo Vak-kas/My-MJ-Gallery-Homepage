@@ -124,9 +124,9 @@ class StreamViewTests(TestCase):
 		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "iq"}).status_code, 403)
 
 	def test_hub_shows_stream_card_only_to_admin(self):
-		self.assertNotContains(self.client.get(reverse("tools:index")), "실시간 데이터 스트림")
+		self.assertNotContains(self.client.get(reverse("tools:index")), "데이터 전송")
 		self.client.force_login(self.admin)
-		self.assertContains(self.client.get(reverse("tools:index")), "실시간 데이터 스트림")
+		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
 
 	def test_admin_creates_room_with_parsed_options(self):
 		from unittest import mock

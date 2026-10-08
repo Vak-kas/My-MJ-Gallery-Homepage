@@ -44,10 +44,10 @@ TOOLS = [
 	{
 		"slug": "stream",
 		"url_name": "tools:stream",
-		"icon": "📡",
-		"title": "실시간 데이터 스트림",
-		"description": "방(포트)을 열어 두면 HackRF·GNU Radio(ZMQ)나 파일로 보낸 데이터를 받는 쪽이 실시간으로 받습니다. 웹에서 스펙트럼·처리량도 볼 수 있어요.",
-		"tags": ["SDR", "관리자"],
+		"icon": "📁",
+		"title": "데이터 전송",
+		"description": "방을 열고 링크를 나눠 주면 브라우저끼리 파일을 바로 주고받아요. 받는 사람이 없으면 맡겨두기, 프로그램 실시간 스트림·GNU Radio(ZMQ) IQ 중계도 지원합니다.",
+		"tags": ["파일", "스트리밍", "관리자"],
 		"admin_only": True,  # 권한은 tools/permissions.py 의 can_manage_streams
 	},
 ]

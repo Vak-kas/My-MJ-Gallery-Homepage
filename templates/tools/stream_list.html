@@ -20,12 +20,12 @@
 <main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
     <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
     <div class="mt-4">
-        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SDR · ZMQ RELAY</p>
-        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Data Stream.</h1>
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">FILE · STREAM · ZMQ</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Data Transfer.</h1>
         <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
-            방을 열면 이 서버에 <b>보내는 포트</b>와 <b>받는 포트</b>, 그리고 <b>보내는 쪽·받는 쪽 링크</b>가 생깁니다.
-            각자 자기 링크를 열어 "입장"하면 그 네트워크에서만 접속할 수 있고, 보내는 쪽(HackRF + GNU Radio ZMQ PUSH Sink, 또는 CLI)이 보내면
-            받는 쪽(GNU Radio ZMQ SUB Source, CLI, 웹 화면)이 실시간으로 받습니다.
+            방을 열면 <b>보내는 쪽 링크</b>와 <b>받는 쪽 링크</b>가 생겨요. 각자 링크를 열면 그 사람들끼리만 연결됩니다.
+            파일은 브라우저로 바로 주고받고, 프로그램의 실시간 데이터나 GNU Radio(ZMQ) IQ 스트림도 같은 방식으로 중계할 수 있어요.
+            받는 사람이 없을 땐 <a href="{% url 'tools:share' %}" class="text-[#0066cc]">맡겨두기</a>를 쓰세요.
         </p>
     </div>
 
@@ -44,13 +44,13 @@
                 <div>
                     <span class="sr-label">보낼 데이터 종류</span>
                     <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <label class="sr-kind relative"><input type="radio" name="kind" value="iq" checked><span><b class="block text-[14px] text-[#1d1d1f]">📡 IQ 실시간</b><small class="text-[12px] text-[#6e6e73]">HackRF 캡처 → 스펙트럼</small></span></label>
-                        <label class="sr-kind relative"><input type="radio" name="kind" value="file"><span><b class="block text-[14px] text-[#1d1d1f]">📁 파일</b><small class="text-[12px] text-[#6e6e73]">손실 없이 전송</small></span></label>
-                        <label class="sr-kind relative"><input type="radio" name="kind" value="raw"><span><b class="block text-[14px] text-[#1d1d1f]">⇢ 일반 바이트</b><small class="text-[12px] text-[#6e6e73]">아무 데이터나 실시간</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="file" checked><span><b class="block text-[14px] text-[#1d1d1f]">📁 파일 전송</b><small class="text-[12px] text-[#6e6e73]">브라우저로 바로 보내고 받기</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="raw"><span><b class="block text-[14px] text-[#1d1d1f]">⇢ 실시간 스트리밍</b><small class="text-[12px] text-[#6e6e73]">프로그램의 바이트 스트림</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="iq"><span><b class="block text-[14px] text-[#1d1d1f]">📡 IQ (GNU Radio)</b><small class="text-[12px] text-[#6e6e73]">ZMQ · 스펙트럼 미리보기</small></span></label>
                     </div>
                 </div>
 
-                <div data-for="iq" class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div data-for="iq" hidden class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                         <label class="sr-label" for="format">샘플 형식</label>
                         <select id="format" name="format" class="sr-input">
@@ -69,10 +69,9 @@
                     </div>
                 </div>
 
-                <div data-for="file" hidden>
-                    <label class="sr-label" for="filename">파일 설명 (선택)</label>
-                    <input id="filename" name="filename" class="sr-input" maxlength="200" placeholder="예: 2026-10-07 433MHz 캡처">
-                    <p class="sr-hint">파일 이름과 크기는 보내는 CLI 가 자동으로 알려줍니다. 받는 쪽을 먼저 실행해 두세요.</p>
+                <div data-for="file" class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]">
+                    보내는 사람·받는 사람이 각자 링크를 열어 두면 <b>브라우저끼리 바로</b> 전달돼요(서버에 저장 안 함, 큰 파일 가능).
+                    받는 사람이 지금 없으면 <a href="{% url 'tools:share' %}" class="font-semibold text-[#0066cc]">맡겨두기</a>로 링크를 보내세요.
                 </div>
 
                 <div>
