@@ -16,6 +16,7 @@
                 <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Studio</a>
                 {% endif %}
                 <a href="{% url 'main:photos' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Gallery</a>
+                {% include "components/notif_bell.html" with bell_class="border border-white/20 bg-white/10 text-white hover:bg-white/20 h-[34px]" %}
                 <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
             {% else %}
                 <a href="{% url 'main:photos' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Gallery</a>

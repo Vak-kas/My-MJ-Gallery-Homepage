@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 
 class UserForm(UserCreationForm):
     email = forms.EmailField(label="이메일", required=True)
+    message = forms.CharField(label="가입 인사", required=False, max_length=300)
 
     class Meta:
         model = User

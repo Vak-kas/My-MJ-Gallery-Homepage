@@ -116,12 +116,34 @@
 
                     </div>
 
+                    <!-- message to admin -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            가입 인사 <span class="font-normal text-[#8e8e93]">(선택)</span>
+                        </label>
+
+                        <textarea
+                            name="message"
+                            id="message"
+                            rows="2"
+                            maxlength="300"
+                            placeholder="어떻게 알고 오셨는지, 누구신지 적어 주시면 승인이 빨라져요."
+                            class="w-full rounded-[22px] border border-black/[0.08] bg-[#fbfbfd] px-6 py-4 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >{{ form.message.value|default_if_none:'' }}</textarea>
+
+                    </div>
+
+                    <p class="rounded-[18px] bg-[#f5f5f7] px-5 py-3 text-[14px] leading-6 text-[#6e6e73]">
+                        가입 신청 후 <b class="text-[#1d1d1f]">관리자가 승인하면</b> 로그인할 수 있어요.
+                    </p>
+
                     <!-- submit -->
                     <button
                         type="submit"
                         class="mt-2 h-[54px] w-full rounded-full bg-[#0066cc] text-[17px] font-normal tracking-[-0.022em] text-white transition active:scale-[0.97]"
                     >
-                        Create Account
+                        가입 신청
                     </button>
 
                 </form>
