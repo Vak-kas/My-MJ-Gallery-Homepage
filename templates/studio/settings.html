@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SETTINGS</p>
+            <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">사이트 설정</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">상단 메뉴와 홈 화면 섹션을 켜고 끄고, ↑↓ 로 순서를 바꾼 뒤 저장하세요.</p>
+        </section>
+
+        <form method="post" id="settings-form">
+            {% csrf_token %}
+            <div class="grid gap-6 xl:grid-cols-2">
+                <section class="rounded-[22px] border border-black/[0.06] bg-white p-6">
+                    <h2 class="text-[17px] font-semibold">상단 메뉴</h2>
+                    <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">
+                        <b>로그인 회원만</b>으로 바꾸면 비로그인 방문자에게 메뉴가 안 보이고 그 페이지에 들어오면 로그인 화면으로,
+                        <b>숨김</b>으로 바꾸면 관리자에게만 (점선으로) 보이고 다른 사람은 페이지에 들어올 수 없어요.
+                        <b>회원만</b>일 때 데이터 전송·비밀 메모·맡겨두기처럼 링크로 여는 페이지는 비로그인도 계속 열리고, <b>숨김</b>이면 그런 링크까지 모두 막혀요.
+                        나(관리자)는 무엇을 닫아도 항상 다 볼 수 있어요.
+                    </p>
+                    <ul class="sortable mt-4 space-y-2" data-name="nav_order">
+                        {% for item in nav_items %}
+                        <li class="sort-item flex flex-wrap items-center gap-3 rounded-2xl border border-black/[0.08] bg-[#fbfbfd] px-4 py-3" data-key="{{ item.key }}">
+                            <input type="hidden" name="nav_order" value="{{ item.key }}">
+                            <div class="flex flex-col">
+                                <button type="button" class="move-up rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06]" aria-label="위로">▲</button>
+                                <button type="button" class="move-down rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06]" aria-label="아래로">▼</button>
+                            </div>
+                            <input type="text" name="nav_label_{{ item.key }}" value="{{ item.label }}" maxlength="20" class="h-9 w-[130px] rounded-lg border border-black/[0.1] bg-white px-3 text-[14px] font-semibold outline-none focus:border-[#0066cc]">
+                            <span class="font-mono text-[12px] text-[#8e8e93]">{% url item.url_name %}</span>
+                            {% if item.fixed %}
+                            <span class="ml-auto rounded-full bg-black/[0.05] px-3 py-1 text-[12px] text-[#6e6e73]">항상 공개</span>
+                            {% else %}
+                            <select name="nav_state_{{ item.key }}" class="ml-auto h-9 rounded-lg border border-black/[0.1] bg-white px-2 text-[13px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in nav_states %}<option value="{{ value }}" {% if item.state == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                            </select>
+                            {% endif %}
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    <p class="mt-3 text-[12px] text-[#8e8e93]">Studio · 🔔 · Login/Logout 버튼은 항상 메뉴 맨 뒤에 붙어요.</p>
+                </section>
+
+                <section class="rounded-[22px] border border-black/[0.06] bg-white p-6">
+                    <h2 class="text-[17px] font-semibold">홈 화면 섹션</h2>
+                    <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">맨 위 소개 화면(인트로) 아래에 이 순서대로 나와요. 끈 섹션은 방문자·회원에게 안 보이고, 나에게는 "숨김" 표시와 함께 보여요.</p>
+                    <ul class="sortable mt-4 space-y-2" data-name="home_order">
+                        {% for section in home_sections %}
+                        <li class="sort-item flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-[#fbfbfd] px-4 py-3" data-key="{{ section.key }}">
+                            <input type="hidden" name="home_order" value="{{ section.key }}">
+                            <div class="flex flex-col">
+                                <button type="button" class="move-up rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06]" aria-label="위로">▲</button>
+                                <button type="button" class="move-down rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06]" aria-label="아래로">▼</button>
+                            </div>
+                            <span class="text-[14px] font-medium">{{ section.label }}</span>
+                            <label class="relative ml-auto inline-flex cursor-pointer items-center">
+                                <input type="checkbox" name="home_on_{{ section.key }}" class="peer sr-only" {% if section.enabled %}checked{% endif %}>
+                                <span class="h-6 w-11 rounded-full bg-black/[0.15] transition peer-checked:bg-[#34c759]"></span>
+                                <span class="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span>
+                            </label>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+            </div>
+
+            <div class="sticky bottom-6 mt-6 flex items-center justify-end gap-3">
+                <span id="dirty-note" class="text-[13px] text-[#b26a00]" hidden>저장하지 않은 변경이 있어요</span>
+                <a href="{% url 'main:home' %}" target="_blank" class="rounded-full border border-black/[0.1] bg-white px-5 py-2.5 text-[14px] hover:bg-[#f5f5f7]">홈 미리보기 ↗</a>
+                <button type="submit" class="rounded-full bg-[#0066cc] px-7 py-2.5 text-[14px] font-semibold text-white shadow-lg">저장</button>
+            </div>
+        </form>
+        </main>
+    </div>
+</div>
+
+<script>
+(() => {
+    const form = document.getElementById('settings-form');
+    const markDirty = () => { document.getElementById('dirty-note').hidden = false; };
+    form.addEventListener('click', (e) => {
+        const btn = e.target.closest('.move-up, .move-down');
+        if (!btn) return;
+        const li = btn.closest('.sort-item');
+        if (btn.classList.contains('move-up') && li.previousElementSibling) li.parentNode.insertBefore(li, li.previousElementSibling);
+        else if (btn.classList.contains('move-down') && li.nextElementSibling) li.parentNode.insertBefore(li.nextElementSibling, li);
+        li.animate([{ background: '#e8f2ff' }, { background: '' }], { duration: 400 });
+        markDirty();
+    });
+    form.addEventListener('change', markDirty);
+    form.addEventListener('input', markDirty);
+})();
+</script>
+{% endblock %}

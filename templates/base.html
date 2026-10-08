@@ -150,19 +150,17 @@
         <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
             <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
             <nav class="flex items-center gap-2">
-                <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
-                <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Blog</a>
-                <a href="{% url 'tools:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Tool</a>
+                {% for item in site_nav %}
+                <a href="{{ item.url }}" class="rounded-full border {% if item.state == 'admin' %}border-dashed border-black/[0.2] text-[#8e8e93]{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %} px-4 py-1.5 text-[13px] hover:bg-[#f5f5f7]">{{ item.label }}</a>
+                {% endfor %}
 
                 {% if user.is_authenticated %}
                     {% if user.is_superuser %}
                     <a href="{% url 'studio:index' %}" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">Studio</a>
                     {% endif %}
-                    <a href="{% url 'main:photos' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Gallery</a>
                     {% include "components/notif_bell.html" %}
                     <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
                 {% else %}
-                    <a href="{% url 'main:photos' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Gallery</a>
                     <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
                 {% endif %}
             </nav>

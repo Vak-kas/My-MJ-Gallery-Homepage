@@ -2,18 +2,16 @@
     <div class="mx-auto flex max-w-[1320px] items-center justify-between px-6 py-3">
         <a href="{% url 'main:home' %}" class="text-[15px] font-semibold text-[#1d1d1f]">MJ GALLERY</a>
         <nav class="flex flex-wrap items-center justify-end gap-2">
-            <a href="{% url 'main:home' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'home' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Home</a>
-            <a href="{% url 'blog:index' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'blog' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Blog</a>
-            <a href="{% url 'tools:index' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'tool' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Tool</a>
+            {% for item in site_nav %}
+            <a href="{{ item.url }}" {% if item.state == 'admin' %}title="숨김 메뉴 (관리자에게만 보여요)"{% endif %} class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == item.key %}bg-[#0066cc] font-semibold text-white{% else %}border {% if item.state == 'admin' %}border-dashed border-black/[0.2] text-[#8e8e93]{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %} hover:bg-[#f5f5f7]{% endif %}">{{ item.label }}</a>
+            {% endfor %}
             {% if user.is_authenticated %}
                 {% if user.is_superuser %}
                 <a href="{% url 'studio:index' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'studio' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Studio</a>
                 {% endif %}
-                <a href="{% url 'main:photos' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'photo' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Gallery</a>
                 {% include "components/notif_bell.html" %}
                 <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
             {% else %}
-                <a href="{% url 'main:photos' %}" class="rounded-full px-4 py-1.5 text-[13px] {% if nav_active == 'photo' %}bg-[#0066cc] font-semibold text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]{% endif %}">Gallery</a>
                 <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
             {% endif %}
         </nav>
