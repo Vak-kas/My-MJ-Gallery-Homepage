@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, share_views, speedtest, views
+from . import clipboard_views, myip, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -10,6 +10,9 @@ urlpatterns = [
     path("subnet/", views.subnet, name="subnet"),
     path("speedtest/", views.speedtest, name="speedtest"),
     path("keygen/", views.keygen, name="keygen"),
+    path("myip/", myip.myip, name="myip"),
+    path("myip/lookup/", myip.myip_lookup, name="myip_lookup"),
+    path("encode/", views.encode, name="encode"),
     path("speedtest/ping/", speedtest.ping, name="speedtest_ping"),
     path("speedtest/download/", speedtest.download, name="speedtest_download"),
     path("speedtest/upload/", speedtest.upload, name="speedtest_upload"),
