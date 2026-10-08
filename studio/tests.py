@@ -172,3 +172,81 @@ class CommunityShortLinkTests(ModerationTestBase):
         self.client.post(reverse("studio:users"), {"action": "purge", "ids": [self.spammer.id], "confirm": "DELETE"})
         self.assertFalse(ShortLink.objects.filter(owner=self.spammer).exists())
         self.assertTrue(ShortLink.objects.filter(code="good01").exists())
+
+
+class SiteSettingsTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        cache.clear()
+        User = get_user_model()
+        self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
+        self.member = User.objects.create_user("member", "m@example.com", "pw")
+
+    def tearDown(self):
+        from django.core.cache import cache
+        cache.clear()  # 설정 캐시가 다른 테스트로 새지 않게
+
+    def save(self, nav=None, home=None, **extra):
+        nav = nav or ["home", "blog", "tool", "photo"]
+        home = home or ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]
+        data = {"nav_order": nav, "home_order": home, **{f"home_on_{k}": "on" for k in home}}
+        data.update(extra)
+        self.client.force_login(self.admin)
+        return self.client.post(reverse("studio:settings"), data)
+
+    def nav_labels(self, path="/blog/"):
+        return [i["label"] for i in self.client.get(path).context["site_nav"]]
+
+    def test_defaults_and_member_cannot_open(self):
+        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery"])
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(reverse("studio:settings")).status_code, 302)
+
+    def test_reorder_and_rename(self):
+        self.save(nav=["home", "photo", "tool", "blog"], nav_label_photo="사진")
+        self.client.logout()
+        self.assertEqual(self.nav_labels("/tools/"), ["Home", "사진", "Tool", "Blog"])
+
+    def test_hidden_section_blocks_page_but_not_share_links(self):
+        self.save(nav_state_tool="admin", nav_state_photo="members")
+        self.client.logout()
+        self.assertEqual(self.nav_labels(), ["Home", "Blog"])
+        self.assertEqual(self.client.get("/tools/").status_code, 404)
+        self.assertEqual(self.client.get("/tools/keygen/").status_code, 404)
+        self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 200)  # 링크로 여는 페이지는 계속 열림
+        resp = self.client.get(reverse("main:photos"))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse("accounts:login"), resp["Location"])
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(reverse("main:photos")).status_code, 200)
+        self.assertEqual(self.client.get("/tools/").status_code, 404)
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get("/tools/").status_code, 200)
+        self.assertIn("Tool", self.nav_labels())
+
+    def test_home_cannot_be_hidden(self):
+        self.save(nav_state_home="admin")
+        self.client.logout()
+        self.assertEqual(self.client.get("/").status_code, 200)
+        self.assertIn("Home", self.nav_labels())
+
+    def test_home_sections_order_and_toggle(self):
+        order = ["project", "profile", "skill", "career", "activity", "award", "publication", "blog_links"]
+        data = {"nav_order": ["home", "blog", "tool", "photo"], "home_order": order,
+                **{f"home_on_{k}": "on" for k in order if k not in ("award", "publication")}}
+        self.client.force_login(self.admin)
+        self.client.post(reverse("studio:settings"), data)
+        self.client.logout()
+        keys = [s["key"] for s in self.client.get("/").context["home_sections"]]
+        self.assertEqual(keys, ["project", "profile", "skill", "career", "activity", "blog_links"])
+
+    def test_blog_links_hidden_when_blog_closed(self):
+        self.save(nav_state_blog="members")
+        self.client.logout()
+        keys = [s["key"] for s in self.client.get("/").context["home_sections"]]
+        self.assertNotIn("blog_links", keys)
+        self.assertEqual(self.client.get("/blog/").status_code, 302)
+
+    def test_tampered_post_rejected(self):
+        self.save(nav=["home", "blog"])  # 항목 누락
+        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery"])

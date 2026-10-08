@@ -5,6 +5,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError
 from django.db.models import DateTimeField
 from django.db.models.functions import Coalesce
+from studio import site_settings
 from django.shortcuts import redirect
 from urllib.parse import quote
 from studio.models import BasicInfo, Contact, Link, Education, Internship, Research, Teaching, Certification, Activity, Award, Publication, Project, Skill
@@ -84,7 +85,14 @@ def home(request):
         "other": awards.filter(award_category="other").count(),
     }
 
+    sections = []
+    for section in site_settings.home_sections():
+        if section["key"] == "blog_links" and not site_settings.can_see(site_settings.nav_state("blog"), request.user):
+            continue  # 블로그를 닫아 두면 바로가기도 숨김
+        sections.append({**section, "template": f"main/sections/{section['key']}.html"})
+
     return render(request, "main/home.html", {
+        "home_sections": sections,
         "info": info,
         "contact_sections": contact_sections,
         "links": links,

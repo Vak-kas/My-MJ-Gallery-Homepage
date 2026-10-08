@@ -7,19 +7,17 @@
         <a href="{% url 'main:home' %}" class="quick-nav-link rounded-full border border-transparent px-3 py-1.5 text-[13px] font-semibold text-white transition hover:bg-white/20">MJ GALLERY</a>
 
         <div class="flex flex-wrap items-center justify-end gap-2">
-            <a href="{% url 'main:home' %}" id="home-link" aria-current="page" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-white/20">Home</a>
-            <a href="{% url 'blog:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Blog</a>
-            <a href="{% url 'tools:index' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Tool</a>
+            {% for item in site_nav %}
+            <a href="{{ item.url }}" {% if item.key == 'home' %}id="home-link" aria-current="page"{% endif %} class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20 {% if item.key == 'home' %}font-semibold{% endif %} {% if item.state == 'admin' %}border-dashed opacity-70{% endif %}">{{ item.label }}</a>
+            {% endfor %}
 
             {% if user.is_authenticated %}
                 {% if user.is_superuser %}
                 <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Studio</a>
                 {% endif %}
-                <a href="{% url 'main:photos' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Gallery</a>
                 {% include "components/notif_bell.html" with bell_class="border border-white/20 bg-white/10 text-white hover:bg-white/20 h-[34px]" %}
                 <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
             {% else %}
-                <a href="{% url 'main:photos' %}" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Gallery</a>
                 <a href="{% url 'accounts:login' %}" id="login-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Login</a>
             {% endif %}
         </div>
@@ -32,48 +30,10 @@
 {% include "main/sections/hero_intro.html" %}
 
 <main class="scroll-snap-main bg-[#f5f5f7] px-6 py-10 md:px-12 lg:px-24">
-    {% include "main/sections/profile.html" %}
-    {% include "main/sections/skill.html" %}
-    {% include "main/sections/career.html" %}
-    {% include "main/sections/activity.html" %}
-    {% include "main/sections/award.html" %}
-    {% include "main/sections/publication.html" %}
-    {% include "main/sections/project.html" %}
+    {% for section in home_sections %}
+    {% include section.template %}
+    {% endfor %}
 
-    <section class="mx-auto mt-20 max-w-[1320px] pb-24">
-        <div class="overflow-hidden rounded-[30px] border border-black/[0.08] bg-white p-7 md:p-10">
-            <div class="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-                <div>
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NEXT STEP</p>
-                    <h3 class="mt-3 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f] md:text-[44px]">더 자세한 내용을 보고 싶다면</h3>
-                    <p class="mt-3 text-[16px] leading-[1.6] text-[#6e6e73]">카테고리별 페이지에서 기술 글, 자유게시판, 일기 콘텐츠를 확인하세요.</p>
-                </div>
-            </div>
-
-            <div class="mt-8 grid gap-3 md:grid-cols-3">
-                <a href="{% url 'blog:tech' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
-                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
-                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Tech Blog</p>
-                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">기술 블로그</p>
-                    <p class="mt-1 text-[13px] text-[#6e6e73]">트러블슈팅 · 아키텍처</p>
-                </a>
-
-                <a href="{% url 'blog:board' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
-                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
-                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Free Board</p>
-                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">자유게시판</p>
-                    <p class="mt-1 text-[13px] text-[#6e6e73]">일상/공지/자유 글</p>
-                </a>
-
-                <a href="{% url 'blog:life' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
-                    <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
-                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Life</p>
-                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">라이프 블로그</p>
-                    <p class="mt-1 text-[13px] text-[#6e6e73]">기록 · 생각 · 메모</p>
-                </a>
-            </div>
-        </div>
-    </section>
     
 
 
@@ -832,9 +792,14 @@
         panel.className = 'side-toc-panel';
         sideToc.appendChild(panel);
 
-        tocSchema.forEach((item) => {
-            const sectionEl = document.querySelector(`[data-section="${item.key}"]`);
-            if (!sectionEl) return;
+        // Studio 설정에서 바꾼 섹션 순서(화면 순서)대로 목차를 만듦
+        const ordered = tocSchema
+            .map((item) => ({ ...item, el: document.querySelector(`[data-section="${item.key}"]`) }))
+            .filter((item) => item.el)
+            .sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+
+        ordered.forEach((item) => {
+            const sectionEl = item.el;
 
             const btn = document.createElement('button');
             btn.type = 'button';

@@ -465,3 +465,13 @@ class Skill(models.Model):
 
     def __str__(self):
         return f"{self.get_category_display()} - {self.name}"
+
+class SiteSetting(models.Model):
+    """사이트 전체 설정 (한 줄만 사용). 내비 메뉴·홈 섹션의 공개 여부와 순서."""
+
+    nav_items = models.JSONField(default=list, blank=True)
+    home_sections = models.JSONField(default=list, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return "SiteSetting"
