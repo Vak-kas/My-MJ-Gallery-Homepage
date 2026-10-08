@@ -552,7 +552,7 @@ def build_app(relay: Relay, live_hub=None):
 	app = web.Application(middlewares=[_api_key_middleware(relay.config.api_key)])
 	app["relay"] = relay
 	if live_hub is not None:
-		add_live_routes(app, live_hub)  # 화면 송출 시그널링 (relay/mj_live.py)
+		add_live_routes(app, live_hub)  # 라이브 방송 시그널링 (relay/mj_live.py)
 
 	async def create(request):
 		try:

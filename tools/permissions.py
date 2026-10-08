@@ -10,7 +10,7 @@ MEMBER_STREAM_LIMITS = {
 }
 
 
-# 회원이 화면 송출 방송을 열 때의 한도 (TURN 중계 시 서버 트래픽 보호)
+# 회원이 라이브 방송을 열 때의 한도 (TURN 중계 시 서버 트래픽 보호)
 MEMBER_LIVE_LIMITS = {
 	"max_open_rooms": 1,   # 동시에 열어 둘 수 있는 방송
 	"rooms_per_day": 3,    # 하루에 만들 수 있는 방송

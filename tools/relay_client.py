@@ -56,7 +56,7 @@ def join_room(room_id, role, token, ip):
 	return _call("POST", f"/rooms/{room_id}/join", {"role": role, "token": token, "ip": ip})
 
 
-# ── 화면 송출(라이브) ─────────────────────────────
+# ── 라이브 방송 ─────────────────────────────
 
 def list_live():
 	return (_call("GET", "/live") or {}).get("rooms", [])

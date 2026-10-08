@@ -1,4 +1,4 @@
-"""화면 송출(라이브 방송) 시그널링 — mj-relay 데몬 안에서 함께 돈다.
+"""라이브 방송 시그널링 — mj-relay 데몬 안에서 함께 돈다.
 
 영상·소리는 WebRTC 로 방송하는 브라우저 → 시청자 브라우저로 직접(또는 TURN 서버를 거쳐) 간다.
 이 모듈은 연결 정보(SDP/ICE)를 서로 전달하고, 시청자 목록·채팅만 다룬다.
@@ -148,7 +148,7 @@ class LiveHub:
 			room_id=room_id,
 			token=secrets.token_urlsafe(24),
 			viewer_token=secrets.token_urlsafe(16),
-			title=str(payload.get("title") or "").strip()[:80] or "화면 송출",
+			title=str(payload.get("title") or "").strip()[:80] or "라이브 방송",
 			owner_id=payload.get("owner_id"),
 			owner=str(payload.get("owner") or "")[:40],
 			max_viewers=_clamp(payload.get("max_viewers"), DEFAULT_MAX_VIEWERS, 1, HARD_MAX_VIEWERS),

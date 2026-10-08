@@ -73,7 +73,7 @@ venv/bin/python -m unittest discover -s relay/tests -t .
 venv/bin/python manage.py test tools
 ```
 
-## 화면 송출 (라이브, `relay/mj_live.py`)
+## 라이브 방송 (`relay/mj_live.py`)
 `/tools/live/` — 방송 만들기는 로그인 회원(한도: 동시 1개·하루 3번·120분·시청자 5명, 관리자 360분·20명), 시청은 링크만 있으면 누구나.
 ```
 [방송 브라우저] ══ WebRTC (영상·소리) ══▶ [시청자 브라우저]      직접 연결

@@ -1,4 +1,4 @@
-# coturn — 화면 송출(WebRTC) 중계용. relay/deploy/install_turn.sh 가 값을 채워 /etc/turnserver.conf 로 복사함
+# coturn — 라이브 방송(WebRTC) 중계용. relay/deploy/install_turn.sh 가 값을 채워 /etc/turnserver.conf 로 복사함
 listening-port=3478
 fingerprint
 realm=__REALM__
