@@ -31,7 +31,8 @@ TOOLS = [
 		"icon": "⚡",
 		"title": "인터넷 속도 측정",
 		"description": "지금 내 인터넷으로 이 서버와 실제 데이터를 주고받아 다운로드·업로드 속도와 지연(ping)을 실시간 그래프로 측정합니다.",
-		"tags": ["네트워크", "실시간 측정"],
+		"tags": ["네트워크", "실시간 측정", "로그인"],
+		"login_required": True,
 	},
 	{
 		"slug": "duplex",
@@ -56,6 +57,6 @@ TOOLS = [
 		"title": "데이터 전송",
 		"description": "방을 열고 링크를 나눠 주면 브라우저끼리 파일을 바로 주고받아요. 받는 사람이 없으면 맡겨두기, 프로그램 실시간 스트림·GNU Radio(ZMQ) IQ 중계도 지원합니다.",
 		"tags": ["파일", "스트리밍", "관리자"],
-		"admin_only": True,  # 권한은 tools/permissions.py 의 can_manage_streams
+		"login_required": True,  # 방 만들기는 회원(한도 있음), 받는 쪽은 링크만 있으면 누구나 — tools/permissions.py
 	},
 ]

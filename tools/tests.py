@@ -32,8 +32,21 @@ class ToolPagesTests(TestCase):
 
 class SpeedtestApiTests(TestCase):
 	def setUp(self):
+		from django.contrib.auth import get_user_model
 		from django.core.cache import cache
 		cache.clear()
+		User = get_user_model()
+		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
+		self.other = User.objects.create_user("other", "o@example.com", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def test_requires_login(self):
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse("tools:speedtest")).status_code, 302)
+		for name in ("tools:speedtest_ping", "tools:speedtest_download"):
+			self.assertEqual(self.client.get(reverse(name)).status_code, 401)
+		resp = self.client.post(reverse("tools:speedtest_upload"), data=b"x", content_type="application/octet-stream")
+		self.assertEqual(resp.status_code, 401)
 
 	def test_ping_is_tiny_and_uncached(self):
 		resp = self.client.get(reverse("tools:speedtest_ping"))
@@ -50,6 +63,7 @@ class SpeedtestApiTests(TestCase):
 	def test_upload_counts_bytes_without_csrf(self):
 		from django.test import Client
 		client = Client(enforce_csrf_checks=True)
+		client.force_login(self.member)
 		resp = client.post(reverse("tools:speedtest_upload"), data=b"x" * 12345, content_type="application/octet-stream")
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(resp.json()["received"], 12345)
@@ -59,32 +73,49 @@ class SpeedtestApiTests(TestCase):
 		self.assertEqual(self.client.post(url, data=b"", content_type="application/octet-stream").status_code, 400)
 		self.assertEqual(self.client.generic("POST", url, b"x", CONTENT_LENGTH=str(26 * 1024 * 1024)).status_code, 413)
 
-	def test_quota_per_ip(self):
+	def test_quota_per_user(self):
 		url = reverse("tools:speedtest_download")
 		size = 25 * 1024 * 1024
-		# 다운로드 한도 2GB / 10분 → 25MB 요청 81번까지 허용
-		statuses = [self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4").status_code for _ in range(82)]
-		self.assertEqual(statuses[:81], [200] * 81)
-		self.assertEqual(statuses[81], 429)
-		blocked = self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4")
+		# 다운로드 한도 1GB / 10분 → 25MB 요청 40번까지 허용
+		statuses = [self.client.get(url, {"bytes": size}).status_code for _ in range(41)]
+		self.assertEqual(statuses[:40], [200] * 40)
+		self.assertEqual(statuses[40], 429)
+		blocked = self.client.get(url, {"bytes": size})
 		self.assertIn("분 뒤", blocked.json()["error"])
 		self.assertGreater(int(blocked["Retry-After"]), 0)
-		# 다른 IP 는 영향 없음
-		self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="5.6.7.8").status_code, 200)
+		# 다른 회원은 같은 IP 여도 영향 없음
+		self.client.force_login(self.other)
+		self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
 
 	def test_quota_window_is_fixed_from_first_request(self):
 		from unittest import mock
 		url = reverse("tools:speedtest_download")
 		size = 25 * 1024 * 1024
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0):
-			for _ in range(81):
-				self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9")
+			for _ in range(40):
+				self.client.get(url, {"bytes": size})
 		# 첫 요청 9분 59초 뒤: 아직 막힘
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 599):
-			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 429)
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 429)
 		# 첫 요청 10분 뒤: 막힌 동안 요청을 계속 보냈어도 풀림
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 600):
-			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 200)
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
+
+	def test_daily_quota(self):
+		from unittest import mock
+		url = reverse("tools:speedtest_download")
+		size = 25 * 1024 * 1024
+		t = 1000.0
+		ok = 0
+		# 10분마다 1GB 씩 → 하루 3GB(25MB × 122번) 를 넘으면 다음 날까지 막힘
+		for _ in range(4):
+			with mock.patch("tools.speedtest.time.time", return_value=t):
+				for _ in range(40):
+					ok += self.client.get(url, {"bytes": size}).status_code == 200
+			t += 601
+		self.assertEqual(ok, 122)  # 3GB // 25MB
+		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 86400):
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
 
 	def test_superuser_has_no_quota(self):
 		from django.contrib.auth import get_user_model
@@ -115,18 +146,81 @@ class StreamViewTests(TestCase):
 		self.admin = User.objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
 		self.member = User.objects.create_user("member", "member@example.com", "pw-for-tests-only")
 
-	def test_anonymous_is_sent_to_login_and_member_is_forbidden(self):
+	def setUp_cache(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_anonymous_is_sent_to_login(self):
 		resp = self.client.get(reverse("tools:stream"))
 		self.assertEqual(resp.status_code, 302)
 		self.assertIn(reverse("accounts:login"), resp["Location"])
-		self.client.force_login(self.member)
-		self.assertEqual(self.client.get(reverse("tools:stream")).status_code, 403)
-		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "iq"}).status_code, 403)
+		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "file"}).status_code, 302)
 
-	def test_hub_shows_stream_card_only_to_admin(self):
-		self.assertNotContains(self.client.get(reverse("tools:index")), "데이터 전송")
-		self.client.force_login(self.admin)
+	def test_hub_shows_stream_card_to_everyone_with_login_tag(self):
 		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
+		self.client.force_login(self.member)
+		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
+
+	def _member_room(self, room_id="mem1", owner=None):
+		owner = owner or self.member
+		return {**self.ROOM, "id": room_id, "token": f"{room_id}-admin", "meta": {"owner_id": owner.id, "owner": owner.username}}
+
+	def test_member_creates_room_with_limits_and_owner(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[]), \
+				mock.patch("tools.relay_client.create_room", return_value=self._member_room()) as create:
+			resp = self.client.post(reverse("tools:stream"), {
+				"kind": "file", "ttl_minutes": "360", "rate_mb": "64", "total_gb": "200",
+			})
+		payload = create.call_args.args[0]
+		self.assertEqual(payload["meta"]["owner_id"], self.member.id)
+		self.assertEqual(payload["ttl"], 60 * 60)
+		self.assertEqual(payload["rate_limit"], 8 * 1024 * 1024)
+		self.assertEqual(payload["total_limit"], 3 * 1024 ** 3)
+		self.assertEqual(resp.status_code, 302)
+
+	def test_member_one_open_room_and_daily_limit(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[self._member_room()]), \
+				mock.patch("tools.relay_client.create_room") as create:
+			self.client.post(reverse("tools:stream"), {"kind": "file"})
+		create.assert_not_called()  # 이미 방 1개 열려 있음
+		with mock.patch("tools.relay_client.list_rooms", return_value=[]), \
+				mock.patch("tools.relay_client.create_room", return_value=self._member_room()) as create:
+			for _ in range(4):
+				self.client.post(reverse("tools:stream"), {"kind": "file"})
+		self.assertEqual(create.call_count, 3)  # 하루 3개
+
+	def test_member_sees_and_closes_only_own_rooms(self):
+		from unittest import mock
+		self.setUp_cache()
+		mine, theirs = self._member_room("mem1"), self._member_room("adm1", owner=self.admin)
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[mine, theirs]):
+			resp = self.client.get(reverse("tools:stream"))
+		self.assertContains(resp, "mem1-admin")
+		self.assertNotContains(resp, "adm1-admin")
+		with mock.patch("tools.relay_client.get_room", return_value=theirs), mock.patch("tools.relay_client.close_room") as close:
+			self.assertEqual(self.client.post(reverse("tools:stream_close", args=["adm1"])).status_code, 403)
+		close.assert_not_called()
+		with mock.patch("tools.relay_client.get_room", return_value=mine), mock.patch("tools.relay_client.close_room") as close:
+			self.client.post(reverse("tools:stream_close", args=["mem1"]))
+		close.assert_called_once_with("mem1")
+
+	def test_admin_has_no_member_limits(self):
+		from unittest import mock
+		self.setUp_cache()
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.list_rooms", return_value=[self._member_room("a", owner=self.admin)] * 3), \
+				mock.patch("tools.relay_client.create_room", return_value=self.ROOM) as create:
+			for _ in range(5):
+				self.client.post(reverse("tools:stream"), {"kind": "file", "total_gb": "100"})
+		self.assertEqual(create.call_count, 5)
+		self.assertEqual(create.call_args.args[0]["total_limit"], 100 * 1024 ** 3)
 
 	def test_admin_creates_room_with_parsed_options(self):
 		from unittest import mock
@@ -192,6 +286,19 @@ class StreamViewTests(TestCase):
 		self.assertNotContains(resp, "ZMQ PUSH Sink")
 		self.assertNotContains(resp, "send-token")
 
+	def test_receiver_link_works_without_login(self):
+		# 받는 쪽은 회원이 아니어도 링크(토큰)만 있으면 방에 들어오고 계속 입장 유지 가능
+		from unittest import mock
+		self.client.logout()
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room", return_value=self.ROOM) as join:
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"}, HTTP_X_REAL_IP="198.51.100.20")
+			self.assertEqual(resp.status_code, 200)
+			beat = self.client.post(f"{reverse('tools:stream_join', args=['abc123'])}?token=recv-token", HTTP_X_REAL_IP="198.51.100.20")
+			self.assertEqual(beat.json()["role"], "receiver")
+		self.assertEqual(join.call_count, 2)
+		# 방 만들기 화면은 여전히 로그인 필요
+		self.assertEqual(self.client.get(reverse("tools:stream")).status_code, 302)
+
 	def test_join_heartbeat_uses_token_role(self):
 		from unittest import mock
 		url = reverse("tools:stream_join", args=["abc123"])
@@ -203,9 +310,9 @@ class StreamViewTests(TestCase):
 			self.assertEqual(self.client.post(f"{url}?token=nope").status_code, 404)
 		self.assertEqual(join.call_count, 2)
 
-	def test_only_admin_can_close(self):
+	def test_member_cannot_close_others_room_but_admin_can(self):
 		from unittest import mock
-		with mock.patch("tools.relay_client.close_room") as close:
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.close_room") as close:
 			self.client.force_login(self.member)
 			self.assertEqual(self.client.post(reverse("tools:stream_close", args=["abc123"])).status_code, 403)
 			self.client.force_login(self.admin)

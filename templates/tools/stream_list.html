@@ -27,8 +27,13 @@
         <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
             방을 열면 <b>보내는 쪽 링크</b>와 <b>받는 쪽 링크</b>가 생겨요. 각자 링크를 열면 그 사람들끼리만 연결됩니다.
             파일은 브라우저로 바로 주고받고, 프로그램의 실시간 데이터나 GNU Radio(ZMQ) IQ 스트림도 같은 방식으로 중계할 수 있어요.
-            받는 사람이 없을 땐 <a href="{% url 'tools:share' %}" class="text-[#0066cc]">맡겨두기</a>를 쓰세요.
+            받는 쪽은 링크만 있으면 로그인하지 않아도 돼요.{% if is_admin %} 받는 사람이 없을 땐 <a href="{% url 'tools:share' %}" class="text-[#0066cc]">맡겨두기</a>를 쓰세요.{% endif %}
         </p>
+        {% if limits %}
+        <p class="mt-3 inline-block rounded-xl bg-[#f0f7ff] px-4 py-2 text-[13px] text-[#0066cc]">
+            회원 한도: 동시에 방 {{ limits.max_open_rooms }}개 · 하루 {{ limits.rooms_per_day }}개 · 유효 시간 최대 {{ limits.ttl_minutes }}분 · 속도 최대 {{ limits.rate_mb }}MB/s · 방당 총량 최대 {{ limits.total_gb }}GB
+        </p>
+        {% endif %}
     </div>
 
     {% for message in messages %}
@@ -101,15 +106,15 @@
                 <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
                     <div>
                         <label class="sr-label" for="ttl_minutes">유효 시간 (분)</label>
-                        <input id="ttl_minutes" name="ttl_minutes" class="sr-input" type="number" min="1" max="360" value="60">
+                        <input id="ttl_minutes" name="ttl_minutes" class="sr-input" type="number" min="1" max="{% if limits %}{{ limits.ttl_minutes }}{% else %}360{% endif %}" value="60">
                     </div>
                     <div>
                         <label class="sr-label" for="rate_mb">속도 상한 (MB/s)</label>
-                        <input id="rate_mb" name="rate_mb" class="sr-input" type="number" min="0.1" max="64" step="any" value="16">
+                        <input id="rate_mb" name="rate_mb" class="sr-input" type="number" min="0.1" max="{% if limits %}{{ limits.rate_mb }}{% else %}64{% endif %}" step="any" value="{% if limits %}{{ limits.rate_mb }}{% else %}16{% endif %}">
                     </div>
                     <div>
                         <label class="sr-label" for="total_gb">총량 상한 (GB)</label>
-                        <input id="total_gb" name="total_gb" class="sr-input" type="number" min="0.01" max="200" step="any" value="20">
+                        <input id="total_gb" name="total_gb" class="sr-input" type="number" min="0.01" max="{% if limits %}{{ limits.total_gb }}{% else %}200{% endif %}" step="any" value="{% if limits %}{{ limits.total_gb }}{% else %}20{% endif %}">
                     </div>
                 </div>
                 <p id="sr-traffic" class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]"></p>
@@ -119,12 +124,12 @@
         </section>
 
         <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
-            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">열린 방</h2>
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">{% if is_admin %}열린 방{% else %}내 방{% endif %}</h2>
             <div class="mt-4 space-y-3">
                 {% for room in rooms %}
                 <a href="{% url 'tools:stream_room' room.id %}?token={{ room.token }}" class="block rounded-2xl border border-black/[0.08] p-4 transition hover:border-[#0066cc]/40">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ room.meta.label|default:room.id }}</p>
+                        <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ room.meta.label|default:room.id }}{% if is_admin and room.meta.owner %} <span class="text-[12px] font-normal text-[#8e8e93]">@{{ room.meta.owner }}</span>{% endif %}</p>
                         <span class="rounded-full bg-[#f0f7ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#0066cc]">{{ room.kind|upper }}</span>
                     </div>
                     <p class="mt-1 font-mono text-[12px] text-[#6e6e73]">IN :{{ room.in_port }} → OUT :{{ room.out_port }} ({{ room.out_socket }})</p>
