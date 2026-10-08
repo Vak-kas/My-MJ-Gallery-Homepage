@@ -621,3 +621,60 @@ class MyIpTests(TestCase):
 
 	def test_encode_page_is_public(self):
 		self.assertContains(self.client.get(reverse("tools:encode")), "MD5")
+
+
+class NetCheckTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.member = get_user_model().objects.create_user("member", "m@example.com", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def run_check(self, **data):
+		import json
+		return self.client.post(reverse("tools:netcheck_run"), json.dumps(data), content_type="application/json")
+
+	def test_requires_login(self):
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse("tools:netcheck")).status_code, 302)
+		self.assertEqual(self.run_check(type="ping", host="example.com").status_code, 401)
+
+	def test_blocks_internal_targets(self):
+		for host in ("127.0.0.1", "10.0.0.5", "169.254.169.254", "192.168.1.1", "[::1]", "localhost"):
+			resp = self.run_check(type="port", host=host, ports="22")
+			self.assertEqual(resp.status_code, 400, host)
+
+	def test_rejects_bad_host_and_ports(self):
+		self.assertIn("올바르지", self.run_check(type="ping", host="bad host;rm -rf").json()["error"])
+		self.assertIn("10개", self.run_check(type="port", host="8.8.8.8", ports="1-20").json()["error"])
+		self.assertEqual(self.run_check(type="nope", host="8.8.8.8").status_code, 400)
+
+	def test_port_check_states(self):
+		from unittest import mock
+		from tools import netcheck
+		def fake_probe(ip, port, timeout=2.5):
+			return {"port": port, "state": {22: "open", 80: "closed"}.get(port, "filtered"), **({"ms": 12.3} if port == 22 else {})}
+		with mock.patch.object(netcheck, "_resolve", return_value=["93.184.216.34"]), mock.patch.object(netcheck, "_probe", side_effect=fake_probe):
+			data = self.run_check(type="port", host="https://example.com/path", ports="22, 80 443").json()
+		self.assertEqual(data["host"], "example.com")
+		self.assertEqual(data["target"], "93.184.216.34")
+		self.assertEqual([(p["port"], p["state"], p["service"]) for p in data["ports"]],
+			[(22, "open", "SSH"), (80, "closed", "HTTP"), (443, "filtered", "HTTPS")])
+
+	def test_ping_parses_summary_and_passes_ip_only(self):
+		from unittest import mock
+		from tools import netcheck
+		out = "4 packets transmitted, 4 received, 0% packet loss\nrtt min/avg/max/mdev = 1.1/2.2/3.3/0.4 ms"
+		with mock.patch.object(netcheck, "_resolve", return_value=["8.8.8.8"]), mock.patch.object(netcheck, "_run", return_value=out) as run:
+			data = self.run_check(type="ping", host="dns.google").json()
+		self.assertEqual(data["summary"], {"sent": 4, "received": 4, "min": 1.1, "avg": 2.2, "max": 3.3})
+		self.assertEqual(run.call_args.args[0][-1], "8.8.8.8")  # 명령에는 검증된 IP 만 들어감
+
+	def test_rate_limit(self):
+		from unittest import mock
+		from tools import netcheck
+		with mock.patch.object(netcheck, "check_dns", return_value={}):
+			codes = [self.run_check(type="dns", host="example.com").status_code for _ in range(21)]
+		self.assertEqual(codes[:20], [200] * 20)
+		self.assertEqual(codes[20], 429)
