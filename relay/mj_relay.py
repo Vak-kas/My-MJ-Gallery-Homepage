@@ -145,8 +145,17 @@ class Room:
 	snapshot: bytes = b""
 	joined: dict = field(default_factory=lambda: {"sender": {}, "receiver": {}})  # 역할 → {ip: 마지막 갱신 시각}
 	viewers: set = field(default_factory=set)
+	web_receivers: set = field(default_factory=set)  # 브라우저로 파일을 받는 쪽 WebSocket
+	web_sending: bool = False  # 브라우저에서 파일을 보내는 중
+	send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+	out_sock: object = None
+	file_bucket: object = None
 	tasks: list = field(default_factory=list)
 	sockets: list = field(default_factory=list)
+
+	def receiver_count(self):
+		"""ZMQ(GNU Radio·CLI) 수신자 + 브라우저 수신자."""
+		return self.receivers + len(self.web_receivers)
 
 	def joined_ips(self, role):
 		now = time.time()
@@ -197,7 +206,8 @@ class Room:
 			"senders": self.senders,
 			"receivers": self.receivers,
 			"viewers": len(self.viewers),
-			"ready": self.senders > 0 and self.receivers > 0,
+			"web_receivers": len(self.web_receivers),
+			"ready": (self.senders > 0 or self.web_sending) and self.receiver_count() > 0,
 			"idle_seconds": round(time.time() - self.last_rx, 1) if self.last_rx else None,
 			"file": self.file_info or None,
 			"closed": self.closed_reason or None,
@@ -345,6 +355,8 @@ class Relay:
 			expires_at=now + ttl,
 			sockets=[pull, out],
 		)
+		room.out_sock = out
+		room.file_bucket = TokenBucket(room.rate_limit)
 		self.rooms[room_id] = room
 		# 감시는 지금 바로 켬: 태스크가 돌기 전에 들어온 연결도 놓치지 않도록
 		events = zmq.EVENT_HANDSHAKE_SUCCEEDED | zmq.EVENT_DISCONNECTED
@@ -425,12 +437,11 @@ class Relay:
 					room.file_info = {**_safe_json(frames[1]), "received": 0, "done": False}
 				elif head == FILE_END:
 					room.file_info = {**room.file_info, "done": True}
-				# 파일은 버리지 않고 속도만 늦춤
-				delay = bucket.wait_time(size)
-				if delay:
-					await asyncio.sleep(delay)
-				bucket.take(size)
-				await out.send_multipart(frames)
+				# 파일은 버리지 않음: 받는 쪽이 생길 때까지 기다리고(→ ZMQ 역압으로 보내는 쪽도 대기), 속도만 늦춤
+				while room.receiver_count() == 0:
+					await asyncio.sleep(0.2)
+				await self._throttle_file(room, size)
+				await self._deliver_file_frames(room, frames)
 				if head not in (FILE_HEADER, FILE_END) and room.file_info:
 					room.file_info["received"] = room.file_info.get("received", 0) + size
 			else:
@@ -455,6 +466,35 @@ class Relay:
 			if room.bytes_in >= room.total_limit:
 				asyncio.create_task(self.close_room(room.id, "총 전송량 한도에 도달했습니다"))
 				return
+
+	async def _throttle_file(self, room, size):
+		delay = room.file_bucket.wait_time(size)
+		if delay:
+			await asyncio.sleep(delay)
+		room.file_bucket.take(size)
+
+	async def _deliver_file_frames(self, room, frames):
+		"""파일 프레임(MJF1 프로토콜)을 ZMQ 수신자와 브라우저 수신자 모두에게 전달."""
+		if room.receivers > 0:
+			await room.out_sock.send_multipart(frames)
+		if not room.web_receivers:
+			return
+		head = frames[0]
+		if head == FILE_HEADER and len(frames) > 1:
+			message, binary = {"type": "file-start", **_safe_json(frames[1])}, None
+		elif head == FILE_END:
+			message, binary = {"type": "file-end", **(_safe_json(frames[1]) if len(frames) > 1 else {})}, None
+		else:
+			message, binary = None, b"".join(frames)
+		for ws in list(room.web_receivers):
+			try:
+				# 받는 쪽 전송이 끝나야 다음 조각을 읽음 → 느린 쪽에 속도가 맞춰짐 (손실 없음)
+				if binary is None:
+					await ws.send_json(message)
+				else:
+					await ws.send_bytes(binary)
+			except Exception:  # noqa: BLE001 - 끊긴 수신자는 빼고 계속
+				room.web_receivers.discard(ws)
 
 	async def _monitor(self, room, mon, attr):
 		"""인증(ZAP)까지 통과한 연결만 송신자·수신자 수로 셈 (거절돼 재시도 중인 연결은 제외)."""
@@ -561,6 +601,79 @@ def build_app(relay: Relay):
 			room.viewers.discard(ws)
 		return ws
 
+	async def web_send(request):
+		"""브라우저에서 파일 보내기: {"type":"start",name,size,mime} → 바이너리 조각들 → {"type":"end"}.
+		조각마다 ack 를 돌려줘서 보내는 쪽이 받는 쪽 속도에 맞춰 보내게 함."""
+		room = relay.rooms.get(request.match_info["room_id"])
+		token = request.query.get("token", "")
+		if room is None or room.kind != "file" or room.token_role(token) not in ("sender", "admin"):
+			return web.Response(status=404)
+		if room.send_lock.locked():
+			return web.Response(status=409, text="another sender is active")
+		ws = web.WebSocketResponse(heartbeat=20, max_msg_size=4 * MB)
+		await ws.prepare(request)
+		async with room.send_lock:
+			room.web_sending = True
+			info = None
+			try:
+				async for msg in ws:
+					if msg.type == WSMsgType.TEXT:
+						data = _safe_json(msg.data.encode())
+						if data.get("type") == "start":
+							if room.receiver_count() == 0:
+								await ws.send_json({"type": "error", "error": "no-receiver"})
+								continue
+							info = {"name": str(data.get("name") or "file")[:255], "size": int(data.get("size") or 0), "mime": str(data.get("mime") or "")[:120]}
+							room.file_info = {**info, "received": 0, "done": False}
+							await self_deliver(room, [FILE_HEADER, json.dumps(info).encode()])
+							await ws.send_json({"type": "started"})
+						elif data.get("type") == "end" and info is not None:
+							room.file_info = {**room.file_info, "done": True}
+							await self_deliver(room, [FILE_END, json.dumps({"size": room.file_info["received"]}).encode()])
+							await ws.send_json({"type": "done", "received": room.file_info["received"]})
+							info = None
+					elif msg.type == WSMsgType.BINARY and info is not None:
+						if room.receiver_count() == 0:
+							await ws.send_json({"type": "error", "error": "receiver-left"})
+							info = None
+							continue
+						size = len(msg.data)
+						await relay._throttle_file(room, size)
+						await self_deliver(room, [msg.data])
+						room.file_info["received"] += size
+						room.bytes_in += size
+						room.messages += 1
+						room.last_rx = time.time()
+						await ws.send_json({"type": "ack", "received": room.file_info["received"]})
+					elif msg.type == WSMsgType.ERROR:
+						break
+			finally:
+				room.web_sending = False
+		return ws
+
+	async def self_deliver(room, frames):
+		await relay._deliver_file_frames(room, frames)
+
+	async def web_recv(request):
+		"""브라우저에서 파일 받기: file-start(JSON) → 바이너리 조각들 → file-end(JSON)."""
+		room = relay.rooms.get(request.match_info["room_id"])
+		token = request.query.get("token", "")
+		if room is None or room.kind != "file" or room.token_role(token) not in ("receiver", "admin"):
+			return web.Response(status=404)
+		if len(room.web_receivers) >= MAX_VIEWERS_PER_ROOM:
+			return web.Response(status=429, text="too many receivers")
+		ws = web.WebSocketResponse(heartbeat=20)
+		await ws.prepare(request)
+		room.web_receivers.add(ws)
+		try:
+			await ws.send_json({"type": "ready"})
+			async for msg in ws:
+				if msg.type == WSMsgType.ERROR:
+					break
+		finally:
+			room.web_receivers.discard(ws)
+		return ws
+
 	async def health(request):
 		return web.json_response({"ok": True, "rooms": len(relay.rooms)})
 
@@ -570,6 +683,8 @@ def build_app(relay: Relay):
 	app.router.add_delete("/rooms/{room_id}", delete)
 	app.router.add_post("/rooms/{room_id}/join", join)
 	app.router.add_get("/relay/ws/{room_id}", viewer)
+	app.router.add_get("/relay/ws/{room_id}/send", web_send)
+	app.router.add_get("/relay/ws/{room_id}/recv", web_recv)
 	app.router.add_get("/health", health)
 	return app
 

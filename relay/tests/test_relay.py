@@ -290,3 +290,100 @@ class ApiTests(RelayTestCase):
 
 if __name__ == "__main__":
 	unittest.main()
+
+
+class WebFileTransferTests(RelayTestCase):
+	async def asyncSetUp(self):
+		await super().asyncSetUp()
+		self.client = TestClient(TestServer(mj_relay.build_app(self.relay)))
+		await self.client.start_server()
+
+	async def asyncTearDown(self):
+		await self.client.close()
+		await super().asyncTearDown()
+
+	async def _recv_file(self, ws):
+		"""file-start → 조각 → file-end 까지 받아 (헤더, 바이트) 반환."""
+		header, chunks = None, []
+		while True:
+			msg = await ws.receive(timeout=3)
+			if msg.type.name == "TEXT":
+				data = json.loads(msg.data)
+				if data["type"] == "file-start":
+					header = data
+				elif data["type"] == "file-end":
+					return header, b"".join(chunks), data
+			elif msg.type.name == "BINARY":
+				chunks.append(msg.data)
+
+	async def _send_file(self, ws, name, payload, chunk=64 * 1024):
+		await ws.send_json({"type": "start", "name": name, "size": len(payload)})
+		self.assertEqual((await ws.receive_json(timeout=3))["type"], "started")
+		for i in range(0, len(payload), chunk):
+			await ws.send_bytes(payload[i:i + chunk])
+			ack = await ws.receive_json(timeout=3)
+			self.assertEqual(ack["type"], "ack")
+		await ws.send_json({"type": "end"})
+		return await ws.receive_json(timeout=3)
+
+	async def test_browser_to_browser(self):
+		room = await self.relay.create_room({"kind": "file"})
+		rx = await self.client.ws_connect(f"/relay/ws/{room.id}/recv?token={room.receiver_token}")
+		self.assertEqual((await rx.receive_json(timeout=2))["type"], "ready")
+		tx = await self.client.ws_connect(f"/relay/ws/{room.id}/send?token={room.sender_token}")
+		payload = os.urandom(300_000)
+		recv_task = asyncio.create_task(self._recv_file(rx))
+		done = await self._send_file(tx, "photo.jpg", payload)
+		header, data, end = await recv_task
+		self.assertEqual(done, {"type": "done", "received": len(payload)})
+		self.assertEqual(header["name"], "photo.jpg")
+		self.assertEqual(data, payload)
+		self.assertEqual(end["size"], len(payload))
+		self.assertTrue(room.file_info["done"])
+		await tx.close()
+		await rx.close()
+
+	async def test_browser_to_cli_zmq_receiver(self):
+		room = await self.open_room({"kind": "file"})
+		zrx = self.receiver(room, zmq.PULL)
+		for _ in range(40):
+			if room.receivers:
+				break
+			await asyncio.sleep(0.05)
+		tx = await self.client.ws_connect(f"/relay/ws/{room.id}/send?token={room.sender_token}")
+		payload = os.urandom(100_000)
+		await self._send_file(tx, "a.bin", payload, chunk=40_000)
+		frames = [await self.recv(zrx) for _ in range(5)]  # 헤더 + 조각 3 + 끝
+		self.assertEqual(frames[0][0], mj_relay.FILE_HEADER)
+		self.assertEqual(b"".join(f[0] for f in frames[1:4]), payload)
+		self.assertEqual(frames[4][0], mj_relay.FILE_END)
+		await tx.close()
+
+	async def test_cli_zmq_sender_to_browser(self):
+		room = await self.open_room({"kind": "file"})
+		rx = await self.client.ws_connect(f"/relay/ws/{room.id}/recv?token={room.receiver_token}")
+		await rx.receive_json(timeout=2)
+		tx = self.sender(room)
+		recv_task = asyncio.create_task(self._recv_file(rx))
+		await tx.send_multipart([mj_relay.FILE_HEADER, json.dumps({"name": "cli.bin", "size": 6}).encode()])
+		await tx.send(b"abc")
+		await tx.send(b"def")
+		await tx.send_multipart([mj_relay.FILE_END, b'{"size": 6}'])
+		header, data, _ = await recv_task
+		self.assertEqual((header["name"], data), ("cli.bin", b"abcdef"))
+		await rx.close()
+
+	async def test_no_receiver_and_token_checks(self):
+		room = await self.relay.create_room({"kind": "file"})
+		tx = await self.client.ws_connect(f"/relay/ws/{room.id}/send?token={room.sender_token}")
+		await tx.send_json({"type": "start", "name": "x", "size": 1})
+		self.assertEqual(await tx.receive_json(timeout=2), {"type": "error", "error": "no-receiver"})
+		self.assertTrue(room.stats()["ready"] is False)
+		await tx.close()
+		resp = await self.client.get(f"/relay/ws/{room.id}/send?token={room.receiver_token}")
+		self.assertEqual(resp.status, 404)  # 받는 쪽 토큰으로는 보낼 수 없음
+		resp = await self.client.get(f"/relay/ws/{room.id}/recv?token={room.sender_token}")
+		self.assertEqual(resp.status, 404)
+		raw = await self.relay.create_room({"kind": "raw"})
+		resp = await self.client.get(f"/relay/ws/{raw.id}/send?token={raw.sender_token}")
+		self.assertEqual(resp.status, 404)  # 파일 방에서만

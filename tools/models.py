@@ -1,3 +1,4 @@
+import secrets
 from uuid import uuid4
 
 from django.conf import settings
@@ -40,5 +41,42 @@ class ClipItem(models.Model):
 
 @receiver(post_delete, sender=ClipItem)
 def _delete_clip_file(sender, instance, **kwargs):
+	if instance.file:
+		instance.file.delete(save=False)
+
+
+def _share_token():
+	return secrets.token_urlsafe(24)
+
+
+def shared_upload_to(instance, filename):
+	return f"shared/{instance.token}"
+
+
+class SharedFile(models.Model):
+	"""맡겨두기: 받는 사람이 없을 때 서버에 잠시 올려두고 링크로 내려받는 파일."""
+
+	token = models.CharField(max_length=64, unique=True, default=_share_token)
+	file = models.FileField(upload_to=shared_upload_to, storage=private_storage, blank=True)
+	name = models.CharField(max_length=255)
+	mime = models.CharField(max_length=120, blank=True)
+	size = models.BigIntegerField()  # 올릴 전체 크기
+	received = models.BigIntegerField(default=0)  # 지금까지 받은 크기
+	sha256 = models.CharField(max_length=64, blank=True)
+	completed = models.BooleanField(default=False)
+	download_count = models.PositiveIntegerField(default=0)
+	created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="shared_files")
+	created_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField(db_index=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"{self.name} ({self.token[:6]}…)"
+
+
+@receiver(post_delete, sender=SharedFile)
+def _delete_shared_file(sender, instance, **kwargs):
 	if instance.file:
 		instance.file.delete(save=False)

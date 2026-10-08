@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, speedtest, views
+from . import clipboard_views, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -19,6 +19,13 @@ urlpatterns = [
     path("clipboard/api/items/<int:item_id>/pin/", clipboard_views.clipboard_pin, name="clipboard_pin"),
     path("clipboard/api/items/<int:item_id>/delete/", clipboard_views.clipboard_delete, name="clipboard_delete"),
     path("clipboard/<int:item_id>/file/", clipboard_views.clipboard_file, name="clipboard_file"),
+    path("share/", share_views.share_page, name="share"),
+    path("share/new/", share_views.share_create, name="share_create"),
+    path("share/<str:token>/", share_views.share_download_page, name="share_download_page"),
+    path("share/<str:token>/download/", share_views.share_download, name="share_download"),
+    path("share/<str:token>/chunk/", share_views.share_chunk, name="share_chunk"),
+    path("share/<str:token>/complete/", share_views.share_complete, name="share_complete"),
+    path("share/<str:token>/delete/", share_views.share_delete, name="share_delete"),
     path("stream/", views.stream_list, name="stream"),
     path("stream/<str:room_id>/", views.stream_room, name="stream_room"),
     path("stream/<str:room_id>/close/", views.stream_close, name="stream_close"),

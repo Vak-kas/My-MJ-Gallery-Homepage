@@ -13,6 +13,10 @@
     .sr-dot { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #c7c7cc; }
     .sr-dot.is-live { background: #34c759; box-shadow: 0 0 0 4px rgba(52,199,89,.18); }
     canvas.sr-canvas { display: block; width: 100%; border-radius: 12px; background: #0b0f17; }
+    .fx-drop { border: 2px dashed rgba(0,0,0,.12); border-radius: 18px; transition: border-color .15s, background .15s; }
+    .fx-drop.is-over { border-color: #0066cc; background: #f0f7ff; }
+    .fx-bar { height: 8px; border-radius: 999px; background: #f2f2f7; overflow: hidden; }
+    .fx-bar > span { display: block; height: 100%; width: 0; border-radius: 999px; background: #0066cc; transition: width .2s; }
     html.theme-dark .sr-copy { background: #2a2a2e; }
     html.theme-dark .sr-copy button { background: #1f1f22; color: #e8e8ea; border-color: rgba(255,255,255,.14); }
 </style>
@@ -72,9 +76,48 @@
     </div>
     {% endif %}
 
+    {% if room.kind == 'file' %}
+    <div class="mt-6 grid grid-cols-1 gap-5 {% if role == 'admin' %}lg:grid-cols-2{% endif %}">
+        {% if role != 'receiver' %}
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">📤 파일 보내기</h2>
+                <span id="fx-peer" class="text-[12px] text-[#8e8e93]">받는 사람 확인 중…</span>
+            </div>
+            <div id="fx-drop" class="fx-drop mt-4 p-6 text-center">
+                <p class="text-[14px] text-[#1d1d1f]">파일을 끌어놓거나</p>
+                <label class="mt-2 inline-block cursor-pointer rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">파일 선택<input id="fx-file" type="file" multiple hidden></label>
+                <p class="mt-2 text-[11px] text-[#8e8e93]">받는 사람이 이 방의 받는 쪽 링크를 열어 두면 바로 전달돼요. 서버에는 저장되지 않아요.</p>
+            </div>
+            <p id="fx-nopeer" class="mt-3 hidden rounded-xl bg-amber-50 px-4 py-3 text-[12px] leading-relaxed text-amber-800">
+                받는 사람이 아직 접속하지 않았어요. 받는 쪽 링크를 열어 달라고 하거나,
+                {% if can_manage %}<a href="{% url 'tools:share' %}" class="font-semibold underline">맡겨두기</a>로 링크를 보내세요.{% else %}관리자에게 맡겨두기를 요청하세요.{% endif %}
+            </p>
+            <ul id="fx-out" class="mt-4 space-y-3"></ul>
+        </section>
+        {% endif %}
+        {% if role != 'sender' %}
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+                <h2 class="text-[16px] font-semibold text-[#1d1d1f]">📥 파일 받기</h2>
+                <span id="fx-rx-state" class="text-[12px] text-[#8e8e93]">연결 중…</span>
+            </div>
+            <div class="mt-4 rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]">
+                이 페이지를 열어 두면 보내는 사람이 보낸 파일이 여기로 들어와요.
+                <span id="fx-dir-support"><button type="button" id="fx-pick-dir" class="ml-1 rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px] font-semibold text-[#1d1d1f]">저장 폴더 선택</button>
+                <span class="block mt-1">폴더를 고르면 큰 파일도 디스크에 바로 저장돼요(Chrome·Edge). 안 고르면 다 받은 뒤 저장 버튼이 나타나요.</span></span>
+                <span id="fx-dir-name" class="mt-1 block font-semibold text-[#1d1d1f]"></span>
+            </div>
+            <ul id="fx-in" class="mt-4 space-y-3"></ul>
+        </section>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <!-- 접속 정보 -->
         <section class="min-w-0 space-y-5">
+            {% if room.kind == 'file' %}<details class="rounded-[22px] border border-black/[0.08] bg-white p-6"><summary class="cursor-pointer text-[14px] font-semibold text-[#1d1d1f]">CLI · 프로그램으로 보내고 받기 (선택)</summary><div class="mt-4 space-y-5">{% endif %}
             {% if role != 'receiver' %}
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">① 보내는 쪽 (A)</h2>
@@ -121,6 +164,7 @@
                 {% endif %}
             </div>
             {% endif %}
+            {% if room.kind == 'file' %}</div></details>{% endif %}
         </section>
 
         <!-- 실시간 상태 -->
@@ -247,6 +291,11 @@
         $('st-drop').textContent = fmtBytes(st.bytes_dropped);
         $('sr-live').classList.toggle('is-live', st.rate_bps > 0);
         $('sr-ready').classList.toggle('hidden', !st.ready);
+        peerCount = (st.receivers || 0) + (st.web_receivers || 0);
+        if ($('fx-peer')) {
+            $('fx-peer').textContent = peerCount ? `받는 사람 ${peerCount}명 접속 중` : '받는 사람 없음';
+            $('fx-nopeer').classList.toggle('hidden', peerCount > 0);
+        }
         ['sender', 'receiver'].forEach((r) => {
             const el = $(`sr-joined-${r}`);
             if (el && s.joined) el.textContent = s.joined[r].length ? s.joined[r].join(', ') : '아직 없음';
@@ -338,6 +387,127 @@
         const sr = room.meta.sample_rate; const fc = room.meta.center_freq || 0;
         $('sr-axis').innerHTML = sr ? [-0.5, -0.25, 0, 0.25, 0.5].map((r) => `<span>${fmtHz(fc + r * sr)}${r === 0 && fc ? 'Hz' : ''}</span>`).join('') : '<span>-fs/2</span><span>0</span><span>+fs/2</span>';
         const g = fall.getContext('2d'); g.fillStyle = '#0b0f17'; g.fillRect(0, 0, fall.width, fall.height);
+    }
+
+
+    // ── 브라우저 파일 전송 ─────────────────────
+    const WS_SEND = "{{ ws_send_url|escapejs }}";
+    const WS_RECV = "{{ ws_recv_url|escapejs }}";
+    const esc = (str) => String(str).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fileRow = (name, size) => {
+        const li = document.createElement('li');
+        li.className = 'rounded-2xl border border-black/[0.08] p-4';
+        li.innerHTML = `<div class="flex justify-between gap-2 text-[13px]"><b class="break-all text-[#1d1d1f]">${esc(name)}</b><span class="shrink-0 text-[12px] text-[#8e8e93]">${size ? fmtBytes(size) : ''}</span></div>
+            <div class="fx-bar mt-3"><span></span></div><p class="mt-2 text-[12px] text-[#6e6e73]">대기 중…</p>`;
+        return { li, bar: li.querySelector('.fx-bar span'), note: li.querySelector('p') };
+    };
+    let peerCount = 0;
+
+    if ($('fx-out')) {
+        const CHUNK = 1024 * 1024;
+        const WINDOW = 8;  // ack 를 기다리지 않고 미리 보낼 조각 수
+        const queue = [];
+        let busy = false;
+
+        const sendOne = (file) => new Promise((resolve) => {
+            const row = fileRow(file.name, file.size);
+            $('fx-out').prepend(row.li);
+            const ws = new WebSocket(WS_SEND);
+            ws.binaryType = 'arraybuffer';
+            let offset = 0; let acked = 0; let inflight = 0; let started = 0;
+            const finish = (ok, text) => { row.note.textContent = text; row.bar.style.background = ok ? '#34c759' : '#d44c47'; try { ws.close(); } catch (_) {} resolve(ok); };
+            const pump = async () => {
+                while (inflight < WINDOW && offset < file.size) {
+                    const buf = await file.slice(offset, offset + CHUNK).arrayBuffer();
+                    offset += buf.byteLength; inflight += 1;
+                    ws.send(buf);
+                }
+                if (offset >= file.size && inflight === 0) ws.send(JSON.stringify({ type: 'end' }));
+            };
+            ws.onopen = () => ws.send(JSON.stringify({ type: 'start', name: file.name, size: file.size, mime: file.type }));
+            ws.onmessage = (ev) => {
+                const msg = JSON.parse(ev.data);
+                if (msg.type === 'started') { started = performance.now(); row.note.textContent = '보내는 중…'; pump(); }
+                else if (msg.type === 'ack') {
+                    inflight -= 1; acked = msg.received;
+                    const pct = file.size ? (acked / file.size) * 100 : 100;
+                    const rate = acked / Math.max(0.001, (performance.now() - started) / 1000);
+                    row.bar.style.width = `${pct}%`;
+                    row.note.textContent = `${pct.toFixed(1)}% · ${fmtRate(rate)} · 남은 시간 약 ${Math.max(0, Math.round((file.size - acked) / Math.max(rate, 1)))}초`;
+                    pump();
+                } else if (msg.type === 'done') { row.bar.style.width = '100%'; finish(true, `전달 완료 · ${fmtBytes(msg.received)}`); }
+                else if (msg.type === 'error') {
+                    finish(false, msg.error === 'no-receiver' ? '받는 사람이 접속해 있지 않아요' : msg.error === 'receiver-left' ? '받는 사람 연결이 끊겼어요' : msg.error);
+                }
+            };
+            ws.onerror = () => finish(false, '연결 오류 (다른 사람이 보내는 중이거나 방이 닫혔어요)');
+            ws.onclose = () => { if (row.note.textContent.endsWith('…')) finish(false, '연결이 끊겼어요'); };
+        });
+
+        const run = async () => {
+            if (busy) return;
+            busy = true;
+            while (queue.length) await sendOne(queue.shift());
+            busy = false;
+        };
+        const add = (files) => { queue.push(...files); run(); };
+        $('fx-file').addEventListener('change', (e) => { add([...e.target.files]); e.target.value = ''; });
+        const drop = $('fx-drop');
+        ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+        ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+        drop.addEventListener('drop', (e) => add([...(e.dataTransfer?.files || [])]));
+    }
+
+    if ($('fx-in')) {
+        let dir = null;
+        if (!window.showDirectoryPicker) $('fx-dir-support').innerHTML = '<span class="block mt-1">다 받은 뒤 저장 버튼이 나타나요. (아주 큰 파일은 Chrome·Edge 에서 저장 폴더를 고르면 좋아요)</span>';
+        else $('fx-pick-dir').addEventListener('click', async () => {
+            try { dir = await window.showDirectoryPicker({ mode: 'readwrite' }); $('fx-dir-name').textContent = `저장 폴더: ${dir.name}`; } catch (_) {}
+        });
+
+        let current = null;
+        const MEMORY_LIMIT = 1024 * 1024 * 1024;
+        const connectRecv = () => {
+            const ws = new WebSocket(WS_RECV);
+            ws.binaryType = 'arraybuffer';
+            ws.onopen = () => { $('fx-rx-state').textContent = '받을 준비됨'; };
+            ws.onmessage = async (ev) => {
+                if (typeof ev.data !== 'string') {
+                    if (!current) return;
+                    current.received += ev.data.byteLength;
+                    if (current.writer) await current.writer.write(ev.data); else current.chunks.push(ev.data);
+                    const pct = current.size ? (current.received / current.size) * 100 : 0;
+                    current.row.bar.style.width = `${pct}%`;
+                    current.row.note.textContent = `${pct.toFixed(1)}% · ${fmtBytes(current.received)}`;
+                    return;
+                }
+                const msg = JSON.parse(ev.data);
+                if (msg.type === 'file-start') {
+                    const row = fileRow(msg.name || 'file', msg.size);
+                    $('fx-in').prepend(row.li);
+                    current = { name: msg.name || 'file', size: msg.size || 0, mime: msg.mime || 'application/octet-stream', received: 0, chunks: [], row, writer: null };
+                    if (dir) {
+                        try { const fh = await dir.getFileHandle(current.name, { create: true }); current.writer = await fh.createWritable(); } catch (_) { current.writer = null; }
+                    } else if (current.size > MEMORY_LIMIT) {
+                        row.note.textContent = '1GB 가 넘는 파일이에요. 메모리에 받는 중 (저장 폴더를 고르면 더 안전해요)';
+                    }
+                } else if (msg.type === 'file-end' && current) {
+                    const c = current; current = null;
+                    c.row.bar.style.width = '100%'; c.row.bar.style.background = '#34c759';
+                    const ok = !c.size || c.received === c.size;
+                    if (c.writer) {
+                        await c.writer.close();
+                        c.row.note.textContent = `${ok ? '저장 완료' : '⚠ 크기가 달라요'} · 폴더에 저장됨 (${fmtBytes(c.received)})`;
+                    } else {
+                        const url = URL.createObjectURL(new Blob(c.chunks, { type: c.mime }));
+                        c.row.note.innerHTML = `${ok ? '다 받았어요' : '⚠ 크기가 달라요'} · ${fmtBytes(c.received)} <a href="${url}" download="${esc(c.name)}" class="ml-2 rounded-full bg-[#0066cc] px-3 py-1 font-semibold text-white">저장</a>`;
+                        c.row.li.querySelector('a').click();  // 자동 저장 시도 (막히면 버튼으로)
+                    }
+                }
+            };
+            ws.onclose = () => { $('fx-rx-state').textContent = '연결이 끊겼어요 · 다시 연결 중…'; setTimeout(connectRecv, 2000); };
+        };
+        connectRecv();
     }
 
     // ── WebSocket ─────────────────────────
