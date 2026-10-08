@@ -84,6 +84,15 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "netcheck",
+		"url_name": "tools:netcheck",
+		"icon": "📡",
+		"title": "포트 · 핑 · DNS 체크",
+		"description": "이 서버에서 내 서버로 포트가 열려 있는지, ping 응답 시간, 경로(traceroute), DNS 레코드(A·MX·TXT 등)를 확인합니다.",
+		"tags": ["네트워크", "진단"],
+		"access": "member",
+	},
+	{
 		"slug": "stream",
 		"url_name": "tools:stream",
 		"icon": "📁",

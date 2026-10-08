@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .nc-input {
+        width: 100%; height: 46px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb;
+        padding: 0 14px; font-size: 16px; outline: none; color: #1d1d1f; font-family: SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .nc-input:focus { border-color: #0066cc; }
+    .nc-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .nc-tab { border-radius: 999px; padding: 7px 16px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); color: #1d1d1f; }
+    .nc-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .nc-pre { white-space: pre-wrap; word-break: break-all; background: #1d1d1f; color: #e8e8ea; border-radius: 14px; padding: 14px 16px; font-size: 12.5px; line-height: 1.6; }
+    .nc-table td, .nc-table th { padding: 9px 10px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); text-align: left; font-size: 13px; }
+    .nc-table th { font-size: 11px; color: #8e8e93; font-weight: 600; }
+    html.theme-dark .nc-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .nc-tab { color: #e8e8ea; border-color: rgba(255, 255, 255, 0.18); }
+    html.theme-dark .nc-tab.is-active { background: #e8e8ea; color: #1d1d1f; }
+</style>
+
+<main class="mx-auto max-w-[1100px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · DIAGNOSTICS</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Net Check.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
+            이 서버(서울 리전)에서 바깥 호스트로 직접 확인해요. 내 서버의 방화벽이 외부에서 열려 보이는지, 응답 속도·경로·DNS 설정이 맞는지 볼 때 쓰세요.
+        </p>
+    </div>
+
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <div class="flex flex-wrap gap-2" id="nc-tabs">
+            <button type="button" class="nc-tab is-active" data-type="port">포트</button>
+            <button type="button" class="nc-tab" data-type="ping">Ping</button>
+            <button type="button" class="nc-tab" data-type="trace">경로 추적</button>
+            <button type="button" class="nc-tab" data-type="dns">DNS</button>
+        </div>
+        <form id="nc-form" class="mt-5 grid gap-3 sm:grid-cols-[minmax(0,1fr)_220px_auto]">
+            {% csrf_token %}
+            <input id="nc-host" class="nc-input" type="text" placeholder="example.com 또는 1.2.3.4" value="smjgallery.kr" spellcheck="false" autocomplete="off" required />
+            <input id="nc-ports" class="nc-input" type="text" placeholder="22, 80, 443" value="22, 80, 443" spellcheck="false" autocomplete="off" />
+            <button type="submit" id="nc-run" class="h-[46px] rounded-xl bg-[#0066cc] px-6 text-[14px] font-semibold text-white disabled:opacity-50">확인</button>
+        </form>
+        <p id="nc-hint" class="mt-2 text-[12px] text-[#8e8e93]"></p>
+        <p class="mt-1 text-[12px] text-[#8e8e93]">사설·내부 주소는 확인할 수 없어요. 포트는 한 번에 {{ max_ports }}개까지, 10분에 {{ run_limit }}번까지 확인할 수 있어요. 남의 서버를 허락 없이 스캔하지 마세요.</p>
+    </section>
+
+    <section id="nc-result" class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6" hidden></section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const csrf = document.querySelector('#nc-form [name=csrfmiddlewaretoken]').value;
+    const HINTS = {
+        port: '포트: 쉼표로 여러 개, 범위는 8000-8005 처럼. 열림 = 접속 받음, 닫힘 = 거부, 응답 없음 = 방화벽이 막았거나 꺼짐.',
+        ping: 'ICMP ping 을 4번 보내 응답 시간과 손실률을 봐요. 방화벽이 ping 을 막는 서버도 많아요.',
+        trace: '이 서버에서 대상까지 거치는 라우터를 최대 20단계까지 보여줘요. 20초 정도 걸릴 수 있어요.',
+        dns: 'A·AAAA·CNAME·MX·NS·TXT 레코드와 IP 의 역방향 이름(PTR)을 조회해요.',
+    };
+    let type = 'port';
+    const setType = (t) => {
+        type = t;
+        document.querySelectorAll('.nc-tab').forEach((b) => b.classList.toggle('is-active', b.dataset.type === t));
+        $('nc-ports').hidden = t !== 'port';
+        $('nc-form').style.gridTemplateColumns = t === 'port' ? '' : 'minmax(0,1fr) auto';
+        $('nc-hint').textContent = HINTS[t];
+    };
+    document.querySelectorAll('.nc-tab').forEach((b) => b.addEventListener('click', () => setType(b.dataset.type)));
+    setType('port');
+
+    const STATE = {
+        open: ['열림', 'bg-[#34c759]/15 text-[#1e7a35]'],
+        closed: ['닫힘', 'bg-black/[0.06] text-[#6e6e73]'],
+        filtered: ['응답 없음', 'bg-[#b26a00]/10 text-[#b26a00]'],
+        error: ['오류', 'bg-[#ff3b30]/10 text-[#c4271d]'],
+    };
+    const render = (d) => {
+        const head = `<p class="text-[13px] text-[#8e8e93]">대상 <span class="nc-mono text-[#1d1d1f]">${esc(d.host)}</span>${d.target && d.target !== d.host ? ` → <span class="nc-mono text-[#1d1d1f]">${esc(d.target)}</span>` : ''}</p>`;
+        if (d.type === 'port') {
+            return head + `<table class="nc-table mt-3 w-full"><thead><tr><th>포트</th><th>서비스</th><th>상태</th><th>응답</th></tr></thead><tbody>${
+                d.ports.map((p) => { const [label, cls] = STATE[p.state] || [p.state, '']; return `<tr><td class="nc-mono">${p.port}</td><td>${esc(p.service)}</td><td><span class="rounded-full px-2.5 py-0.5 text-[12px] ${cls}">${label}</span>${p.detail ? ` <span class="text-[12px] text-[#8e8e93]">${esc(p.detail)}</span>` : ''}</td><td class="nc-mono">${p.ms != null ? `${p.ms} ms` : '-'}</td></tr>`; }).join('')
+            }</tbody></table>`;
+        }
+        if (d.type === 'ping') {
+            const s = d.summary || {};
+            const loss = s.sent ? Math.round((1 - s.received / s.sent) * 100) : null;
+            const cards = s.sent != null ? `<div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">${[
+                ['받음', `${s.received}/${s.sent}`], ['손실', loss != null ? `${loss}%` : '-'], ['평균', s.avg != null ? `${s.avg} ms` : '-'], ['최소 / 최대', s.min != null ? `${s.min} / ${s.max} ms` : '-'],
+            ].map(([k, v]) => `<div class="rounded-2xl bg-[#f5f5f7] p-4"><p class="text-[12px] text-[#8e8e93]">${k}</p><p class="nc-mono mt-1 text-[18px] font-semibold">${esc(v)}</p></div>`).join('')}</div>` : '';
+            return head + cards + `<pre class="nc-pre mt-4">${esc(d.output)}</pre>`;
+        }
+        if (d.type === 'trace') return head + `<pre class="nc-pre mt-3">${esc(d.output)}</pre>`;
+        const recs = Object.entries(d.records || {}).map(([k, v]) => `<tr><td class="w-20 font-semibold">${esc(k)}</td><td class="nc-mono">${v === null ? '<span class="text-[#d44c47]">조회 실패</span>' : v.length ? v.map(esc).join('<br>') : '<span class="text-[#8e8e93]">없음</span>'}</td></tr>`).join('');
+        const ptr = Object.entries(d.reverse || {}).map(([ip, name]) => `<tr><td class="nc-mono">${esc(ip)}</td><td class="nc-mono">${esc(name) || '<span class="text-[#8e8e93]">없음</span>'}</td></tr>`).join('');
+        return head + (recs ? `<table class="nc-table mt-3 w-full"><tbody>${recs}</tbody></table>` : '')
+            + (ptr ? `<h3 class="mt-5 text-[14px] font-semibold">역방향 이름 (PTR)</h3><table class="nc-table mt-2 w-full"><tbody>${ptr}</tbody></table>` : '');
+    };
+
+    $('nc-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const out = $('nc-result');
+        const btn = $('nc-run');
+        btn.disabled = true; btn.textContent = type === 'trace' ? '추적 중… (최대 25초)' : '확인 중…';
+        out.hidden = false; out.innerHTML = '<p class="text-[13px] text-[#8e8e93]">확인하고 있어요…</p>';
+        try {
+            const res = await fetch('{% url "tools:netcheck_run" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+                body: JSON.stringify({ type, host: $('nc-host').value, ports: $('nc-ports').value }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '확인하지 못했어요.');
+            out.innerHTML = render(data);
+        } catch (err) {
+            out.innerHTML = `<p class="text-[14px] text-[#d44c47]">${esc(err.message)}</p>`;
+        }
+        btn.disabled = false; btn.textContent = '확인';
+    });
+})();
+</script>
+{% endblock %}

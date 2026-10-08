@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, myip, share_views, speedtest, views
+from . import clipboard_views, myip, netcheck, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -13,6 +13,8 @@ urlpatterns = [
     path("myip/", myip.myip, name="myip"),
     path("myip/lookup/", myip.myip_lookup, name="myip_lookup"),
     path("encode/", views.encode, name="encode"),
+    path("netcheck/", netcheck.netcheck, name="netcheck"),
+    path("netcheck/run/", netcheck.netcheck_run, name="netcheck_run"),
     path("speedtest/ping/", speedtest.ping, name="speedtest_ping"),
     path("speedtest/download/", speedtest.download, name="speedtest_download"),
     path("speedtest/upload/", speedtest.upload, name="speedtest_upload"),
