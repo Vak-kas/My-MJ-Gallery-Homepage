@@ -1,3 +1,136 @@
-from django.test import TestCase
+from urllib.parse import urlencode
 
-# Create your tests here.
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
+
+from blog.models import Comment, GuestbookEntry, Post
+
+
+class ModerationTestBase(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
+        self.spammer = User.objects.create_user("spammer", "s@example.com", "pw")
+        self.member = User.objects.create_user("member", "m@example.com", "pw")
+        self.client.force_login(self.admin)
+        self.good = self.post("정상 글", self.member)
+
+    def post(self, title, author, **kw):
+        n = Post.objects.count()
+        return Post.objects.create(category="tech", title=title, slug=f"p{n}", author=author,
+                                   published_at=timezone.now(), **kw)
+
+
+class PostsBulkTests(ModerationTestBase):
+    def test_title_filter_and_filtered_scope_delete(self):
+        for i in range(25):  # 한 페이지(20개)를 넘겨도 전부 지워지는지
+            self.post(f"광고 555 {i}", self.spammer)
+        res = self.client.get(reverse("studio:posts"), {"title_q": "555"})
+        self.assertEqual(res.context["post_count"], 25)
+
+        self.client.post(reverse("studio:posts"), {
+            "bulk_action": "delete", "bulk_scope": "filtered", "bulk_delete_confirm": "DELETE",
+            "return_qs": urlencode({"title_q": "555"}),
+        })
+        self.assertEqual(Post.objects.count(), 1)
+        self.assertTrue(Post.objects.filter(id=self.good.id).exists())
+
+    def test_filtered_scope_requires_filter(self):
+        self.client.post(reverse("studio:posts"), {
+            "bulk_action": "delete", "bulk_scope": "filtered", "bulk_delete_confirm": "DELETE", "return_qs": "",
+        })
+        self.assertTrue(Post.objects.filter(id=self.good.id).exists())
+
+    def test_unpublish_keeps_published_at(self):
+        before = self.good.published_at
+        self.client.post(reverse("studio:posts"), {"bulk_action": "unpublish", "selected_ids": [self.good.id]})
+        self.good.refresh_from_db()
+        self.assertFalse(self.good.is_published)
+        self.assertEqual(self.good.published_at, before)
+
+
+class CommunityTests(ModerationTestBase):
+    def setUp(self):
+        super().setUp()
+        self.g_spam = GuestbookEntry.objects.create(author_name="spam", message="555 카지노")
+        self.g_ok = GuestbookEntry.objects.create(author=self.member, author_name="member", message="안녕하세요")
+        self.c_spam = Comment.objects.create(post=self.good, author=self.spammer, author_name="spammer", content="555 링크")
+
+    def test_requires_superuser(self):
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(reverse("studio:community")).status_code, 302)
+        self.assertEqual(self.client.get(reverse("studio:users")).status_code, 302)
+
+    def test_list_and_hide(self):
+        res = self.client.get(reverse("studio:community"), {"tab": "guestbook", "q": "555"})
+        self.assertEqual(res.context["item_count"], 1)
+        self.client.post(reverse("studio:community"), {
+            "action": "hide", "ids": [self.g_spam.id], "return_qs": "tab=guestbook",
+        })
+        self.g_spam.refresh_from_db()
+        self.assertFalse(self.g_spam.is_visible)
+
+    def test_filtered_delete_needs_confirm(self):
+        data = {"action": "delete", "scope": "filtered", "return_qs": "tab=guestbook&q=555"}
+        self.client.post(reverse("studio:community"), data)
+        self.assertTrue(GuestbookEntry.objects.filter(id=self.g_spam.id).exists())
+        self.client.post(reverse("studio:community"), {**data, "confirm": "DELETE"})
+        self.assertFalse(GuestbookEntry.objects.filter(id=self.g_spam.id).exists())
+        self.assertTrue(GuestbookEntry.objects.filter(id=self.g_ok.id).exists())
+
+    def test_keyword_purge_preview_and_delete(self):
+        spam_post = self.post("555 이벤트", self.spammer)
+        qs = urlencode([("tab", "cleanup"), ("keyword", "555"), ("fields", "post_title"),
+                        ("fields", "comments"), ("fields", "guestbook")])
+        res = self.client.get(reverse("studio:community") + "?" + qs)
+        self.assertEqual(res.context["preview_total"], 3)
+        self.client.post(reverse("studio:community"), {"action": "purge", "confirm": "DELETE", "return_qs": qs})
+        self.assertFalse(Post.objects.filter(id=spam_post.id).exists())
+        self.assertFalse(Comment.objects.exists())
+        self.assertEqual(list(GuestbookEntry.objects.all()), [self.g_ok])
+        self.assertTrue(Post.objects.filter(id=self.good.id).exists())
+
+
+class UsersTests(ModerationTestBase):
+    def test_list_counts(self):
+        self.post("스팸", self.spammer)
+        res = self.client.get(reverse("studio:users"), {"q": "spam"})
+        [u] = res.context["users"]
+        self.assertEqual((u.username, u.post_count), ("spammer", 1))
+
+    def test_suspend_and_activate(self):
+        self.client.post(reverse("studio:users"), {"action": "suspend", "ids": [self.spammer.id]})
+        self.spammer.refresh_from_db()
+        self.assertFalse(self.spammer.is_active)
+        res = self.client.get(reverse("studio:users"), {"state": "inactive"})
+        self.assertEqual([u.username for u in res.context["users"]], ["spammer"])
+        self.client.post(reverse("studio:users"), {"action": "activate", "ids": [self.spammer.id]})
+        self.spammer.refresh_from_db()
+        self.assertTrue(self.spammer.is_active)
+
+    def test_purge_content(self):
+        self.post("스팸", self.spammer)
+        Comment.objects.create(post=self.good, author=self.spammer, author_name="spammer", content="x")
+        GuestbookEntry.objects.create(author=self.spammer, author_name="spammer", message="x")
+        self.client.post(reverse("studio:users"), {"action": "purge", "ids": [self.spammer.id], "confirm": "DELETE"})
+        self.spammer.refresh_from_db()
+        self.assertFalse(self.spammer.is_active)
+        self.assertFalse(Post.objects.filter(author=self.spammer).exists())
+        self.assertFalse(Comment.objects.filter(author=self.spammer).exists())
+        self.assertFalse(GuestbookEntry.objects.filter(author=self.spammer).exists())
+        self.assertTrue(Post.objects.filter(id=self.good.id).exists())
+
+    def test_delete_account(self):
+        self.client.post(reverse("studio:users"), {"action": "delete", "ids": [self.spammer.id]})
+        self.assertTrue(get_user_model().objects.filter(id=self.spammer.id).exists())  # 확인 문구 없으면 안 지움
+        self.client.post(reverse("studio:users"), {"action": "delete", "ids": [self.spammer.id], "confirm": "DELETE"})
+        self.assertFalse(get_user_model().objects.filter(id=self.spammer.id).exists())
+
+    def test_cannot_touch_self_or_admin(self):
+        other_admin = get_user_model().objects.create_superuser("admin2", "b@example.com", "pw")
+        self.client.post(reverse("studio:users"), {"action": "suspend", "ids": [self.admin.id, other_admin.id]})
+        self.admin.refresh_from_db()
+        other_admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active and other_admin.is_active)
