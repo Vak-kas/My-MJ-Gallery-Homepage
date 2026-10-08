@@ -49,35 +49,50 @@
     {% if role == 'admin' %}
     <section class="mt-6 rounded-[22px] border border-black/[0.08] bg-white p-6">
         <h2 class="text-[16px] font-semibold text-[#1d1d1f]">링크 나눠 주기</h2>
+        {% if room.kind == 'file' %}
         <p class="mt-1 text-[13px] leading-relaxed text-[#6e6e73]">
-            고정 IP 가 없어도 됩니다. 각 사람이 <b>GNU Radio 를 돌릴 컴퓨터(같은 인터넷 연결)</b>에서 자기 링크를 열면, 그 네트워크의 공인 IP 가 자동으로 등록되고
+            <b>받는 쪽 링크</b>를 받을 사람에게 보내세요. 그 사람이 링크를 열어 두면 아래 <b>파일 보내기</b>에 올린 파일이 바로 전달돼요.
+            이 화면은 보내는 쪽이라 여기서 보낸 파일이 이 화면으로 다시 받아지지 않아요. 다른 사람이 대신 보내게 하려면 보내는 쪽 링크를 주세요.
+        </p>
+        {% else %}
+        <p class="mt-1 text-[13px] leading-relaxed text-[#6e6e73]">
+            고정 IP 가 없어도 됩니다. 각 사람이 <b>프로그램을 돌릴 컴퓨터(같은 인터넷 연결)</b>에서 자기 링크를 열면, 그 네트워크의 공인 IP 가 자동으로 등록되고
             <b>등록된 곳에서만</b> 포트에 접속할 수 있어요. 링크 페이지를 열어 두면 IP 가 바뀌어도 30초마다 다시 등록됩니다.
         </p>
+        {% endif %}
         <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
                 <p class="text-[12px] font-semibold text-[#0066cc]">① 보내는 쪽(A) 링크</p>
                 <div class="sr-copy mt-2"><code class="sr-code">{{ sender_link }}</code><button type="button" data-copy="{{ sender_link }}">복사</button></div>
+                {% if room.kind != 'file' %}
                 <p class="mt-2 text-[12px] text-[#6e6e73]">등록된 IP: <span id="sr-joined-sender" class="sr-code">-</span></p>
                 <button type="button" data-join="sender" class="mt-2 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">이 컴퓨터를 보내는 쪽으로 등록</button>
+                {% endif %}
             </div>
             <div>
                 <p class="text-[12px] font-semibold text-[#0066cc]">② 받는 쪽(B) 링크</p>
                 <div class="sr-copy mt-2"><code class="sr-code">{{ receiver_link }}</code><button type="button" data-copy="{{ receiver_link }}">복사</button></div>
+                {% if room.kind != 'file' %}
                 <p class="mt-2 text-[12px] text-[#6e6e73]">등록된 IP: <span id="sr-joined-receiver" class="sr-code">-</span></p>
                 <button type="button" data-join="receiver" class="mt-2 rounded-full border border-black/[0.1] px-3 py-1 text-[12px] text-[#1d1d1f]">이 컴퓨터를 받는 쪽으로 등록</button>
+                {% endif %}
             </div>
         </div>
     </section>
     {% else %}
     <div class="mt-6 rounded-2xl border border-[#0066cc]/20 bg-[#f0f7ff] px-5 py-4 text-[14px] leading-relaxed text-[#1d1d1f]">
-        이 네트워크(<b class="sr-code" id="sr-my-ip">{{ my_ip }}</b>)를 <b>{% if role == 'sender' %}보내는 쪽{% else %}받는 쪽{% endif %}</b>으로 등록했어요.
+        {% if room.kind == 'file' %}
+        {% if role == 'sender' %}이 페이지에서 <b>파일을 보내면</b> 받는 쪽 링크를 열어 둔 사람에게 바로 전달돼요.{% else %}이 페이지를 <b>열어 두면</b> 보내는 사람이 보낸 파일이 여기로 들어와요.{% endif %}
+        <span class="block text-[12px] text-[#6e6e73]">브라우저끼리 바로 전달되고 서버에는 저장되지 않아요. (CLI 로 주고받을 때를 위해 이 네트워크 <span class="sr-code" id="sr-my-ip">{{ my_ip }}</span> 도 등록해 뒀어요)</span>
+        {% else %}        이 네트워크(<b class="sr-code" id="sr-my-ip">{{ my_ip }}</b>)를 <b>{% if role == 'sender' %}보내는 쪽{% else %}받는 쪽{% endif %}</b>으로 등록했어요.
         이제 <b>이 인터넷 연결을 쓰는 컴퓨터</b>의 GNU Radio/CLI 로 아래 주소에 접속하면 됩니다.
         <span class="block text-[12px] text-[#6e6e73]">이 페이지를 열어 두면 IP 가 바뀌어도 30초마다 자동으로 다시 등록돼요. VPN 을 브라우저에만 켜 두면 IP 가 달라 접속이 안 될 수 있어요.</span>
+            {% endif %}
     </div>
     {% endif %}
 
     {% if room.kind == 'file' %}
-    <div class="mt-6 grid grid-cols-1 gap-5 {% if role == 'admin' %}lg:grid-cols-2{% endif %}">
+    <div class="mt-6 grid grid-cols-1 gap-5">
         {% if role != 'receiver' %}
         <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -96,7 +111,7 @@
             <ul id="fx-out" class="mt-4 space-y-3"></ul>
         </section>
         {% endif %}
-        {% if role != 'sender' %}
+        {% if role == 'receiver' %}
         <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
             <div class="flex flex-wrap items-baseline justify-between gap-2">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">📥 파일 받기</h2>
@@ -117,20 +132,22 @@
     <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <!-- 접속 정보 -->
         <section class="min-w-0 space-y-5">
-            {% if room.kind == 'file' %}<details class="rounded-[22px] border border-black/[0.08] bg-white p-6"><summary class="cursor-pointer text-[14px] font-semibold text-[#1d1d1f]">CLI · 프로그램으로 보내고 받기 (선택)</summary><div class="mt-4 space-y-5">{% endif %}
+            {% if room.kind == 'file' %}<details class="rounded-[22px] border border-black/[0.08] bg-white p-6"><summary class="cursor-pointer text-[14px] font-semibold text-[#1d1d1f]">CLI 로 보내고 받기 (선택)</summary><div class="mt-4 space-y-5">{% endif %}
             {% if role != 'receiver' %}
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">① 보내는 쪽 (A)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.in_port }}">복사</button></div>
+                {% if room.kind != 'file' %}
                 <table class="sr-table mt-4 w-full text-[13px]">
-                    <tr><td>GNU Radio 블록</td><td><b>ZMQ PUSH Sink</b></td></tr>
+                    {% if room.kind == 'iq' %}<tr><td>GNU Radio 블록</td><td><b>ZMQ PUSH Sink</b></td></tr>{% else %}<tr><td>ZMQ 소켓</td><td><b>PUSH</b> 로 접속(connect)</td></tr>{% endif %}
                     <tr><td>Address</td><td class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</td></tr>
                     <tr><td>Bind</td><td><b>No</b> (서버로 접속)</td></tr>
                     {% if room.kind == 'iq' %}<tr><td>IO Type</td><td>{% if room.meta.format == 'fc32' %}Complex{% else %}Byte / Short (원본 형식 그대로){% endif %}</td></tr>{% endif %}
                     <tr><td>Pass Tags</td><td>Off 권장 (켜도 그대로 전달)</td></tr>
                     {% if room.allow_ips %}<tr><td>고정 허용 IP</td><td class="sr-code">{{ room.allow_ips|join:", " }}</td></tr>{% endif %}
                 </table>
-                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">또는 CLI (<a href="https://github.com/Vak-kas/My-MJ-Gallery-Homepage/blob/main/relay/mj_stream.py" class="text-[#0066cc]" target="_blank" rel="noopener">mj_stream.py</a>, <span class="sr-code">pip install pyzmq</span>)</p>
+                {% endif %}
+                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">{% if room.kind != 'file' %}또는 {% endif %}CLI (<a href="https://github.com/Vak-kas/My-MJ-Gallery-Homepage/blob/main/relay/mj_stream.py" class="text-[#0066cc]" target="_blank" rel="noopener">mj_stream.py</a>, <span class="sr-code">pip install pyzmq</span>)</p>
                 {% if room.kind == 'iq' %}
                 <div class="sr-copy mt-2"><code class="sr-code">hackrf_transfer -r - -s {{ room.meta.sample_rate|default:2000000|floatformat:0 }} -f {{ room.meta.center_freq|default:433920000|floatformat:0 }} | python mj_stream.py send tcp://{{ public_host }}:{{ room.in_port }} --stdin</code><button type="button" data-copy-prev>복사</button></div>
                 <p class="mt-1 text-[11px] text-[#8e8e93]">hackrf_transfer 출력은 sc8 형식입니다. 방 형식이 sc8 일 때 웹 스펙트럼이 맞게 보여요.</p>
@@ -148,16 +165,18 @@
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">② 받는 쪽 (B)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.out_port }}">복사</button></div>
+                {% if room.kind != 'file' %}
                 <table class="sr-table mt-4 w-full text-[13px]">
-                    <tr><td>GNU Radio 블록</td><td><b>{% if room.out_socket == 'PUSH' %}ZMQ PULL Source{% else %}ZMQ SUB Source{% endif %}</b></td></tr>
+                    {% if room.kind == 'iq' %}<tr><td>GNU Radio 블록</td><td><b>ZMQ SUB Source</b></td></tr>{% else %}<tr><td>ZMQ 소켓</td><td><b>SUB</b> 로 접속, 구독 필터 없음</td></tr>{% endif %}
                     <tr><td>Address</td><td class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</td></tr>
                     <tr><td>Bind</td><td><b>No</b></td></tr>
                     {% if room.kind == 'iq' %}<tr><td>IO Type</td><td>보내는 쪽과 같게</td></tr>{% endif %}
                 </table>
-                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">또는 CLI</p>
+                {% endif %}
+                <p class="mt-4 text-[12px] font-semibold text-[#6e6e73]">{% if room.kind != 'file' %}또는 {% endif %}CLI</p>
                 {% if room.kind == 'file' %}
                 <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py recv tcp://{{ public_host }}:{{ room.out_port }} --output . --file</code><button type="button" data-copy-prev>복사</button></div>
-                <p class="mt-1 text-[11px] text-[#8e8e93]">파일 방은 받는 쪽을 먼저 실행해 두세요. 끝나면 SHA-256 으로 무결성을 확인합니다.</p>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">CLI 로 받을 땐 먼저 실행해 두세요. 끝나면 SHA-256 으로 무결성을 확인합니다. 브라우저 받는 쪽과 함께 받을 수도 있어요.</p>
                 {% else %}
                 <div class="sr-copy mt-2"><code class="sr-code">python mj_stream.py recv tcp://{{ public_host }}:{{ room.out_port }} --output received.{% if room.kind == 'iq' %}{{ room.meta.format }}{% else %}bin{% endif %}</code><button type="button" data-copy-prev>복사</button></div>
                 <p class="mt-1 text-[11px] text-[#8e8e93]">실시간 방은 받는 쪽이 접속한 뒤부터의 데이터만 받으며, 받는 쪽이 느리면 일부가 버려집니다.</p>
