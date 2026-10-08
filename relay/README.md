@@ -72,3 +72,22 @@ python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 venv/bin/python -m unittest discover -s relay/tests -t .
 venv/bin/python manage.py test tools
 ```
+
+## 화면 송출 (라이브, `relay/mj_live.py`)
+`/tools/live/` — 방송 만들기는 로그인 회원(한도: 동시 1개·하루 3번·120분·시청자 5명, 관리자 360분·20명), 시청은 링크만 있으면 누구나.
+```
+[방송 브라우저] ══ WebRTC (영상·소리) ══▶ [시청자 브라우저]      직접 연결
+             ╲                          ╱
+              ══ TURN(coturn, :3478) ══        직접 연결이 막힌 네트워크(핫스팟 등)만 서버 중계
+[양쪽] ── wss://smjgallery.kr/relay/ws/live/<방>?token= ── mj-relay   연결 정보(SDP/ICE)·채팅·시청자 목록
+```
+- 화면+소리(`getDisplayMedia`), 웹캠, 마이크를 따로 켜고 끔 → 시청자는 화면 위에 웹캠을 작은 창으로 봄
+- 방송자가 시청자마다 연결을 하나씩 만듦(offer 는 항상 방송자) → 시청자 5~10명 규모용
+- 제어 API: `POST/GET /live`, `GET/DELETE /live/<id>` (127.0.0.1 + `RELAY_API_KEY`)
+- TURN 계정은 Django 가 방송마다 시간 제한 임시 계정으로 발급 (`TURN_SECRET`, coturn `use-auth-secret`)
+
+### TURN 서버 설치 (1회)
+1. 배포 후 서버에서: `cd /home/ubuntu/projects/smjgallery && sudo bash relay/deploy/install_turn.sh`
+   - coturn 설치, `.env` 에 `TURN_SECRET` 생성, `/etc/turnserver.conf` 작성(사설망 중계 차단·속도 제한), gunicorn 재시작
+2. **Lightsail 콘솔 → 네트워킹 → IPv4 방화벽**: 사용자 지정 `UDP 3478`, `TCP 3478`, `UDP 49160-49200` 추가
+3. 확인: `systemctl status coturn`, 방송 화면의 시청자 목록에서 "서버 중계" 표시

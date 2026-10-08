@@ -1,0 +1,44 @@
+# coturn — 화면 송출(WebRTC) 중계용. relay/deploy/install_turn.sh 가 값을 채워 /etc/turnserver.conf 로 복사함
+listening-port=3478
+fingerprint
+realm=__REALM__
+
+# Django 가 방송마다 시간 제한 임시 계정을 만들어 줌 (TURN_SECRET 공유, coturn REST API 방식)
+use-auth-secret
+static-auth-secret=__SECRET__
+
+# Lightsail 은 공인 IP 가 NAT 뒤에 있음: 공인IP/사설IP
+external-ip=__PUBLIC_IP__/__PRIVATE_IP__
+
+# 중계에 쓰는 UDP 포트 범위 (Lightsail 방화벽에서 열어야 함)
+min-port=49160
+max-port=49200
+
+# TLS 는 쓰지 않음 (3478 UDP/TCP 만)
+no-tls
+no-dtls
+no-cli
+no-multicast-peers
+
+# 서버 내부망·사설망으로는 중계 금지 (TURN 을 통한 내부 접근 차단)
+denied-peer-ip=0.0.0.0-0.255.255.255
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=100.64.0.0-100.127.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=192.0.0.0-192.0.0.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=198.18.0.0-198.19.255.255
+denied-peer-ip=::1
+denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+
+# 남용 방지: 계정당 동시 연결, 전체 연결, 연결 하나당 속도(바이트/초, 약 5Mbps)
+user-quota=12
+total-quota=60
+max-bps=625000
+stale-nonce=600
+
+log-file=/var/log/turnserver/turn.log
+simple-log

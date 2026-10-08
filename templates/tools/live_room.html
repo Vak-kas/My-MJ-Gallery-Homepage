@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .lv-stage { position: relative; background: #0b0b0d; border-radius: 22px; overflow: hidden; aspect-ratio: 16 / 9; }
+    .lv-stage video.main { width: 100%; height: 100%; object-fit: contain; background: #0b0b0d; }
+    .lv-stage video.pip { position: absolute; right: 14px; bottom: 14px; width: 24%; max-width: 280px; border-radius: 14px; border: 2px solid rgba(255,255,255,0.7); background: #000; box-shadow: 0 8px 24px rgba(0,0,0,0.4); }
+    .lv-empty { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #a1a1a6; font-size: 15px; text-align: center; padding: 20px; }
+    .lv-btn { border-radius: 999px; padding: 9px 16px; font-size: 13px; font-weight: 600; border: 1px solid rgba(0,0,0,0.1); background: #fff; color: #1d1d1f; }
+    .lv-btn.on { background: #d44c47; border-color: #d44c47; color: #fff; }
+    .lv-btn:disabled { opacity: 0.5; }
+    .lv-chat { height: 420px; overflow-y: auto; }
+    .lv-input { width: 100%; height: 42px; border-radius: 12px; border: 1px solid rgba(0,0,0,0.1); background: #f9f9fb; padding: 0 12px; font-size: 14px; outline: none; color: #1d1d1f; }
+    .lv-input:focus { border-color: #0066cc; }
+    html.theme-dark .lv-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255,255,255,0.14); }
+    html.theme-dark .lv-input { background: #2a2a2e; border-color: rgba(255,255,255,0.14); color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-4 py-8 sm:px-6 lg:py-10">
+    {% if relay_error %}
+    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-800">{{ relay_error }}</div>
+    {% else %}
+    <div class="flex flex-wrap items-center gap-3">
+        {% if role == 'host' %}<a href="{% url 'tools:live' %}" class="text-[13px] text-[#0066cc]">← 내 방송</a>{% endif %}
+        <h1 class="text-[24px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">{{ room.title }}</h1>
+        <span id="lv-badge" class="rounded-full bg-black/[0.06] px-3 py-1 text-[12px] text-[#6e6e73]">연결 중…</span>
+        <span class="text-[13px] text-[#8e8e93]">👀 <span id="lv-count">0</span>{% if role == 'host' %}/{{ room.max_viewers }}{% endif %}</span>
+        {% if role == 'viewer' %}<span class="text-[13px] text-[#8e8e93]">· {{ room.owner }}</span>{% endif %}
+    </div>
+
+    <div class="mt-5 grid gap-5 {% if room.chat %}lg:grid-cols-[minmax(0,1fr)_340px]{% endif %}">
+        <div class="min-w-0">
+            <div class="lv-stage" id="lv-stage">
+                <video id="lv-main" class="main" autoplay playsinline {% if role == 'host' %}muted{% endif %}></video>
+                <video id="lv-pip" class="pip" autoplay playsinline muted hidden></video>
+                <audio id="lv-mic" autoplay hidden></audio>
+                <div id="lv-empty" class="lv-empty">
+                    {% if role == 'host' %}
+                    <p class="text-[40px]">📺</p>
+                    <p>아래에서 <b class="text-white">화면 공유</b>나 <b class="text-white">웹캠</b>을 켜면 방송이 시작돼요.</p>
+                    {% else %}
+                    <p class="text-[40px]">⏳</p>
+                    <p id="lv-wait">방송을 기다리고 있어요…</p>
+                    {% endif %}
+                </div>
+                {% if role == 'viewer' %}
+                <div id="lv-join" class="lv-empty" style="background:rgba(11,11,13,0.92)">
+                    <p class="text-[40px]">📺</p>
+                    <p class="text-[17px] font-semibold text-white">{{ room.title }}</p>
+                    <p>{{ room.owner }} 님의 방송</p>
+                    <div class="mt-3 flex w-full max-w-[360px] gap-2">
+                        <input id="lv-name" class="lv-input" maxlength="20" placeholder="닉네임 (선택)" value="{{ default_name }}">
+                        <button id="lv-join-btn" class="shrink-0 rounded-xl bg-[#0066cc] px-5 text-[14px] font-semibold text-white">시청하기</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="mt-4 flex flex-wrap items-center gap-2">
+                {% if role == 'host' %}
+                <button type="button" class="lv-btn" id="btn-screen">🖥 화면 공유</button>
+                <button type="button" class="lv-btn" id="btn-cam">📷 웹캠</button>
+                <button type="button" class="lv-btn" id="btn-mic">🎙 마이크</button>
+                <select id="sel-quality" class="lv-input" style="width:auto;height:38px">
+                    <option value="detail">선명하게 (글자·코드)</option>
+                    <option value="motion">부드럽게 (영상·게임)</option>
+                </select>
+                <button type="button" class="lv-btn ml-auto" id="btn-end" style="color:#c4271d">방송 끝내기</button>
+                {% else %}
+                <button type="button" class="lv-btn" id="btn-sound" hidden>🔊 소리 켜기</button>
+                <button type="button" class="lv-btn" id="btn-full">⛶ 전체 화면</button>
+                {% endif %}
+            </div>
+
+            {% if role == 'host' %}
+            <section class="mt-5 rounded-[20px] border border-black/[0.08] bg-white p-5">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="text-[15px] font-semibold">시청 링크</h2>
+                    <span class="text-[12px] text-[#8e8e93]">이 링크를 받은 사람은 로그인 없이 볼 수 있어요</span>
+                </div>
+                <div class="mt-2 flex gap-2">
+                    <input id="viewer-link" class="lv-input font-mono text-[12.5px]" readonly value="{{ viewer_link }}">
+                    <button type="button" id="btn-copy" class="shrink-0 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">복사</button>
+                </div>
+                <h2 class="mt-5 text-[15px] font-semibold">시청자</h2>
+                <ul id="viewer-list" class="mt-2 divide-y divide-black/[0.05] text-[13px]"></ul>
+                <p class="mt-3 text-[12px] text-[#8e8e93]">"서버 중계"는 직접 연결이 막혀 이 사이트의 TURN 서버를 거치는 시청자예요. 이 탭을 닫으면 방송이 멈추고, 다시 열면 이어져요.</p>
+            </section>
+            {% endif %}
+        </div>
+
+        {% if room.chat %}
+        <aside class="flex flex-col rounded-[20px] border border-black/[0.08] bg-white p-4 lg:sticky lg:top-6 lg:self-start">
+            <h2 class="text-[15px] font-semibold">채팅</h2>
+            <div id="chat-log" class="lv-chat mt-3 space-y-1.5 text-[14px]"></div>
+            <form id="chat-form" class="mt-3 flex gap-2">
+                <input id="chat-input" class="lv-input" maxlength="300" placeholder="메시지 입력" autocomplete="off" disabled>
+                <button class="shrink-0 rounded-xl bg-[#1d1d1f] px-4 text-[13px] font-semibold text-white">전송</button>
+            </form>
+        </aside>
+        {% endif %}
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+{{ ice_servers|json_script:"lv-ice" }}
+<script>
+(() => {
+    const ROLE = '{{ role }}';
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ICE = JSON.parse(document.getElementById('lv-ice').textContent);
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const badge = (text, color) => { const b = $('lv-badge'); b.textContent = text; b.style.background = color || 'rgba(0,0,0,0.06)'; b.style.color = color ? '#fff' : '#6e6e73'; };
+    let ws = null;
+    let ended = false;
+    const send = (data) => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(data)); };
+
+    // ── 채팅 (방송자·시청자 공통)
+    const chatLog = $('chat-log');
+    const addChat = (m) => {
+        if (!chatLog) return;
+        const time = new Date(m.at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const row = document.createElement('div');
+        row.innerHTML = `<span class="text-[11px] text-[#8e8e93]">${time}</span> <b class="${m.host ? 'text-[#d44c47]' : 'text-[#0066cc]'}">${m.host ? '👑 ' : ''}${esc(m.name)}</b> <span class="break-words">${esc(m.text)}</span>`;
+        chatLog.appendChild(row);
+        chatLog.scrollTop = chatLog.scrollHeight;
+    };
+    $('chat-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = $('chat-input');
+        const text = input.value.trim();
+        if (!text) return;
+        send({ type: 'chat', text });
+        input.value = '';
+    });
+
+    function openSocket(url, onMessage) {
+        ws = new WebSocket(url);
+        ws.onopen = () => { $('chat-input') && ($('chat-input').disabled = false); };
+        ws.onmessage = (ev) => {
+            const msg = JSON.parse(ev.data);
+            if (msg.type === 'chat') addChat(msg);
+            else if (msg.type === 'count') $('lv-count').textContent = msg.viewers;
+            else if (msg.type === 'end') { ended = true; onEnd(msg.reason); }
+            onMessage(msg);
+        };
+        ws.onclose = (ev) => {
+            if (ended) return;
+            if (ev.code === 1006 || ev.code === 1000 || ev.code === 1001) {
+                badge('다시 연결 중…');
+                setTimeout(() => openSocket(url, onMessage), 2000);
+            }
+        };
+    }
+
+    function onEnd(reason) {
+        badge('방송 종료');
+        $('lv-empty').hidden = false;
+        $('lv-empty').innerHTML = `<p class="text-[40px]">🛑</p><p>${esc(reason || '방송이 끝났어요.')}</p>`;
+        $('lv-main').srcObject = null;
+        $('lv-pip').hidden = true;
+        $('chat-input') && ($('chat-input').disabled = true);
+    }
+
+    // ═════════════════════ 방송하는 쪽 ═════════════════════
+    if (ROLE === 'host') {
+        const streams = { screen: null, cam: null, mic: null };
+        const peers = new Map(); // viewerId → { pc, name, state, relay }
+
+        const meta = () => ({ screen: streams.screen?.id || null, cam: streams.cam?.id || null, mic: streams.mic?.id || null });
+        const sendMeta = () => send({ type: 'meta', data: meta() });
+
+        const renderPreview = () => {
+            const main = streams.screen || streams.cam;
+            $('lv-main').srcObject = main;
+            $('lv-pip').srcObject = streams.screen && streams.cam ? streams.cam : null;
+            $('lv-pip').hidden = !(streams.screen && streams.cam);
+            $('lv-empty').hidden = !!main;
+            const live = streams.screen || streams.cam || streams.mic;
+            badge(live ? '● 방송 중' : '대기 중', live ? '#d44c47' : null);
+        };
+
+        const renderViewers = () => {
+            const list = $('viewer-list');
+            if (!peers.size) { list.innerHTML = '<li class="py-2 text-[#8e8e93]">아직 시청자가 없어요.</li>'; return; }
+            list.innerHTML = Array.from(peers.entries()).map(([id, p]) => {
+                const state = { connected: '<span class="text-[#1e7a35]">● 연결됨</span>', connecting: '연결 중…', new: '대기', failed: '<span class="text-[#d44c47]">연결 실패</span>', disconnected: '<span class="text-[#b26a00]">끊김</span>' }[p.state] || p.state;
+                const via = p.state === 'connected' ? (p.relay ? ' · <span class="text-[#b26a00]">서버 중계</span>' : ' · 직접') : '';
+                return `<li class="flex items-center gap-3 py-2"><span class="font-semibold">${esc(p.name)}</span><span class="text-[12px] text-[#6e6e73]">${state}${via}</span><button data-kick="${id}" class="ml-auto text-[12px] text-[#c4271d] hover:underline">내보내기</button></li>`;
+            }).join('');
+        };
+        $('viewer-list').addEventListener('click', (e) => {
+            const id = e.target.dataset?.kick;
+            if (id && confirm('이 시청자를 내보낼까요?')) send({ type: 'kick', id });
+        });
+
+        const BITRATE = { screen: { detail: 2500000, motion: 3500000 }, cam: 700000 };
+        const tuneSenders = async (pc) => {
+            const quality = $('sel-quality').value;
+            for (const sender of pc.getSenders()) {
+                const track = sender.track;
+                if (!track || track.kind !== 'video') continue;
+                const isScreen = streams.screen && streams.screen.getVideoTracks().includes(track);
+                const params = sender.getParameters();
+                if (!params.encodings || !params.encodings.length) continue;
+                params.encodings[0].maxBitrate = isScreen ? BITRATE.screen[quality] : BITRATE.cam;
+                try { await sender.setParameters(params); } catch {}
+            }
+        };
+
+        const createPeer = (id, name) => {
+            peers.get(id)?.pc.close();
+            const pc = new RTCPeerConnection({ iceServers: ICE });
+            const peer = { pc, name, state: 'new', relay: false };
+            peers.set(id, peer);
+            pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'signal', to: id, data: { candidate: e.candidate } }); };
+            pc.onnegotiationneeded = async () => {
+                try {
+                    await pc.setLocalDescription(await pc.createOffer());
+                    send({ type: 'signal', to: id, data: { sdp: pc.localDescription } });
+                    tuneSenders(pc);
+                } catch (err) { console.warn('offer 실패', err); }
+            };
+            pc.onconnectionstatechange = () => { peer.state = pc.connectionState; renderViewers(); };
+            for (const s of Object.values(streams)) if (s) s.getTracks().forEach((t) => pc.addTrack(t, s));
+            renderViewers();
+            sendMeta();
+        };
+
+        const setStream = (kind, stream) => {
+            const old = streams[kind];
+            streams[kind] = stream;
+            for (const { pc } of peers.values()) {
+                if (old) pc.getSenders().filter((s) => s.track && old.getTracks().includes(s.track)).forEach((s) => pc.removeTrack(s));
+                if (stream) stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+            }
+            old?.getTracks().forEach((t) => t.stop());
+            sendMeta();
+            renderPreview();
+            $('btn-' + kind).classList.toggle('on', !!stream);
+        };
+
+        const applyHint = () => {
+            const hint = $('sel-quality').value;
+            streams.screen?.getVideoTracks().forEach((t) => { t.contentHint = hint; });
+            for (const { pc } of peers.values()) tuneSenders(pc);
+        };
+        $('sel-quality').addEventListener('change', applyHint);
+
+        $('btn-screen').addEventListener('click', async () => {
+            if (streams.screen) return setStream('screen', null);
+            try {
+                const s = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 30, max: 30 } }, audio: true });
+                s.getVideoTracks()[0].addEventListener('ended', () => { if (streams.screen === s) setStream('screen', null); });
+                setStream('screen', s);
+                applyHint();
+            } catch (err) { if (err.name !== 'NotAllowedError') alert('화면 공유를 시작하지 못했어요: ' + err.message); }
+        });
+        $('btn-cam').addEventListener('click', async () => {
+            if (streams.cam) return setStream('cam', null);
+            try { setStream('cam', await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } } })); }
+            catch (err) { alert('웹캠을 켜지 못했어요: ' + err.message); }
+        });
+        $('btn-mic').addEventListener('click', async () => {
+            if (streams.mic) return setStream('mic', null);
+            try { setStream('mic', await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })); }
+            catch (err) { alert('마이크를 켜지 못했어요: ' + err.message); }
+        });
+        $('btn-end').addEventListener('click', () => {
+            if (!confirm('방송을 끝낼까요? 시청자 연결이 모두 끊기고 이 방은 닫혀요.')) return;
+            send({ type: 'end' });
+        });
+        $('btn-copy').addEventListener('click', async (e) => {
+            try { await navigator.clipboard.writeText($('viewer-link').value); } catch { $('viewer-link').select(); document.execCommand('copy'); }
+            e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
+        });
+
+        // 서버 중계(TURN) 사용 여부 확인
+        setInterval(async () => {
+            for (const peer of peers.values()) {
+                if (peer.state !== 'connected') continue;
+                try {
+                    const stats = await peer.pc.getStats();
+                    let pairId = null;
+                    stats.forEach((r) => { if (r.type === 'transport' && r.selectedCandidatePairId) pairId = r.selectedCandidatePairId; });
+                    let pair = pairId ? stats.get(pairId) : null;
+                    if (!pair) stats.forEach((r) => { if (r.type === 'candidate-pair' && r.nominated && r.state === 'succeeded') pair = r; });
+                    if (pair) {
+                        const local = stats.get(pair.localCandidateId), remote = stats.get(pair.remoteCandidateId);
+                        peer.relay = local?.candidateType === 'relay' || remote?.candidateType === 'relay';
+                    }
+                } catch {}
+            }
+            renderViewers();
+        }, 3000);
+
+        window.addEventListener('beforeunload', (e) => { if (!ended && (streams.screen || streams.cam || streams.mic)) { e.preventDefault(); e.returnValue = ''; } });
+
+        openSocket(WS_URL, (msg) => {
+            if (msg.type === 'hello') {
+                badge('대기 중');
+                (msg.chat || []).forEach(addChat);
+                msg.viewers.forEach((v) => createPeer(v.id, v.name));
+                renderPreview();
+                renderViewers();
+            } else if (msg.type === 'viewer-join') {
+                createPeer(msg.id, msg.name);
+            } else if (msg.type === 'viewer-leave') {
+                peers.get(msg.id)?.pc.close();
+                peers.delete(msg.id);
+                renderViewers();
+            } else if (msg.type === 'signal') {
+                const peer = peers.get(msg.from);
+                if (!peer) return;
+                const { sdp, candidate } = msg.data || {};
+                if (sdp) peer.pc.setRemoteDescription(sdp).catch((err) => console.warn(err));
+                if (candidate) peer.pc.addIceCandidate(candidate).catch(() => {});
+            } else if (msg.type === 'end') {
+                for (const k of Object.keys(streams)) streams[k]?.getTracks().forEach((t) => t.stop());
+                for (const { pc } of peers.values()) pc.close();
+                peers.clear();
+                renderViewers();
+            }
+        });
+        renderViewers();
+    }
+
+    // ═════════════════════ 보는 쪽 ═════════════════════
+    if (ROLE === 'viewer') {
+        let pc = null;
+        let meta = { screen: null, cam: null, mic: null };
+        const remote = {};
+        let pending = [];
+
+        const applyMeta = () => {
+            const screen = remote[meta.screen] || null, cam = remote[meta.cam] || null, mic = remote[meta.mic] || null;
+            const main = screen || cam;
+            if ($('lv-main').srcObject !== main) $('lv-main').srcObject = main;
+            const pip = screen && cam ? cam : null;
+            if ($('lv-pip').srcObject !== pip) $('lv-pip').srcObject = pip;
+            $('lv-pip').hidden = !pip;
+            if ($('lv-mic').srcObject !== mic) $('lv-mic').srcObject = mic;
+            $('lv-empty').hidden = !!main || !!mic;
+            if (!main && !mic) $('lv-empty').innerHTML = '<p class="text-[40px]">⏳</p><p>방송자가 화면을 켜기를 기다리고 있어요…</p>';
+            else if (!main) $('lv-empty').innerHTML = '<p class="text-[40px]">🎙</p><p>소리만 방송 중이에요.</p>';
+        };
+
+        const resetPc = () => {
+            pc?.close();
+            pc = null;
+            pending = [];
+            for (const k of Object.keys(remote)) delete remote[k];
+            applyMeta();
+        };
+
+        const makePc = () => {
+            pc = new RTCPeerConnection({ iceServers: ICE });
+            pc.onicecandidate = (e) => { if (e.candidate) send({ type: 'signal', data: { candidate: e.candidate } }); };
+            pc.ontrack = (e) => {
+                const s = e.streams[0];
+                if (!s) return;
+                remote[s.id] = s;
+                s.onremovetrack = applyMeta;
+                applyMeta();
+            };
+            pc.onconnectionstatechange = () => {
+                const st = pc.connectionState;
+                if (st === 'connected') badge('● 시청 중', '#d44c47');
+                else if (st === 'failed') badge('연결 실패 — 새로고침해 보세요');
+                else if (st === 'disconnected') badge('연결 불안정…');
+            };
+        };
+
+        const onSignal = async ({ sdp, candidate }) => {
+            if (sdp) {
+                if (!pc) makePc();
+                await pc.setRemoteDescription(sdp);
+                for (const c of pending) await pc.addIceCandidate(c).catch(() => {});
+                pending = [];
+                if (sdp.type === 'offer') {
+                    await pc.setLocalDescription(await pc.createAnswer());
+                    send({ type: 'signal', data: { sdp: pc.localDescription } });
+                }
+            } else if (candidate) {
+                if (pc && pc.remoteDescription) await pc.addIceCandidate(candidate).catch(() => {});
+                else pending.push(candidate);
+            }
+        };
+
+        const start = () => {
+            const name = $('lv-name').value.trim();
+            try { localStorage.setItem('mj-live-name', name); } catch {}
+            $('lv-join').hidden = true;
+            const url = WS_URL + (name ? `&name=${encodeURIComponent(name)}` : '');
+            openSocket(url, (msg) => {
+                if (msg.type === 'hello') {
+                    (msg.chat || []).forEach(addChat);
+                    badge(msg.room.host_online ? '연결 중…' : '방송자 대기 중');
+                } else if (msg.type === 'host') {
+                    if (!msg.online) { resetPc(); badge('방송자가 잠시 나갔어요'); }
+                    else badge('연결 중…');
+                } else if (msg.type === 'meta') {
+                    meta = msg.data || meta;
+                    applyMeta();
+                } else if (msg.type === 'signal') {
+                    onSignal(msg.data || {}).catch((err) => console.warn(err));
+                } else if (msg.type === 'end') {
+                    pc?.close();  // 종료 안내 화면은 onEnd 가 그대로 둠
+                    pc = null;
+                }
+            });
+        };
+        try { if (!$('lv-name').value) $('lv-name').value = localStorage.getItem('mj-live-name') || ''; } catch {}
+        $('lv-join-btn').addEventListener('click', start);
+        $('lv-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') start(); });
+        $('btn-full').addEventListener('click', () => $('lv-stage').requestFullscreen?.());
+        // 자동 재생이 막히면 소리 켜기 버튼
+        $('lv-main').addEventListener('playing', () => { $('btn-sound').hidden = !$('lv-main').muted; });
+        for (const el of [$('lv-main'), $('lv-mic')]) {
+            el.addEventListener('loadedmetadata', () => el.play().catch(() => { el.muted = true; el.play().catch(() => {}); $('btn-sound').hidden = false; }));
+        }
+        $('btn-sound').addEventListener('click', () => { for (const el of [$('lv-main'), $('lv-mic')]) { el.muted = false; el.play().catch(() => {}); } $('btn-sound').hidden = true; });
+    }
+})();
+</script>
+{% endif %}
+{% endblock %}
