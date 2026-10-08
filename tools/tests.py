@@ -678,3 +678,97 @@ class NetCheckTests(TestCase):
 			codes = [self.run_check(type="dns", host="example.com").status_code for _ in range(21)]
 		self.assertEqual(codes[:20], [200] * 20)
 		self.assertEqual(codes[20], 429)
+
+
+class ShortLinkTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		User = get_user_model()
+		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
+		self.other = User.objects.create_user("other", "o@example.com", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def test_requires_login_to_create(self):
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse("tools:shortlink")).status_code, 302)
+
+	def test_create_and_redirect_counts_clicks(self):
+		from tools.models import ShortLink
+		self.client.post(reverse("tools:shortlink"), {"url": "example.com/very/long?x=1"})
+		link = ShortLink.objects.get()
+		self.assertEqual(link.target_url, "https://example.com/very/long?x=1")
+		self.client.logout()  # 여는 건 누구나
+		resp = self.client.get(f"/s/{link.code}")
+		self.assertRedirects(resp, "https://example.com/very/long?x=1", fetch_redirect_response=False)
+		link.refresh_from_db()
+		self.assertEqual(link.click_count, 1)
+
+	def test_rejects_bad_scheme_and_loops(self):
+		from tools.models import ShortLink
+		for url in ("javascript:alert(1)", "ftp://example.com/x", "http://testserver/s/abc"):
+			self.client.post(reverse("tools:shortlink"), {"url": url})
+		self.assertFalse(ShortLink.objects.exists())
+
+	def test_expired_and_missing_show_gone_page(self):
+		from datetime import timedelta
+		from django.utils import timezone
+		from tools.models import ShortLink
+		ShortLink.objects.create(code="old123", target_url="https://example.com", owner=self.member, expires_at=timezone.now() - timedelta(seconds=1))
+		self.assertContains(self.client.get("/s/old123"), "만료된", status_code=404)
+		self.assertEqual(self.client.get("/s/nothere").status_code, 404)
+
+	def test_only_owner_deletes(self):
+		from tools.models import ShortLink
+		link = ShortLink.objects.create(code="mine01", target_url="https://example.com", owner=self.member)
+		self.client.force_login(self.other)
+		self.assertEqual(self.client.post(reverse("tools:shortlink_delete", args=["mine01"])).status_code, 404)
+		self.client.force_login(self.member)
+		self.client.post(reverse("tools:shortlink_delete", args=["mine01"]))
+		self.assertFalse(ShortLink.objects.filter(pk=link.pk).exists())
+
+
+class SecretNoteTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		self.member = get_user_model().objects.create_user("member", "m@example.com", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def create(self, **extra):
+		import json
+		return self.client.post(reverse("tools:secret_create"), json.dumps({"ciphertext": "AAAAenc", "label": "와이파이", "ttl": "1", **extra}), content_type="application/json")
+
+	def test_create_requires_login(self):
+		self.client.logout()
+		self.assertEqual(self.create().status_code, 302)
+
+	def test_reveal_once(self):
+		from tools.models import SecretNote
+		url = self.create().json()["url"]
+		note = SecretNote.objects.get()
+		self.assertIn(note.note_id, url)
+		self.client.logout()  # 받는 사람은 로그인 없이
+		view = self.client.get(reverse("tools:secret_view", args=[note.note_id]))
+		self.assertContains(view, "메모 열기")
+		note.refresh_from_db()
+		self.assertEqual(note.ciphertext, "AAAAenc")  # 화면만 열어서는(링크 미리보기 등) 안 지워짐
+		first = self.client.post(reverse("tools:secret_reveal", args=[note.note_id]))
+		self.assertEqual(first.json(), {"ciphertext": "AAAAenc"})
+		second = self.client.post(reverse("tools:secret_reveal", args=[note.note_id]))
+		self.assertEqual(second.status_code, 410)
+		note.refresh_from_db()
+		self.assertEqual(note.ciphertext, "")
+		self.assertIsNotNone(note.opened_at)
+		self.assertContains(self.client.get(reverse("tools:secret_view", args=[note.note_id])), "이미 열어 본")
+
+	def test_expired_cannot_reveal(self):
+		from datetime import timedelta
+		from django.utils import timezone
+		from tools.models import SecretNote
+		self.create()
+		note = SecretNote.objects.get()
+		SecretNote.objects.update(expires_at=timezone.now() - timedelta(seconds=1))
+		self.assertEqual(self.client.post(reverse("tools:secret_reveal", args=[note.note_id])).status_code, 410)
+
+	def test_size_limit(self):
+		self.assertEqual(self.create(ciphertext="A" * 20001).status_code, 400)
+		self.assertEqual(self.create(ciphertext="").status_code, 400)
