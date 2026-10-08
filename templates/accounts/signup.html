@@ -64,6 +64,27 @@
 
                     </div>
 
+                    <!-- real name -->
+                    <div>
+
+                        <label class="mb-3 block text-[14px] font-semibold text-[#1d1d1f]">
+                            이름 <span class="font-normal text-[#8e8e93]">(실명)</span>
+                        </label>
+
+                        <input
+                            type="text"
+                            name="real_name"
+                            id="real_name"
+                            required
+                            maxlength="30"
+                            autocomplete="name"
+                            value="{{ form.real_name.value|default_if_none:'' }}"
+                            placeholder="홍길동"
+                            class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[17px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
+                        >
+
+                    </div>
+
                     <!-- email -->
                     <div>
 
@@ -132,6 +153,21 @@
                             class="w-full rounded-[22px] border border-black/[0.08] bg-[#fbfbfd] px-6 py-4 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10"
                         >{{ form.message.value|default_if_none:'' }}</textarea>
 
+                    </div>
+
+                    <!-- privacy consent -->
+                    <div class="rounded-[18px] border border-black/[0.08] px-5 py-4">
+                        <p class="text-[14px] font-semibold text-[#1d1d1f]">개인정보 수집·이용 안내</p>
+                        <ul class="mt-2 space-y-1 text-[13px] leading-5 text-[#6e6e73]">
+                            <li>· 수집 항목: 아이디, 이름(실명), 이메일, 가입 인사</li>
+                            <li>· 이용 목적: 가입 승인을 위한 본인 확인, 회원 관리</li>
+                            <li>· 보관 기간: 회원 탈퇴 또는 가입 거절 후 삭제 요청 시 지체 없이 삭제</li>
+                            <li>· 동의하지 않을 수 있지만, 이 경우 가입할 수 없어요.</li>
+                        </ul>
+                        <label class="mt-3 flex items-center gap-2 text-[14px] text-[#1d1d1f]">
+                            <input type="checkbox" name="privacy_agree" value="on" required class="h-4 w-4" {% if form.privacy_agree.value %}checked{% endif %}>
+                            위 내용에 동의합니다 <span class="text-[#c4271d]">(필수)</span>
+                        </label>
                     </div>
 
                     <p class="rounded-[18px] bg-[#f5f5f7] px-5 py-3 text-[14px] leading-6 text-[#6e6e73]">
