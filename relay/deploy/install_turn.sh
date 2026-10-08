@@ -1,5 +1,5 @@
 #!/bin/bash
-# 화면 송출용 TURN 서버(coturn) 1회 설치 (서버에서 실행: sudo bash relay/deploy/install_turn.sh)
+# 라이브 방송용 TURN 서버(coturn) 1회 설치 (서버에서 실행: sudo bash relay/deploy/install_turn.sh)
 # 하는 일:
 #   1) coturn 설치
 #   2) .env 에 TURN_SECRET 이 없으면 무작위 값 추가

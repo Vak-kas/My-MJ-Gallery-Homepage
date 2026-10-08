@@ -1,4 +1,4 @@
-"""화면 송출 시그널링(mj_live) 테스트.
+"""라이브 방송 시그널링(mj_live) 테스트.
 
 실행: venv/bin/python -m unittest discover -s relay/tests -t .
 """

@@ -33,7 +33,7 @@ ALWAYS_OPEN = [re.compile(p) for p in (
     r"^/tools/share/[^/]+/(download/)?$",          # 맡겨두기 다운로드
     r"^/tools/stream/[^/]+/(join/)?$",              # 데이터 전송 방 링크
     r"^/tools/secret/[^/]+/(reveal/)?$",            # 비밀 메모 열기
-    r"^/tools/live/[^/]+/$",                        # 화면 송출 시청 링크
+    r"^/tools/live/[^/]+/$",                        # 라이브 방송 시청 링크
     r"^/blog/api/",                                 # 에디터 API (관리자 글쓰기)
 )]
 
