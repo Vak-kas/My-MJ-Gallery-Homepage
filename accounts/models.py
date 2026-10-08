@@ -17,6 +17,7 @@ class SignupRequest(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="signup_request")
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     message = models.CharField("가입 인사", max_length=300, blank=True)
+    privacy_agreed_at = models.DateTimeField("개인정보 수집·이용 동의 시각", null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
     decided_by = models.ForeignKey(

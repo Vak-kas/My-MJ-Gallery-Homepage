@@ -17,11 +17,30 @@ class SignupApprovalTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
 
-    def signup(self, username="newbie", message="친구 소개로 왔어요"):
-        return self.client.post(reverse("accounts:signup"), {
-            "username": username, "email": f"{username}@example.com",
+    def signup(self, username="newbie", message="친구 소개로 왔어요", **extra):
+        data = {
+            "username": username, "email": f"{username}@example.com", "real_name": "김 철수",
             "password1": "Very-strong-pw-123", "password2": "Very-strong-pw-123", "message": message,
-        })
+            "privacy_agree": "on",
+        }
+        data.update(extra)
+        return self.client.post(reverse("accounts:signup"), {k: v for k, v in data.items() if v is not None})
+
+    def test_real_name_and_consent_required(self):
+        res = self.signup(privacy_agree=None)
+        self.assertContains(res, "개인정보 수집·이용에 동의해야")
+        res = self.signup(real_name=" ")
+        self.assertFalse(User.objects.filter(username="newbie").exists())
+
+    def test_real_name_saved_and_shown(self):
+        self.signup()
+        user = User.objects.get(username="newbie")
+        self.assertEqual(user.first_name, "김 철수")
+        self.assertIsNotNone(user.signup_request.privacy_agreed_at)
+        self.assertIn("김 철수(newbie)", Notification.objects.get().title)
+        self.client.force_login(self.admin)
+        res = self.client.get(reverse("studio:users"), {"q": "철수"})
+        self.assertContains(res, "김 철수")
 
     def test_signup_creates_pending_inactive_user_and_notification(self):
         res = self.signup()

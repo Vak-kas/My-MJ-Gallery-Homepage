@@ -7,6 +7,7 @@ from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.db import transaction
+from django.utils import timezone
 
 from accounts.forms import UserForm
 from accounts.models import SignupRequest
@@ -59,13 +60,15 @@ def signup_view(request):
             with transaction.atomic():
                 user = form.save(commit=False)
                 user.is_active = False
+                user.first_name = form.cleaned_data["real_name"]  # 실명은 first_name 에 통째로 저장
                 user.save()
                 signup = SignupRequest.objects.create(
                     user=user, message=(form.cleaned_data.get("message") or "").strip(),
+                    privacy_agreed_at=timezone.now(),
                 )
             notify(
                 Notification.KIND_SIGNUP,
-                f"{user.username} 님이 가입을 요청했어요",
+                f"{user.first_name}({user.username}) 님이 가입을 요청했어요",
                 signup.message or user.email,
                 reverse("studio:users") + "?state=pending",
             )
