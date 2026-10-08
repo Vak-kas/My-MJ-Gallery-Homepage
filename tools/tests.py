@@ -32,8 +32,21 @@ class ToolPagesTests(TestCase):
 
 class SpeedtestApiTests(TestCase):
 	def setUp(self):
+		from django.contrib.auth import get_user_model
 		from django.core.cache import cache
 		cache.clear()
+		User = get_user_model()
+		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
+		self.other = User.objects.create_user("other", "o@example.com", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def test_requires_login(self):
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse("tools:speedtest")).status_code, 302)
+		for name in ("tools:speedtest_ping", "tools:speedtest_download"):
+			self.assertEqual(self.client.get(reverse(name)).status_code, 401)
+		resp = self.client.post(reverse("tools:speedtest_upload"), data=b"x", content_type="application/octet-stream")
+		self.assertEqual(resp.status_code, 401)
 
 	def test_ping_is_tiny_and_uncached(self):
 		resp = self.client.get(reverse("tools:speedtest_ping"))
@@ -50,6 +63,7 @@ class SpeedtestApiTests(TestCase):
 	def test_upload_counts_bytes_without_csrf(self):
 		from django.test import Client
 		client = Client(enforce_csrf_checks=True)
+		client.force_login(self.member)
 		resp = client.post(reverse("tools:speedtest_upload"), data=b"x" * 12345, content_type="application/octet-stream")
 		self.assertEqual(resp.status_code, 200)
 		self.assertEqual(resp.json()["received"], 12345)
@@ -59,32 +73,49 @@ class SpeedtestApiTests(TestCase):
 		self.assertEqual(self.client.post(url, data=b"", content_type="application/octet-stream").status_code, 400)
 		self.assertEqual(self.client.generic("POST", url, b"x", CONTENT_LENGTH=str(26 * 1024 * 1024)).status_code, 413)
 
-	def test_quota_per_ip(self):
+	def test_quota_per_user(self):
 		url = reverse("tools:speedtest_download")
 		size = 25 * 1024 * 1024
-		# 다운로드 한도 2GB / 10분 → 25MB 요청 81번까지 허용
-		statuses = [self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4").status_code for _ in range(82)]
-		self.assertEqual(statuses[:81], [200] * 81)
-		self.assertEqual(statuses[81], 429)
-		blocked = self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="1.2.3.4")
+		# 다운로드 한도 1GB / 10분 → 25MB 요청 40번까지 허용
+		statuses = [self.client.get(url, {"bytes": size}).status_code for _ in range(41)]
+		self.assertEqual(statuses[:40], [200] * 40)
+		self.assertEqual(statuses[40], 429)
+		blocked = self.client.get(url, {"bytes": size})
 		self.assertIn("분 뒤", blocked.json()["error"])
 		self.assertGreater(int(blocked["Retry-After"]), 0)
-		# 다른 IP 는 영향 없음
-		self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="5.6.7.8").status_code, 200)
+		# 다른 회원은 같은 IP 여도 영향 없음
+		self.client.force_login(self.other)
+		self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
 
 	def test_quota_window_is_fixed_from_first_request(self):
 		from unittest import mock
 		url = reverse("tools:speedtest_download")
 		size = 25 * 1024 * 1024
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0):
-			for _ in range(81):
-				self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9")
+			for _ in range(40):
+				self.client.get(url, {"bytes": size})
 		# 첫 요청 9분 59초 뒤: 아직 막힘
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 599):
-			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 429)
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 429)
 		# 첫 요청 10분 뒤: 막힌 동안 요청을 계속 보냈어도 풀림
 		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 600):
-			self.assertEqual(self.client.get(url, {"bytes": size}, HTTP_X_REAL_IP="9.9.9.9").status_code, 200)
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
+
+	def test_daily_quota(self):
+		from unittest import mock
+		url = reverse("tools:speedtest_download")
+		size = 25 * 1024 * 1024
+		t = 1000.0
+		ok = 0
+		# 10분마다 1GB 씩 → 하루 3GB(25MB × 122번) 를 넘으면 다음 날까지 막힘
+		for _ in range(4):
+			with mock.patch("tools.speedtest.time.time", return_value=t):
+				for _ in range(40):
+					ok += self.client.get(url, {"bytes": size}).status_code == 200
+			t += 601
+		self.assertEqual(ok, 122)  # 3GB // 25MB
+		with mock.patch("tools.speedtest.time.time", return_value=1000.0 + 86400):
+			self.assertEqual(self.client.get(url, {"bytes": size}).status_code, 200)
 
 	def test_superuser_has_no_quota(self):
 		from django.contrib.auth import get_user_model
@@ -191,6 +222,19 @@ class StreamViewTests(TestCase):
 		self.assertContains(resp, "ZMQ SUB Source")
 		self.assertNotContains(resp, "ZMQ PUSH Sink")
 		self.assertNotContains(resp, "send-token")
+
+	def test_receiver_link_works_without_login(self):
+		# 받는 쪽은 회원이 아니어도 링크(토큰)만 있으면 방에 들어오고 계속 입장 유지 가능
+		from unittest import mock
+		self.client.logout()
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room", return_value=self.ROOM) as join:
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"}, HTTP_X_REAL_IP="198.51.100.20")
+			self.assertEqual(resp.status_code, 200)
+			beat = self.client.post(f"{reverse('tools:stream_join', args=['abc123'])}?token=recv-token", HTTP_X_REAL_IP="198.51.100.20")
+			self.assertEqual(beat.json()["role"], "receiver")
+		self.assertEqual(join.call_count, 2)
+		# 방 만들기 화면은 여전히 로그인 필요
+		self.assertEqual(self.client.get(reverse("tools:stream")).status_code, 302)
 
 	def test_join_heartbeat_uses_token_role(self):
 		from unittest import mock

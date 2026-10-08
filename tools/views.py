@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 from django.conf import settings
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
@@ -32,6 +33,7 @@ def subnet(request):
 	return render(request, "tools/subnet.html")
 
 
+@login_required  # 서버 트래픽을 실제로 쓰는 도구라 회원만
 def speedtest(request):
 	return render(request, "tools/speedtest.html")
 
