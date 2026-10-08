@@ -93,12 +93,8 @@
             height: calc(100vh - 62px);
         }
 
-        /* 화면이 낮으면 Studio 메뉴가 잘리지 않게 스크롤 (평소엔 오른쪽 설명 말풍선이 보이도록 스크롤 없음) */
-        @media (max-height: 780px) {
-            #studio-sidebar {
-                overflow-y: auto;
-            }
-        }
+        /* Studio 메뉴: 스크롤바는 얇게 (설명 말풍선은 화면 위에 따로 띄움) */
+        #studio-sidebar { scrollbar-width: thin; }
 
         html.theme-dark body {
             background: #0f1115;
