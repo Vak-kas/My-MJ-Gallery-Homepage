@@ -32,3 +32,21 @@ class Notification(models.Model):
     @property
     def icon(self):
         return self.ICONS.get(self.kind, "🔔")
+
+
+class KakaoLink(models.Model):
+    """관리자 카카오톡 '나에게 보내기' 연결 (한 개만 사용)."""
+
+    access_token = models.CharField(max_length=300)
+    refresh_token = models.CharField(max_length=300)
+    expires_at = models.DateTimeField()
+    refresh_expires_at = models.DateTimeField(null=True, blank=True)
+    connected_by = models.ForeignKey(
+        "auth.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+",
+    )
+    connected_at = models.DateTimeField(auto_now_add=True)
+    last_sent_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.CharField(max_length=300, blank=True)
+
+    def __str__(self):
+        return f"KakaoLink({self.connected_by})"

@@ -127,3 +127,77 @@ class NotificationTests(TestCase):
         self.assertEqual(req.full_url, "https://ntfy.example/topic")
         self.assertEqual(req.data, "안녕".encode())
         self.assertTrue(req.headers["Click"].startswith("https://smjgallery.kr/studio/community/"))
+
+
+@override_settings(KAKAO_REST_API_KEY="rest-key", KAKAO_CLIENT_SECRET="secret", SITE_URL="https://smjgallery.kr")
+class KakaoTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
+        self.member = User.objects.create_user("member", "m@example.com", "pw")
+        self.client.force_login(self.admin)
+        self.calls = []
+
+    def fake_post(self, url, data, token=None):
+        self.calls.append((url, data, token))
+        if url.endswith("/oauth/token"):
+            if data["grant_type"] == "authorization_code":
+                return {"access_token": "A1", "refresh_token": "R1", "expires_in": 21599,
+                        "refresh_token_expires_in": 5184000, "scope": "talk_message"}
+            return {"access_token": "A2", "expires_in": 21599}
+        return {"result_code": 0}
+
+    def connect(self):
+        res = self.client.post(reverse("notifications:kakao_connect"))
+        self.assertTrue(res["Location"].startswith("https://kauth.kakao.com/oauth/authorize?"))
+        self.assertIn("scope=talk_message", res["Location"])
+        state = self.client.session["kakao_oauth_state"]
+        with mock.patch("notifications.kakao._post", side_effect=self.fake_post):
+            return self.client.get(reverse("notifications:kakao_callback"), {"code": "C", "state": state})
+
+    def test_connect_saves_tokens_and_sends_test(self):
+        from .models import KakaoLink
+        self.connect()
+        link = KakaoLink.objects.get()
+        self.assertEqual((link.access_token, link.refresh_token, link.connected_by), ("A1", "R1", self.admin))
+        token_call = self.calls[0]
+        self.assertEqual(token_call[1]["client_secret"], "secret")
+        self.assertEqual(token_call[1]["redirect_uri"], "http://testserver/notifications/kakao/callback/".replace("http://testserver", "https://smjgallery.kr"))
+        self.assertTrue(self.calls[1][0].endswith("/talk/memo/default/send"))
+        self.assertEqual(self.calls[1][2], "A1")
+
+    def test_bad_state_rejected(self):
+        self.client.post(reverse("notifications:kakao_connect"))
+        with mock.patch("notifications.kakao._post", side_effect=self.fake_post) as post:
+            self.client.get(reverse("notifications:kakao_callback"), {"code": "C", "state": "wrong"})
+        post.assert_not_called()
+
+    def test_notification_sends_kakao_and_refreshes_expired_token(self):
+        from .models import KakaoLink
+        self.connect()
+        KakaoLink.objects.update(expires_at=timezone.now())  # 만료 → 갱신 후 전송
+        self.calls.clear()
+        with mock.patch("notifications.kakao._post", side_effect=self.fake_post), \
+                mock.patch("notifications.service.threading.Thread") as thread:
+            thread.side_effect = lambda target, daemon: mock.Mock(start=target)
+            GuestbookEntry.objects.create(author=self.member, author_name="member", message="안녕")
+        self.assertEqual(self.calls[0][1]["grant_type"], "refresh_token")
+        url, data, token = self.calls[1]
+        self.assertEqual(token, "A2")
+        self.assertIn("방명록", data["template_object"])
+        self.assertIn("https://smjgallery.kr/studio/community/", data["template_object"])
+        link = KakaoLink.objects.get()
+        self.assertEqual((link.access_token, link.refresh_token), ("A2", "R1"))
+        self.assertIsNotNone(link.last_sent_at)
+
+    def test_send_failure_recorded(self):
+        from . import kakao
+        from .models import KakaoLink
+        self.connect()
+        with mock.patch("notifications.kakao._post", side_effect=kakao.KakaoError("invalid token")):
+            self.assertFalse(kakao.send_text("hi"))
+        self.assertEqual(KakaoLink.objects.get().last_error, "invalid token")
+
+    def test_member_cannot_connect(self):
+        self.client.force_login(self.member)
+        res = self.client.post(reverse("notifications:kakao_connect"))
+        self.assertNotIn("kauth.kakao.com", res.get("Location", ""))
