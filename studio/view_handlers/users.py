@@ -4,17 +4,21 @@ from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 
+from accounts.models import SignupRequest
 from blog.models import Comment, GuestbookEntry, Post
 
 from .common import admin_view
 
 STATES = [
     ("", "전체"),
+    ("pending", "🙋 승인 대기"),
     ("active", "활성"),
-    ("inactive", "정지·승인 대기"),
+    ("inactive", "정지·거절"),
     ("admin", "관리자"),
 ]
+PENDING = Q(signup_request__status=SignupRequest.STATUS_PENDING)
 
 
 def _purge_user_content(user):
@@ -27,6 +31,13 @@ def _purge_user_content(user):
     Comment.objects.filter(author=user).delete()
     GuestbookEntry.objects.filter(author=user).delete()
     return counts
+
+
+def _decide(targets, status, admin):
+    """대기 중인 가입 요청에 승인/거절 결과를 기록."""
+    SignupRequest.objects.filter(user__in=targets, status=SignupRequest.STATUS_PENDING).update(
+        status=status, decided_at=timezone.now(), decided_by=admin,
+    )
 
 
 @admin_view
@@ -50,7 +61,12 @@ def users(request):
         count = targets.count()
         if action == "activate":
             targets.update(is_active=True)
+            _decide(targets, SignupRequest.STATUS_APPROVED, request.user)
             messages.success(request, f"{count}명 활성화(승인): {names}")
+        elif action == "reject":
+            targets.update(is_active=False)
+            _decide(targets, SignupRequest.STATUS_REJECTED, request.user)
+            messages.success(request, f"{count}명 가입 거절: {names}")
         elif action == "suspend":
             targets.update(is_active=False)
             messages.success(request, f"{count}명 정지: {names}")
@@ -78,7 +94,7 @@ def users(request):
 
     keyword = (request.GET.get("q") or "").strip()
     state = (request.GET.get("state") or "").strip()
-    qs = User.objects.annotate(
+    qs = User.objects.select_related("signup_request").annotate(
         post_count=Count("blog_posts", distinct=True),
         comment_count=Count("blog_comments", distinct=True),
         guestbook_count=Count("guestbook_entries", distinct=True),
@@ -90,14 +106,17 @@ def users(request):
         )
     state_counts = {
         "": User.objects.count(),
+        "pending": User.objects.filter(PENDING).count(),
         "active": User.objects.filter(is_active=True).count(),
-        "inactive": User.objects.filter(is_active=False).count(),
+        "inactive": User.objects.filter(is_active=False).exclude(PENDING).count(),
         "admin": User.objects.filter(is_superuser=True).count(),
     }
-    if state == "active":
+    if state == "pending":
+        qs = qs.filter(PENDING)
+    elif state == "active":
         qs = qs.filter(is_active=True)
     elif state == "inactive":
-        qs = qs.filter(is_active=False)
+        qs = qs.filter(is_active=False).exclude(PENDING)
     elif state == "admin":
         qs = qs.filter(is_superuser=True)
     else:
@@ -116,4 +135,5 @@ def users(request):
         "state": state,
         "states": [(k, label, state_counts[k]) for k, label in STATES],
         "current_query_string": query.urlencode(),
+        "pending_count": state_counts["pending"],
     })

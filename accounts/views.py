@@ -6,7 +6,12 @@ from django.contrib.auth import login, logout, authenticate
 from django.http import HttpResponse
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.db import transaction
+
 from accounts.forms import UserForm
+from accounts.models import SignupRequest
+from notifications.models import Notification
+from notifications.service import notify
 
 
 def _safe_next_url(request):
@@ -50,15 +55,37 @@ def signup_view(request):
     if request.method == "POST":
         form = UserForm(request.POST)
         if form.is_valid():
-            form.save()
-            username = form.cleaned_data.get('username')
-            raw_password = form.cleaned_data.get('password1')
-            user = authenticate(username=username, password=raw_password)  # 사용자 인증
-            login(request, user)  # 로그인
-            return redirect('accounts:index')
+            # 관리자 승인 전까지는 비활성 계정 (로그인 불가)
+            with transaction.atomic():
+                user = form.save(commit=False)
+                user.is_active = False
+                user.save()
+                signup = SignupRequest.objects.create(
+                    user=user, message=(form.cleaned_data.get("message") or "").strip(),
+                )
+            notify(
+                Notification.KIND_SIGNUP,
+                f"{user.username} 님이 가입을 요청했어요",
+                signup.message or user.email,
+                reverse("studio:users") + "?state=pending",
+            )
+            return render(request, "accounts/signup_pending.html", {"pending_user": user})
     else:
         form = UserForm()
     return render(request, 'accounts/signup.html', {'form': form})
+
+
+def _inactive_reason(username, password):
+    """비밀번호는 맞는데 비활성인 계정이면 이유를 알려줌 (승인 대기 / 거절 / 정지)."""
+    candidate = User.objects.filter(username=username, is_active=False).first()
+    if not candidate or not candidate.check_password(password or ""):
+        return None
+    signup = SignupRequest.objects.filter(user=candidate).first()
+    if signup and signup.status == SignupRequest.STATUS_PENDING:
+        return "아직 관리자 승인 대기 중이에요. 승인되면 로그인할 수 있어요."
+    if signup and signup.status == SignupRequest.STATUS_REJECTED:
+        return "가입 요청이 승인되지 않았어요."
+    return "이용이 정지된 계정입니다."
 
 
 def login_view(request):
@@ -81,10 +108,10 @@ def login_view(request):
             # superuser면 studio로
             if user.is_superuser:
                 return redirect('studio:index')
-            return redirect('accounts:index')
+            return redirect('main:home')
         else:
             return render(request, 'accounts/login.html', {
-                'error': '아이디 또는 비밀번호가 올바르지 않습니다.',
+                'error': _inactive_reason(username, password) or '아이디 또는 비밀번호가 올바르지 않습니다.',
                 'next_url': next_url,
             })
     return render(request, 'accounts/login.html', {'next_url': next_url})

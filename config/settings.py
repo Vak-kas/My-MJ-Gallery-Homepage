@@ -73,6 +73,7 @@ INSTALLED_APPS = [
     'main',
     'blog',
     'tools',
+    'notifications',
 ]
 
 MIDDLEWARE = [
@@ -97,12 +98,18 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'notifications.context_processors.admin_notifications',
             ],
         },
     },
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+# 관리자 알림 휴대폰 푸시 (ntfy, 선택). 예: NTFY_TOPIC_URL=https://ntfy.sh/<아무도 모를 긴 이름>
+NTFY_TOPIC_URL = os.getenv("NTFY_TOPIC_URL", "")
+NTFY_TOKEN = os.getenv("NTFY_TOKEN", "")
+SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
 
 
 # Database

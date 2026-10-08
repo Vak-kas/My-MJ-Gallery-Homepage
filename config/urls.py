@@ -26,6 +26,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('studio/', include('studio.urls')),
+    path('notifications/', include('notifications.urls')),
 ]
 
 if settings.DEBUG:

@@ -20,7 +20,7 @@
             <p class="mt-3 text-[16px] text-[#6e6e73]">회원을 정지·승인하고, 스팸 계정이 쓴 글·댓글·방명록을 한 번에 정리합니다.</p>
             <div class="mt-5 flex flex-wrap gap-2 text-[13px]">
                 {% for key, label, count in states %}
-                <a href="?state={{ key }}{% if keyword %}&q={{ keyword|urlencode }}{% endif %}" class="rounded-full px-4 py-1.5 {% if state == key %}{% if key == 'inactive' %}bg-[#b26a00]{% else %}bg-[#1d1d1f]{% endif %} text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }} {{ count }}</a>
+                <a href="?state={{ key }}{% if keyword %}&q={{ keyword|urlencode }}{% endif %}" class="rounded-full px-4 py-1.5 {% if state == key %}{% if key == 'pending' %}bg-[#b26a00]{% else %}bg-[#1d1d1f]{% endif %} text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }} {{ count }}</a>
                 {% endfor %}
             </div>
         </section>
@@ -48,6 +48,7 @@
                         <select name="action" required class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
                             <option value="">작업 선택</option>
                             <option value="activate">활성화 · 가입 승인</option>
+                            <option value="reject">가입 거절</option>
                             <option value="suspend">정지 (로그인 차단)</option>
                             <option value="purge">정지 + 작성한 글·댓글·방명록 전부 삭제</option>
                             <option value="delete">계정 삭제 + 작성한 것 전부 삭제</option>
@@ -60,7 +61,7 @@
                         <li>· 정지된 회원은 로그인할 수 없고, 쓴 글은 그대로 남아요.</li>
                         <li>· 스팸 계정은 "정지 + 전부 삭제"를 추천해요. 같은 아이디로 다시 가입하는 걸 막을 수 있어요.</li>
                         <li>· 내 계정과 관리자 계정은 대상에서 빠집니다.</li>
-                        <li>· 나중에 가입 승인제를 켜면 승인 대기 회원이 "정지·승인 대기"에 나오고, 활성화로 승인합니다.</li>
+                        <li>· 새로 가입한 회원은 "승인 대기"에 나오고, 승인해야 로그인할 수 있어요.</li>
                     </ul>
                 </section>
             </aside>
@@ -89,11 +90,19 @@
                                 <td class="px-2 py-3">
                                     <p class="font-semibold">{{ u.username }}{% if u.id == request.user.id %} <span class="font-normal text-[#8e8e93]">(나)</span>{% endif %}</p>
                                     <p class="text-[12px] text-[#8e8e93]">{{ u.email|default:"이메일 없음" }}</p>
+                                    {% if u.signup_request.message %}<p class="mt-1 max-w-[280px] rounded-lg bg-[#f5f5f7] px-2 py-1 text-[12px] text-[#1d1d1f]">💬 {{ u.signup_request.message }}</p>{% endif %}
                                 </td>
                                 <td class="px-2 py-3">
                                     {% if u.is_superuser %}<span class="rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[12px] text-[#0066cc]">관리자</span>
                                     {% elif u.is_active %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
-                                    {% else %}<span class="rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[12px] text-[#b26a00]">정지·승인 대기</span>{% endif %}
+                                    {% elif u.signup_request.status == 'pending' %}
+                                    <span class="rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[12px] text-[#b26a00]">승인 대기</span>
+                                    <div class="mt-2 flex gap-1">
+                                        <form method="post" action="{% url 'studio:users' %}">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="activate"><input type="hidden" name="ids" value="{{ u.id }}"><button class="rounded-full bg-[#0066cc] px-3 py-1 text-[12px] font-semibold text-white">승인</button></form>
+                                        <form method="post" action="{% url 'studio:users' %}" onsubmit="return confirm('{{ u.username|escapejs }} 님의 가입을 거절할까요?');">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="reject"><input type="hidden" name="ids" value="{{ u.id }}"><button class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px]">거절</button></form>
+                                    </div>
+                                    {% elif u.signup_request.status == 'rejected' %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]">거절됨</span>
+                                    {% else %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[12px] text-[#c4271d]">정지</span>{% endif %}
                                 </td>
                                 <td class="px-2 py-3 text-right tabular-nums">{{ u.post_count }}</td>
                                 <td class="px-2 py-3 text-right tabular-nums">{% if u.comment_count %}<a href="{% url 'studio:community' %}?tab=comments&author={{ u.username|urlencode }}" class="text-[#0066cc] hover:underline">{{ u.comment_count }}</a>{% else %}0{% endif %}</td>

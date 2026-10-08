@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" %}
+<main class="mx-auto max-w-[760px] px-5 py-12 pb-24 text-[#1d1d1f]">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">NOTIFICATIONS</p>
+            <h1 class="mt-3 text-[36px] font-semibold tracking-[-0.03em]">알림 {% if unread_total %}<span class="text-[#ff3b30]">{{ unread_total }}</span>{% endif %}</h1>
+        </div>
+        <div class="flex gap-2">
+            {% if unread_total %}
+            <form method="post" action="{% url 'notifications:read_all' %}">{% csrf_token %}<button class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] hover:bg-[#f5f5f7]">모두 읽음</button></form>
+            {% endif %}
+            <form method="post" action="{% url 'notifications:clear_read' %}" onsubmit="return confirm('읽은 알림을 모두 지울까요?');">{% csrf_token %}<button class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] text-[#6e6e73] hover:bg-[#f5f5f7]">읽은 알림 지우기</button></form>
+        </div>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-2 text-[13px]">
+        <a href="?" class="rounded-full px-4 py-1.5 {% if not kind %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">전체</a>
+        {% for value, label in kinds %}
+        <a href="?kind={{ value }}" class="rounded-full px-4 py-1.5 {% if kind == value %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }}</a>
+        {% endfor %}
+    </div>
+
+    <div class="mt-5 overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
+        {% for n in items %}
+        <form method="post" action="{% url 'notifications:open' n.id %}" class="border-b border-black/[0.05] last:border-b-0">
+            {% csrf_token %}
+            <button type="submit" class="flex w-full gap-4 px-5 py-4 text-left hover:bg-[#fafafa] {% if n.is_read %}opacity-55{% endif %}">
+                <span class="text-[22px] leading-none">{{ n.icon }}</span>
+                <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-2">
+                        {% if not n.is_read %}<span class="h-2 w-2 shrink-0 rounded-full bg-[#0066cc]"></span>{% endif %}
+                        <span class="text-[15px] font-semibold">{{ n.title }}</span>
+                    </span>
+                    {% if n.body %}<span class="mt-1 block truncate text-[13px] text-[#6e6e73]">{{ n.body }}</span>{% endif %}
+                    <span class="mt-1 block text-[12px] text-[#8e8e93]">{{ n.created_at|timesince }} 전</span>
+                </span>
+            </button>
+        </form>
+        {% empty %}
+        <p class="p-12 text-center text-[14px] text-[#8e8e93]">알림이 없어요.</p>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="mt-5 flex items-center justify-center gap-2 text-[13px]">
+        {% if page_obj.has_previous %}<a href="?kind={{ kind }}&page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">이전</a>{% endif %}
+        <span class="text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}<a href="?kind={{ kind }}&page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">다음</a>{% endif %}
+    </nav>
+    {% endif %}
+</main>
+{% endblock %}

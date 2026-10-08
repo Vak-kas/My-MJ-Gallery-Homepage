@@ -1,0 +1,34 @@
+from django.db import models
+
+
+class Notification(models.Model):
+    """관리자(슈퍼유저)에게 보여주는 사이트 알림. 관리자 모두가 같은 목록을 봄."""
+
+    KIND_SIGNUP = "signup"
+    KIND_COMMENT = "comment"
+    KIND_GUESTBOOK = "guestbook"
+    KIND_POST = "post"
+    KIND_CHOICES = [
+        (KIND_SIGNUP, "가입 요청"),
+        (KIND_COMMENT, "댓글"),
+        (KIND_GUESTBOOK, "방명록"),
+        (KIND_POST, "글"),
+    ]
+    ICONS = {KIND_SIGNUP: "🙋", KIND_COMMENT: "💬", KIND_GUESTBOOK: "📝", KIND_POST: "📄"}
+
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, db_index=True)
+    title = models.CharField(max_length=200)
+    body = models.CharField(max_length=300, blank=True)
+    url = models.CharField(max_length=300, blank=True)
+    is_read = models.BooleanField(default=False, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"[{self.kind}] {self.title}"
+
+    @property
+    def icon(self):
+        return self.ICONS.get(self.kind, "🔔")
