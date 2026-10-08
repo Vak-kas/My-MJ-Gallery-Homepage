@@ -4,9 +4,11 @@ from django.db.models import Q
 from django.http import QueryDict
 from django.shortcuts import redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from blog.models import Comment, GuestbookEntry, Post
+from tools.models import ShortLink
 
 from .common import admin_view
 
@@ -73,6 +75,8 @@ def _purge_targets(keyword, fields):
         targets["comments"] = Comment.objects.filter(Q(content__icontains=keyword) | Q(author_name__icontains=keyword))
     if "guestbook" in fields:
         targets["guestbook"] = GuestbookEntry.objects.filter(Q(message__icontains=keyword) | Q(author_name__icontains=keyword))
+    if "links" in fields:
+        targets["links"] = ShortLink.objects.filter(target_url__icontains=keyword)
     return targets
 
 
@@ -81,14 +85,35 @@ PURGE_FIELDS = [
     ("post_content", "글 본문·요약"),
     ("comments", "댓글 (내용·작성자 이름)"),
     ("guestbook", "방명록 (내용·작성자 이름)"),
+    ("links", "단축 링크 (원래 주소)"),
 ]
+PURGE_LABELS = {"posts": "글", "comments": "댓글", "guestbook": "방명록", "links": "단축 링크"}
 DEFAULT_PURGE_FIELDS = ["post_title", "comments", "guestbook"]
+
+
+def _filtered_links(params):
+    qs = ShortLink.objects.select_related("owner")
+    q = (params.get("q") or "").strip()
+    owner = (params.get("owner") or "").strip()
+    state = (params.get("state") or "").strip()
+    if q:
+        qs = qs.filter(Q(target_url__icontains=q) | Q(code__icontains=q))
+    if owner:
+        qs = qs.filter(Q(owner__username__icontains=owner) | Q(owner__first_name__icontains=owner))
+    now = timezone.now()
+    if state == "active":
+        qs = qs.filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+    elif state == "expired":
+        qs = qs.filter(expires_at__lte=now)
+    else:
+        state = ""
+    return qs.order_by("-created_at", "-id"), {"q": q, "owner": owner, "state": state}
 
 
 @admin_view
 def community(request):
     tab = (request.GET.get("tab") or "guestbook").strip()
-    if tab not in TABS and tab != "cleanup":
+    if tab not in TABS and tab not in {"cleanup", "links"}:
         tab = "guestbook"
     base = reverse("studio:community")
 
@@ -99,7 +124,20 @@ def community(request):
                "counts": {
                    "guestbook": GuestbookEntry.objects.count(),
                    "comments": Comment.objects.count(),
+                   "links": ShortLink.objects.count(),
                }}
+
+    if tab == "links":
+        qs, filters = _filtered_links(request.GET)
+        page_obj = Paginator(qs, 30).get_page(request.GET.get("page"))
+        query = request.GET.copy()
+        query.pop("page", None)
+        context.update({
+            "filters": filters, "items": list(page_obj.object_list), "page_obj": page_obj,
+            "item_count": page_obj.paginator.count, "current_query_string": query.urlencode(),
+            "has_filter": any(filters.values()), "now": timezone.now(),
+        })
+        return render(request, "studio/community.html", context)
 
     if tab == "cleanup":
         keyword = (request.GET.get("keyword") or "").strip()
@@ -107,7 +145,7 @@ def community(request):
         targets = _purge_targets(keyword, fields)
         preview = []
         for key, qs in targets.items():
-            label = {"posts": "글", "comments": "댓글", "guestbook": "방명록"}[key]
+            label = PURGE_LABELS[key]
             sample = list(qs.order_by("-created_at")[:20])
             preview.append({"key": key, "label": label, "count": qs.count(), "sample": sample})
         context.update({
@@ -148,7 +186,7 @@ def _handle_post(request, base):
         targets = _purge_targets(keyword, params.getlist("fields") or DEFAULT_PURGE_FIELDS)
         done = []
         for key, qs in targets.items():
-            label = {"posts": "글", "comments": "댓글", "guestbook": "방명록"}[key]
+            label = PURGE_LABELS[key]
             n = qs.count()
             qs.delete()
             done.append(f"{label} {n}개")
@@ -156,6 +194,8 @@ def _handle_post(request, base):
         return back
 
     tab = (params.get("tab") or "guestbook").strip()
+    if tab == "links":
+        return _handle_links_post(request, params, action, confirm_text, back)
     if tab not in TABS:
         messages.error(request, "대상이 올바르지 않습니다.")
         return back
@@ -189,4 +229,29 @@ def _handle_post(request, base):
         messages.success(request, f"{label} {count}개를 삭제했습니다.")
     else:
         messages.error(request, "작업 종류가 올바르지 않습니다.")
+    return back
+
+
+def _handle_links_post(request, params, action, confirm_text, back):
+    if action != "delete":
+        messages.error(request, "단축 링크는 삭제만 할 수 있어요.")
+        return back
+    if request.POST.get("scope") == "filtered":
+        filtered, filters = _filtered_links(params)
+        if not any(filters.values()):
+            messages.error(request, "필터 결과 전체에 적용하려면 검색 조건을 먼저 걸어 주세요.")
+            return back
+        target = ShortLink.objects.filter(id__in=filtered.values("id"))
+    else:
+        ids = [int(v) for v in request.POST.getlist("ids") if v.isdigit()]
+        target = ShortLink.objects.filter(id__in=ids)
+    count = target.count()
+    if count == 0:
+        messages.error(request, "선택된 링크가 없습니다.")
+        return back
+    if confirm_text != "DELETE":
+        messages.error(request, "일괄 삭제는 확인 문구(DELETE) 입력이 필요합니다.")
+        return back
+    target.delete()
+    messages.success(request, f"단축 링크 {count}개를 삭제했습니다.")
     return back

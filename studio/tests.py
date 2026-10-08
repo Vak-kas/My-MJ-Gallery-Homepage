@@ -134,3 +134,41 @@ class UsersTests(ModerationTestBase):
         self.admin.refresh_from_db()
         other_admin.refresh_from_db()
         self.assertTrue(self.admin.is_active and other_admin.is_active)
+
+
+class CommunityShortLinkTests(ModerationTestBase):
+    def setUp(self):
+        super().setUp()
+        from tools.models import ShortLink
+        self.phish = ShortLink.objects.create(code="bad001", target_url="https://evil-login.example/kakao", owner=self.spammer)
+        self.phish2 = ShortLink.objects.create(code="bad002", target_url="https://evil-login.example/naver", owner=self.spammer)
+        self.ok = ShortLink.objects.create(code="good01", target_url="https://github.com/", owner=self.member)
+
+    def test_list_and_filter(self):
+        res = self.client.get(reverse("studio:community"), {"tab": "links", "q": "evil-login"})
+        self.assertEqual(res.context["item_count"], 2)
+        self.assertContains(res, "/s/bad001")
+        res = self.client.get(reverse("studio:community"), {"tab": "links", "owner": "member"})
+        self.assertEqual([l.code for l in res.context["items"]], ["good01"])
+
+    def test_delete_filtered_needs_confirm(self):
+        from tools.models import ShortLink
+        data = {"action": "delete", "scope": "filtered", "return_qs": "tab=links&q=evil-login"}
+        self.client.post(reverse("studio:community"), data)
+        self.assertEqual(ShortLink.objects.count(), 3)
+        self.client.post(reverse("studio:community"), {**data, "confirm": "DELETE"})
+        self.assertEqual(list(ShortLink.objects.values_list("code", flat=True)), ["good01"])
+
+    def test_keyword_purge_includes_links(self):
+        from tools.models import ShortLink
+        qs = urlencode([("tab", "cleanup"), ("keyword", "evil-login"), ("fields", "links")])
+        res = self.client.get(reverse("studio:community") + "?" + qs)
+        self.assertEqual(res.context["preview_total"], 2)
+        self.client.post(reverse("studio:community"), {"action": "purge", "confirm": "DELETE", "return_qs": qs})
+        self.assertEqual(ShortLink.objects.count(), 1)
+
+    def test_user_purge_removes_links(self):
+        from tools.models import ShortLink
+        self.client.post(reverse("studio:users"), {"action": "purge", "ids": [self.spammer.id], "confirm": "DELETE"})
+        self.assertFalse(ShortLink.objects.filter(owner=self.spammer).exists())
+        self.assertTrue(ShortLink.objects.filter(code="good01").exists())

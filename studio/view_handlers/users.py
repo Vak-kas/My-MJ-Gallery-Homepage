@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from accounts.models import SignupRequest
 from blog.models import Comment, GuestbookEntry, Post
+from tools.models import SecretNote, ShortLink
 
 from .common import admin_view
 
@@ -26,10 +27,13 @@ def _purge_user_content(user):
         "posts": Post.objects.filter(author=user).count(),
         "comments": Comment.objects.filter(author=user).count(),
         "guestbook": GuestbookEntry.objects.filter(author=user).count(),
+        "links": ShortLink.objects.filter(owner=user).count(),
     }
     Post.objects.filter(author=user).delete()
     Comment.objects.filter(author=user).delete()
     GuestbookEntry.objects.filter(author=user).delete()
+    ShortLink.objects.filter(owner=user).delete()
+    SecretNote.objects.filter(created_by=user).delete()
     return counts
 
 
@@ -74,11 +78,11 @@ def users(request):
             if (request.POST.get("confirm") or "").strip() != "DELETE":
                 messages.error(request, "삭제 작업은 확인 문구(DELETE) 입력이 필요합니다.")
                 return back
-            total = {"posts": 0, "comments": 0, "guestbook": 0}
+            total = {"posts": 0, "comments": 0, "guestbook": 0, "links": 0}
             for user in targets:
                 for key, n in _purge_user_content(user).items():
                     total[key] += n
-            summary = f"글 {total['posts']}개, 댓글 {total['comments']}개, 방명록 {total['guestbook']}개 삭제"
+            summary = f"글 {total['posts']}개, 댓글 {total['comments']}개, 방명록 {total['guestbook']}개, 단축 링크 {total['links']}개 삭제"
             if action == "purge":
                 targets.update(is_active=False)
                 messages.success(request, f"{count}명 정지 + 작성한 {summary}: {names}")

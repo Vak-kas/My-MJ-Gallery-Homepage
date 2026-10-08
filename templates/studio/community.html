@@ -22,6 +22,7 @@
                 {% for key, label in tabs %}
                 <a href="?tab={{ key }}" class="rounded-full px-4 py-1.5 {% if tab == key %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">{{ label }} {% if key == 'guestbook' %}{{ counts.guestbook }}{% else %}{{ counts.comments }}{% endif %}</a>
                 {% endfor %}
+                <a href="?tab=links" class="rounded-full px-4 py-1.5 {% if tab == 'links' %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">🔗 단축 링크 {{ counts.links }}</a>
                 <a href="?tab=cleanup" class="rounded-full px-4 py-1.5 {% if tab == 'cleanup' %}bg-[#ff3b30] text-white{% else %}border border-[#ff3b30]/30 text-[#c4271d] hover:bg-white{% endif %}">🧹 키워드 일괄 정리</a>
             </div>
         </section>
@@ -72,8 +73,8 @@
                         {% for obj in group.sample %}
                         <li class="flex gap-3 py-2">
                             <span class="w-[86px] shrink-0 text-[#8e8e93]">{{ obj.created_at|date:"y.m.d H:i" }}</span>
-                            <span class="w-[110px] shrink-0 truncate text-[#6e6e73]">{% if group.key == 'posts' %}{{ obj.author.username|default:'(탈퇴)' }}{% else %}{{ obj.author_name }}{% endif %}</span>
-                            <span class="min-w-0 flex-1 truncate">{% if group.key == 'posts' %}{{ obj.title }}{% elif group.key == 'comments' %}{{ obj.content }}{% else %}{{ obj.message }}{% endif %}</span>
+                            <span class="w-[110px] shrink-0 truncate text-[#6e6e73]">{% if group.key == 'posts' %}{{ obj.author.username|default:'(탈퇴)' }}{% elif group.key == 'links' %}{{ obj.owner.username }}{% else %}{{ obj.author_name }}{% endif %}</span>
+                            <span class="min-w-0 flex-1 truncate">{% if group.key == 'posts' %}{{ obj.title }}{% elif group.key == 'comments' %}{{ obj.content }}{% elif group.key == 'links' %}/s/{{ obj.code }} → {{ obj.target_url }}{% else %}{{ obj.message }}{% endif %}</span>
                         </li>
                         {% endfor %}
                     </ul>
@@ -83,6 +84,82 @@
                 {% empty %}
                 <div class="rounded-[20px] border border-black/[0.06] bg-white p-6 text-[14px] text-[#8e8e93]">검색할 대상을 하나 이상 체크해 주세요.</div>
                 {% endfor %}
+                {% endif %}
+            </div>
+        </section>
+
+        {% elif tab == 'links' %}
+        <section class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold">필터</h2>
+                    <form method="get" class="mt-3 space-y-2">
+                        <input type="hidden" name="tab" value="links">
+                        <input type="text" name="q" value="{{ filters.q }}" placeholder="원래 주소 또는 코드 (예: 의심 도메인)"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <input type="text" name="owner" value="{{ filters.owner }}" placeholder="만든 회원 (아이디·이름)"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <select name="state" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            <option value="">사용 중·만료 전체</option>
+                            <option value="active" {% if filters.state == 'active' %}selected{% endif %}>사용 중</option>
+                            <option value="expired" {% if filters.state == 'expired' %}selected{% endif %}>만료됨</option>
+                        </select>
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+                            <a href="?tab=links" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px]">초기화</a>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold">삭제</h2>
+                    <form id="bulk-form" method="post" action="{% url 'studio:community' %}" class="mt-3 space-y-2" data-filtered-count="{{ item_count }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string }}">
+                        <input type="hidden" name="action" value="delete">
+                        <div class="grid gap-1.5 rounded-xl border border-black/[0.08] p-2 text-[12px]">
+                            <label class="flex items-center gap-2"><input type="radio" name="scope" value="selected" checked class="h-4 w-4"> 체크한 링크만</label>
+                            <label class="flex items-center gap-2 {% if not has_filter %}opacity-40{% endif %}"><input type="radio" name="scope" value="filtered" class="h-4 w-4" {% if not has_filter %}disabled{% endif %}> 필터 결과 전체 <b>{{ item_count }}개</b></label>
+                        </div>
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-black/[0.08] px-3 py-2 text-[12px] text-[#6e6e73]">
+                            <input id="select-all" type="checkbox" class="h-4 w-4" /> 이 페이지 전체 체크
+                        </label>
+                        <input type="text" name="confirm" placeholder="DELETE 입력" required
+                            class="h-10 w-full rounded-xl border border-[#ff3b30]/20 px-3 text-[12px] outline-none focus:border-[#ff3b30]" />
+                        <button type="submit" class="h-10 w-full rounded-xl bg-[#ff3b30] px-4 text-[13px] font-semibold text-white">삭제</button>
+                    </form>
+                    <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">피싱·스팸 주소를 줄인 회원은 Users 에서 "정지 + 전부 삭제" 하면 그 회원의 단축 링크도 함께 지워져요.</p>
+                </section>
+            </aside>
+
+            <div>
+                <p class="mb-3 text-[13px] text-[#6e6e73]">{{ item_count }}개</p>
+                <div class="overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
+                    {% for link in items %}
+                    <label class="flex cursor-pointer gap-4 border-b border-black/[0.05] px-5 py-4 last:border-b-0 hover:bg-[#fafafa] {% if link.expires_at and link.expires_at <= now %}opacity-55{% endif %}">
+                        <input type="checkbox" name="ids" value="{{ link.id }}" form="bulk-form" class="item-checkbox mt-1 h-4 w-4 shrink-0" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#8e8e93]">
+                                <span class="font-mono text-[13px] font-semibold text-[#1d1d1f]">/s/{{ link.code }}</span>
+                                <span>@{{ link.owner.username }}{% if link.owner.first_name %} ({{ link.owner.first_name }}){% endif %}</span>
+                                <span>{{ link.created_at|date:"Y.m.d H:i" }}</span>
+                                <span>클릭 {{ link.click_count }}</span>
+                                {% if link.expires_at and link.expires_at <= now %}<span class="rounded-full bg-black/[0.06] px-2 py-0.5">만료됨</span>{% elif link.expires_at %}<span>{{ link.expires_at|date:"m.d H:i" }}까지</span>{% endif %}
+                            </div>
+                            <p class="mt-1.5 break-all text-[13px] text-[#1d1d1f]">→ {{ link.target_url }}</p>
+                        </div>
+                    </label>
+                    {% empty %}
+                    <p class="p-10 text-center text-[14px] text-[#8e8e93]">단축 링크가 없습니다.</p>
+                    {% endfor %}
+                </div>
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav class="mt-5 flex items-center justify-center gap-2 text-[13px]">
+                    {% if page_obj.has_previous %}<a href="?{{ current_query_string }}&page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">이전</a>{% endif %}
+                    <span class="text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}<a href="?{{ current_query_string }}&page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">다음</a>{% endif %}
+                </nav>
                 {% endif %}
             </div>
         </section>
@@ -184,8 +261,8 @@
         if (selectAll) selectAll.addEventListener('change', () => boxes.forEach((cb) => { cb.checked = selectAll.checked; }));
         form.addEventListener('submit', function (e) {
             const scope = form.querySelector('input[name="scope"]:checked');
-            const action = form.querySelector('select[name="action"]');
-            const label = action.options[action.selectedIndex].text;
+            const action = form.querySelector('[name="action"]');
+            const label = action.options ? action.options[action.selectedIndex].text : '삭제';
             const n = scope && scope.value === 'filtered' ? form.dataset.filteredCount : boxes.filter((cb) => cb.checked).length;
             if (!confirm(n + '개 항목을 "' + label + '" 할까요?')) e.preventDefault();
         });
