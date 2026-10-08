@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+<main class="mx-auto flex min-h-[60vh] max-w-[560px] flex-col items-center justify-center px-6 py-20 text-center">
+    <p class="text-[48px]">🕳️</p>
+    <h1 class="mt-4 text-[28px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">없거나 만료된 {{ what }}예요</h1>
+    <p class="mt-3 text-[15px] text-[#6e6e73]">주소를 다시 확인하거나, 링크를 보낸 사람에게 새 링크를 요청해 주세요.</p>
+    <a href="{% url 'main:home' %}" class="mt-8 rounded-full border border-black/[0.1] px-6 py-3 text-[15px] text-[#1d1d1f] hover:bg-white">홈으로</a>
+</main>
+{% endblock %}

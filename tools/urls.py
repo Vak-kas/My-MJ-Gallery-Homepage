@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, myip, netcheck, share_views, speedtest, views
+from . import clipboard_views, link_views, myip, netcheck, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -15,6 +15,13 @@ urlpatterns = [
     path("encode/", views.encode, name="encode"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),
     path("netcheck/run/", netcheck.netcheck_run, name="netcheck_run"),
+    path("shortlink/", link_views.shortlink, name="shortlink"),
+    path("shortlink/<str:code>/delete/", link_views.shortlink_delete, name="shortlink_delete"),
+    path("secret/", link_views.secret, name="secret"),
+    path("secret/new/", link_views.secret_create, name="secret_create"),
+    path("secret/<str:note_id>/", link_views.secret_view, name="secret_view"),
+    path("secret/<str:note_id>/reveal/", link_views.secret_reveal, name="secret_reveal"),
+    path("secret/<str:note_id>/delete/", link_views.secret_delete, name="secret_delete"),
     path("speedtest/ping/", speedtest.ping, name="speedtest_ping"),
     path("speedtest/download/", speedtest.download, name="speedtest_download"),
     path("speedtest/upload/", speedtest.upload, name="speedtest_upload"),

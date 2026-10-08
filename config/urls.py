@@ -16,12 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+
+from tools.link_views import short_redirect
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
     path('blog/', include(('blog.urls', 'blog'), namespace='blog')),
     path('tools/', include(('tools.urls', 'tools'), namespace='tools')),
+    path('s/<str:code>', short_redirect, name='short_redirect'),
     path('', include('main.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
