@@ -28,7 +28,8 @@
                     <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">
                         <b>로그인 회원만</b>으로 바꾸면 비로그인 방문자에게 메뉴가 안 보이고 그 페이지에 들어오면 로그인 화면으로,
                         <b>숨김</b>으로 바꾸면 관리자에게만 (점선으로) 보이고 다른 사람은 페이지에 들어올 수 없어요.
-                        데이터 전송·비밀 메모·맡겨두기처럼 <b>링크로 여는 페이지는 Tool 을 숨겨도 계속 열려요.</b>
+                        <b>회원만</b>일 때 데이터 전송·비밀 메모·맡겨두기처럼 링크로 여는 페이지는 비로그인도 계속 열리고, <b>숨김</b>이면 그런 링크까지 모두 막혀요.
+                        나(관리자)는 무엇을 닫아도 항상 다 볼 수 있어요.
                     </p>
                     <ul class="sortable mt-4 space-y-2" data-name="nav_order">
                         {% for item in nav_items %}
@@ -55,7 +56,7 @@
 
                 <section class="rounded-[22px] border border-black/[0.06] bg-white p-6">
                     <h2 class="text-[17px] font-semibold">홈 화면 섹션</h2>
-                    <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">맨 위 소개 화면(인트로) 아래에 이 순서대로 나와요. 끈 섹션은 홈과 오른쪽 목차에서 빠져요.</p>
+                    <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">맨 위 소개 화면(인트로) 아래에 이 순서대로 나와요. 끈 섹션은 방문자·회원에게 안 보이고, 나에게는 "숨김" 표시와 함께 보여요.</p>
                     <ul class="sortable mt-4 space-y-2" data-name="home_order">
                         {% for section in home_sections %}
                         <li class="sort-item flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-[#fbfbfd] px-4 py-3" data-key="{{ section.key }}">

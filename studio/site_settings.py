@@ -2,7 +2,10 @@
 
 - 내비 메뉴 상태: public(모두) / members(로그인 회원만) / admin(숨김 — 관리자만 보고 들어갈 수 있음)
   숨기거나 회원 전용으로 하면 메뉴뿐 아니라 그 페이지 자체도 막힘 (middleware.SectionAccessMiddleware)
-- 홈 섹션: 켜기/끄기 + 순서
+  - 회원만: 링크(토큰)로 여는 공유 페이지는 비로그인도 계속 열림
+  - 숨김: 관리자 말고는 공유 링크까지 모두 막힘
+- 홈 섹션: 켜기/끄기 + 순서 (끈 섹션도 관리자에게는 "숨김" 표시와 함께 보임)
+- 관리자는 무엇을 닫아도 전부 볼 수 있음
 """
 
 import re
@@ -106,17 +109,18 @@ def visible_nav(user):
 
 
 def section_for_path(path):
-    if any(p.match(path) for p in ALWAYS_OPEN):
-        return None
+    """(메뉴 key, 링크로 여는 공유 페이지인지)"""
     for key, prefixes in SECTION_PATHS.items():
         if any(path.startswith(p) for p in prefixes):
-            return key
-    return None
+            return key, any(p.match(path) for p in ALWAYS_OPEN)
+    return None, False
 
 
 def nav_state(key):
     return next((i["state"] for i in load()["nav"] if i["key"] == key), "public")
 
 
-def home_sections():
-    return [s for s in load()["home"] if s["enabled"]]
+def home_sections(user):
+    """보여줄 홈 섹션. 관리자에게는 끈 섹션도 hidden=True 로 함께 돌려줌."""
+    is_admin = user.is_authenticated and user.is_superuser
+    return [{**s, "hidden": not s["enabled"]} for s in load()["home"] if s["enabled"] or is_admin]

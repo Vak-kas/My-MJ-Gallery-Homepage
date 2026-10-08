@@ -86,9 +86,9 @@ def home(request):
     }
 
     sections = []
-    for section in site_settings.home_sections():
+    for section in site_settings.home_sections(request.user):
         if section["key"] == "blog_links" and not site_settings.can_see(site_settings.nav_state("blog"), request.user):
-            continue  # 블로그를 닫아 두면 바로가기도 숨김
+            continue  # 블로그를 닫아 두면 바로가기도 숨김 (관리자에게는 보임)
         sections.append({**section, "template": f"main/sections/{section['key']}.html"})
 
     return render(request, "main/home.html", {

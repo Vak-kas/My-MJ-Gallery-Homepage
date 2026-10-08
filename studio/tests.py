@@ -213,7 +213,7 @@ class SiteSettingsTests(TestCase):
         self.assertEqual(self.nav_labels(), ["Home", "Blog"])
         self.assertEqual(self.client.get("/tools/").status_code, 404)
         self.assertEqual(self.client.get("/tools/keygen/").status_code, 404)
-        self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 200)  # 링크로 여는 페이지는 계속 열림
+        self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 404)  # 숨김이면 공유 링크도 막힘
         resp = self.client.get(reverse("main:photos"))
         self.assertEqual(resp.status_code, 302)
         self.assertIn(reverse("accounts:login"), resp["Location"])
@@ -223,6 +223,28 @@ class SiteSettingsTests(TestCase):
         self.client.force_login(self.admin)
         self.assertEqual(self.client.get("/tools/").status_code, 200)
         self.assertIn("Tool", self.nav_labels())
+
+    def test_members_only_keeps_share_links_open(self):
+        self.save(nav_state_tool="members")
+        self.client.logout()
+        self.assertEqual(self.client.get("/tools/").status_code, 302)
+        self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 200)
+
+    def test_admin_sees_hidden_home_sections(self):
+        order = ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]
+        data = {"nav_order": ["home", "blog", "tool", "photo"], "home_order": order, "nav_state_blog": "admin",
+                **{f"home_on_{k}": "on" for k in order if k != "award"}}
+        self.client.force_login(self.admin)
+        self.client.post(reverse("studio:settings"), data)
+        res = self.client.get("/")
+        sections = {s["key"]: s["hidden"] for s in res.context["home_sections"]}
+        self.assertTrue(sections["award"])
+        self.assertIn("blog_links", sections)
+        self.assertContains(res, "관리자에게만 보여요")
+        self.client.force_login(self.member)
+        keys = [s["key"] for s in self.client.get("/").context["home_sections"]]
+        self.assertNotIn("award", keys)
+        self.assertNotIn("blog_links", keys)
 
     def test_home_cannot_be_hidden(self):
         self.save(nav_state_home="admin")

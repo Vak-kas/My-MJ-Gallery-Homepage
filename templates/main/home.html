@@ -31,6 +31,11 @@
 
 <main class="scroll-snap-main bg-[#f5f5f7] px-6 py-10 md:px-12 lg:px-24">
     {% for section in home_sections %}
+    {% if section.hidden %}
+    <p class="mx-auto mt-16 flex max-w-[1320px] items-center gap-2 rounded-full border border-dashed border-[#b26a00]/40 bg-[#fff8ec] px-4 py-2 text-[13px] text-[#b26a00]">
+        🙈 아래 <b>{{ section.label }}</b> 섹션은 숨겨져 있어요 — 관리자에게만 보여요. <a href="{% url 'studio:settings' %}" class="ml-auto underline">설정</a>
+    </p>
+    {% endif %}
     {% include section.template %}
     {% endfor %}
 
