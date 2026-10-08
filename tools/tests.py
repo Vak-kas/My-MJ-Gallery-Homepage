@@ -408,3 +408,38 @@ class KeygenPageTests(TestCase):
 		self.assertContains(resp, "crypto.getRandomValues")
 		self.assertContains(resp, "서버로 전송되지 않아요")
 		self.assertNotContains(resp, "fetch(")  # 키를 어디에도 보내지 않음
+
+
+class FileRoomPageTests(TestCase):
+	ROOM = {**StreamViewTests.ROOM, "kind": "file", "meta": {"label": "파일 방"}, "out_socket": "PUSH"}
+
+	def get(self, token, user=None):
+		from unittest import mock
+		if user:
+			self.client.force_login(user)
+		with mock.patch("tools.relay_client.get_room", return_value=self.ROOM), mock.patch("tools.relay_client.join_room", return_value=self.ROOM):
+			return self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": token}).content.decode()
+
+	def test_admin_page_is_sender_only(self):
+		from django.contrib.auth import get_user_model
+		admin = get_user_model().objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
+		html = self.get("secret-token", admin)
+		self.assertIn('id="fx-out"', html)  # 파일 보내기
+		self.assertNotIn('id="fx-in"', html)  # 관리자 화면에서 자기 파일을 받지 않음
+		self.assertIn("?token=recv-token", html)  # 받는 쪽 링크는 나눠 줄 수 있음
+		self.assertNotIn("data-join=", html)  # 파일 방엔 IP 등록 버튼 없음
+
+	def test_receiver_link_only_receives(self):
+		html = self.get("recv-token")
+		self.assertIn('id="fx-in"', html)
+		self.assertNotIn('id="fx-out"', html)
+
+	def test_sender_link_only_sends(self):
+		html = self.get("send-token")
+		self.assertIn('id="fx-out"', html)
+		self.assertNotIn('id="fx-in"', html)
+
+	def test_file_room_has_no_gnu_radio_blocks(self):
+		html = self.get("send-token")
+		self.assertNotIn("GNU Radio 블록", html)
+		self.assertIn("mj_stream.py send", html)
