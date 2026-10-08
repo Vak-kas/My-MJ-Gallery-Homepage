@@ -1,0 +1,525 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .kg-input { width: 100%; height: 40px; border-radius: 12px; border: 1px solid rgba(0,0,0,.1); background: #f9f9fb; padding: 0 12px; font-size: 14px; outline: none; color: #1d1d1f; }
+    .kg-input:focus { border-color: #0066cc; }
+    .kg-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #1d1d1f; }
+    .kg-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1d1d1f; }
+    .kg-check input { width: 16px; height: 16px; accent-color: #0066cc; }
+    .kg-tab { border-radius: 999px; padding: 6px 16px; font-size: 13px; border: 1px solid rgba(0,0,0,.1); color: #1d1d1f; }
+    .kg-tab.is-active { background: #0066cc; border-color: #0066cc; color: #fff; font-weight: 600; }
+    .kg-chip { border-radius: 999px; border: 1px solid rgba(0,0,0,.1); padding: 4px 12px; font-size: 12px; color: #1d1d1f; background: #fff; }
+    .kg-chip:hover { background: #f5f5f7; }
+    .kg-out { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; word-break: break-all; }
+    .kg-meter { height: 8px; border-radius: 999px; background: #f2f2f7; overflow: hidden; }
+    .kg-meter > span { display: block; height: 100%; border-radius: 999px; transition: width .2s, background .2s; }
+    .kg-pem { width: 100%; min-height: 180px; border-radius: 12px; border: 1px solid rgba(0,0,0,.1); background: #f9f9fb; padding: 10px 12px; font: 12px/1.5 SFMono-Regular, Menlo, Consolas, monospace; color: #1d1d1f; resize: vertical; }
+    #kg-form [hidden] { display: none !important; }
+    html.theme-dark .kg-input, html.theme-dark .kg-pem { background: #2a2a2e; border-color: rgba(255,255,255,.14); color: #e8e8ea; }
+    html.theme-dark .kg-label, html.theme-dark .kg-check { color: #e8e8ea; }
+    html.theme-dark .kg-chip, html.theme-dark .kg-tab:not(.is-active) { background: #1f1f22; color: #e8e8ea; border-color: rgba(255,255,255,.14); }
+    html.theme-dark .kg-meter { background: #2a2a2e; }
+</style>
+
+<main class="mx-auto max-w-[1100px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SECURITY · GENERATOR</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Key Generator.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            비밀번호, API 키, 암호화 키, 공개키/개인키 쌍을 만듭니다.
+            <b class="text-[#1d1d1f]">모든 키는 이 브라우저 안에서만 만들어지고 서버로 전송되지 않아요</b> (Web Crypto 보안 난수 사용).
+        </p>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-2">
+        <button type="button" class="kg-tab is-active" data-tab="secret">🔐 키 · 비밀번호</button>
+        <button type="button" class="kg-tab" data-tab="pair">🗝 공개키 / 개인키 쌍</button>
+    </div>
+
+    <!-- ── 키·비밀번호 ───────────────────────── -->
+    <section id="tab-secret" class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[400px_minmax(0,1fr)]">
+        <form id="kg-form" class="min-w-0 space-y-4 rounded-[22px] border border-black/[0.08] bg-white p-6" onsubmit="return false">
+            <div>
+                <span class="kg-label">빠른 선택</span>
+                <div class="flex flex-wrap gap-2" id="kg-presets">
+                    <button type="button" class="kg-chip" data-preset="password">강한 비밀번호</button>
+                    <button type="button" class="kg-chip" data-preset="wifi">Wi‑Fi 비밀번호</button>
+                    <button type="button" class="kg-chip" data-preset="django">Django SECRET_KEY</button>
+                    <button type="button" class="kg-chip" data-preset="jwt">JWT 시크릿 (HS256)</button>
+                    <button type="button" class="kg-chip" data-preset="aes">AES‑256 키</button>
+                    <button type="button" class="kg-chip" data-preset="api">API 키</button>
+                    <button type="button" class="kg-chip" data-preset="uuid">UUID</button>
+                    <button type="button" class="kg-chip" data-preset="pin">PIN 6자리</button>
+                </div>
+            </div>
+
+            <div>
+                <label class="kg-label" for="kg-format">형식</label>
+                <select id="kg-format" class="kg-input">
+                    <option value="chars">문자 (비밀번호·임의 문자열)</option>
+                    <option value="hex">Hex (16진수)</option>
+                    <option value="base64">Base64</option>
+                    <option value="base64url">Base64URL (URL·JWT 에 안전)</option>
+                    <option value="uuid">UUID v4</option>
+                    <option value="pin">숫자 PIN</option>
+                    <option value="api">API 키 (접두사 + 영문·숫자)</option>
+                </select>
+            </div>
+
+            <!-- 문자 -->
+            <div data-for="chars" class="space-y-4">
+                <div>
+                    <label class="kg-label" for="kg-length">길이 <span id="kg-length-label" class="font-normal text-[#0066cc]"></span></label>
+                    <div class="flex items-center gap-3">
+                        <input id="kg-length" type="range" min="4" max="128" value="20" class="flex-1 accent-[#0066cc]">
+                        <input id="kg-length-num" type="number" min="4" max="256" value="20" class="kg-input w-[80px]">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="kg-check"><input id="kg-upper" type="checkbox" checked> 대문자 A–Z</label>
+                    <label class="kg-check"><input id="kg-lower" type="checkbox" checked> 소문자 a–z</label>
+                    <label class="kg-check"><input id="kg-digits" type="checkbox" checked> 숫자 0–9</label>
+                    <label class="kg-check"><input id="kg-symbols" type="checkbox" checked> 특수문자</label>
+                </div>
+                <div>
+                    <label class="kg-label" for="kg-symbol-set">사용할 특수문자</label>
+                    <input id="kg-symbol-set" class="kg-input font-mono" value="!@#$%^&*()-_=+[]{};:,.?/~">
+                    <p class="mt-1 text-[11px] text-[#8e8e93]">사이트마다 허용하는 특수문자가 다르면 여기서 고치세요.</p>
+                </div>
+                <div class="space-y-2">
+                    <label class="kg-check"><input id="kg-ambiguous" type="checkbox"> 헷갈리는 글자 빼기 (0 O o 1 l I |)</label>
+                    <label class="kg-check"><input id="kg-each" type="checkbox" checked> 고른 종류를 하나 이상씩 꼭 포함</label>
+                </div>
+                <div>
+                    <label class="kg-label" for="kg-exclude">빼고 싶은 문자 (선택)</label>
+                    <input id="kg-exclude" class="kg-input font-mono" placeholder="예: '&quot;\`">
+                </div>
+            </div>
+
+            <!-- Hex / Base64 -->
+            <div data-for="bytes" hidden class="space-y-3">
+                <div>
+                    <label class="kg-label" for="kg-bits">키 크기</label>
+                    <select id="kg-bits" class="kg-input">
+                        <option value="64">64비트 (8바이트)</option>
+                        <option value="128">128비트 (16바이트) · AES‑128</option>
+                        <option value="192">192비트 (24바이트)</option>
+                        <option value="256" selected>256비트 (32바이트) · AES‑256 · HS256</option>
+                        <option value="384">384비트 (48바이트) · HS384</option>
+                        <option value="512">512비트 (64바이트) · HS512</option>
+                        <option value="1024">1024비트 (128바이트)</option>
+                    </select>
+                </div>
+                <label class="kg-check" data-for="hex"><input id="kg-hex-upper" type="checkbox"> 대문자로 (A–F)</label>
+                <label class="kg-check" data-for="base64"><input id="kg-b64-pad" type="checkbox" checked> 끝에 = 패딩 붙이기</label>
+            </div>
+
+            <!-- PIN -->
+            <div data-for="pin" hidden>
+                <label class="kg-label" for="kg-pin-length">자릿수</label>
+                <input id="kg-pin-length" type="number" min="4" max="32" value="6" class="kg-input">
+            </div>
+
+            <!-- API 키 -->
+            <div data-for="api" hidden class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="kg-label" for="kg-api-prefix">접두사</label>
+                    <input id="kg-api-prefix" class="kg-input font-mono" value="sk_live_" maxlength="24">
+                </div>
+                <div>
+                    <label class="kg-label" for="kg-api-length">본문 길이</label>
+                    <input id="kg-api-length" type="number" min="16" max="128" value="32" class="kg-input">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="kg-label" for="kg-count">만들 개수</label>
+                    <input id="kg-count" type="number" min="1" max="50" value="5" class="kg-input">
+                </div>
+                <div class="flex items-end">
+                    <button id="kg-generate" type="button" class="h-10 w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white">다시 만들기</button>
+                </div>
+            </div>
+            <p id="kg-error" class="min-h-[18px] text-[12px] text-[#d44c47]"></p>
+        </form>
+
+        <div class="min-w-0 space-y-5">
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">안전성</h2>
+                    <span id="kg-strength" class="text-[14px] font-semibold"></span>
+                </div>
+                <div class="kg-meter mt-3"><span id="kg-meter"></span></div>
+                <p id="kg-entropy" class="mt-3 text-[13px] text-[#6e6e73]"></p>
+            </div>
+
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">생성된 키</h2>
+                    <div class="flex gap-2">
+                        <button id="kg-copy-all" type="button" class="kg-chip">전체 복사</button>
+                        <button id="kg-download" type="button" class="kg-chip">txt 저장</button>
+                    </div>
+                </div>
+                <ul id="kg-list" class="mt-4 space-y-2"></ul>
+                <p class="mt-4 text-[11px] leading-relaxed text-[#8e8e93]">
+                    이 페이지를 닫으면 키는 남지 않아요. 비밀번호 관리자나 서버의 <code>.env</code> 처럼 안전한 곳에 바로 저장하세요.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── 키 쌍 ───────────────────────────── -->
+    <section id="tab-pair" hidden class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[400px_minmax(0,1fr)]">
+        <div class="min-w-0 space-y-4 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div>
+                <label class="kg-label" for="kp-alg">알고리즘</label>
+                <select id="kp-alg" class="kg-input">
+                    <option value="Ed25519">Ed25519 (SSH·서명, 짧고 빠름)</option>
+                    <option value="ECDSA-P256">ECDSA P‑256 (ES256)</option>
+                    <option value="ECDSA-P384">ECDSA P‑384 (ES384)</option>
+                    <option value="RSA-2048">RSA 2048</option>
+                    <option value="RSA-3072" selected>RSA 3072</option>
+                    <option value="RSA-4096">RSA 4096 (생성에 몇 초 걸려요)</option>
+                </select>
+            </div>
+            <div>
+                <label class="kg-label" for="kp-comment">주석 (SSH 공개키 끝에 붙음, 선택)</label>
+                <input id="kp-comment" class="kg-input" placeholder="예: seo@macbook">
+            </div>
+            <button id="kp-generate" type="button" class="h-10 w-full rounded-full bg-[#0066cc] text-[14px] font-semibold text-white">키 쌍 만들기</button>
+            <p id="kp-status" class="min-h-[18px] text-[12px] text-[#6e6e73]"></p>
+            <div class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]">
+                <b class="text-[#1d1d1f]">개인키는 절대 공유하지 마세요.</b> 공개키만 서버·GitHub 등에 등록합니다.
+                SSH 로 쓰려면 <b>OpenSSH 형식</b> 개인키를 <code>~/.ssh/id_xxx</code> 로 저장하고 <code>chmod 600</code> 하세요.
+                PKCS#8 PEM 은 JWT 서명·OpenSSL·프로그램용이에요.
+            </div>
+        </div>
+        <div class="min-w-0 space-y-5">
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">공개키 (OpenSSH 한 줄)</h2>
+                    <div class="flex gap-2"><button type="button" class="kg-chip" data-copy-target="kp-ssh">복사</button></div>
+                </div>
+                <textarea id="kp-ssh" class="kg-pem mt-3" style="min-height:90px" readonly placeholder="키 쌍을 만들면 여기에 나와요 (authorized_keys·GitHub 등록용)"></textarea>
+            </div>
+            <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#1d1d1f]">공개키 (PEM · SPKI)</h2>
+                    <div class="flex gap-2"><button type="button" class="kg-chip" data-copy-target="kp-public">복사</button><button type="button" class="kg-chip" data-save-target="kp-public" data-filename="public.pem">저장</button></div>
+                </div>
+                <textarea id="kp-public" class="kg-pem mt-3" readonly></textarea>
+            </div>
+            <div class="rounded-[22px] border border-[#d44c47]/30 bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#d44c47]">개인키 (OpenSSH 형식 · SSH 접속용) — 비밀</h2>
+                    <div class="flex gap-2"><button type="button" class="kg-chip" data-copy-target="kp-openssh">복사</button><button type="button" class="kg-chip" data-save-target="kp-openssh" data-filename="id_key">저장</button></div>
+                </div>
+                <textarea id="kp-openssh" class="kg-pem mt-3" readonly></textarea>
+                <p class="mt-2 text-[11px] text-[#8e8e93]"><code>ssh -i 이파일</code> 로 바로 쓸 수 있어요 (저장 후 <code>chmod 600</code>).</p>
+            </div>
+            <div class="rounded-[22px] border border-[#d44c47]/30 bg-white p-6">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="text-[16px] font-semibold text-[#d44c47]">개인키 (PEM · PKCS#8, 프로그램·JWT 용) — 비밀</h2>
+                    <div class="flex gap-2"><button type="button" class="kg-chip" data-copy-target="kp-private">복사</button><button type="button" class="kg-chip" data-save-target="kp-private" data-filename="private.pem">저장</button></div>
+                </div>
+                <textarea id="kp-private" class="kg-pem mt-3" readonly></textarea>
+            </div>
+        </div>
+    </section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const enc = new TextEncoder();
+
+    // ── 보안 난수 ───────────────────────────
+    // 0 이상 n 미만의 정수를 치우침 없이 (거절 표본추출)
+    const randomInt = (n) => {
+        const limit = Math.floor(0x100000000 / n) * n;
+        const buf = new Uint32Array(1);
+        for (;;) {
+            crypto.getRandomValues(buf);
+            if (buf[0] < limit) return buf[0] % n;
+        }
+    };
+    const randomBytes = (len) => crypto.getRandomValues(new Uint8Array(len));
+    const pick = (chars) => chars[randomInt(chars.length)];
+    const shuffle = (arr) => {
+        for (let i = arr.length - 1; i > 0; i -= 1) { const j = randomInt(i + 1); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+        return arr;
+    };
+    const toHex = (bytes, upper) => { const h = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join(''); return upper ? h.toUpperCase() : h; };
+    const toBase64 = (bytes) => btoa(String.fromCharCode(...bytes));
+    const unique = (s) => [...new Set([...s])].join('');
+
+    // ── 문자 집합 ───────────────────────────
+    const UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const LOWER = 'abcdefghijklmnopqrstuvwxyz';
+    const DIGITS = '0123456789';
+    const AMBIGUOUS = '0Oo1lI|';
+    const ALNUM = UPPER + LOWER + DIGITS;
+
+    const charGroups = () => {
+        const strip = (s) => {
+            let out = s;
+            if ($('kg-ambiguous').checked) out = [...out].filter((c) => !AMBIGUOUS.includes(c)).join('');
+            const ex = $('kg-exclude').value;
+            if (ex) out = [...out].filter((c) => !ex.includes(c)).join('');
+            return unique(out);
+        };
+        const groups = [];
+        if ($('kg-upper').checked) groups.push(strip(UPPER));
+        if ($('kg-lower').checked) groups.push(strip(LOWER));
+        if ($('kg-digits').checked) groups.push(strip(DIGITS));
+        if ($('kg-symbols').checked) groups.push(strip($('kg-symbol-set').value.replace(/\s/g, '')));
+        return groups.filter((g) => g.length);
+    };
+
+    const clampInt = (el, lo, hi) => { const v = Math.max(lo, Math.min(hi, parseInt(el.value, 10) || lo)); el.value = v; return v; };
+
+    // ── 생성 ──────────────────────────────
+    const generateOne = (fmt) => {
+        if (fmt === 'chars') {
+            const groups = charGroups();
+            const pool = unique(groups.join(''));
+            const len = clampInt($('kg-length-num'), 4, 256);
+            const chars = [];
+            if ($('kg-each').checked) groups.forEach((g) => chars.push(pick(g)));  // 종류마다 하나씩 먼저
+            while (chars.length < len) chars.push(pick(pool));
+            return shuffle(chars.slice(0, len)).join('');
+        }
+        if (fmt === 'hex') return toHex(randomBytes(Number($('kg-bits').value) / 8), $('kg-hex-upper').checked);
+        if (fmt === 'base64') { const s = toBase64(randomBytes(Number($('kg-bits').value) / 8)); return $('kg-b64-pad').checked ? s : s.replace(/=+$/, ''); }
+        if (fmt === 'base64url') return toBase64(randomBytes(Number($('kg-bits').value) / 8)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        if (fmt === 'uuid') return crypto.randomUUID ? crypto.randomUUID() : (() => {
+            const b = randomBytes(16); b[6] = (b[6] & 0x0f) | 0x40; b[8] = (b[8] & 0x3f) | 0x80; const h = toHex(b);
+            return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+        })();
+        if (fmt === 'pin') { const n = clampInt($('kg-pin-length'), 4, 32); return Array.from({ length: n }, () => pick(DIGITS)).join(''); }
+        if (fmt === 'api') { const n = clampInt($('kg-api-length'), 16, 128); return $('kg-api-prefix').value.trim() + Array.from({ length: n }, () => pick(ALNUM)).join(''); }
+        return '';
+    };
+
+    const entropyBits = (fmt) => {
+        if (fmt === 'chars') { const pool = unique(charGroups().join('')).length; return pool > 1 ? Number($('kg-length-num').value) * Math.log2(pool) : 0; }
+        if (['hex', 'base64', 'base64url'].includes(fmt)) return Number($('kg-bits').value);
+        if (fmt === 'uuid') return 122;
+        if (fmt === 'pin') return Number($('kg-pin-length').value) * Math.log2(10);
+        if (fmt === 'api') return Number($('kg-api-length').value) * Math.log2(62);
+        return 0;
+    };
+
+    const crackTime = (bits) => {
+        // 오프라인 공격, 초당 1조(10^12) 번 추측 가정 → 평균 절반을 시도하면 맞춤
+        const seconds = 2 ** (bits - 1) / 1e12;
+        if (!Number.isFinite(seconds) || seconds > 1e30) return '사실상 불가능 (우주 나이보다 훨씬 김)';
+        const units = [['년', 31557600], ['일', 86400], ['시간', 3600], ['분', 60], ['초', 1]];
+        for (const [name, size] of units) {
+            if (seconds >= size) {
+                const v = seconds / size;
+                return v >= 1e6 ? `약 ${v.toExponential(1)} ${name}` : `약 ${Math.round(v).toLocaleString('ko-KR')} ${name}`;
+            }
+        }
+        return '1초 미만';
+    };
+
+    let current = [];
+    const render = () => {
+        const fmt = $('kg-format').value;
+        $('kg-error').textContent = '';
+        if (fmt === 'chars' && !charGroups().length) { $('kg-error').textContent = '문자 종류를 하나 이상 골라 주세요.'; current = []; $('kg-list').innerHTML = ''; return; }
+        if (fmt === 'chars' && $('kg-each').checked && charGroups().length > Number($('kg-length-num').value)) { $('kg-error').textContent = '길이가 고른 종류 수보다 짧아요.'; }
+        const count = clampInt($('kg-count'), 1, 50);
+        current = Array.from({ length: count }, () => generateOne(fmt));
+        $('kg-list').innerHTML = current.map((key, i) => `
+            <li class="flex items-center gap-3 rounded-xl bg-[#f5f5f7] px-3 py-2">
+                <span class="kg-out min-w-0 flex-1 text-[#1d1d1f]">${key.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))}</span>
+                <button type="button" class="kg-chip shrink-0" data-copy-index="${i}">복사</button>
+            </li>`).join('');
+
+        const bits = entropyBits(fmt);
+        const levels = [[28, '매우 약함', '#d44c47'], [36, '약함', '#d9730d'], [60, '보통', '#cb912f'], [80, '강함', '#448361'], [128, '매우 강함', '#337ea9'], [Infinity, '암호 키 수준', '#0066cc']];
+        const [, label, color] = levels.find(([max]) => bits < max);
+        $('kg-strength').textContent = label;
+        $('kg-strength').style.color = color;
+        $('kg-meter').style.width = `${Math.min(100, (bits / 128) * 100)}%`;
+        $('kg-meter').style.background = color;
+        $('kg-entropy').innerHTML = `엔트로피 약 <b>${bits.toFixed(0)}비트</b> · 초당 1조 번 추측하는 공격으로 뚫는 데 ${crackTime(bits)}`
+            + (fmt === 'pin' ? '<br><span class="text-[12px]">PIN 은 시도 횟수 제한이 있는 곳(카드·잠금화면)에서만 쓰세요.</span>' : '');
+    };
+
+    const syncVisibility = () => {
+        const fmt = $('kg-format').value;
+        document.querySelectorAll('#kg-form [data-for]').forEach((el) => {
+            const keys = el.dataset.for.split(' ');
+            const isBytes = ['hex', 'base64', 'base64url'].includes(fmt);
+            el.hidden = !(keys.includes(fmt) || (keys.includes('bytes') && isBytes));
+        });
+        $('kg-length-label').textContent = `${$('kg-length-num').value}자`;
+    };
+
+    const PRESETS = {
+        password: { format: 'chars', length: 20, upper: true, lower: true, digits: true, symbols: true, ambiguous: false, each: true },
+        wifi: { format: 'chars', length: 16, upper: true, lower: true, digits: true, symbols: false, ambiguous: true, each: true },
+        django: { format: 'chars', length: 50, upper: false, lower: true, digits: true, symbols: true, symbolSet: '!@#$%^&*(-_=+)', ambiguous: false, each: false },
+        jwt: { format: 'base64url', bits: 256 },
+        aes: { format: 'hex', bits: 256 },
+        api: { format: 'api' },
+        uuid: { format: 'uuid' },
+        pin: { format: 'pin', pin: 6 },
+    };
+    const applyPreset = (name) => {
+        const p = PRESETS[name];
+        $('kg-format').value = p.format;
+        if (p.length) { $('kg-length').value = Math.min(128, p.length); $('kg-length-num').value = p.length; }
+        ['upper', 'lower', 'digits', 'symbols', 'ambiguous', 'each'].forEach((k) => { if (k in p) $(`kg-${k}`).checked = p[k]; });
+        $('kg-symbol-set').value = p.symbolSet || '!@#$%^&*()-_=+[]{};:,.?/~';
+        if (p.bits) $('kg-bits').value = String(p.bits);
+        if (p.pin) $('kg-pin-length').value = p.pin;
+        $('kg-count').value = 1;
+        syncVisibility();
+        render();
+    };
+
+    // 입력 연결
+    $('kg-length').addEventListener('input', () => { $('kg-length-num').value = $('kg-length').value; syncVisibility(); render(); });
+    $('kg-length-num').addEventListener('input', () => { $('kg-length').value = Math.min(128, $('kg-length-num').value); syncVisibility(); render(); });
+    document.querySelectorAll('#kg-form input, #kg-form select').forEach((el) => {
+        if (el.id === 'kg-length' || el.id === 'kg-length-num') return;
+        el.addEventListener('change', () => { syncVisibility(); render(); });
+        if (el.type === 'text') el.addEventListener('input', () => render());
+    });
+    $('kg-generate').addEventListener('click', render);
+    document.querySelectorAll('#kg-presets [data-preset]').forEach((b) => b.addEventListener('click', () => applyPreset(b.dataset.preset)));
+
+    // ── 복사 / 저장 ─────────────────────────
+    const copyText = async (text, btn) => {
+        let ok = false;
+        try { await navigator.clipboard.writeText(text); ok = true; } catch (_) {
+            const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;top:-1000px'; document.body.appendChild(ta); ta.select();
+            ok = document.execCommand('copy'); ta.remove();
+        }
+        if (btn) { const old = btn.textContent; btn.textContent = ok ? '복사됨' : '복사 실패'; setTimeout(() => { btn.textContent = old; }, 1200); }
+    };
+    const saveText = (text, filename) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
+        a.download = filename;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    };
+    $('kg-list').addEventListener('click', (e) => { const b = e.target.closest('[data-copy-index]'); if (b) copyText(current[Number(b.dataset.copyIndex)], b); });
+    $('kg-copy-all').addEventListener('click', (e) => copyText(current.join('\n'), e.currentTarget));
+    $('kg-download').addEventListener('click', () => saveText(current.join('\n') + '\n', 'keys.txt'));
+    document.querySelectorAll('[data-copy-target]').forEach((b) => b.addEventListener('click', () => copyText($(b.dataset.copyTarget).value, b)));
+    document.querySelectorAll('[data-save-target]').forEach((b) => b.addEventListener('click', () => { const v = $(b.dataset.saveTarget).value; if (v) saveText(v, b.dataset.filename); }));
+
+    // ── 탭 ──────────────────────────────
+    document.querySelectorAll('[data-tab]').forEach((t) => t.addEventListener('click', () => {
+        document.querySelectorAll('[data-tab]').forEach((x) => x.classList.toggle('is-active', x === t));
+        $('tab-secret').hidden = t.dataset.tab !== 'secret';
+        $('tab-pair').hidden = t.dataset.tab !== 'pair';
+    }));
+
+    // ── 키 쌍 (Web Crypto) ───────────────────
+    const pem = (label, buf) => {
+        const b64 = toBase64(new Uint8Array(buf));
+        return `-----BEGIN ${label}-----\n${b64.match(/.{1,64}/g).join('\n')}\n-----END ${label}-----\n`;
+    };
+    const b64urlToBytes = (s) => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), (c) => c.charCodeAt(0));
+    // OpenSSH 공개키 형식: string = 길이(4바이트) + 내용, mpint = 최상위 비트가 1이면 0x00 을 앞에
+    const sshString = (bytes) => { const out = new Uint8Array(4 + bytes.length); new DataView(out.buffer).setUint32(0, bytes.length); out.set(bytes, 4); return out; };
+    const sshMpint = (bytes) => { let b = bytes; while (b.length > 1 && b[0] === 0) b = b.slice(1); if (b[0] & 0x80) { const t = new Uint8Array(b.length + 1); t.set(b, 1); b = t; } return sshString(b); };
+    const concat = (parts) => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; parts.forEach((p) => { out.set(p, o); o += p.length; }); return out; };
+
+    const ALGS = {
+        'Ed25519': { gen: { name: 'Ed25519' }, usages: ['sign', 'verify'] },
+        'ECDSA-P256': { gen: { name: 'ECDSA', namedCurve: 'P-256' }, usages: ['sign', 'verify'], ssh: 'nistp256' },
+        'ECDSA-P384': { gen: { name: 'ECDSA', namedCurve: 'P-384' }, usages: ['sign', 'verify'], ssh: 'nistp384' },
+        'RSA-2048': { gen: { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, usages: ['sign', 'verify'] },
+        'RSA-3072': { gen: { name: 'RSASSA-PKCS1-v1_5', modulusLength: 3072, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, usages: ['sign', 'verify'] },
+        'RSA-4096': { gen: { name: 'RSASSA-PKCS1-v1_5', modulusLength: 4096, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, usages: ['sign', 'verify'] },
+    };
+
+    const sshPublic = async (algKey, cfg, publicKey) => {
+        if (algKey === 'Ed25519') {
+            const raw = new Uint8Array(await crypto.subtle.exportKey('raw', publicKey));
+            return ['ssh-ed25519', concat([sshString(enc.encode('ssh-ed25519')), sshString(raw)])];
+        }
+        if (cfg.ssh) {
+            const type = `ecdsa-sha2-${cfg.ssh}`;
+            const raw = new Uint8Array(await crypto.subtle.exportKey('raw', publicKey));
+            return [type, concat([sshString(enc.encode(type)), sshString(enc.encode(cfg.ssh)), sshString(raw)])];
+        }
+        const jwk = await crypto.subtle.exportKey('jwk', publicKey);
+        return ['ssh-rsa', concat([sshString(enc.encode('ssh-rsa')), sshMpint(b64urlToBytes(jwk.e)), sshMpint(b64urlToBytes(jwk.n))])];
+    };
+
+    const u32 = (n) => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n); return b; };
+
+    // OpenSSH 개인키 형식 (openssh-key-v1, 암호 없음): ssh 가 바로 읽을 수 있음
+    const opensshPrivate = async (algKey, cfg, pair, publicBlob, comment) => {
+        const jwk = await crypto.subtle.exportKey('jwk', pair.privateKey);
+        const b = b64urlToBytes;
+        let body;
+        if (algKey === 'Ed25519') {
+            const pub = b(jwk.x);
+            body = [sshString(enc.encode('ssh-ed25519')), sshString(pub), sshString(concat([b(jwk.d), pub]))];
+        } else if (cfg.ssh) {
+            const type = `ecdsa-sha2-${cfg.ssh}`;
+            const q = concat([new Uint8Array([4]), b(jwk.x), b(jwk.y)]);
+            body = [sshString(enc.encode(type)), sshString(enc.encode(cfg.ssh)), sshString(q), sshMpint(b(jwk.d))];
+        } else {
+            body = [sshString(enc.encode('ssh-rsa')), sshMpint(b(jwk.n)), sshMpint(b(jwk.e)), sshMpint(b(jwk.d)), sshMpint(b(jwk.qi)), sshMpint(b(jwk.p)), sshMpint(b(jwk.q))];
+        }
+        const check = randomBytes(4);
+        let priv = concat([check, check, ...body, sshString(enc.encode(comment))]);
+        const padLen = (8 - (priv.length % 8)) % 8;
+        priv = concat([priv, Uint8Array.from({ length: padLen }, (_, i) => i + 1)]);
+        const blob = concat([
+            enc.encode('openssh-key-v1\0'),
+            sshString(enc.encode('none')), sshString(enc.encode('none')), sshString(new Uint8Array(0)),
+            u32(1), sshString(publicBlob), sshString(priv),
+        ]);
+        return `-----BEGIN OPENSSH PRIVATE KEY-----\n${toBase64(blob).match(/.{1,70}/g).join('\n')}\n-----END OPENSSH PRIVATE KEY-----\n`;
+    };
+
+    $('kp-generate').addEventListener('click', async () => {
+        const algKey = $('kp-alg').value;
+        const cfg = ALGS[algKey];
+        $('kp-status').textContent = '만드는 중…';
+        $('kp-generate').disabled = true;
+        try {
+            const pair = await crypto.subtle.generateKey(cfg.gen, true, cfg.usages);
+            $('kp-private').value = pem('PRIVATE KEY', await crypto.subtle.exportKey('pkcs8', pair.privateKey));
+            $('kp-public').value = pem('PUBLIC KEY', await crypto.subtle.exportKey('spki', pair.publicKey));
+            const [type, blob] = await sshPublic(algKey, cfg, pair.publicKey);
+            const comment = $('kp-comment').value.trim();
+            $('kp-ssh').value = `${type} ${toBase64(blob)}${comment ? ` ${comment}` : ''}`;
+            $('kp-openssh').value = await opensshPrivate(algKey, cfg, pair, blob, comment);
+            const ext = algKey.startsWith('RSA') ? 'rsa' : algKey === 'Ed25519' ? 'ed25519' : 'ecdsa';
+            document.querySelector('[data-save-target="kp-openssh"]').dataset.filename = `id_${ext}`;
+            document.querySelector('[data-save-target="kp-private"]').dataset.filename = `id_${ext}.pem`;
+            document.querySelector('[data-save-target="kp-public"]').dataset.filename = `id_${ext}.pub.pem`;
+            $('kp-status').textContent = `${algKey} 키 쌍을 만들었어요.`;
+        } catch (err) {
+            $('kp-status').textContent = algKey === 'Ed25519'
+                ? '이 브라우저는 Ed25519 를 아직 지원하지 않아요. 최신 Chrome·Edge·Safari·Firefox 를 쓰거나 ECDSA/RSA 를 고르세요.'
+                : `만들지 못했어요: ${err.message}`;
+        } finally {
+            $('kp-generate').disabled = false;
+        }
+    });
+
+    syncVisibility();
+    render();
+})();
+</script>
+{% endblock %}

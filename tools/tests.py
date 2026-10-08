@@ -399,3 +399,12 @@ class ShareTests(TestCase):
 		other = get_user_model().objects.create_superuser("admin2", "a2@example.com", "pw-for-tests-only")
 		self.client.force_login(other)
 		self.assertEqual(self.chunk(info, 0, b"hello").status_code, 403)
+
+
+class KeygenPageTests(TestCase):
+	def test_keygen_page_is_public_and_client_side_only(self):
+		resp = self.client.get(reverse("tools:keygen"))
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, "crypto.getRandomValues")
+		self.assertContains(resp, "서버로 전송되지 않아요")
+		self.assertNotContains(resp, "fetch(")  # 키를 어디에도 보내지 않음
