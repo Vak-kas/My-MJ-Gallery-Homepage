@@ -572,3 +572,52 @@ class FileRoomPageTests(TestCase):
 		html = self.get("send-token")
 		self.assertNotIn("GNU Radio 블록", html)
 		self.assertIn("mj_stream.py send", html)
+
+
+class MyIpTests(TestCase):
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_page_shows_client_ip(self):
+		from unittest import mock
+		with mock.patch("tools.myip._reverse_dns", return_value="host.example.net"):
+			resp = self.client.get(reverse("tools:myip"), HTTP_X_REAL_IP="203.0.113.9", HTTP_USER_AGENT="TestAgent/1.0")
+		self.assertContains(resp, "203.0.113.9")
+		self.assertContains(resp, "IPv4")
+		self.assertContains(resp, "TestAgent/1.0")
+
+	def test_ipv6_and_private(self):
+		resp = self.client.get(reverse("tools:myip"), HTTP_X_REAL_IP="2001:db8::1")
+		self.assertContains(resp, "IPv6")
+		resp = self.client.get(reverse("tools:myip"), HTTP_X_REAL_IP="192.168.0.5")
+		self.assertContains(resp, "사설·로컬 주소")
+		self.assertEqual(self.client.get(reverse("tools:myip_lookup"), HTTP_X_REAL_IP="192.168.0.5").status_code, 400)
+
+	def test_lookup_summarizes_rdap_and_caches(self):
+		import io
+		import json
+		from unittest import mock
+		rdap = {
+			"name": "KORNET", "country": "KR", "startAddress": "1.96.0.0", "endAddress": "1.111.255.255",
+			"entities": [{"roles": ["registrant"], "vcardArray": ["vcard", [["version", {}, "text", "4.0"], ["fn", {}, "text", "Korea Telecom"]]]}],
+		}
+		fake = mock.MagicMock()
+		fake.__enter__.return_value = io.BytesIO(json.dumps(rdap).encode())
+		with mock.patch("tools.myip.urllib.request.urlopen", return_value=fake) as urlopen:
+			data = self.client.get(reverse("tools:myip_lookup"), HTTP_X_REAL_IP="1.97.1.1").json()
+			self.client.get(reverse("tools:myip_lookup"), HTTP_X_REAL_IP="1.97.1.1")
+		self.assertEqual(data["network"], "KORNET")
+		self.assertEqual(data["org"], ["Korea Telecom"])
+		self.assertEqual(data["country"], "KR")
+		self.assertEqual(urlopen.call_count, 1)  # 두 번째는 캐시
+		self.assertIn("1.97.1.1", urlopen.call_args.args[0].full_url)
+
+	def test_lookup_rate_limited(self):
+		from unittest import mock
+		with mock.patch("tools.myip.urllib.request.urlopen", side_effect=OSError):
+			codes = [self.client.get(reverse("tools:myip_lookup"), HTTP_X_REAL_IP="8.8.4.4").status_code for _ in range(11)]
+		self.assertEqual(codes[-1], 429)
+
+	def test_encode_page_is_public(self):
+		self.assertContains(self.client.get(reverse("tools:encode")), "MD5")

@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .ip-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .ip-row { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.06); font-size: 13px; }
+    .ip-row:last-child { border-bottom: 0; }
+    .ip-row dt { color: #8e8e93; }
+    .ip-row dd { color: #1d1d1f; word-break: break-all; }
+    html.theme-dark .ip-row { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .ip-row dd { color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1100px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · WHO AM I</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">My IP.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            이 서버가 본 내 접속 정보예요. 공유기·회사·학교 네트워크 뒤에 있으면 같은 공인 IP 를 여러 사람이 함께 써요.
+        </p>
+    </div>
+
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6 sm:p-8">
+        <p class="text-[13px] text-[#8e8e93]">내 공인 IP ({{ info.version }})</p>
+        <div class="mt-2 flex flex-wrap items-center gap-3">
+            <p id="ip-value" class="ip-mono text-[32px] font-semibold tracking-[-0.02em] text-[#1d1d1f] sm:text-[44px]">{{ info.ip }}</p>
+            <button type="button" id="ip-copy" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">복사</button>
+        </div>
+        {% if info.hostname %}<p class="ip-mono mt-1 text-[14px] text-[#6e6e73]">{{ info.hostname }}</p>{% endif %}
+        {% if info.is_private %}<p class="mt-2 text-[13px] text-[#b26a00]">사설·로컬 주소예요. (개발 환경이거나 프록시 설정 문제일 수 있어요)</p>{% endif %}
+
+        <div class="mt-6 rounded-2xl bg-[#f5f5f7] p-4">
+            <div class="flex flex-wrap items-center gap-3">
+                <p class="text-[14px] font-semibold text-[#1d1d1f]">통신사 · 국가 조회</p>
+                <button type="button" id="ip-lookup" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white" {% if info.is_private %}disabled{% endif %}>조회하기</button>
+            </div>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">누르면 이 IP 를 공개 등록 정보(RDAP, 국가별 인터넷 주소 관리 기관)에 조회해 대역 소유 기관과 국가를 보여줘요. 정확한 위치는 알 수 없어요.</p>
+            <dl id="ip-lookup-result" class="mt-3 hidden"></dl>
+        </div>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">브라우저 · 기기</h2>
+            <dl id="ip-client" class="mt-3"></dl>
+        </section>
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">서버가 받은 요청 정보</h2>
+            <dl class="mt-3">
+                {% for name, value in info.headers %}
+                <div class="ip-row"><dt>{{ name }}</dt><dd class="ip-mono">{{ value|default:"-" }}</dd></div>
+                {% endfor %}
+            </dl>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const row = (k, v) => `<div class="ip-row"><dt>${esc(k)}</dt><dd>${esc(v || '-')}</dd></div>`;
+
+    document.getElementById('ip-copy').addEventListener('click', async (e) => {
+        const text = document.getElementById('ip-value').textContent.trim();
+        try { await navigator.clipboard.writeText(text); } catch {
+            const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+        }
+        e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200);
+    });
+
+    const ua = navigator.userAgent;
+    const ver = (re) => { const r = re.exec(ua); return r ? r[1] : null; };
+    const pick = (pairs) => { for (const [re, name] of pairs) { const v = ver(re); if (v) return `${name} ${v}`; } return null; };
+    const browser = pick([[/Edg\/([\d.]+)/, 'Edge'], [/Whale\/([\d.]+)/, 'Whale'], [/SamsungBrowser\/([\d.]+)/, 'Samsung Internet'],
+        [/Firefox\/([\d.]+)/, 'Firefox'], [/Chrome\/([\d.]+)/, 'Chrome'], [/Version\/([\d.]+).*Safari/, 'Safari']]) || '알 수 없음';
+    const os = (/Windows NT 10/.test(ua) && 'Windows 10/11') || (/iPhone|iPad/.test(ua) && 'iOS / iPadOS')
+        || pick([[/Android ([\d.]+)/, 'Android']]) || (/Mac OS X/.test(ua) && 'macOS') || (/Linux/.test(ua) && 'Linux') || '알 수 없음';
+    const conn = navigator.connection;
+    document.getElementById('ip-client').innerHTML = [
+        row('브라우저', browser),
+        row('운영체제', os),
+        row('화면', `${screen.width} × ${screen.height} (배율 ${window.devicePixelRatio})`),
+        row('창 크기', `${window.innerWidth} × ${window.innerHeight}`),
+        row('언어', (navigator.languages || [navigator.language]).join(', ')),
+        row('시간대', Intl.DateTimeFormat().resolvedOptions().timeZone),
+        row('다크 모드', matchMedia('(prefers-color-scheme: dark)').matches ? '켜짐' : '꺼짐'),
+        row('쿠키', navigator.cookieEnabled ? '허용' : '차단'),
+        row('네트워크 종류', conn ? `${conn.effectiveType || ''}${conn.downlink ? ` · 약 ${conn.downlink} Mbps` : ''}` : '브라우저가 알려주지 않음'),
+        row('CPU 코어', navigator.hardwareConcurrency || ''),
+    ].join('');
+
+    const btn = document.getElementById('ip-lookup');
+    const out = document.getElementById('ip-lookup-result');
+    btn.addEventListener('click', async () => {
+        btn.disabled = true; btn.textContent = '조회 중…';
+        try {
+            const res = await fetch('{% url "tools:myip_lookup" %}', { headers: { Accept: 'application/json' } });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || '조회 실패');
+            out.innerHTML = [
+                row('네트워크 이름', data.network),
+                row('기관', (data.org || []).join(', ')),
+                row('국가', data.country),
+                row('IP 대역', data.range),
+                data.description ? row('설명', data.description) : '',
+            ].join('');
+        } catch (err) {
+            out.innerHTML = `<p class="text-[13px] text-[#d44c47]">${esc(err.message)}</p>`;
+        }
+        out.classList.remove('hidden');
+        btn.disabled = false; btn.textContent = '다시 조회';
+    });
+})();
+</script>
+{% endblock %}

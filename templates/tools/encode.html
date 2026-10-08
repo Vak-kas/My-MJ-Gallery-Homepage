@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .ec-input {
+        width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb;
+        padding: 12px 14px; font-size: 14px; outline: none; color: #1d1d1f; font-family: SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .ec-input:focus { border-color: #0066cc; }
+    textarea.ec-input { min-height: 150px; resize: vertical; }
+    .ec-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .ec-tab { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); color: #1d1d1f; }
+    .ec-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .ec-hash { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
+    .ec-hash:last-child { border-bottom: 0; }
+    .ec-hash code { word-break: break-all; font-size: 12.5px; }
+    .ec-copy { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); padding: 3px 10px; font-size: 12px; }
+    html.theme-dark .ec-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .ec-tab { color: #e8e8ea; border-color: rgba(255, 255, 255, 0.18); }
+    html.theme-dark .ec-tab.is-active { background: #e8e8ea; color: #1d1d1f; }
+    html.theme-dark .ec-hash { border-color: rgba(255, 255, 255, 0.08); }
+</style>
+
+<main class="mx-auto max-w-[1200px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">ENCODE · HASH · JWT</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Encode.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">
+            모든 계산은 이 브라우저 안에서만 이뤄지고 서버로 보내지 않아요. 비밀번호·토큰을 넣어도 안전합니다.
+        </p>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-2" id="ec-tabs">
+        <button type="button" class="ec-tab is-active" data-tab="convert">변환</button>
+        <button type="button" class="ec-tab" data-tab="hash">해시</button>
+        <button type="button" class="ec-tab" data-tab="jwt">JWT</button>
+    </div>
+
+    <!-- 변환 -->
+    <section data-panel="convert" class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <div class="flex flex-wrap items-center gap-2">
+            <select id="cv-mode" class="ec-input" style="width:auto;height:40px;padding:0 12px">
+                <option value="b64">Base64</option>
+                <option value="b64url">Base64 URL-safe</option>
+                <option value="url">URL 인코딩 (퍼센트)</option>
+                <option value="hex">Hex (16진수)</option>
+                <option value="html">HTML 엔티티</option>
+                <option value="unicode">유니코드 이스케이프 (\uXXXX)</option>
+            </select>
+            <div class="inline-flex overflow-hidden rounded-full border border-black/[0.1] text-[13px]">
+                <button type="button" id="cv-enc" class="bg-[#0066cc] px-4 py-2 font-semibold text-white">인코딩 →</button>
+                <button type="button" id="cv-dec" class="px-4 py-2 text-[#1d1d1f]">← 디코딩</button>
+            </div>
+            <button type="button" id="cv-swap" class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px]">⇅ 결과를 입력으로</button>
+        </div>
+        <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+                <label class="mb-1.5 block text-[13px] font-semibold" for="cv-in">입력</label>
+                <textarea id="cv-in" class="ec-input" spellcheck="false" placeholder="여기에 입력하면 바로 바뀌어요">안녕하세요, smjgallery!</textarea>
+            </div>
+            <div>
+                <div class="mb-1.5 flex items-center justify-between">
+                    <label class="text-[13px] font-semibold" for="cv-out">결과</label>
+                    <button type="button" class="ec-copy" data-copy="cv-out">복사</button>
+                </div>
+                <textarea id="cv-out" class="ec-input" spellcheck="false" readonly></textarea>
+                <p id="cv-err" class="mt-1 min-h-[18px] text-[12px] text-[#d44c47]"></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 해시 -->
+    <section data-panel="hash" class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6" hidden>
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div>
+                <label class="mb-1.5 block text-[13px] font-semibold" for="hs-in">텍스트 (UTF-8)</label>
+                <textarea id="hs-in" class="ec-input" spellcheck="false">smjgallery</textarea>
+                <label class="mb-1.5 mt-4 block text-[13px] font-semibold" for="hs-key">HMAC 키 <span class="font-normal text-[#8e8e93]">(선택 — 넣으면 HMAC 도 계산)</span></label>
+                <input id="hs-key" class="ec-input" type="text" spellcheck="false" autocomplete="off" />
+                <div id="hs-drop" class="mt-4 cursor-pointer rounded-2xl border-2 border-dashed border-black/[0.12] p-5 text-center text-[13px] text-[#6e6e73]">
+                    📄 파일을 끌어놓거나 눌러서 고르면 파일 해시를 계산해요 <span class="text-[#8e8e93]">(MD5 는 200MB 까지)</span>
+                    <input id="hs-file" type="file" class="hidden" />
+                </div>
+                <p id="hs-file-name" class="ec-mono mt-2 text-[12px] text-[#6e6e73]"></p>
+            </div>
+            <div>
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[15px] font-semibold" id="hs-title">텍스트 해시</h2>
+                    <label class="flex items-center gap-2 text-[12px] text-[#6e6e73]"><input type="checkbox" id="hs-upper"> 대문자</label>
+                </div>
+                <div id="hs-out" class="mt-2"></div>
+                <div class="mt-4 rounded-xl bg-[#f5f5f7] p-3">
+                    <label class="text-[12px] font-semibold" for="hs-compare">비교할 해시값 붙여넣기</label>
+                    <input id="hs-compare" class="ec-input mt-1.5" type="text" spellcheck="false" placeholder="다운로드 페이지의 SHA-256 등" />
+                    <p id="hs-compare-result" class="mt-1.5 min-h-[18px] text-[12px]"></p>
+                </div>
+                <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">MD5·SHA-1 은 충돌이 알려져 있어 보안 용도(서명·비밀번호 저장)에는 쓰지 마세요. 파일 무결성 확인에는 SHA-256 을 권장해요.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- JWT -->
+    <section data-panel="jwt" class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6" hidden>
+        <label class="mb-1.5 block text-[13px] font-semibold" for="jwt-in">JWT 토큰</label>
+        <textarea id="jwt-in" class="ec-input" style="min-height:110px" spellcheck="false" placeholder="eyJhbGciOi..."></textarea>
+        <p id="jwt-status" class="mt-2 min-h-[20px] text-[13px]"></p>
+        <div class="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div>
+                <p class="mb-1.5 text-[13px] font-semibold text-[#d44c47]">Header</p>
+                <pre id="jwt-head" class="ec-input ec-mono min-h-[120px] whitespace-pre-wrap break-all text-[13px]"></pre>
+            </div>
+            <div>
+                <p class="mb-1.5 text-[13px] font-semibold text-[#8e44ad]">Payload</p>
+                <pre id="jwt-body" class="ec-input ec-mono min-h-[120px] whitespace-pre-wrap break-all text-[13px]"></pre>
+            </div>
+        </div>
+        <dl id="jwt-times" class="mt-3 text-[13px]"></dl>
+        <p class="mt-3 text-[12px] text-[#8e8e93]">내용만 풀어서 보여줘요. 서명이 올바른지는 검증하지 않아요(비밀키가 필요).</p>
+    </section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const enc = new TextEncoder();
+    const dec = new TextDecoder('utf-8', { fatal: true });
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+    // ── 탭
+    document.querySelectorAll('.ec-tab').forEach((btn) => btn.addEventListener('click', () => {
+        document.querySelectorAll('.ec-tab').forEach((b) => b.classList.toggle('is-active', b === btn));
+        document.querySelectorAll('[data-panel]').forEach((p) => { p.hidden = p.dataset.panel !== btn.dataset.tab; });
+    }));
+
+    async function copyText(text, btn) {
+        try { await navigator.clipboard.writeText(text); } catch {
+            const t = document.createElement('textarea'); t.value = text; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+        }
+        const old = btn.textContent; btn.textContent = '복사됨'; setTimeout(() => { btn.textContent = old; }, 1000);
+    }
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-copy],[data-copy-text]');
+        if (!b) return;
+        copyText(b.dataset.copyText ?? $(b.dataset.copy).value, b);
+    });
+
+    // ── 바이트 도우미
+    const toBin = (bytes) => { let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return s; };
+    const fromBin = (s) => Uint8Array.from(s, (c) => c.charCodeAt(0));
+    const toHex = (bytes) => Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    const b64enc = (bytes) => btoa(toBin(bytes));
+    const b64dec = (s) => {
+        s = s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+        while (s.length % 4) s += '=';
+        return fromBin(atob(s));
+    };
+    const utf8 = (bytes) => { try { return dec.decode(bytes); } catch { throw new Error('UTF-8 텍스트가 아니에요. (바이너리 데이터일 수 있어요 — Hex 로 확인해 보세요)'); } };
+
+    // ── 변환
+    let direction = 'enc';
+    const CONVERT = {
+        b64: { enc: (s) => b64enc(enc.encode(s)), dec: (s) => utf8(b64dec(s)) },
+        b64url: { enc: (s) => b64enc(enc.encode(s)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''), dec: (s) => utf8(b64dec(s)) },
+        url: { enc: (s) => encodeURIComponent(s), dec: (s) => decodeURIComponent(s.replace(/\+/g, ' ')) },
+        hex: {
+            enc: (s) => toHex(enc.encode(s)),
+            dec: (s) => {
+                const h = s.replace(/0x/gi, '').replace(/[\s:,-]/g, '');
+                if (!/^[0-9a-fA-F]*$/.test(h) || h.length % 2) throw new Error('16진수 두 자리씩이어야 해요.');
+                return utf8(Uint8Array.from(h.match(/../g) || [], (x) => parseInt(x, 16)));
+            },
+        },
+        html: {
+            enc: (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])),
+            dec: (s) => new DOMParser().parseFromString(`<!doctype html><body><textarea>${s.replace(/<\/textarea/gi, '')}</textarea>`, 'text/html').querySelector('textarea').value,
+        },
+        unicode: {
+            enc: (s) => Array.from(s).map((ch) => {
+                const cp = ch.codePointAt(0);
+                if (cp < 0x80) return ch;
+                return ch.split('').map((u) => '\\u' + u.charCodeAt(0).toString(16).padStart(4, '0')).join('');
+            }).join(''),
+            dec: (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))),
+        },
+    };
+    function convert() {
+        $('cv-err').textContent = '';
+        try { $('cv-out').value = CONVERT[$('cv-mode').value][direction]($('cv-in').value); }
+        catch (err) { $('cv-out').value = ''; $('cv-err').textContent = err.message.includes('atob') || err.name === 'InvalidCharacterError' ? '올바른 Base64 가 아니에요.' : err.message === 'URI malformed' ? '올바른 URL 인코딩이 아니에요.' : err.message; }
+    }
+    const setDir = (d) => {
+        direction = d;
+        $('cv-enc').className = d === 'enc' ? 'bg-[#0066cc] px-4 py-2 font-semibold text-white' : 'px-4 py-2 text-[#1d1d1f]';
+        $('cv-dec').className = d === 'dec' ? 'bg-[#0066cc] px-4 py-2 font-semibold text-white' : 'px-4 py-2 text-[#1d1d1f]';
+        convert();
+    };
+    $('cv-enc').addEventListener('click', () => setDir('enc'));
+    $('cv-dec').addEventListener('click', () => setDir('dec'));
+    $('cv-swap').addEventListener('click', () => { $('cv-in').value = $('cv-out').value; setDir(direction === 'enc' ? 'dec' : 'enc'); });
+    $('cv-in').addEventListener('input', convert);
+    $('cv-mode').addEventListener('change', convert);
+    convert();
+
+    // ── MD5 (WebCrypto 에 없어서 직접 구현, RFC 1321)
+    const MD5_K = Array.from({ length: 64 }, (_, i) => Math.floor(Math.abs(Math.sin(i + 1)) * 2 ** 32) >>> 0);
+    const MD5_S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+    function md5(bytes) {
+        const len = bytes.length;
+        const blocks = ((len + 8) >>> 6) + 1;
+        const w = new Uint32Array(blocks * 16);
+        for (let i = 0; i < len; i++) w[i >>> 2] |= bytes[i] << ((i & 3) * 8);
+        w[len >>> 2] |= 0x80 << ((len & 3) * 8);
+        w[blocks * 16 - 2] = (len * 8) >>> 0;
+        w[blocks * 16 - 1] = Math.floor(len / 0x20000000) >>> 0;
+        let a0 = 0x67452301, b0 = 0xefcdab89, c0 = 0x98badcfe, d0 = 0x10325476;
+        for (let off = 0; off < w.length; off += 16) {
+            let A = a0, B = b0, C = c0, D = d0;
+            for (let i = 0; i < 64; i++) {
+                let F, g;
+                if (i < 16) { F = (B & C) | (~B & D); g = i; }
+                else if (i < 32) { F = (D & B) | (~D & C); g = (5 * i + 1) & 15; }
+                else if (i < 48) { F = B ^ C ^ D; g = (3 * i + 5) & 15; }
+                else { F = C ^ (B | ~D); g = (7 * i) & 15; }
+                const s = MD5_S[(i >>> 4) * 4 + (i & 3)];
+                F = (F + A + MD5_K[i] + w[off + g]) >>> 0;
+                A = D; D = C; C = B;
+                B = (B + ((F << s) | (F >>> (32 - s)))) >>> 0;
+            }
+            a0 = (a0 + A) >>> 0; b0 = (b0 + B) >>> 0; c0 = (c0 + C) >>> 0; d0 = (d0 + D) >>> 0;
+        }
+        const out = new Uint8Array(16);
+        [a0, b0, c0, d0].forEach((v, k) => { for (let j = 0; j < 4; j++) out[k * 4 + j] = (v >>> (8 * j)) & 255; });
+        return toHex(out);
+    }
+    window.__mjMd5 = md5;  // 테스트용
+
+    // ── 해시
+    const ALGOS = ['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512'];
+    let current = [];
+    async function hashBytes(bytes, key) {
+        const rows = [];
+        rows.push(['MD5', bytes.length <= 200 * 1024 * 1024 ? md5(bytes) : '(200MB 초과 — 계산 안 함)']);
+        for (const algo of ALGOS) rows.push([algo, toHex(new Uint8Array(await crypto.subtle.digest(algo, bytes)))]);
+        if (key) {
+            const k = await crypto.subtle.importKey('raw', enc.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+            rows.push(['HMAC-SHA256', toHex(new Uint8Array(await crypto.subtle.sign('HMAC', k, bytes)))]);
+        }
+        return rows;
+    }
+    function renderHashes() {
+        const upper = $('hs-upper').checked;
+        $('hs-out').innerHTML = current.map(([name, v]) => {
+            const val = upper && !v.startsWith('(') ? v.toUpperCase() : v;
+            return `<div class="ec-hash"><span class="text-[12px] font-semibold text-[#6e6e73]">${name}</span><code class="ec-mono">${esc(val)}</code><button type="button" class="ec-copy" data-copy-text="${esc(val)}">복사</button></div>`;
+        }).join('');
+        compare();
+    }
+    function compare() {
+        const want = $('hs-compare').value.trim().toLowerCase().replace(/\s+/g, '');
+        const out = $('hs-compare-result');
+        if (!want) { out.textContent = ''; return; }
+        const hit = current.find(([, v]) => v.toLowerCase() === want);
+        out.innerHTML = hit ? `<span class="text-[#1e7a35]">✓ ${hit[0]} 값과 일치해요.</span>` : '<span class="text-[#d44c47]">✗ 일치하는 해시가 없어요.</span>';
+    }
+    let hashTimer;
+    async function hashText() {
+        $('hs-title').textContent = '텍스트 해시';
+        $('hs-file-name').textContent = '';
+        current = await hashBytes(enc.encode($('hs-in').value), $('hs-key').value);
+        renderHashes();
+    }
+    const scheduleText = () => { clearTimeout(hashTimer); hashTimer = setTimeout(hashText, 120); };
+    $('hs-in').addEventListener('input', scheduleText);
+    $('hs-key').addEventListener('input', scheduleText);
+    $('hs-upper').addEventListener('change', renderHashes);
+    $('hs-compare').addEventListener('input', compare);
+
+    async function hashFile(file) {
+        $('hs-title').textContent = '파일 해시';
+        $('hs-file-name').textContent = `${file.name} · ${(file.size / 1048576).toFixed(2)} MB · 계산 중…`;
+        $('hs-out').innerHTML = '';
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        current = await hashBytes(bytes, $('hs-key').value);
+        $('hs-file-name').textContent = `${file.name} · ${(file.size / 1048576).toFixed(2)} MB`;
+        renderHashes();
+    }
+    const drop = $('hs-drop');
+    drop.addEventListener('click', () => $('hs-file').click());
+    $('hs-file').addEventListener('change', (e) => { if (e.target.files[0]) hashFile(e.target.files[0]); });
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('border-[#0066cc]'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('border-[#0066cc]'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('border-[#0066cc]'); if (e.dataTransfer.files[0]) hashFile(e.dataTransfer.files[0]); });
+    if (window.crypto && crypto.subtle) hashText();
+    else $('hs-out').innerHTML = '<p class="text-[13px] text-[#d44c47]">이 브라우저(또는 http 접속)에서는 SHA 계산을 쓸 수 없어요. https 로 접속해 주세요.</p>';
+
+    // ── JWT
+    function showJwt() {
+        const raw = $('jwt-in').value.trim();
+        const status = $('jwt-status');
+        $('jwt-head').textContent = ''; $('jwt-body').textContent = ''; $('jwt-times').innerHTML = '';
+        if (!raw) { status.textContent = ''; return; }
+        const parts = raw.split('.');
+        if (parts.length < 2) { status.innerHTML = '<span class="text-[#d44c47]">JWT 는 점(.)으로 나뉜 세 부분이어야 해요.</span>'; return; }
+        try {
+            const head = JSON.parse(utf8(b64dec(parts[0])));
+            const body = JSON.parse(utf8(b64dec(parts[1])));
+            $('jwt-head').textContent = JSON.stringify(head, null, 2);
+            $('jwt-body').textContent = JSON.stringify(body, null, 2);
+            const now = Date.now() / 1000;
+            const fmt = (t) => new Date(t * 1000).toLocaleString();
+            const rows = [['iat', '발급'], ['nbf', '사용 시작'], ['exp', '만료']]
+                .filter(([k]) => typeof body[k] === 'number')
+                .map(([k, label]) => `<div class="flex gap-3 py-1"><span class="w-24 text-[#8e8e93]">${label} (${k})</span><span class="ec-mono">${esc(fmt(body[k]))}</span></div>`);
+            $('jwt-times').innerHTML = rows.join('');
+            if (typeof body.exp === 'number' && body.exp < now) status.innerHTML = '<span class="text-[#d44c47]">⚠️ 만료된 토큰이에요.</span>';
+            else if (typeof body.nbf === 'number' && body.nbf > now) status.innerHTML = '<span class="text-[#b26a00]">아직 사용 시작 전인 토큰이에요.</span>';
+            else status.innerHTML = `<span class="text-[#1e7a35]">✓ 해석됨 · 알고리즘 ${esc(head.alg || '?')}</span>`;
+        } catch {
+            status.innerHTML = '<span class="text-[#d44c47]">JWT 형식이 아니에요. (Base64URL 로 인코딩된 JSON 이어야 해요)</span>';
+        }
+    }
+    $('jwt-in').addEventListener('input', showJwt);
+})();
+</script>
+{% endblock %}

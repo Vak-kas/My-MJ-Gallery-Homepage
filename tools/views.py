@@ -47,6 +47,10 @@ def keygen(request):
 	return render(request, "tools/keygen.html")
 
 
+def encode(request):
+	return render(request, "tools/encode.html")
+
+
 # ── 실시간 데이터 스트림 ─────────────────────────────
 
 MB = 1024 * 1024
