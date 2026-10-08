@@ -136,17 +136,6 @@ class NotificationTests(TestCase):
         self.client.post(reverse("notifications:clear_read"))
         self.assertFalse(Notification.objects.exists())
 
-    @override_settings(NTFY_TOPIC_URL="https://ntfy.example/topic", SITE_URL="https://smjgallery.kr")
-    def test_ntfy_push(self):
-        with mock.patch("notifications.service.urllib.request.urlopen") as urlopen, \
-                mock.patch("notifications.service.threading.Thread") as thread:
-            thread.side_effect = lambda target, daemon: mock.Mock(start=target)
-            GuestbookEntry.objects.create(author=self.member, author_name="member", message="안녕")
-        req = urlopen.call_args[0][0]
-        self.assertEqual(req.full_url, "https://ntfy.example/topic")
-        self.assertEqual(req.data, "안녕".encode())
-        self.assertTrue(req.headers["Click"].startswith("https://smjgallery.kr/studio/community/"))
-
 
 @override_settings(KAKAO_REST_API_KEY="rest-key", KAKAO_CLIENT_SECRET="secret", SITE_URL="https://smjgallery.kr")
 class KakaoTests(TestCase):

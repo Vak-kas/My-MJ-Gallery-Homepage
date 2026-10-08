@@ -1,6 +1,5 @@
 import logging
 import threading
-import urllib.request
 
 from django.conf import settings
 from django.db import connection
@@ -11,10 +10,8 @@ logger = logging.getLogger(__name__)
 
 
 def notify(kind, title, body="", url=""):
-    """사이트 알림을 남기고, 설정돼 있으면 휴대폰 푸시(ntfy)·카카오톡으로도 보냄."""
+    """사이트 알림을 남기고, 카카오톡이 연결돼 있으면 카카오톡으로도 보냄."""
     item = Notification.objects.create(kind=kind, title=title[:200], body=body[:300], url=url[:300])
-    if getattr(settings, "NTFY_TOPIC_URL", ""):
-        _run_background(lambda: _push_ntfy(item))
     if getattr(settings, "KAKAO_REST_API_KEY", ""):
         _run_background(lambda: _push_kakao(item))
     return item
@@ -41,20 +38,3 @@ def _push_kakao(item):
     if item.body:
         text += f"\n\n{item.body}"
     kakao.send_text(text, item.url)
-
-
-def _push_ntfy(item):
-    topic_url = getattr(settings, "NTFY_TOPIC_URL", "")
-    if not topic_url:
-        return
-    site = getattr(settings, "SITE_URL", "").rstrip("/")
-    headers = {"Title": item.title.encode("utf-8"), "Tags": item.kind}
-    if site and item.url:
-        headers["Click"] = f"{site}{item.url}"
-    token = getattr(settings, "NTFY_TOKEN", "")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
-    data = (item.body or item.title).encode("utf-8")
-
-    req = urllib.request.Request(topic_url, data=data, headers=headers, method="POST")
-    urllib.request.urlopen(req, timeout=5).close()

@@ -63,7 +63,6 @@
 - 알림 종류: 가입 요청, 다른 회원의 댓글 · 방명록 · 새 글 발행 (관리자 본인 활동은 제외)
 - `/notifications/`: 종류별 필터, 누르면 읽음 처리 후 해당 화면으로 이동, 모두 읽음 / 읽은 알림 지우기
 - **카카오톡 '나에게 보내기'** 연동: 알림 화면에서 카카오톡 연결 → 새 알림을 나와의 채팅으로 전송 (토큰 자동 갱신)
-- **ntfy** 휴대폰 푸시 (선택)
 
 ### 1.8 Studio (관리자 전용 CMS, `/studio/`)
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
@@ -98,7 +97,7 @@ MjGallery/
 ├─ blog/              # 블로그/댓글/좋아요/방명록, 에디터 콘텐츠 렌더링(content.py)
 ├─ main/              # 홈/갤러리/프로젝트 상세
 ├─ studio/            # 관리자 CMS (Posts, Community, Users 포함)
-├─ notifications/     # 관리자 알림, 카카오톡·ntfy 푸시
+├─ notifications/     # 관리자 알림, 카카오톡 푸시
 ├─ tools/             # Tool 메뉴 (키 생성기, 클립보드, 속도 측정, 계산기, 데이터 전송·맡겨두기)
 ├─ relay/             # 데이터 전송 중계 데몬(mj_relay.py), CLI(mj_stream.py), 서버 설치 스크립트
 ├─ frontend/editor/   # 노션형 에디터 소스 (Tiptap)
@@ -150,11 +149,10 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # RELAY_PORT_MAX=5599
 # RELAY_PUBLIC_HOST=smjgallery.kr
 
-# 선택: 관리자 알림 푸시
+# 선택: 관리자 알림 카카오톡
 # SITE_URL=https://smjgallery.kr
 # KAKAO_REST_API_KEY=...        # 카카오 개발자 콘솔 > 플랫폼 키 > REST API 키
 # KAKAO_CLIENT_SECRET=...       # 같은 키의 클라이언트 시크릿
-# NTFY_TOPIC_URL=https://ntfy.sh/<추측하기 어려운 주제 이름>
 ```
 
 카카오톡 알림을 쓰려면 카카오 개발자 콘솔에서

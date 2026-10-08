@@ -106,9 +106,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# 관리자 알림 휴대폰 푸시 (ntfy, 선택). 예: NTFY_TOPIC_URL=https://ntfy.sh/<아무도 모를 긴 이름>
-NTFY_TOPIC_URL = os.getenv("NTFY_TOPIC_URL", "")
-NTFY_TOKEN = os.getenv("NTFY_TOKEN", "")
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
 # 관리자 알림 카카오톡 '나에게 보내기' (선택)
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
