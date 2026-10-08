@@ -110,6 +110,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 NTFY_TOPIC_URL = os.getenv("NTFY_TOPIC_URL", "")
 NTFY_TOKEN = os.getenv("NTFY_TOKEN", "")
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
+# 관리자 알림 카카오톡 '나에게 보내기' (선택)
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
+KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
 
 
 # Database
