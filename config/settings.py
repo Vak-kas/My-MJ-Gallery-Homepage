@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'blog',
     'tools',
     'notifications',
+    'security',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'security.middleware.IPBlockMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

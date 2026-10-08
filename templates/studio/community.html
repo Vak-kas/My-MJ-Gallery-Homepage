@@ -227,6 +227,7 @@
                                 <span class="font-semibold text-[#1d1d1f]">{{ item.author_name }}</span>
                                 {% if item.author %}<span>@{{ item.author.username }}</span>{% else %}<span class="rounded bg-[#f5f5f7] px-1.5">비회원</span>{% endif %}
                                 <span>{{ item.created_at|date:"Y.m.d H:i" }}</span>
+                                {% if item.author_ip %}<a href="{% url 'studio:security' %}?tab=content&ip={{ item.author_ip }}" onclick="event.stopPropagation()" class="font-mono hover:text-[#0066cc] hover:underline">{{ item.author_ip }}</a>{% endif %}
                                 {% if not item.is_visible %}<span class="rounded-full bg-[#1d1d1f] px-2 py-0.5 text-white">숨김</span>{% endif %}
                                 {% if tab == 'comments' %}<a href="{% url 'blog:post_detail' item.post.slug %}" target="_blank" class="truncate text-[#0066cc] hover:underline" onclick="event.stopPropagation()">↗ {{ item.post.title|truncatechars:40 }}</a>{% endif %}
                             </div>

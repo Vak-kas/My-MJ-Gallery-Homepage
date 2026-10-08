@@ -23,6 +23,7 @@ from django.utils.text import slugify
 from urllib.parse import urlencode
 
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
+from security.utils import client_ip, user_agent
 
 
 UNLOCK_MAX_ATTEMPTS = 5
@@ -340,6 +341,8 @@ def index(request):
 					author=request.user,
 					author_name=request.user.get_username()[:60],
 					message=message[:1000],
+					author_ip=client_ip(request),
+					author_agent=user_agent(request),
 				)
 				messages.success(request, "방명록이 등록되었습니다.")
 
@@ -654,6 +657,8 @@ def post_detail(request, slug: str):
 					author=request.user,
 					author_name=author_name[:60],
 					content=content[:1200],
+					author_ip=client_ip(request),
+					author_agent=user_agent(request),
 				)
 				messages.success(request, "댓글이 등록되었습니다.")
 			else:
@@ -877,6 +882,8 @@ def post_create(request):
 				author=request.user,
 				is_published=is_published,
 				published_at=timezone.now() if is_published else None,
+				author_ip=client_ip(request),
+				author_agent=user_agent(request),
 			)
 
 		_apply_post_tags(post, tags_raw)

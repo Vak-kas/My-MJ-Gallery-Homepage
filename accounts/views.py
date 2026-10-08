@@ -11,6 +11,8 @@ from django.utils import timezone
 
 from accounts.forms import UserForm
 from accounts.models import SignupRequest
+from security.models import LoginEvent
+from security.utils import clear_failures, client_ip, is_locked, record_failure, user_agent
 from notifications.models import Notification
 from notifications.service import notify
 
@@ -97,12 +99,22 @@ def login_view(request):
     if request.method == "POST":
         username = request.POST.get('username')
         password = request.POST.get('password')
+        ip = client_ip(request)
+        if is_locked(ip, username):
+            LoginEvent.objects.create(
+                username=(username or "")[:150], ip=ip, user_agent=user_agent(request), result=LoginEvent.RESULT_LOCKED,
+            )
+            return render(request, 'accounts/login.html', {
+                'error': '로그인 실패가 너무 많아 잠시 잠겼어요. 15분 뒤에 다시 시도해 주세요.',
+                'next_url': next_url,
+            })
         user = authenticate(
             request,
             username=username,
             password=password
         )
         if user is not None:
+            clear_failures(ip, username)
             login(request, user)
 
             if next_url:
@@ -113,6 +125,7 @@ def login_view(request):
                 return redirect('studio:index')
             return redirect('main:home')
         else:
+            record_failure(ip, username)
             return render(request, 'accounts/login.html', {
                 'error': _inactive_reason(username, password) or '아이디 또는 비밀번호가 올바르지 않습니다.',
                 'next_url': next_url,
