@@ -9,6 +9,14 @@
 
 TOOLS = [
 	{
+		"slug": "keygen",
+		"url_name": "tools:keygen",
+		"icon": "🔑",
+		"title": "암호화 키 생성기",
+		"description": "길이·문자 종류·형식(Hex·Base64·UUID·PIN·API 키)을 골라 안전한 키와 비밀번호를 만들고, RSA·ECDSA 키 쌍도 PEM 으로 생성합니다. 모두 브라우저 안에서만 만들어져요.",
+		"tags": ["보안", "생성기"],
+	},
+	{
 		"slug": "clipboard",
 		"url_name": "tools:clipboard",
 		"icon": "📋",
