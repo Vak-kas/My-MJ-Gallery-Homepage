@@ -3,6 +3,7 @@
 {% block content %}
 {% include "components/main_nav.html" %}
 <main class="mx-auto max-w-[760px] px-5 py-12 pb-24 text-[#1d1d1f]">
+    {% include "components/studio_messages.html" %}
     <div class="flex flex-wrap items-end justify-between gap-3">
         <div>
             <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">NOTIFICATIONS</p>
@@ -15,6 +16,28 @@
             <form method="post" action="{% url 'notifications:clear_read' %}" onsubmit="return confirm('읽은 알림을 모두 지울까요?');">{% csrf_token %}<button class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] text-[#6e6e73] hover:bg-[#f5f5f7]">읽은 알림 지우기</button></form>
         </div>
     </div>
+
+    <section class="mt-6 flex flex-wrap items-center gap-3 rounded-[20px] border border-black/[0.06] bg-white px-5 py-4">
+        <span class="text-[22px]">💛</span>
+        <div class="min-w-0 flex-1 text-[13px]">
+            <p class="text-[14px] font-semibold">카카오톡 알림</p>
+            {% if kakao_link %}
+            <p class="text-[#1e7a35]">연결됨 · 나와의 채팅으로 받아요{% if kakao_link.last_sent_at %} · 마지막 전송 {{ kakao_link.last_sent_at|timesince }} 전{% endif %}</p>
+            {% if kakao_link.last_error %}<p class="text-[#c4271d]">최근 오류: {{ kakao_link.last_error }} — 계속되면 다시 연결해 주세요.</p>{% endif %}
+            {% elif kakao_configured %}
+            <p class="text-[#6e6e73]">연결하면 새 알림이 카카오톡 나와의 채팅으로 와요.</p>
+            {% else %}
+            <p class="text-[#6e6e73]">서버 .env 에 KAKAO_REST_API_KEY 를 넣으면 연결할 수 있어요.</p>
+            {% endif %}
+        </div>
+        {% if kakao_link %}
+        <form method="post" action="{% url 'notifications:kakao_test' %}">{% csrf_token %}<button class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] hover:bg-[#f5f5f7]">테스트 보내기</button></form>
+        <form method="post" action="{% url 'notifications:kakao_connect' %}">{% csrf_token %}<button class="rounded-full border border-black/[0.1] px-4 py-2 text-[13px] hover:bg-[#f5f5f7]">다시 연결</button></form>
+        <form method="post" action="{% url 'notifications:kakao_disconnect' %}" onsubmit="return confirm('카카오톡 알림 연결을 해제할까요?');">{% csrf_token %}<button class="rounded-full px-3 py-2 text-[13px] text-[#c4271d] hover:bg-[#fff5f4]">해제</button></form>
+        {% elif kakao_configured %}
+        <form method="post" action="{% url 'notifications:kakao_connect' %}">{% csrf_token %}<button class="rounded-full bg-[#FEE500] px-5 py-2 text-[13px] font-semibold text-[#191919]">카카오톡 연결</button></form>
+        {% endif %}
+    </section>
 
     <div class="mt-6 flex flex-wrap gap-2 text-[13px]">
         <a href="?" class="rounded-full px-4 py-1.5 {% if not kind %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">전체</a>
