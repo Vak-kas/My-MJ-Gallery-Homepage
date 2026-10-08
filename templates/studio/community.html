@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO COMMUNITY</p>
+            <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">방명록 · 댓글 관리</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">스팸은 숨기거나 지우고, 같은 키워드가 들어간 글·댓글·방명록은 한 번에 정리합니다.</p>
+            <div class="mt-5 flex flex-wrap gap-2 text-[13px]">
+                {% for key, label in tabs %}
+                <a href="?tab={{ key }}" class="rounded-full px-4 py-1.5 {% if tab == key %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">{{ label }} {% if key == 'guestbook' %}{{ counts.guestbook }}{% else %}{{ counts.comments }}{% endif %}</a>
+                {% endfor %}
+                <a href="?tab=cleanup" class="rounded-full px-4 py-1.5 {% if tab == 'cleanup' %}bg-[#ff3b30] text-white{% else %}border border-[#ff3b30]/30 text-[#c4271d] hover:bg-white{% endif %}">🧹 키워드 일괄 정리</a>
+            </div>
+        </section>
+
+        {% if tab == 'cleanup' %}
+        <section class="grid gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+            <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold">1. 키워드로 찾기</h2>
+                    <form method="get" class="mt-3 space-y-3">
+                        <input type="hidden" name="tab" value="cleanup">
+                        <input type="text" name="keyword" value="{{ keyword }}" placeholder="예: 555, 카지노, 특정 링크" required minlength="2"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <div class="space-y-1.5 text-[13px]">
+                            {% for value, label in purge_fields %}
+                            <label class="flex items-center gap-2"><input type="checkbox" name="fields" value="{{ value }}" class="h-4 w-4" {% if value in fields %}checked{% endif %}> {{ label }}</label>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">미리보기</button>
+                    </form>
+                    <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">대소문자 구분 없이 <b>포함</b>된 항목을 모두 찾습니다. 숫자처럼 짧은 키워드는 정상 글까지 걸릴 수 있으니 미리보기를 꼭 확인하세요. 글 본문은 기본으로 꺼져 있어요.</p>
+                </section>
+
+                {% if keyword and preview_total %}
+                <section class="rounded-[20px] border border-[#ff3b30]/25 bg-white p-4">
+                    <h2 class="text-[14px] font-semibold text-[#c4271d]">2. 모두 삭제</h2>
+                    <form method="post" action="{% url 'studio:community' %}" class="mt-3 space-y-2" onsubmit="return confirm('&quot;{{ keyword|escapejs }}&quot; 이(가) 들어간 {{ preview_total }}개 항목을 모두 삭제할까요? 되돌릴 수 없습니다.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string }}">
+                        <input type="hidden" name="action" value="purge">
+                        <input type="text" name="confirm" placeholder="DELETE 입력" required
+                            class="h-10 w-full rounded-xl border border-[#ff3b30]/20 px-3 text-[13px] outline-none focus:border-[#ff3b30]" />
+                        <button type="submit" class="h-10 w-full rounded-xl bg-[#ff3b30] px-4 text-[13px] font-semibold text-white">{{ preview_total }}개 항목 삭제</button>
+                    </form>
+                </section>
+                {% endif %}
+            </aside>
+
+            <div class="space-y-4">
+                {% if not keyword %}
+                <div class="rounded-[20px] border border-dashed border-black/[0.12] bg-white/60 p-10 text-center text-[14px] text-[#8e8e93]">왼쪽에 키워드를 넣고 미리보기를 누르면 지워질 항목이 여기에 나옵니다.</div>
+                {% else %}
+                {% for group in preview %}
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                    <h3 class="text-[15px] font-semibold">{{ group.label }} <span class="text-[#c4271d]">{{ group.count }}개</span></h3>
+                    {% if group.sample %}
+                    <ul class="mt-3 divide-y divide-black/[0.05] text-[13px]">
+                        {% for obj in group.sample %}
+                        <li class="flex gap-3 py-2">
+                            <span class="w-[86px] shrink-0 text-[#8e8e93]">{{ obj.created_at|date:"y.m.d H:i" }}</span>
+                            <span class="w-[110px] shrink-0 truncate text-[#6e6e73]">{% if group.key == 'posts' %}{{ obj.author.username|default:'(탈퇴)' }}{% else %}{{ obj.author_name }}{% endif %}</span>
+                            <span class="min-w-0 flex-1 truncate">{% if group.key == 'posts' %}{{ obj.title }}{% elif group.key == 'comments' %}{{ obj.content }}{% else %}{{ obj.message }}{% endif %}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% if group.count > group.sample|length %}<p class="mt-2 text-[12px] text-[#8e8e93]">… 외 {{ group.count|add:"-20" }}개</p>{% endif %}
+                    {% endif %}
+                </section>
+                {% empty %}
+                <div class="rounded-[20px] border border-black/[0.06] bg-white p-6 text-[14px] text-[#8e8e93]">검색할 대상을 하나 이상 체크해 주세요.</div>
+                {% endfor %}
+                {% endif %}
+            </div>
+        </section>
+
+        {% else %}
+        <section class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+            <aside class="space-y-4 lg:sticky lg:top-24 lg:self-start">
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold">필터</h2>
+                    <form method="get" class="mt-3 space-y-2">
+                        <input type="hidden" name="tab" value="{{ tab }}">
+                        <input type="text" name="q" value="{{ filters.q }}" placeholder="내용 검색"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <input type="text" name="author" value="{{ filters.author }}" placeholder="작성자 (이름·아이디)"
+                            class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
+                        <select name="visible" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            <option value="">보임·숨김 전체</option>
+                            <option value="shown" {% if filters.visible == 'shown' %}selected{% endif %}>보이는 것만</option>
+                            <option value="hidden" {% if filters.visible == 'hidden' %}selected{% endif %}>숨긴 것만</option>
+                        </select>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="date" name="created_from" value="{{ filters.created_from }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+                            <input type="date" name="created_to" value="{{ filters.created_to }}" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[12px] outline-none focus:border-[#0066cc]" />
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+                            <a href="?tab={{ tab }}" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px]">초기화</a>
+                        </div>
+                    </form>
+                </section>
+
+                <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
+                    <h2 class="text-[14px] font-semibold">일괄 작업</h2>
+                    <form id="bulk-form" method="post" action="{% url 'studio:community' %}" class="mt-3 space-y-2" data-filtered-count="{{ item_count }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="return_qs" value="{{ current_query_string }}">
+                        <div class="grid gap-1.5 rounded-xl border border-black/[0.08] p-2 text-[12px]">
+                            <label class="flex items-center gap-2"><input type="radio" name="scope" value="selected" checked class="h-4 w-4"> 체크한 항목만</label>
+                            <label class="flex items-center gap-2 {% if not has_filter %}opacity-40{% endif %}"><input type="radio" name="scope" value="filtered" class="h-4 w-4" {% if not has_filter %}disabled{% endif %}> 필터 결과 전체 <b>{{ item_count }}개</b></label>
+                        </div>
+                        <label class="inline-flex items-center gap-2 rounded-lg border border-black/[0.08] px-3 py-2 text-[12px] text-[#6e6e73]">
+                            <input id="select-all" type="checkbox" class="h-4 w-4" /> 이 페이지 전체 체크
+                        </label>
+                        <select name="action" required class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                            <option value="">작업 선택</option>
+                            <option value="hide">숨기기</option>
+                            <option value="show">다시 보이기</option>
+                            <option value="delete">삭제</option>
+                        </select>
+                        <input type="text" name="confirm" placeholder="삭제 시 DELETE 입력"
+                            class="h-10 w-full rounded-xl border border-[#ff3b30]/20 px-3 text-[12px] outline-none focus:border-[#ff3b30]" />
+                        <button type="submit" class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">실행</button>
+                    </form>
+                </section>
+            </aside>
+
+            <div>
+                <p class="mb-3 text-[13px] text-[#6e6e73]">{{ item_count }}개</p>
+                <div class="overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
+                    {% for item in items %}
+                    <label class="flex cursor-pointer gap-4 border-b border-black/[0.05] px-5 py-4 last:border-b-0 hover:bg-[#fafafa] {% if not item.is_visible %}bg-[#fafafa] opacity-60{% endif %}">
+                        <input type="checkbox" name="ids" value="{{ item.id }}" form="bulk-form" class="item-checkbox mt-1 h-4 w-4 shrink-0" />
+                        <div class="min-w-0 flex-1">
+                            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#8e8e93]">
+                                <span class="font-semibold text-[#1d1d1f]">{{ item.author_name }}</span>
+                                {% if item.author %}<span>@{{ item.author.username }}</span>{% else %}<span class="rounded bg-[#f5f5f7] px-1.5">비회원</span>{% endif %}
+                                <span>{{ item.created_at|date:"Y.m.d H:i" }}</span>
+                                {% if not item.is_visible %}<span class="rounded-full bg-[#1d1d1f] px-2 py-0.5 text-white">숨김</span>{% endif %}
+                                {% if tab == 'comments' %}<a href="{% url 'blog:post_detail' item.post.slug %}" target="_blank" class="truncate text-[#0066cc] hover:underline" onclick="event.stopPropagation()">↗ {{ item.post.title|truncatechars:40 }}</a>{% endif %}
+                            </div>
+                            <p class="mt-1.5 whitespace-pre-line break-words text-[14px] leading-6">{% if tab == 'comments' %}{{ item.content|truncatechars:400 }}{% else %}{{ item.message|truncatechars:400 }}{% endif %}</p>
+                        </div>
+                    </label>
+                    {% empty %}
+                    <p class="p-10 text-center text-[14px] text-[#8e8e93]">항목이 없습니다.</p>
+                    {% endfor %}
+                </div>
+
+                {% if page_obj.paginator.num_pages > 1 %}
+                <nav class="mt-5 flex items-center justify-center gap-2 text-[13px]">
+                    {% if page_obj.has_previous %}<a href="?{{ current_query_string }}&page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">이전</a>{% endif %}
+                    <span class="text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    {% if page_obj.has_next %}<a href="?{{ current_query_string }}&page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">다음</a>{% endif %}
+                </nav>
+                {% endif %}
+            </div>
+        </section>
+        {% endif %}
+        </main>
+    </div>
+</div>
+
+<script>
+    (function () {
+        const form = document.getElementById('bulk-form');
+        if (!form) return;
+        const selectAll = document.getElementById('select-all');
+        const boxes = Array.from(document.querySelectorAll('.item-checkbox'));
+        if (selectAll) selectAll.addEventListener('change', () => boxes.forEach((cb) => { cb.checked = selectAll.checked; }));
+        form.addEventListener('submit', function (e) {
+            const scope = form.querySelector('input[name="scope"]:checked');
+            const action = form.querySelector('select[name="action"]');
+            const label = action.options[action.selectedIndex].text;
+            const n = scope && scope.value === 'filtered' ? form.dataset.filteredCount : boxes.filter((cb) => cb.checked).length;
+            if (!confirm(n + '개 항목을 "' + label + '" 할까요?')) e.preventDefault();
+        });
+    })();
+</script>
+{% endblock %}

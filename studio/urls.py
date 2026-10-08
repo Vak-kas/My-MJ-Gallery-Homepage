@@ -46,6 +46,8 @@ urlpatterns = [
     path('project/reorder/', views.project_reorder, name='project_reorder'),
 
     path('posts/', views.posts, name='posts'),
+    path('community/', views.community, name='community'),
+    path('users/', views.users, name='users'),
     path('posts/<int:id>/visibility/', views.post_visibility_update, name='post_visibility_update'),
     path('posts/<int:id>/delete/', views.post_delete, name='post_delete'),
 
