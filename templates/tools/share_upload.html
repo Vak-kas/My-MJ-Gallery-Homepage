@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sh-drop { border: 2px dashed rgba(0,0,0,.12); border-radius: 22px; transition: border-color .15s, background .15s; }
+    .sh-drop.is-over { border-color: #0066cc; background: #f0f7ff; }
+    .sh-copy { display: flex; align-items: center; gap: 8px; border-radius: 12px; background: #f5f5f7; padding: 8px 10px; }
+    .sh-copy code { flex: 1 1 auto; min-width: 0; overflow-x: auto; white-space: nowrap; font-size: 12px; }
+    .sh-btn { border-radius: 999px; border: 1px solid rgba(0,0,0,.1); padding: 4px 12px; font-size: 12px; color: #1d1d1f; background: #fff; }
+    html.theme-dark .sh-drop.is-over { background: rgba(78,161,255,.12); }
+    html.theme-dark .sh-copy { background: #2a2a2e; }
+    html.theme-dark .sh-btn { background: #1f1f22; color: #e8e8ea; border-color: rgba(255,255,255,.14); }
+</style>
+
+<main class="mx-auto max-w-[960px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:stream' %}" class="text-[13px] text-[#0066cc]">← 데이터 전송</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DATA TRANSFER · 맡겨두기</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">File Drop.</h1>
+        <p class="mt-3 text-[15px] leading-relaxed text-[#6e6e73]">
+            받는 사람이 지금 접속해 있지 않을 때 쓰세요. 파일을 서버에 잠시 맡겨 두고 링크를 보내면, 받는 사람이 나중에 내려받습니다. 유효 시간이 지나면 자동으로 지워져요.
+        </p>
+    </div>
+
+    <section id="sh-drop" class="sh-drop mt-8 bg-white p-8 text-center">
+        <p class="text-[28px]">📁</p>
+        <p class="mt-2 text-[15px] font-semibold text-[#1d1d1f]">파일을 여기에 끌어놓거나</p>
+        <label class="mt-3 inline-block cursor-pointer rounded-full bg-[#0066cc] px-5 py-2 text-[14px] font-semibold text-white">파일 선택<input id="sh-file" type="file" multiple hidden></label>
+        <div class="mt-4 flex flex-wrap items-center justify-center gap-2 text-[13px] text-[#6e6e73]">
+            <label for="sh-hours">유효 시간</label>
+            <select id="sh-hours" class="h-9 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-3 text-[13px]">
+                {% for h in expiry_hours %}<option value="{{ h }}" {% if h == default_hours %}selected{% endif %}>{% if h < 24 %}{{ h }}시간{% else %}{% widthratio h 24 1 %}일{% endif %}</option>{% endfor %}
+            </select>
+            <span>· 파일당 최대 {{ max_gb }}GB</span>
+        </div>
+    </section>
+
+    <ul id="sh-queue" class="mt-5 space-y-3"></ul>
+
+    <section class="mt-10">
+        <h2 class="text-[16px] font-semibold text-[#1d1d1f]">내가 맡긴 파일</h2>
+        <ul class="mt-4 space-y-3">
+            {% for f in files %}
+            <li class="rounded-2xl border border-black/[0.08] bg-white p-4">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <p class="break-all text-[14px] font-semibold text-[#1d1d1f]">{{ f.name }}</p>
+                    <span class="text-[12px] text-[#8e8e93]">{{ f.size|filesizeformat }} · {% if f.completed %}다운로드 {{ f.download_count }}회 · {{ f.expires_at|timeuntil }} 뒤 삭제{% else %}업로드 미완료{% endif %}</span>
+                </div>
+                {% if f.completed %}
+                <div class="sh-copy mt-3"><code>{{ request.scheme }}://{{ request.get_host }}{% url 'tools:share_download_page' f.token %}</code><button type="button" class="sh-btn" data-copy-prev>복사</button></div>
+                {% endif %}
+                <form method="post" action="{% url 'tools:share_delete' f.token %}" class="mt-2 text-right">{% csrf_token %}<button class="text-[12px] text-[#d44c47]">지금 삭제</button></form>
+            </li>
+            {% empty %}
+            <li class="rounded-2xl border border-dashed border-black/[0.12] p-6 text-center text-[13px] text-[#8e8e93]">맡긴 파일이 없어요.</li>
+            {% endfor %}
+        </ul>
+    </section>
+</main>
+
+{% csrf_token %}
+<script>
+(() => {
+    const CREATE_URL = "{% url 'tools:share_create' %}";
+    const csrf = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const fmtSize = (n) => (n >= 1073741824 ? `${(n / 1073741824).toFixed(2)}GB` : n >= 1048576 ? `${(n / 1048576).toFixed(1)}MB` : `${(n / 1024).toFixed(0)}KB`);
+
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('[data-copy-prev]');
+        if (!btn) return;
+        try { await navigator.clipboard.writeText(btn.previousElementSibling.textContent); btn.textContent = '복사됨'; } catch (_) { btn.textContent = '선택해서 복사'; }
+        setTimeout(() => { btn.textContent = '복사'; }, 1300);
+    });
+
+    const post = async (url, body, headers = {}) => {
+        const resp = await fetch(url, { method: 'POST', body, headers: { 'X-CSRFToken': csrf, ...headers }, credentials: 'same-origin' });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) { const err = new Error(data.error || `오류 (${resp.status})`); err.data = data; err.status = resp.status; throw err; }
+        return data;
+    };
+
+    const upload = async (file) => {
+        const row = document.createElement('li');
+        row.className = 'rounded-2xl border border-black/[0.08] bg-white p-4';
+        row.innerHTML = `<div class="flex justify-between gap-2 text-[14px]"><b class="break-all text-[#1d1d1f]">${esc(file.name)}</b><span class="shrink-0 text-[12px] text-[#8e8e93]">${fmtSize(file.size)}</span></div>
+            <div class="mt-3 h-2 overflow-hidden rounded-full bg-[#f2f2f7]"><span class="block h-full w-0 rounded-full bg-[#0066cc] transition-all"></span></div>
+            <p class="mt-2 text-[12px] text-[#6e6e73]">준비 중…</p>`;
+        $('sh-queue').prepend(row);
+        const bar = row.querySelector('span.block'); const note = row.querySelector('p');
+        try {
+            const info = await post(CREATE_URL, JSON.stringify({ name: file.name, size: file.size, mime: file.type, hours: Number($('sh-hours').value) }), { 'Content-Type': 'application/json' });
+            let offset = 0; const started = performance.now();
+            while (offset < file.size) {
+                const chunk = file.slice(offset, offset + info.chunk_size);
+                let tries = 0;
+                for (;;) {
+                    try {
+                        const res = await post(`${info.chunk_url}?offset=${offset}`, chunk, { 'Content-Type': 'application/octet-stream' });
+                        offset = res.received;
+                        break;
+                    } catch (err) {
+                        if (err.status === 409 && err.data && typeof err.data.received === 'number') { offset = err.data.received; break; }  // 이미 받은 위치로 맞춤
+                        if (++tries >= 3) throw err;
+                        await new Promise((r) => setTimeout(r, 1000 * tries));
+                    }
+                }
+                const pct = (offset / file.size) * 100;
+                const rate = offset / ((performance.now() - started) / 1000);
+                bar.style.width = `${pct}%`;
+                note.textContent = `${pct.toFixed(1)}% · ${fmtSize(rate)}/s · 남은 시간 약 ${Math.max(0, Math.round((file.size - offset) / rate))}초`;
+            }
+            note.textContent = '서버에서 확인 중…';
+            const done = await post(info.complete_url, '');
+            bar.style.background = '#34c759';
+            note.innerHTML = `완료 · 링크를 받는 사람에게 보내세요 <span class="block text-[11px] text-[#8e8e93]">SHA-256 ${done.sha256.slice(0, 16)}…</span>`;
+            row.insertAdjacentHTML('beforeend', `<div class="sh-copy mt-3"><code>${esc(done.share_url)}</code><button type="button" class="sh-btn" data-copy-prev>복사</button></div>`);
+        } catch (err) {
+            bar.style.background = '#d44c47';
+            note.textContent = `실패: ${err.message}`;
+        }
+    };
+
+    const start = async (files) => { for (const f of files) await upload(f); };
+    $('sh-file').addEventListener('change', (e) => { start([...e.target.files]); e.target.value = ''; });
+    const drop = $('sh-drop');
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+    drop.addEventListener('drop', (e) => start([...(e.dataTransfer?.files || [])]));
+})();
+</script>
+{% endblock %}

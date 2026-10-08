@@ -316,3 +316,86 @@ class ClipboardTests(TestCase):
 	def test_hub_card_visible_and_page_renders(self):
 		self.assertContains(self.client.get(reverse("tools:index")), "내 클립보드")
 		self.assertContains(self.client.get(reverse("tools:clipboard")), "alice")
+
+
+@override_settings(PRIVATE_MEDIA_ROOT=_PRIVATE)
+class ShareTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
+		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
+
+	def create(self, size, **extra):
+		import json
+		return self.client.post(reverse("tools:share_create"), json.dumps({"name": "data.bin", "size": size, **extra}), content_type="application/json")
+
+	def chunk(self, info, offset, data):
+		return self.client.generic("POST", f"{info['chunk_url']}?offset={offset}", data, content_type="application/octet-stream")
+
+	def test_only_admin_can_upload(self):
+		self.assertEqual(self.create(10).status_code, 403)
+		self.client.force_login(self.member)
+		self.assertEqual(self.create(10).status_code, 403)
+		self.assertEqual(self.client.get(reverse("tools:share")).status_code, 404)
+
+	def test_chunked_upload_then_anyone_downloads(self):
+		import hashlib
+		import os
+		data = os.urandom(50_000)
+		self.client.force_login(self.admin)
+		info = self.create(len(data)).json()
+		self.assertEqual(self.chunk(info, 0, data[:30_000]).json()["received"], 30_000)
+		wrong = self.chunk(info, 0, data[30_000:])  # 잘못된 offset → 현재 위치 알려줌
+		self.assertEqual(wrong.status_code, 409)
+		self.assertEqual(wrong.json()["received"], 30_000)
+		self.chunk(info, 30_000, data[30_000:])
+		done = self.client.post(info["complete_url"]).json()
+		self.assertEqual(done["sha256"], hashlib.sha256(data).hexdigest())
+
+		self.client.logout()  # 링크만 있으면 누구나
+		page = self.client.get(reverse("tools:share_download_page", args=[info["token"]]))
+		self.assertContains(page, "data.bin")
+		resp = self.client.get(reverse("tools:share_download", args=[info["token"]]))
+		self.assertEqual(b"".join(resp.streaming_content), data)
+
+	def test_incomplete_upload_is_not_downloadable_and_complete_checks_size(self):
+		self.client.force_login(self.admin)
+		info = self.create(100).json()
+		self.chunk(info, 0, b"x" * 40)
+		self.assertEqual(self.client.post(info["complete_url"]).status_code, 409)
+		self.assertEqual(self.client.get(reverse("tools:share_download_page", args=[info["token"]])).status_code, 404)
+
+	def test_expired_links_are_deleted(self):
+		import os
+		from datetime import timedelta
+		from django.utils import timezone
+		from tools.models import SharedFile
+		self.client.force_login(self.admin)
+		info = self.create(5).json()
+		self.chunk(info, 0, b"hello")
+		self.client.post(info["complete_url"])
+		item = SharedFile.objects.get(token=info["token"])
+		path = item.file.path
+		SharedFile.objects.filter(pk=item.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+		self.assertEqual(self.client.get(reverse("tools:share_download", args=[info["token"]])).status_code, 404)
+		self.assertFalse(SharedFile.objects.exists())
+		self.assertFalse(os.path.exists(path))
+
+	def test_size_limits(self):
+		from unittest import mock
+		self.client.force_login(self.admin)
+		self.assertEqual(self.create(0).status_code, 400)
+		with mock.patch("tools.share_views.MAX_FILE_BYTES", 10):
+			self.assertEqual(self.create(11).status_code, 400)
+		with mock.patch("tools.share_views.MAX_TOTAL_BYTES", 15):
+			self.assertEqual(self.create(10).status_code, 201)
+			self.assertEqual(self.create(10).status_code, 507)
+
+	def test_other_user_cannot_append_chunks(self):
+		self.client.force_login(self.admin)
+		info = self.create(5).json()
+		from django.contrib.auth import get_user_model
+		other = get_user_model().objects.create_superuser("admin2", "a2@example.com", "pw-for-tests-only")
+		self.client.force_login(other)
+		self.assertEqual(self.chunk(info, 0, b"hello").status_code, 403)
