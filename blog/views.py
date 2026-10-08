@@ -236,6 +236,8 @@ def _write_page_context(request, form_data=None, selected_draft=None, editing_po
 		"editor_heading": "글 수정" if editing_post else "새 글 작성",
 		"editor_submit_label": "수정 완료" if editing_post else "완료",
 		"editing_post": editing_post,
+		# 이미 발행된 글을 고치는 중이면 '임시저장' 은 발행 취소가 되므로 화면에서 따로 안내
+		"editing_published": bool(editing_post and editing_post.is_published),
 	}
 
 
@@ -945,8 +947,7 @@ def post_edit(request, slug: str):
 			post.cover_image = cover_image
 		if is_published and not post.published_at:
 			post.published_at = timezone.now()
-		if not is_published:
-			post.published_at = None
+		# 발행 취소해도 처음 발행일은 유지 (다시 발행하면 원래 날짜로 돌아옴)
 		post.save()
 		_apply_post_tags(post, tags_raw)
 

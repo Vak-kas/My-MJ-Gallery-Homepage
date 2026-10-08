@@ -79,6 +79,11 @@
             backdrop-filter: blur(10px);
         }
 
+        /* hidden 속성은 Tailwind 의 grid/flex 보다 우선 (탭·조건부 영역이 같이 보이던 문제) */
+        [hidden] {
+            display: none !important;
+        }
+
         .has-global-navbar {
             padding-top: 62px;
         }
@@ -86,6 +91,13 @@
         .has-global-navbar #studio-sidebar {
             top: 62px;
             height: calc(100vh - 62px);
+        }
+
+        /* 화면이 낮으면 Studio 메뉴가 잘리지 않게 스크롤 (평소엔 오른쪽 설명 말풍선이 보이도록 스크롤 없음) */
+        @media (max-height: 780px) {
+            #studio-sidebar {
+                overflow-y: auto;
+            }
         }
 
         html.theme-dark body {
@@ -140,6 +152,7 @@
             <nav class="flex items-center gap-2">
                 <a href="{% url 'main:home' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Home</a>
                 <a href="{% url 'blog:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Blog</a>
+                <a href="{% url 'tools:index' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Tool</a>
 
                 {% if user.is_authenticated %}
                     {% if user.is_superuser %}

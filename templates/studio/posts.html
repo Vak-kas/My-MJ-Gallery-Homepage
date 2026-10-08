@@ -17,7 +17,12 @@
         <section class="mb-8">
             <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO POSTS</p>
             <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">글 공개/비공개 관리</h1>
-            <p class="mt-3 text-[16px] text-[#6e6e73]">게시 상태(발행/비발행), 공개 범위(전체공개/비공개/일부공개), 관리자 일괄 작업을 한 곳에서 관리합니다.</p>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">발행 상태(발행됨/임시저장), 공개 범위(전체공개/비공개/일부공개), 관리자 일괄 작업을 한 곳에서 관리합니다.</p>
+            <div class="mt-5 flex flex-wrap gap-2 text-[13px]">
+                <a href="?status=" class="rounded-full px-4 py-1.5 {% if not status_filter %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">전체 {{ status_counts.all }}</a>
+                <a href="?status=published" class="rounded-full px-4 py-1.5 {% if status_filter == 'published' %}bg-[#0066cc] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">발행됨 {{ status_counts.published }}</a>
+                <a href="?status=draft" class="rounded-full px-4 py-1.5 {% if status_filter == 'draft' %}bg-[#b26a00] text-white{% else %}border border-black/[0.1] text-[#1d1d1f] hover:bg-white{% endif %}">📝 임시저장 {{ status_counts.draft }}</a>
+            </div>
         </section>
 
         <section class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
@@ -25,8 +30,8 @@
                 <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
                     <h2 class="text-[14px] font-semibold text-[#1d1d1f]">상태 안내</h2>
                     <ul class="mt-3 space-y-2 text-[12px] leading-6 text-[#6e6e73]">
-                        <li><span class="font-semibold text-[#1d1d1f]">발행 ON</span>: 블로그 목록/상세에 노출됩니다.</li>
-                        <li><span class="font-semibold text-[#1d1d1f]">발행 OFF</span>: 초안 상태로 외부 비노출입니다.</li>
+                        <li><span class="font-semibold text-[#0066cc]">발행됨</span>: 블로그에 올라간 글. 아래 공개 범위대로 보입니다.</li>
+                        <li><span class="font-semibold text-[#b26a00]">📝 임시저장</span>: 아직 발행 전인 작성 중인 글. 공개 범위와 상관없이 나만 볼 수 있어요.</li>
                         <li><span class="font-semibold text-[#1d1d1f]">전체공개</span>: 누구나 열람 가능</li>
                         <li><span class="font-semibold text-[#1d1d1f]">비공개</span>: 관리자만 관리 페이지에서 접근</li>
                         <li><span class="font-semibold text-[#1d1d1f]">일부공개</span>: 비밀번호 입력 시 열람 가능</li>
@@ -36,6 +41,7 @@
                 <section class="rounded-[20px] border border-black/[0.06] bg-white p-4">
                     <h2 class="text-[14px] font-semibold text-[#1d1d1f]">필터</h2>
                     <form method="get" class="mt-3 space-y-2">
+                        <input type="hidden" name="status" value="{{ status_filter|default:'' }}">
                         <input type="text" name="q" value="{{ search_query|default:'' }}" placeholder="제목/내용/작성자 검색"
                             class="h-10 w-full rounded-xl border border-black/[0.1] px-4 text-[14px] outline-none focus:border-[#0066cc]" />
                         <select name="author" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
@@ -77,8 +83,8 @@
 
                         <select name="bulk_action" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
                             <option value="">일괄 작업 선택</option>
-                            <option value="publish">선택 글 발행</option>
-                            <option value="unpublish">선택 글 비발행</option>
+                            <option value="publish">선택 글 발행하기</option>
+                            <option value="unpublish">선택 글 임시저장으로 되돌리기 (발행 취소)</option>
                             <option value="set_public">선택 글 전체공개</option>
                             <option value="set_private">선택 글 비공개</option>
                             <option value="set_protected">선택 글 일부공개(비밀번호)</option>
@@ -102,7 +108,7 @@
 
                 <section class="space-y-3">
             {% for post in posts %}
-            <article class="rounded-[18px] border border-black/[0.06] bg-white p-4">
+            <article class="rounded-[18px] p-4 {% if post.is_published %}border border-black/[0.06] bg-white{% else %}border-2 border-dashed border-[#f0b75e] bg-[#fffaf0]{% endif %}">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div class="min-w-0 flex-1">
                         <div class="mb-2">
@@ -114,15 +120,22 @@
                         <div class="flex flex-wrap items-center gap-2">
                             <a href="{% url 'blog:post_detail' post.slug %}" target="_blank" rel="noreferrer" class="truncate text-[17px] font-semibold text-[#1d1d1f] hover:text-[#0066cc]">{{ post.title }}</a>
                             {% if post.is_published %}
-                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">발행</span>
-                            {% else %}
-                            <span class="rounded-full bg-[#f3f4f6] px-2.5 py-1 text-[11px] font-semibold text-[#6b7280]">비발행</span>
-                            {% endif %}
+                            <span class="rounded-full bg-[#e9f5ff] px-2.5 py-1 text-[11px] font-semibold text-[#0066cc]">발행됨</span>
                             <span class="rounded-full bg-[#f2f2f7] px-2.5 py-1 text-[11px] font-semibold text-[#6e6e73]">{{ post.get_visibility_display }}</span>
+                            {% else %}
+                            <span class="whitespace-nowrap rounded-full bg-[#fdebc8] px-2.5 py-1 text-[11px] font-semibold text-[#b26a00]">📝 임시저장 · 나만 보임</span>
+                            {% endif %}
                         </div>
                         <p class="mt-1 text-[12px] text-[#8e8e93]">
                             작성자 {{ post.author.username|default:'익명' }} · 카테고리 {{ post.get_category_display }} · 생성 {{ post.created_at|date:"Y.m.d" }} · 수정 {{ post.updated_at|date:"Y.m.d H:i" }}
                         </p>
+                        <div class="mt-2">
+                            {% if post.is_published %}
+                            <a href="{% url 'blog:post_edit' post.slug %}" class="text-[12px] font-semibold text-[#0066cc] hover:underline">✏️ 글 수정</a>
+                            {% else %}
+                            <a href="{% url 'blog:post_edit' post.slug %}" class="inline-flex rounded-full bg-[#b26a00] px-3 py-1 text-[12px] font-semibold text-white hover:opacity-90">✏️ 이어서 쓰기</a>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <form method="post" action="{% url 'studio:post_visibility_update' post.id %}" class="grid min-w-[300px] gap-2 rounded-xl border border-black/[0.06] bg-[#fafafa] p-3 md:grid-cols-[auto_1fr_auto] md:items-center">
@@ -133,7 +146,8 @@
                             <input type="hidden" name="is_published" value="false">
                             <input type="checkbox" name="is_published" value="true" {% if post.is_published %}checked{% endif %} class="peer sr-only">
                             <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
-                            <span class="text-[12px] font-semibold text-[#34c759]">발행</span>
+                            <span class="text-[12px] font-semibold text-[#b26a00] peer-checked:hidden">임시저장</span>
+                            <span class="hidden text-[12px] font-semibold text-[#34c759] peer-checked:inline">발행됨</span>
                         </label>
 
                         <div class="space-y-2">
