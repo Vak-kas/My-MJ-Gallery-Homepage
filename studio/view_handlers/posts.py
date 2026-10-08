@@ -21,6 +21,9 @@ def posts(request):
     created_to = (request.GET.get("created_to") or "").strip()
     sort_key = (request.GET.get("sort") or "updated_desc").strip()
     per_page_raw = (request.GET.get("per_page") or "20").strip()
+    status = (request.GET.get("status") or "").strip()
+    if status not in {"published", "draft"}:
+        status = ""
 
     sort_map = {
         "updated_desc": ("-updated_at", "-id"),
@@ -57,6 +60,16 @@ def posts(request):
         post_qs = post_qs.filter(created_at__date__gte=created_from_date)
     if created_to and created_to_date:
         post_qs = post_qs.filter(created_at__date__lte=created_to_date)
+
+    status_counts = {
+        "all": post_qs.count(),
+        "published": post_qs.filter(is_published=True).count(),
+        "draft": post_qs.filter(is_published=False).count(),
+    }
+    if status == "published":
+        post_qs = post_qs.filter(is_published=True)
+    elif status == "draft":
+        post_qs = post_qs.filter(is_published=False)
 
     post_qs = post_qs.order_by(*sort_map[sort_key])
 
@@ -145,6 +158,8 @@ def posts(request):
         request,
         "studio/posts.html",
         {
+        "status_filter": status,
+        "status_counts": status_counts,
             "posts": posts_list,
             "post_count": paginator.count,
             "page_obj": page_obj,

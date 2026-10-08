@@ -312,9 +312,13 @@
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <span class="text-[12px] text-[#8e8e93]">임시저장은 초안으로 저장되고, 완료는 즉시 공개됩니다.</span>
+                {% if editing_published %}
+                <span class="text-[12px] text-[#8e8e93]">이 글은 <b class="text-[#1d1d1f]">발행된 상태</b>예요. 고친 내용은 '{{ editor_submit_label|default:"완료" }}'로 바로 반영됩니다.</span>
+                {% else %}
+                <span class="text-[12px] text-[#8e8e93]">임시저장은 나만 보는 초안으로 저장되고, 완료는 즉시 공개됩니다.</span>
+                {% endif %}
                 <div class="flex flex-wrap items-center gap-2">
-                    <button id="draft-btn" type="button" class="rounded-full border border-black/[0.12] px-4 py-2 text-[13px] text-[#1d1d1f]">임시저장</button>
+                    <button id="draft-btn" type="button" data-unpublish="{% if editing_published %}1{% endif %}" class="rounded-full border px-4 py-2 text-[13px] {% if editing_published %}border-[#ff3b30]/30 text-[#ff3b30]{% else %}border-black/[0.12] text-[#1d1d1f]{% endif %}">{% if editing_published %}발행 취소 · 임시저장으로{% else %}임시저장{% endif %}</button>
                     <button id="publish-btn" type="button" class="rounded-full bg-[#0066cc] px-5 py-2 text-[13px] font-semibold text-white">{{ editor_submit_label|default:"완료" }}</button>
                 </div>
             </div>
@@ -509,6 +513,8 @@ window.addEventListener('DOMContentLoaded', () => {
     });
 
     draftBtn.addEventListener('click', async () => {
+        // 발행된 글을 임시저장하면 블로그에서 내려가므로 한 번 더 확인
+        if (draftBtn.dataset.unpublish === '1' && !confirm('이 글은 지금 발행된 상태예요.\n임시저장으로 돌리면 블로그에서 내려가고 나만 볼 수 있어요. 계속할까요?\n(고친 내용만 반영하려면 취소 후 "수정 완료"를 누르세요)')) return;
         if (!(await syncContentOrWarn())) return;
         persistSnapshot();
         publishConfirmed = false;

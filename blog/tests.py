@@ -215,3 +215,39 @@ class ClearGuestbookCommandTests(TestCase):
 			backups = list(Path(tmp).glob("guestbook-*.json"))
 			self.assertEqual(len(backups), 1)
 			self.assertEqual(len(json.loads(backups[0].read_text(encoding="utf-8"))), 2)
+
+
+class DraftVsPublishedTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.utils import timezone
+		from blog.models import Post
+		self.admin = get_user_model().objects.create_superuser("admin", "admin@example.com", "pw-for-tests-only")
+		self.client.force_login(self.admin)
+		self.published_at = timezone.now().replace(microsecond=0)
+		self.post = Post.objects.create(title="발행글", slug="published-post", category=Post.CATEGORY_TECH, author=self.admin, content="", is_published=True, published_at=self.published_at)
+		self.draft = Post.objects.create(title="쓰는중", slug="draft-post", category=Post.CATEGORY_TECH, author=self.admin, content="", is_published=False)
+
+	def test_edit_page_warns_that_draft_unpublishes_a_published_post(self):
+		resp = self.client.get(reverse("blog:post_edit", args=[self.post.slug]))
+		self.assertContains(resp, "발행 취소 · 임시저장으로")
+		self.assertContains(resp, 'data-unpublish="1"')
+		resp = self.client.get(reverse("blog:post_edit", args=[self.draft.slug]))
+		self.assertContains(resp, ">임시저장</button>")
+
+	def test_unpublishing_keeps_original_publish_date(self):
+		self.client.post(reverse("blog:post_edit", args=[self.post.slug]), {"title": "발행글", "category": "tech", "content": "", "submit_action": "draft"})
+		self.post.refresh_from_db()
+		self.assertFalse(self.post.is_published)
+		self.assertEqual(self.post.published_at, self.published_at)
+
+	def test_studio_lists_drafts_separately(self):
+		resp = self.client.get(reverse("studio:posts"))
+		self.assertContains(resp, "📝 임시저장 · 나만 보임")
+		self.assertContains(resp, "이어서 쓰기")
+		drafts = self.client.get(reverse("studio:posts"), {"status": "draft"})
+		self.assertContains(drafts, "쓰는중")
+		self.assertNotContains(drafts, ">발행글</a>")
+		published = self.client.get(reverse("studio:posts"), {"status": "published"})
+		self.assertContains(published, "발행글")
+		self.assertNotContains(published, ">쓰는중</a>")
