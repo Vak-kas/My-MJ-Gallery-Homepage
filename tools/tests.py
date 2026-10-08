@@ -772,3 +772,89 @@ class SecretNoteTests(TestCase):
 	def test_size_limit(self):
 		self.assertEqual(self.create(ciphertext="A" * 20001).status_code, 400)
 		self.assertEqual(self.create(ciphertext="").status_code, 400)
+
+
+class LiveViewTests(TestCase):
+	ROOM = {"id": "live01", "token": "host-tok", "viewer_token": "view-tok", "title": "테스트", "owner_id": None, "owner": "seo",
+			"max_viewers": 5, "chat": True, "expires_in": 3600, "host_online": False, "viewers": 0}
+
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("admin", "a@example.com", "pw-for-tests-only")
+		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
+
+	def room(self, owner=None):
+		return {**self.ROOM, "owner_id": (owner or self.member).id}
+
+	def test_list_requires_login(self):
+		self.assertEqual(self.client.get(reverse("tools:live")).status_code, 302)
+
+	def test_member_create_applies_limits(self):
+		from unittest import mock
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_live", return_value=[]), \
+				mock.patch("tools.relay_client.create_live", return_value=self.room()) as create:
+			resp = self.client.post(reverse("tools:live"), {"title": "발표", "ttl_minutes": "999", "max_viewers": "50", "chat": "on"})
+		payload = create.call_args.args[0]
+		self.assertEqual((payload["ttl"], payload["max_viewers"], payload["chat"], payload["owner_id"]), (120 * 60, 5, True, self.member.id))
+		self.assertEqual(resp["Location"], f"{reverse('tools:live_room', args=['live01'])}?token=host-tok")
+
+	def test_member_one_room_and_daily_limit(self):
+		from unittest import mock
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.list_live", return_value=[self.room()]), mock.patch("tools.relay_client.create_live") as create:
+			self.client.post(reverse("tools:live"), {"title": "x"})
+		create.assert_not_called()
+		with mock.patch("tools.relay_client.list_live", return_value=[]), \
+				mock.patch("tools.relay_client.create_live", return_value=self.room()) as create:
+			for _ in range(4):
+				self.client.post(reverse("tools:live"), {"title": "x"})
+		self.assertEqual(create.call_count, 3)
+
+	def test_viewer_link_works_without_login_and_hides_host_token(self):
+		from unittest import mock
+		with mock.patch("tools.relay_client.get_live", return_value=self.room()):
+			resp = self.client.get(reverse("tools:live_room", args=["live01"]), {"token": "view-tok"})
+			self.assertEqual(resp.status_code, 200)
+			self.assertEqual(resp.context["role"], "viewer")
+			self.assertNotContains(resp, "host-tok")
+			self.assertContains(resp, "시청하기")
+			bad = self.client.get(reverse("tools:live_room", args=["live01"]), {"token": "nope"})
+		self.assertEqual(bad.status_code, 404)
+
+	def test_host_page_shows_viewer_link(self):
+		from unittest import mock
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.get_live", return_value=self.room()):
+			resp = self.client.get(reverse("tools:live_room", args=["live01"]), {"token": "host-tok"})
+		self.assertEqual(resp.context["role"], "host")
+		self.assertIn("token=view-tok", resp.context["viewer_link"])
+
+	def test_turn_credentials(self):
+		import base64, hashlib, hmac
+		from django.test import override_settings
+		from tools.live_views import ice_servers
+		with override_settings(TURN_SECRET="s3cret", TURN_HOST="turn.example", TURN_PORT=3478):
+			servers = ice_servers("live01", 3600)
+		turn = servers[-1]
+		self.assertIn("turn:turn.example:3478?transport=udp", turn["urls"])
+		expected = base64.b64encode(hmac.new(b"s3cret", turn["username"].encode(), hashlib.sha1).digest()).decode()
+		self.assertEqual(turn["credential"], expected)
+		self.assertTrue(turn["username"].endswith(":live01"))
+		with override_settings(TURN_SECRET=""):
+			self.assertEqual(len(ice_servers("live01", 60)), 1)  # STUN 만
+
+	def test_only_owner_or_admin_closes(self):
+		from unittest import mock
+		other = self.room(owner=self.admin)
+		self.client.force_login(self.member)
+		with mock.patch("tools.relay_client.get_live", return_value=other), mock.patch("tools.relay_client.close_live") as close:
+			self.assertEqual(self.client.post(reverse("tools:live_close", args=["live01"])).status_code, 404)
+		close.assert_not_called()
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.get_live", return_value=self.room()), mock.patch("tools.relay_client.close_live") as close:
+			self.client.post(reverse("tools:live_close", args=["live01"]))
+		close.assert_called_once_with("live01")

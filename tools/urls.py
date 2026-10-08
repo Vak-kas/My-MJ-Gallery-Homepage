@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, link_views, myip, netcheck, share_views, speedtest, views
+from . import clipboard_views, link_views, live_views, myip, netcheck, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -39,6 +39,9 @@ urlpatterns = [
     path("share/<str:token>/chunk/", share_views.share_chunk, name="share_chunk"),
     path("share/<str:token>/complete/", share_views.share_complete, name="share_complete"),
     path("share/<str:token>/delete/", share_views.share_delete, name="share_delete"),
+    path("live/", live_views.live_list, name="live"),
+    path("live/<str:room_id>/", live_views.live_room, name="live_room"),
+    path("live/<str:room_id>/close/", live_views.live_close, name="live_close"),
     path("stream/", views.stream_list, name="stream"),
     path("stream/<str:room_id>/", views.stream_room, name="stream_room"),
     path("stream/<str:room_id>/close/", views.stream_close, name="stream_close"),

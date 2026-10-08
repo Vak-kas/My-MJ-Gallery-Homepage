@@ -10,6 +10,16 @@ MEMBER_STREAM_LIMITS = {
 }
 
 
+# 회원이 화면 송출 방송을 열 때의 한도 (TURN 중계 시 서버 트래픽 보호)
+MEMBER_LIVE_LIMITS = {
+	"max_open_rooms": 1,   # 동시에 열어 둘 수 있는 방송
+	"rooms_per_day": 3,    # 하루에 만들 수 있는 방송
+	"ttl_minutes": 120,    # 방송 시간 최대
+	"max_viewers": 5,      # 시청자 최대
+}
+ADMIN_LIVE_LIMITS = {"ttl_minutes": 360, "max_viewers": 20}
+
+
 def can_create_streams(user):
 	"""데이터 전송 방 만들기: 로그인한(승인된) 회원."""
 	return bool(user and user.is_authenticated and user.is_active)

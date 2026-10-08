@@ -111,6 +111,15 @@ TOOLS = [
 		"access": "member",
 	},
 	{
+		"slug": "live",
+		"url_name": "tools:live",
+		"icon": "📺",
+		"title": "화면 송출",
+		"description": "내 화면·소리, 웹캠·마이크를 링크 받은 사람이 브라우저로 실시간 시청해요. 채팅도 되고, 시청자는 로그인할 필요 없어요.",
+		"tags": ["방송", "WebRTC"],
+		"access": "member",
+	},
+	{
 		"slug": "stream",
 		"url_name": "tools:stream",
 		"icon": "📁",

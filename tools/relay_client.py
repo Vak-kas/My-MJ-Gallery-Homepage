@@ -54,3 +54,21 @@ def close_room(room_id):
 def join_room(room_id, role, token, ip):
 	"""role(sender/receiver) 링크를 연 네트워크의 IP 를 등록."""
 	return _call("POST", f"/rooms/{room_id}/join", {"role": role, "token": token, "ip": ip})
+
+
+# ── 화면 송출(라이브) ─────────────────────────────
+
+def list_live():
+	return (_call("GET", "/live") or {}).get("rooms", [])
+
+
+def get_live(room_id):
+	return _call("GET", f"/live/{room_id}")
+
+
+def create_live(payload):
+	return _call("POST", "/live", payload)
+
+
+def close_live(room_id):
+	return _call("DELETE", f"/live/{room_id}")
