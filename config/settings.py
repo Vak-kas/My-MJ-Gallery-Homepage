@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'blog',
     'tools',
     'notifications',
+    'security',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'security.middleware.IPBlockMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -105,6 +107,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'config.wsgi.application'
+
+# gunicorn 워커끼리 공유하는 캐시 (로그인 잠금 횟수, IP 차단 목록, 속도 측정 한도 등)
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': os.getenv('DJANGO_CACHE_DIR', str(BASE_DIR / '.django_cache')),
+    }
+}
 
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
 # 관리자 알림 카카오톡 '나에게 보내기' (선택)

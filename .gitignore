@@ -172,3 +172,4 @@ backups/
 
 # 비공개 업로드 (클립보드·맡겨둔 파일)
 private_media/
+.django_cache/

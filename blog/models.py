@@ -64,6 +64,8 @@ class Post(models.Model):
 	published_at = models.DateTimeField(null=True, blank=True, db_index=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	author_ip = models.GenericIPAddressField("작성 IP", null=True, blank=True)  # 부정 이용 방지, 90일 뒤 비움
+	author_agent = models.CharField("작성 브라우저", max_length=300, blank=True)
 
 	class Meta:
 		ordering = ["-published_at", "-id"]
@@ -115,6 +117,8 @@ class Comment(models.Model):
 	is_visible = models.BooleanField(default=True, db_index=True)
 	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 	updated_at = models.DateTimeField(auto_now=True)
+	author_ip = models.GenericIPAddressField("작성 IP", null=True, blank=True)  # 부정 이용 방지, 90일 뒤 비움
+	author_agent = models.CharField("작성 브라우저", max_length=300, blank=True)
 
 	class Meta:
 		ordering = ["-created_at", "-id"]
@@ -153,6 +157,8 @@ class GuestbookEntry(models.Model):
 	message = models.TextField(max_length=1000)
 	is_visible = models.BooleanField(default=True, db_index=True)
 	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+	author_ip = models.GenericIPAddressField("작성 IP", null=True, blank=True)  # 부정 이용 방지, 90일 뒤 비움
+	author_agent = models.CharField("작성 브라우저", max_length=300, blank=True)
 
 	class Meta:
 		ordering = ["-created_at", "-id"]

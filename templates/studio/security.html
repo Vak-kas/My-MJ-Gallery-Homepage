@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SECURITY</p>
+            <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">보안</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">누가, 어디서, 언제 로그인하고 글을 썼는지 남기고, 문제 있는 IP 를 막습니다. 기록은 {{ retention_days }}일 뒤 자동으로 지워져요. 지금 내 IP: <span class="font-mono text-[#1d1d1f]">{{ my_ip|default:"-" }}</span></p>
+            <div class="mt-5 flex flex-wrap gap-2 text-[13px]">
+                {% for key, label in tabs %}
+                <a href="?tab={{ key }}" class="rounded-full px-4 py-1.5 {% if tab == key %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if tab == 'overview' %}
+        <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 로그인 실패</p><p class="mt-2 text-[32px] font-semibold {% if stats.failed %}text-[#c4271d]{% endif %}">{{ stats.failed }}</p></div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 잠김 (반복 실패)</p><p class="mt-2 text-[32px] font-semibold {% if stats.locked %}text-[#b26a00]{% endif %}">{{ stats.locked }}</p></div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 로그인 성공</p><p class="mt-2 text-[32px] font-semibold">{{ stats.success }}</p></div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">차단 중인 IP</p><p class="mt-2 text-[32px] font-semibold">{{ stats.blocks }}</p></div>
+        </section>
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-2">
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">최근 관리자 로그인</h2>
+                <p class="mt-1 text-[12px] text-[#8e8e93]">처음 보는 IP 에서 로그인하면 🔔 알림과 카톡이 와요.</p>
+                <div class="mt-3 divide-y divide-black/[0.05] text-[13px]">
+                    {% for e in admin_logins %}
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
+                        <span class="w-[110px] text-[#8e8e93]">{{ e.created_at|date:"m.d H:i:s" }}</span>
+                        <span class="font-mono">{{ e.ip|default:"-" }}</span>
+                        {% if e.new_location %}<span class="rounded-full bg-[#b26a00]/10 px-2 py-0.5 text-[11px] text-[#b26a00]">새 IP</span>{% endif %}
+                        <span class="min-w-0 flex-1 truncate text-[12px] text-[#8e8e93]">{{ e.user_agent }}</span>
+                    </div>
+                    {% empty %}
+                    <p class="py-4 text-[#8e8e93]">아직 기록이 없어요.</p>
+                    {% endfor %}
+                </div>
+            </section>
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">24시간 실패가 많은 IP</h2>
+                <div class="mt-3 divide-y divide-black/[0.05] text-[13px]">
+                    {% for row in top_failed %}
+                    <div class="flex items-center gap-3 py-2.5">
+                        <a href="?tab=logins&ip={{ row.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ row.ip }}</a>
+                        <span class="text-[#c4271d]">실패 {{ row.n }}번</span>
+                        <form method="post" class="ml-auto" onsubmit="return confirm('{{ row.ip }} 을(를) 7일 동안 차단할까요?');">
+                            {% csrf_token %}<input type="hidden" name="action" value="block"><input type="hidden" name="network" value="{{ row.ip }}"><input type="hidden" name="duration" value="7d"><input type="hidden" name="reason" value="로그인 반복 실패"><input type="hidden" name="return_qs" value="tab=overview">
+                            <button class="rounded-full border border-[#ff3b30]/30 px-3 py-1 text-[12px] text-[#c4271d] hover:bg-[#fff5f4]">7일 차단</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <p class="py-4 text-[#8e8e93]">실패한 로그인이 없어요. 👍</p>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+
+        {% elif tab == 'logins' %}
+        <form method="get" class="flex flex-wrap items-center gap-2 rounded-[20px] border border-black/[0.06] bg-white p-4">
+            <input type="hidden" name="tab" value="logins">
+            <select name="result" class="h-10 rounded-xl border border-black/[0.1] px-3 text-[13px]">
+                <option value="">결과 전체</option>
+                <option value="fail" {% if filters.result == 'fail' %}selected{% endif %}>실패·잠김·차단</option>
+                {% for value, label in results %}<option value="{{ value }}" {% if filters.result == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+            </select>
+            <input type="text" name="ip" value="{{ filters.ip }}" placeholder="IP (앞부분만 넣어도 돼요)" class="h-10 rounded-xl border border-black/[0.1] px-3 font-mono text-[13px]">
+            <input type="text" name="username" value="{{ filters.username }}" placeholder="시도한 아이디" class="h-10 rounded-xl border border-black/[0.1] px-3 text-[13px]">
+            <button class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+            <a href="?tab=logins" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px]">초기화</a>
+        </form>
+        <div class="mt-4 overflow-x-auto rounded-[20px] border border-black/[0.06] bg-white">
+            <table class="w-full min-w-[820px] text-left text-[13px]">
+                <thead class="border-b border-black/[0.06] text-[12px] text-[#8e8e93]"><tr><th class="px-4 py-3 font-medium">시각</th><th class="px-2 py-3 font-medium">결과</th><th class="px-2 py-3 font-medium">아이디</th><th class="px-2 py-3 font-medium">IP</th><th class="px-2 py-3 font-medium">브라우저</th><th class="px-4 py-3"></th></tr></thead>
+                <tbody>
+                    {% for e in events %}
+                    <tr class="border-b border-black/[0.05] last:border-b-0">
+                        <td class="px-4 py-2.5 text-[#6e6e73]">{{ e.created_at|date:"m.d H:i:s" }}</td>
+                        <td class="px-2 py-2.5">
+                            {% if e.result == 'success' %}<span class="rounded-full bg-[#34c759]/12 px-2 py-0.5 text-[12px] text-[#1e7a35]">성공</span>{% if e.new_location %} <span class="rounded-full bg-[#b26a00]/10 px-2 py-0.5 text-[11px] text-[#b26a00]">새 IP</span>{% endif %}
+                            {% elif e.result == 'failed' %}<span class="rounded-full bg-[#ff3b30]/10 px-2 py-0.5 text-[12px] text-[#c4271d]">실패</span>
+                            {% else %}<span class="rounded-full bg-[#b26a00]/10 px-2 py-0.5 text-[12px] text-[#b26a00]">{{ e.get_result_display }}</span>{% endif %}
+                        </td>
+                        <td class="px-2 py-2.5">{{ e.username|default:"-" }}{% if e.is_admin %} <span class="text-[11px] text-[#0066cc]">관리자</span>{% endif %}</td>
+                        <td class="px-2 py-2.5 font-mono"><a href="?tab=logins&ip={{ e.ip }}" class="hover:underline">{{ e.ip|default:"-" }}</a></td>
+                        <td class="max-w-[320px] truncate px-2 py-2.5 text-[12px] text-[#8e8e93]" title="{{ e.user_agent }}">{{ e.user_agent }}</td>
+                        <td class="px-4 py-2.5 text-right">{% if e.ip and e.ip != my_ip %}<a href="?tab=blocks&prefill={{ e.ip }}" class="text-[12px] text-[#c4271d] hover:underline">차단…</a>{% endif %}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="p-10 text-center text-[#8e8e93]">기록이 없어요.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav class="mt-5 flex items-center justify-center gap-2 text-[13px]">
+            {% if page_obj.has_previous %}<a href="?{{ current_query_string }}&page={{ page_obj.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">이전</a>{% endif %}
+            <span class="text-[#6e6e73]">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}<a href="?{{ current_query_string }}&page={{ page_obj.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1">다음</a>{% endif %}
+        </nav>
+        {% endif %}
+
+        {% elif tab == 'content' %}
+        <form method="get" class="flex flex-wrap items-center gap-2 rounded-[20px] border border-black/[0.06] bg-white p-4">
+            <input type="hidden" name="tab" value="content">
+            <select name="kind" class="h-10 rounded-xl border border-black/[0.1] px-3 text-[13px]">
+                <option value="">종류 전체</option>
+                <option value="comment" {% if filters.kind == 'comment' %}selected{% endif %}>댓글</option>
+                <option value="guestbook" {% if filters.kind == 'guestbook' %}selected{% endif %}>방명록</option>
+                <option value="post" {% if filters.kind == 'post' %}selected{% endif %}>글</option>
+            </select>
+            <input type="text" name="ip" value="{{ filters.ip }}" placeholder="IP (앞부분만 넣어도 돼요)" class="h-10 rounded-xl border border-black/[0.1] px-3 font-mono text-[13px]">
+            <input type="text" name="who" value="{{ filters.who }}" placeholder="작성자 아이디" class="h-10 rounded-xl border border-black/[0.1] px-3 text-[13px]">
+            <button class="h-10 rounded-xl bg-[#0066cc] px-4 text-[13px] font-semibold text-white">검색</button>
+            <a href="?tab=content" class="h-10 rounded-xl border border-black/[0.1] px-4 text-[13px] leading-[40px]">초기화</a>
+            <a href="?{{ current_query_string }}&export=csv" class="ml-auto h-10 rounded-xl border border-black/[0.1] bg-white px-4 text-[13px] leading-[40px] hover:bg-[#f5f5f7]">📄 증거 내보내기 (CSV)</a>
+        </form>
+        <p class="mt-2 text-[12px] text-[#8e8e93]">신고할 때는 검색 결과를 CSV 로 내려받아 화면 캡처와 함께 제출하세요. (작성 시각·내용·IP·브라우저 포함)</p>
+        <div class="mt-3 overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
+            {% for r in rows %}
+            <div class="flex gap-4 border-b border-black/[0.05] px-5 py-3.5 last:border-b-0">
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[#8e8e93]">
+                        <span class="rounded bg-[#f5f5f7] px-1.5 text-[#1d1d1f]">{{ r.label }}</span>
+                        <span class="font-semibold text-[#1d1d1f]">{{ r.author }}</span>
+                        <span>{{ r.created_at|date:"Y.m.d H:i" }}</span>
+                        <a href="?tab=content&ip={{ r.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ r.ip }}</a>
+                        <span class="max-w-[360px] truncate" title="{{ r.agent }}">{{ r.agent }}</span>
+                    </div>
+                    <p class="mt-1 truncate text-[14px]">{{ r.text|truncatechars:160 }}</p>
+                </div>
+                {% if r.ip != my_ip %}<a href="?tab=blocks&prefill={{ r.ip }}" class="self-center text-[12px] text-[#c4271d] hover:underline">차단…</a>{% endif %}
+            </div>
+            {% empty %}
+            <p class="p-10 text-center text-[14px] text-[#8e8e93]">IP 가 기록된 작성 내역이 없어요. (이 기능을 켠 뒤 작성된 것부터 기록돼요)</p>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="grid gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5 lg:self-start">
+                <h2 class="text-[15px] font-semibold">IP · 대역 차단</h2>
+                <form method="post" class="mt-3 space-y-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="block"><input type="hidden" name="return_qs" value="tab=blocks">
+                    <input type="text" name="network" value="{{ request.GET.prefill|default:'' }}" required placeholder="1.2.3.4 또는 1.2.3.0/24" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 font-mono text-[13px]">
+                    <input type="text" name="reason" maxlength="200" placeholder="이유 (예: 방명록 스팸)" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px]">
+                    <select name="duration" class="h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[13px]">
+                        {% for key, label in durations %}<option value="{{ key }}" {% if key == '7d' %}selected{% endif %}>{{ label }}</option>{% endfor %}
+                    </select>
+                    <button class="h-10 w-full rounded-xl bg-[#ff3b30] text-[13px] font-semibold text-white">차단</button>
+                </form>
+                <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">차단된 IP 는 사이트 전체에 접속할 수 없어요. 공격자는 IP 를 자주 바꾸고, 학교·회사·통신사 IP 는 여러 사람이 같이 쓰니 기간을 두고 막는 걸 추천해요. 내 IP 가 포함된 대역은 막을 수 없어요.</p>
+                <form method="post" class="mt-4 border-t border-black/[0.06] pt-4" onsubmit="return confirm('{{ retention_days }}일 지난 기록을 지금 정리할까요?');">
+                    {% csrf_token %}<input type="hidden" name="action" value="cleanup"><input type="hidden" name="return_qs" value="tab=blocks">
+                    <button class="text-[12px] text-[#6e6e73] underline">{{ retention_days }}일 지난 기록 지금 정리</button>
+                </form>
+            </section>
+            <section class="overflow-hidden rounded-[20px] border border-black/[0.06] bg-white">
+                {% for b in blocks %}
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-black/[0.05] px-5 py-3.5 last:border-b-0 {% if not b.is_active %}opacity-50{% endif %}">
+                    <span class="font-mono text-[14px] font-semibold">{{ b.network }}</span>
+                    <span class="text-[12px] text-[#6e6e73]">{{ b.reason|default:"" }}</span>
+                    <span class="text-[12px] text-[#8e8e93]">{% if not b.is_active %}만료됨{% elif b.expires_at %}{{ b.expires_at|date:"m.d H:i" }}까지{% else %}무기한{% endif %} · 막은 횟수 {{ b.hit_count }}</span>
+                    <form method="post" class="ml-auto">
+                        {% csrf_token %}<input type="hidden" name="action" value="unblock"><input type="hidden" name="id" value="{{ b.id }}"><input type="hidden" name="return_qs" value="tab=blocks">
+                        <button class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] hover:bg-[#f5f5f7]">차단 해제</button>
+                    </form>
+                </div>
+                {% empty %}
+                <p class="p-10 text-center text-[14px] text-[#8e8e93]">차단한 IP 가 없어요.</p>
+                {% endfor %}
+            </section>
+        </div>
+        {% endif %}
+        </main>
+    </div>
+</div>
+{% endblock %}
