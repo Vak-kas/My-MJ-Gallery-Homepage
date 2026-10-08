@@ -14,17 +14,20 @@ from django.views.decorators.http import require_POST
 
 from . import relay_client
 from .permissions import MEMBER_STREAM_LIMITS, can_create_streams, can_manage_streams, owns_room
-from .registry import TOOLS
+from .registry import SECTIONS, TOOLS
 from .speedtest import _client_ip
 
 
 def index(request):
-	tools = [
-		{**tool, "url": reverse(tool["url_name"])}
-		for tool in TOOLS
-		if not tool.get("admin_only") or can_manage_streams(request.user)
-	]
-	return render(request, "tools/index.html", {"tools": tools})
+	user = request.user
+	sections = []
+	for key, title, note in SECTIONS:
+		if key == "admin" and not user.is_superuser:
+			continue
+		tools = [{**t, "url": reverse(t["url_name"])} for t in TOOLS if t.get("access", "public") == key]
+		if tools:  # 도구가 없는 칸은 숨김
+			sections.append({"key": key, "title": title, "note": note, "tools": tools})
+	return render(request, "tools/index.html", {"sections": sections})
 
 
 def duplex(request):

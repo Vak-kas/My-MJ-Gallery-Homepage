@@ -10,27 +10,38 @@
         <p class="mt-3 text-[16px] text-[#6e6e73]">공부하고 일하면서 필요했던 계산기와 편의 기능을 모아둔 공간입니다.</p>
     </div>
 
-    <section class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {% for tool in tools %}
-        <a href="{{ tool.url }}" class="group flex flex-col rounded-[22px] border border-black/[0.08] bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#0066cc]/40 hover:shadow-md">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f0f7ff] text-[22px] text-[#0066cc]">{{ tool.icon }}</div>
-            <h2 class="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">{{ tool.title }}</h2>
-            <p class="mt-2 flex-1 text-[14px] leading-relaxed text-[#6e6e73]">{{ tool.description }}</p>
-            <div class="mt-5 flex flex-wrap items-center gap-2">
-                {% for tag in tool.tags %}
-                <span class="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-[#6e6e73]">{{ tag }}</span>
-                {% endfor %}
-                <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">열기 →</span>
-            </div>
-        </a>
-        {% empty %}
-        <p class="rounded-[22px] border border-dashed border-black/[0.12] p-8 text-[14px] text-[#8e8e93]">아직 등록된 도구가 없습니다.</p>
-        {% endfor %}
+    {% for section in sections %}
+    <section class="mt-12">
+        <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2 class="text-[22px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+                {% if section.key == 'member' %}🔒 {% elif section.key == 'admin' %}🛠 {% endif %}{{ section.title }}
+            </h2>
+            <p class="text-[14px] text-[#8e8e93]">{{ section.note }}</p>
+            {% if section.key == 'member' and not user.is_authenticated %}
+            <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="ml-auto rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#0066cc] hover:bg-white">로그인하고 쓰기 →</a>
+            {% endif %}
+        </div>
 
-        <div class="flex flex-col justify-center rounded-[22px] border border-dashed border-black/[0.12] p-6 text-[14px] text-[#8e8e93]">
-            <p class="text-[20px]">＋</p>
-            <p class="mt-2">새 도구가 계속 추가될 예정입니다.</p>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {% for tool in section.tools %}
+            <a href="{{ tool.url }}" class="group flex flex-col rounded-[22px] border {% if section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08]{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#0066cc]/40 hover:shadow-md">
+                <div class="flex h-12 w-12 items-center justify-center rounded-2xl {% if section.key == 'admin' %}bg-[#fff6e8] text-[#b26a00]{% else %}bg-[#f0f7ff] text-[#0066cc]{% endif %} text-[22px]">{{ tool.icon }}</div>
+                <h3 class="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">{{ tool.title }}</h3>
+                <p class="mt-2 flex-1 text-[14px] leading-relaxed text-[#6e6e73]">{{ tool.description }}</p>
+                <div class="mt-5 flex flex-wrap items-center gap-2">
+                    {% for tag in tool.tags %}
+                    <span class="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-[#6e6e73]">{{ tag }}</span>
+                    {% endfor %}
+                    <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">{% if section.key == 'member' and not user.is_authenticated %}로그인 →{% else %}열기 →{% endif %}</span>
+                </div>
+            </a>
+            {% endfor %}
         </div>
     </section>
+    {% empty %}
+    <p class="mt-8 rounded-[22px] border border-dashed border-black/[0.12] p-8 text-[14px] text-[#8e8e93]">아직 등록된 도구가 없습니다.</p>
+    {% endfor %}
+
+    <p class="mt-12 text-[13px] text-[#8e8e93]">＋ 새 도구가 계속 추가될 예정입니다.</p>
 </main>
 {% endblock %}

@@ -9,17 +9,20 @@ class ToolPagesTests(TestCase):
 		resp = self.client.get(reverse("tools:index"))
 		self.assertEqual(resp.status_code, 200)
 		for tool in TOOLS:
-			if tool.get("admin_only"):
+			if tool.get("access") == "admin":
 				self.assertNotContains(resp, tool["title"])
 				continue
 			self.assertContains(resp, tool["title"])
 			self.assertContains(resp, reverse(tool["url_name"]))
 
-	def test_tool_pages_are_public(self):
+	def test_tool_pages_match_access(self):
+		# public 은 비로그인으로 열리고, member 는 로그인 화면으로 보냄
 		for tool in TOOLS:
-			if tool.get("admin_only") or tool.get("login_required"):
-				continue
-			self.assertEqual(self.client.get(reverse(tool["url_name"])).status_code, 200)
+			status = self.client.get(reverse(tool["url_name"])).status_code
+			if tool["access"] == "public":
+				self.assertEqual(status, 200, tool["slug"])
+			elif tool["access"] == "member":
+				self.assertEqual(status, 302, tool["slug"])
 
 	def test_nav_has_tool_link(self):
 		resp = self.client.get(reverse("tools:index"))
@@ -155,6 +158,25 @@ class StreamViewTests(TestCase):
 		self.assertEqual(resp.status_code, 302)
 		self.assertIn(reverse("accounts:login"), resp["Location"])
 		self.assertEqual(self.client.post(reverse("tools:stream"), {"kind": "file"}).status_code, 302)
+
+	def test_hub_sections(self):
+		from unittest import mock
+		from tools import registry
+		resp = self.client.get(reverse("tools:index"))
+		self.assertContains(resp, "누구나 쓸 수 있는 도구")
+		self.assertContains(resp, "회원 전용")
+		self.assertContains(resp, "로그인하고 쓰기")
+		self.assertNotContains(resp, "관리자 전용")  # 관리자 도구가 없으면 칸 자체가 없음
+		admin_tool = {"slug": "x", "url_name": "tools:index", "icon": "🛠", "title": "관리자 테스트 도구", "description": "", "tags": [], "access": "admin"}
+		with mock.patch.object(registry, "TOOLS", registry.TOOLS + [admin_tool]), mock.patch("tools.views.TOOLS", registry.TOOLS + [admin_tool]):
+			self.client.force_login(self.member)
+			resp = self.client.get(reverse("tools:index"))
+			self.assertNotContains(resp, "관리자 테스트 도구")
+			self.assertNotContains(resp, "로그인하고 쓰기")
+			self.client.force_login(self.admin)
+			resp = self.client.get(reverse("tools:index"))
+			self.assertContains(resp, "관리자 전용")
+			self.assertContains(resp, "관리자 테스트 도구")
 
 	def test_hub_shows_stream_card_to_everyone_with_login_tag(self):
 		self.assertContains(self.client.get(reverse("tools:index")), "데이터 전송")
