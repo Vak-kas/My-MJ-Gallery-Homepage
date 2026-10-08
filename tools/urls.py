@@ -13,6 +13,7 @@ urlpatterns = [
     path("myip/", myip.myip, name="myip"),
     path("myip/lookup/", myip.myip_lookup, name="myip_lookup"),
     path("encode/", views.encode, name="encode"),
+    path("qrcode/", views.qrcode, name="qrcode"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),
     path("netcheck/run/", netcheck.netcheck_run, name="netcheck_run"),
     path("shortlink/", link_views.shortlink, name="shortlink"),

@@ -1,0 +1,336 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .qr-input { width: 100%; height: 44px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 0 14px; font-size: 15px; outline: none; color: #1d1d1f; }
+    textarea.qr-input { height: auto; min-height: 96px; padding: 12px 14px; resize: vertical; }
+    .qr-input:focus { border-color: #0066cc; }
+    .qr-label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; color: #1d1d1f; }
+    .qr-tab { border-radius: 999px; padding: 7px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); color: #1d1d1f; }
+    .qr-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .qr-preview { background: repeating-conic-gradient(#f0f0f2 0% 25%, #fff 0% 50%) 50% / 20px 20px; }
+    .qr-preview canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
+    html.theme-dark .qr-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .qr-label { color: #e8e8ea; }
+    html.theme-dark .qr-tab { color: #e8e8ea; border-color: rgba(255, 255, 255, 0.18); }
+    html.theme-dark .qr-tab.is-active { background: #e8e8ea; color: #1d1d1f; }
+</style>
+
+<main class="mx-auto max-w-[1200px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">QR CODE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">QR Code.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">입력하는 대로 바로 QR 코드가 바뀌어요. 모두 이 브라우저 안에서 만들어져서 Wi-Fi 비밀번호를 넣어도 서버로 가지 않아요.</p>
+    </div>
+
+    <div class="mt-8 flex flex-wrap gap-2" id="qr-modes">
+        <button type="button" class="qr-tab is-active" data-mode="text">🔗 주소 · 글</button>
+        <button type="button" class="qr-tab" data-mode="wifi">📶 Wi-Fi</button>
+        <button type="button" class="qr-tab" data-mode="vcard">👤 연락처</button>
+        <button type="button" class="qr-tab" data-mode="sms">💬 문자</button>
+        <button type="button" class="qr-tab" data-mode="email">✉️ 메일</button>
+        <button type="button" class="qr-tab" data-mode="read">📷 QR 읽기</button>
+    </div>
+
+    <div id="qr-make" class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6">
+            <div data-form="text">
+                <label class="qr-label" for="f-text">주소 또는 글</label>
+                <textarea id="f-text" class="qr-input" spellcheck="false">https://smjgallery.kr</textarea>
+            </div>
+            <div data-form="wifi" hidden class="grid gap-3">
+                <div><label class="qr-label" for="f-ssid">네트워크 이름 (SSID)</label><input id="f-ssid" class="qr-input" autocomplete="off"></div>
+                <div><label class="qr-label" for="f-wpass">비밀번호</label><input id="f-wpass" class="qr-input" autocomplete="off"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="qr-label" for="f-wsec">보안</label>
+                        <select id="f-wsec" class="qr-input"><option value="WPA">WPA/WPA2/WPA3</option><option value="WEP">WEP</option><option value="nopass">없음 (열린 와이파이)</option></select></div>
+                    <label class="flex items-end gap-2 pb-3 text-[13px]"><input id="f-whidden" type="checkbox" class="h-4 w-4"> 숨겨진 네트워크</label>
+                </div>
+                <p class="text-[12px] text-[#8e8e93]">휴대폰 카메라로 찍으면 바로 이 와이파이에 연결돼요.</p>
+            </div>
+            <div data-form="vcard" hidden class="grid gap-3">
+                <div><label class="qr-label" for="f-vname">이름</label><input id="f-vname" class="qr-input"></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="qr-label" for="f-vtel">전화</label><input id="f-vtel" class="qr-input" inputmode="tel"></div>
+                    <div><label class="qr-label" for="f-vmail">이메일</label><input id="f-vmail" class="qr-input" inputmode="email"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="qr-label" for="f-vorg">소속</label><input id="f-vorg" class="qr-input"></div>
+                    <div><label class="qr-label" for="f-vurl">웹사이트</label><input id="f-vurl" class="qr-input" inputmode="url"></div>
+                </div>
+                <p class="text-[12px] text-[#8e8e93]">찍으면 연락처 저장 화면이 떠요. 명함에 넣기 좋아요.</p>
+            </div>
+            <div data-form="sms" hidden class="grid gap-3">
+                <div><label class="qr-label" for="f-stel">받는 번호</label><input id="f-stel" class="qr-input" inputmode="tel"></div>
+                <div><label class="qr-label" for="f-smsg">내용</label><textarea id="f-smsg" class="qr-input"></textarea></div>
+            </div>
+            <div data-form="email" hidden class="grid gap-3">
+                <div><label class="qr-label" for="f-eto">받는 사람</label><input id="f-eto" class="qr-input" inputmode="email"></div>
+                <div><label class="qr-label" for="f-esub">제목</label><input id="f-esub" class="qr-input"></div>
+                <div><label class="qr-label" for="f-ebody">내용</label><textarea id="f-ebody" class="qr-input"></textarea></div>
+            </div>
+
+            <div class="mt-6 border-t border-black/[0.06] pt-5">
+                <h2 class="text-[14px] font-semibold">모양</h2>
+                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="qr-label" for="o-ec">오류 복원</label>
+                        <select id="o-ec" class="qr-input"><option value="L">낮음 7%</option><option value="M" selected>보통 15%</option><option value="Q">높음 25%</option><option value="H">최고 30%</option></select></div>
+                    <div><label class="qr-label" for="o-shape">점 모양</label>
+                        <select id="o-shape" class="qr-input"><option value="square">네모</option><option value="round">둥근 점</option><option value="soft">둥근 네모</option></select></div>
+                    <div><label class="qr-label" for="o-size">크기 <span id="o-size-v" class="font-normal text-[#8e8e93]"></span></label>
+                        <input id="o-size" type="range" min="200" max="1600" step="40" value="720" class="w-full accent-[#0066cc]"></div>
+                    <div><label class="qr-label" for="o-fg">색</label><input id="o-fg" type="color" value="#1d1d1f" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                    <div><label class="qr-label" for="o-bg">배경</label><input id="o-bg" type="color" value="#ffffff" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                    <div><label class="qr-label" for="o-margin">여백</label>
+                        <select id="o-margin" class="qr-input"><option value="0">없음</option><option value="2">좁게</option><option value="4" selected>보통</option><option value="6">넓게</option></select></div>
+                </div>
+                <label class="mt-3 flex items-center gap-2 text-[13px]"><input id="o-transparent" type="checkbox" class="h-4 w-4"> 배경 투명 (PNG)</label>
+                <div class="mt-4 rounded-xl bg-[#f5f5f7] p-3">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="text-[13px] font-semibold">가운데 로고</span>
+                        <label class="cursor-pointer rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px]">이미지 고르기<input id="o-logo" type="file" accept="image/*" class="hidden"></label>
+                        <button type="button" id="o-logo-mj" class="rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px]">MJ 로고</button>
+                        <button type="button" id="o-logo-clear" class="rounded-full px-3 py-1 text-[12px] text-[#c4271d]" hidden>빼기</button>
+                    </div>
+                    <p class="mt-1.5 text-[12px] text-[#8e8e93]">로고를 넣으면 가려지는 만큼을 복원할 수 있게 오류 복원이 자동으로 "최고"가 돼요.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-6 lg:sticky lg:top-6 lg:self-start">
+            <div class="qr-preview flex min-h-[320px] items-center justify-center rounded-2xl p-4">
+                <canvas id="qr-canvas" width="720" height="720"></canvas>
+            </div>
+            <p id="qr-info" class="mt-3 text-[12px] text-[#8e8e93]"></p>
+            <p id="qr-error" class="mt-1 min-h-[18px] text-[13px] text-[#d44c47]"></p>
+            <div class="mt-3 flex flex-wrap gap-2">
+                <button type="button" id="dl-png" class="rounded-full bg-[#0066cc] px-5 py-2.5 text-[14px] font-semibold text-white">PNG 저장</button>
+                <button type="button" id="dl-svg" class="rounded-full border border-black/[0.1] px-5 py-2.5 text-[14px]">SVG 저장</button>
+                <button type="button" id="cp-img" class="rounded-full border border-black/[0.1] px-5 py-2.5 text-[14px]">이미지 복사</button>
+            </div>
+            <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">인쇄할 때는 SVG(크게 키워도 안 깨짐)를, 메신저·문서에 붙일 때는 PNG 를 쓰세요. 색을 바꿀 땐 배경과 대비가 충분해야 잘 찍혀요.</p>
+        </section>
+    </div>
+
+    <section id="qr-read" class="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6" hidden>
+        <div id="rd-drop" class="cursor-pointer rounded-2xl border-2 border-dashed border-black/[0.12] p-10 text-center text-[14px] text-[#6e6e73]">
+            📷 QR 코드가 있는 사진·스크린샷을 끌어놓거나, 누르거나, <b>⌘V 로 붙여넣으세요</b>
+            <input id="rd-file" type="file" accept="image/*" class="hidden">
+        </div>
+        <div id="rd-result" class="mt-4"></div>
+        <p id="rd-unsupported" class="mt-3 text-[13px] text-[#b26a00]" hidden>이 브라우저는 QR 읽기를 지원하지 않아요. Chrome·Edge(맥·안드로이드) 또는 Safari 17 이상에서 열어 주세요.</p>
+    </section>
+</main>
+
+<script src="{% static 'vendor/qrcode-generator/qrcode-1.4.4.js' %}"></script>
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+    const LOGO_MJ = "{% static 'images/mj-logo.svg' %}";
+    let mode = 'text';
+    let logo = null;      // HTMLImageElement
+    let current = null;   // { qr, count }
+
+    // ── 입력 → QR 에 넣을 문자열
+    const wifiEsc = (s) => s.replace(/([\\;,:"])/g, '\\$1');
+    const BUILD = {
+        text: () => $('f-text').value,
+        wifi: () => {
+            const ssid = $('f-ssid').value, sec = $('f-wsec').value;
+            if (!ssid) return '';
+            return `WIFI:T:${sec};S:${wifiEsc(ssid)};${sec === 'nopass' ? '' : `P:${wifiEsc($('f-wpass').value)};`}${$('f-whidden').checked ? 'H:true;' : ''};`;
+        },
+        vcard: () => {
+            const name = $('f-vname').value.trim();
+            if (!name && !$('f-vtel').value && !$('f-vmail').value) return '';
+            const lines = ['BEGIN:VCARD', 'VERSION:3.0', `N:;${name};;;`, `FN:${name}`];
+            if ($('f-vorg').value) lines.push(`ORG:${$('f-vorg').value}`);
+            if ($('f-vtel').value) lines.push(`TEL;TYPE=CELL:${$('f-vtel').value}`);
+            if ($('f-vmail').value) lines.push(`EMAIL:${$('f-vmail').value}`);
+            if ($('f-vurl').value) lines.push(`URL:${$('f-vurl').value}`);
+            lines.push('END:VCARD');
+            return lines.join('\n');
+        },
+        sms: () => ($('f-stel').value ? `SMSTO:${$('f-stel').value}:${$('f-smsg').value}` : ''),
+        email: () => {
+            const to = $('f-eto').value.trim();
+            if (!to) return '';
+            const q = [['subject', $('f-esub').value], ['body', $('f-ebody').value]].filter(([, v]) => v).map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+            return `mailto:${to}${q ? '?' + q : ''}`;
+        },
+    };
+
+    // ── 그리기
+    function drawTo(ctx, size, { forPng }) {
+        const { qr, count } = current;
+        const margin = +$('o-margin').value;
+        const cell = size / (count + margin * 2);
+        const fg = $('o-fg').value, bg = $('o-bg').value, shape = $('o-shape').value;
+        ctx.clearRect(0, 0, size, size);
+        if (!(forPng && $('o-transparent').checked)) { ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size); }
+        ctx.fillStyle = fg;
+        const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= count - 7) || (r >= count - 7 && c < 7);
+        for (let r = 0; r < count; r++) {
+            for (let c = 0; c < count; c++) {
+                if (!qr.isDark(r, c)) continue;
+                const x = (c + margin) * cell, y = (r + margin) * cell;
+                if (shape === 'round' && !isFinder(r, c)) {
+                    ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.45, 0, Math.PI * 2); ctx.fill();
+                } else if (shape === 'soft' && !isFinder(r, c)) {
+                    ctx.beginPath(); ctx.roundRect(x + cell * 0.06, y + cell * 0.06, cell * 0.88, cell * 0.88, cell * 0.3); ctx.fill();
+                } else {
+                    ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(cell), Math.ceil(cell));
+                }
+            }
+        }
+        if (logo) {
+            const box = cell * Math.round(count * 0.22);
+            const pad = cell * 0.6;
+            const cx = size / 2 - box / 2, cy = size / 2 - box / 2;
+            ctx.fillStyle = bg;
+            ctx.beginPath(); ctx.roundRect(cx - pad, cy - pad, box + pad * 2, box + pad * 2, cell); ctx.fill();
+            const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1;  // 크기 없는 SVG 는 정사각형으로
+            const ratio = Math.min(box / nw, box / nh);
+            const w = nw * ratio, h = nh * ratio;
+            ctx.drawImage(logo, size / 2 - w / 2, size / 2 - h / 2, w, h);
+        }
+    }
+
+    function render() {
+        $('o-size-v').textContent = `${$('o-size').value}px`;
+        const text = BUILD[mode]();
+        $('qr-error').textContent = '';
+        if (!text) { current = null; $('qr-info').textContent = '내용을 입력하면 QR 코드가 생겨요.'; const c = $('qr-canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); return; }
+        if (logo && $('o-ec').value !== 'H') $('o-ec').value = 'H';
+        try {
+            const qr = qrcode(0, $('o-ec').value);
+            qr.addData(text, 'Byte');
+            qr.make();
+            current = { qr, count: qr.getModuleCount(), text };
+        } catch (err) {
+            current = null;
+            $('qr-error').textContent = '내용이 너무 길어요. 줄이거나 오류 복원 단계를 낮춰 주세요.';
+            return;
+        }
+        const size = +$('o-size').value;
+        const canvas = $('qr-canvas');
+        canvas.width = canvas.height = size;
+        drawTo(canvas.getContext('2d'), size, { forPng: false });
+        const bytes = new TextEncoder().encode(text).length;
+        $('qr-info').textContent = `버전 ${(current.count - 17) / 4} · ${current.count}×${current.count} 칸 · ${bytes} 바이트`;
+    }
+
+    // ── 저장 · 복사
+    const filename = (ext) => `qrcode-${mode}-${new Date().toISOString().slice(0, 10)}.${ext}`;
+    const pngBlob = () => new Promise((resolve) => {
+        const size = +$('o-size').value;
+        const c = document.createElement('canvas'); c.width = c.height = size;
+        drawTo(c.getContext('2d'), size, { forPng: true });
+        c.toBlob(resolve, 'image/png');
+    });
+    const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+
+    $('dl-png').addEventListener('click', async () => { if (current) download(await pngBlob(), filename('png')); });
+    $('dl-svg').addEventListener('click', async () => {
+        if (!current) return;
+        const { qr, count } = current;
+        const m = +$('o-margin').value, n = count + m * 2, shape = $('o-shape').value;
+        const fg = $('o-fg').value, bg = $('o-bg').value;
+        const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= count - 7) || (r >= count - 7 && c < 7);
+        let path = '', dots = '';
+        for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) {
+            if (!qr.isDark(r, c)) continue;
+            const x = c + m, y = r + m;
+            if (shape === 'round' && !isFinder(r, c)) dots += `<circle cx="${x + 0.5}" cy="${y + 0.5}" r="0.45"/>`;
+            else if (shape === 'soft' && !isFinder(r, c)) dots += `<rect x="${x + 0.06}" y="${y + 0.06}" width="0.88" height="0.88" rx="0.3"/>`;
+            else path += `M${x} ${y}h1v1h-1z`;
+        }
+        let logoSvg = '';
+        if (logo) {
+            const box = Math.round(count * 0.22), pad = 0.6, start = n / 2 - box / 2;
+            const data = await new Promise((resolve) => {
+                const c = document.createElement('canvas'); c.width = logo.naturalWidth || 512; c.height = logo.naturalHeight || 512;
+                c.getContext('2d').drawImage(logo, 0, 0, c.width, c.height); resolve(c.toDataURL('image/png'));
+            });
+            logoSvg = `<rect x="${start - pad}" y="${start - pad}" width="${box + pad * 2}" height="${box + pad * 2}" rx="1" fill="${bg}"/><image href="${data}" x="${start}" y="${start}" width="${box}" height="${box}" preserveAspectRatio="xMidYMid meet"/>`;
+        }
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${$('o-size').value}" height="${$('o-size').value}" shape-rendering="${shape === 'square' ? 'crispEdges' : 'geometricPrecision'}">`
+            + `${$('o-transparent').checked ? '' : `<rect width="${n}" height="${n}" fill="${bg}"/>`}<g fill="${fg}"><path d="${path}"/>${dots}</g>${logoSvg}</svg>`;
+        download(new Blob([svg], { type: 'image/svg+xml' }), filename('svg'));
+    });
+    $('cp-img').addEventListener('click', async (e) => {
+        if (!current) return;
+        try {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob() })]);
+            e.target.textContent = '복사됨';
+        } catch { e.target.textContent = '복사 안 됨 — PNG 저장을 써 주세요'; }
+        setTimeout(() => { e.target.textContent = '이미지 복사'; }, 1500);
+    });
+
+    // ── 로고
+    const setLogo = (src) => {
+        const img = new Image();
+        img.onload = () => { logo = img; $('o-logo-clear').hidden = false; render(); };
+        img.src = src;
+    };
+    $('o-logo').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) setLogo(URL.createObjectURL(f)); e.target.value = ''; });
+    $('o-logo-mj').addEventListener('click', () => setLogo(LOGO_MJ));
+    $('o-logo-clear').addEventListener('click', () => { logo = null; $('o-logo-clear').hidden = true; render(); });
+
+    // ── 탭
+    document.querySelectorAll('.qr-tab').forEach((tab) => tab.addEventListener('click', () => {
+        mode = tab.dataset.mode;
+        document.querySelectorAll('.qr-tab').forEach((t) => t.classList.toggle('is-active', t === tab));
+        $('qr-make').hidden = mode === 'read';
+        $('qr-read').hidden = mode !== 'read';
+        document.querySelectorAll('[data-form]').forEach((f) => { f.hidden = f.dataset.form !== mode; });
+        if (mode !== 'read') render();
+    }));
+    document.addEventListener('input', (e) => { if (e.target.closest('#qr-make')) render(); });
+    document.addEventListener('change', (e) => { if (e.target.closest('#qr-make')) render(); });
+
+    // ── QR 읽기 (브라우저 내장 BarcodeDetector)
+    const hasDetector = 'BarcodeDetector' in window;
+    if (!hasDetector) $('rd-unsupported').hidden = false;
+    async function readImage(file) {
+        const out = $('rd-result');
+        if (!hasDetector) return;
+        out.innerHTML = '<p class="text-[13px] text-[#8e8e93]">읽는 중…</p>';
+        try {
+            const bitmap = await createImageBitmap(file);
+            const codes = await new BarcodeDetector({ formats: ['qr_code'] }).detect(bitmap);
+            if (!codes.length) { out.innerHTML = '<p class="text-[14px] text-[#d44c47]">QR 코드를 찾지 못했어요. 더 크게·선명하게 찍힌 사진을 써 보세요.</p>'; return; }
+            out.innerHTML = codes.map((c) => {
+                const v = c.rawValue;
+                const link = /^https?:\/\//i.test(v) ? `<a href="${esc(v)}" target="_blank" rel="noopener noreferrer" class="rounded-full bg-[#0066cc] px-4 py-1.5 text-[13px] font-semibold text-white">열기 ↗</a>` : '';
+                return `<div class="mt-2 rounded-2xl bg-[#f5f5f7] p-4"><pre class="whitespace-pre-wrap break-all font-mono text-[14px]">${esc(v)}</pre><div class="mt-3 flex gap-2">${link}<button type="button" class="rd-copy rounded-full border border-black/[0.1] bg-white px-4 py-1.5 text-[13px]" data-text="${esc(v)}">복사</button></div>${link ? '<p class="mt-2 text-[12px] text-[#b26a00]">모르는 곳에서 받은 QR 의 링크는 주소를 먼저 확인하고 여세요.</p>' : ''}</div>`;
+            }).join('');
+        } catch (err) {
+            out.innerHTML = `<p class="text-[14px] text-[#d44c47]">이미지를 읽지 못했어요: ${esc(err.message)}</p>`;
+        }
+    }
+    $('rd-drop').addEventListener('click', () => $('rd-file').click());
+    $('rd-file').addEventListener('change', (e) => { if (e.target.files[0]) readImage(e.target.files[0]); e.target.value = ''; });
+    $('rd-drop').addEventListener('dragover', (e) => e.preventDefault());
+    $('rd-drop').addEventListener('drop', (e) => { e.preventDefault(); if (e.dataTransfer.files[0]) readImage(e.dataTransfer.files[0]); });
+    document.addEventListener('paste', (e) => {
+        if (mode !== 'read') return;
+        const item = Array.from(e.clipboardData?.items || []).find((i) => i.type.startsWith('image/'));
+        if (item) readImage(item.getAsFile());
+    });
+    $('rd-result').addEventListener('click', async (e) => {
+        const b = e.target.closest('.rd-copy');
+        if (!b) return;
+        try { await navigator.clipboard.writeText(b.dataset.text); b.textContent = '복사됨'; } catch {}
+    });
+
+    render();
+})();
+</script>
+{% endblock %}
