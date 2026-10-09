@@ -117,7 +117,7 @@
 ## 2) 기술 스택
 
 - Python 3.x, **Django 6.0.5**
-- SQLite (기본) / PostgreSQL (옵션), django-storages + boto3 (S3 옵션)
+- PostgreSQL (서버) / SQLite (로컬 기본), boto3 (S3 백업), django-storages (S3 업로드 옵션)
 - Pillow (이미지 처리)
 - Tailwind CSS (CDN), Tiptap 3 + esbuild (에디터)
 - pyzmq + aiohttp (데이터 전송 중계 데몬)
@@ -292,6 +292,8 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
   - 버킷: `db/날짜_시각.sqlite3.gz`(PostgreSQL 이면 `.pgdump`, `BACKUP_KEEP_DAYS` 일 보관) + `media/`·`private_media/`(바뀐 파일만 올리고, 서버에서 지운 파일도 버킷에는 남김)
   - `.env` 는 비밀키라 백업하지 않음 → 따로 안전하게 보관
   - 복원: `manage.py backup_s3 --download ~/mj-backup` → SQLite 는 `gunzip` 해서 `db.sqlite3` 로, PostgreSQL 은 `pg_restore -d mjgallery 파일.pgdump`, `media/`·`private_media/` 는 프로젝트 폴더로 복사
+- DB: 서버는 PostgreSQL 16 (`DB_ENGINE=postgresql`, `django.db.backends.postgresql` 로 적어도 됨). SQLite 에서 옮길 때:
+  `dumpdata --natural-foreign --natural-primary -e contenttypes -e auth.permission` → `DB_ENGINE=postgresql manage.py migrate` → `loaddata` → 표마다 행 수 비교 → `.env` 바꾸고 gunicorn 재시작 (옛 `db.sqlite3` 는 되돌리기용으로 남겨둠)
 - 새 색을 쓰는 템플릿을 추가하면 `venv/bin/python scripts/gen_dark_css.py` 로 다크 모드 CSS 다시 생성
 - 카카오톡은 링크 미리보기를 저장해 두므로, 예전에 보낸 링크는 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 캐시 초기화
 - 업로드 한도는 `config/settings.py` 의 `DATA_UPLOAD_MAX_MEMORY_SIZE`, `FILE_UPLOAD_MAX_MEMORY_SIZE` (nginx `client_max_body_size` 와 함께 조정)

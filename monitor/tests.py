@@ -169,6 +169,10 @@ class BackupTests(TestCase):
 		cache.clear()
 
 	def test_run_uploads_db_and_only_changed_files(self):
+		from django.db import connection
+
+		if connection.vendor != "sqlite":
+			self.skipTest("SQLite 백업 형식 확인 (PostgreSQL 은 pg_dump)")
 		import gzip
 		import sqlite3
 		import tempfile

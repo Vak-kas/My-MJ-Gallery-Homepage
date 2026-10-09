@@ -110,6 +110,24 @@ class NotificationTests(TestCase):
         kinds = sorted(Notification.objects.values_list("kind", flat=True))
         self.assertEqual(kinds, ["comment", "guestbook", "post"])
 
+    def test_loaddata_does_not_notify(self):
+        import json
+        import tempfile
+
+        from django.core.management import call_command
+
+        rows = [
+            {"model": "blog.guestbookentry", "pk": 900, "fields": {"author": self.member.pk, "author_name": "member", "message": "옛 방명록", "created_at": "2026-01-01T00:00:00Z"}},
+            {"model": "blog.comment", "pk": 900, "fields": {"post": self.post.pk, "author": self.member.pk, "author_name": "member", "content": "옛 댓글", "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}},
+        ]
+        with tempfile.NamedTemporaryFile("w", suffix=".json") as f:
+            json.dump(rows, f)
+            f.flush()
+            with mock.patch("notifications.service._run_background") as push:
+                call_command("loaddata", f.name, verbosity=0)
+        self.assertEqual(Notification.objects.count(), 0)
+        push.assert_not_called()
+
     def test_bell_count_and_open_marks_read(self):
         Comment.objects.create(post=self.post, author=self.member, author_name="member", content="좋아요")
         self.client.force_login(self.admin)

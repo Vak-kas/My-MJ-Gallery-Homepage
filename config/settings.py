@@ -132,7 +132,8 @@ KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-_db_engine = os.getenv("DB_ENGINE", "sqlite3")
+# "postgresql" 과 "django.db.backends.postgresql" 둘 다 받음 (예전엔 전체 경로를 적으면 조용히 SQLite 로 떨어졌음)
+_db_engine = os.getenv("DB_ENGINE", "sqlite3").rsplit(".", 1)[-1]
 
 if _db_engine == "postgresql":
     DATABASES = {
@@ -143,6 +144,8 @@ if _db_engine == "postgresql":
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": os.getenv("DB_HOST", "localhost"),
             "PORT": os.getenv("DB_PORT", "5432"),
+            "CONN_MAX_AGE": 60,  # 요청마다 새로 접속하지 않게
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 else:
