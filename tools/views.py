@@ -52,7 +52,7 @@ def encode(request):
 
 
 def qrcode(request):
-	return render(request, "tools/qrcode.html")
+	return render(request, "tools/qrcode.html", {"ai_enabled": bool(settings.ANTHROPIC_API_KEY)})
 
 
 # ── 실시간 데이터 스트림 ─────────────────────────────

@@ -74,6 +74,33 @@
                 <div><label class="qr-label" for="f-ebody">내용</label><textarea id="f-ebody" class="qr-input"></textarea></div>
             </div>
 
+            {% if ai_enabled %}
+            <div class="mt-6 rounded-2xl border border-[#8e44ad]/20 bg-gradient-to-br from-[#f7f0ff] to-[#eef6ff] p-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-[18px]">✨</span>
+                    <h2 class="text-[14px] font-semibold">AI 에게 꾸미기 부탁하기</h2>
+                    {% if not user.is_authenticated %}<span class="text-[12px] text-[#8e8e93]">· 회원 전용</span>{% endif %}
+                </div>
+                {% if user.is_authenticated %}
+                <form id="ai-form" class="mt-3 flex gap-2">
+                    {% csrf_token %}
+                    <input id="ai-prompt" class="qr-input" maxlength="200" placeholder="예: 피카츄처럼 귀엽게, 사이버펑크 느낌, 카페 메뉴판용 차분하게" autocomplete="off">
+                    <button id="ai-btn" class="shrink-0 rounded-xl bg-[#6d28d9] px-4 text-[14px] font-semibold text-white disabled:opacity-50">추천받기</button>
+                </form>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <button type="button" class="ai-ex rounded-full bg-white/70 px-2.5 py-1 text-[12px]">⚡ 피카츄 느낌</button>
+                    <button type="button" class="ai-ex rounded-full bg-white/70 px-2.5 py-1 text-[12px]">🌃 사이버펑크</button>
+                    <button type="button" class="ai-ex rounded-full bg-white/70 px-2.5 py-1 text-[12px]">☕ 카페 메뉴판</button>
+                    <button type="button" class="ai-ex rounded-full bg-white/70 px-2.5 py-1 text-[12px]">💍 청첩장</button>
+                    <button type="button" class="ai-ex rounded-full bg-white/70 px-2.5 py-1 text-[12px]">🎮 레트로 게임</button>
+                </div>
+                <p id="ai-result" class="mt-2 min-h-[18px] text-[13px] text-[#6e6e73]"></p>
+                {% else %}
+                <p class="mt-2 text-[13px] text-[#6e6e73]">원하는 분위기를 글로 적으면 AI 가 색·모양·문구를 골라 줘요. <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="text-[#0066cc] underline">로그인하고 써 보기</a></p>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <div class="mt-6 border-t border-black/[0.06] pt-5">
                 <div class="flex flex-wrap items-center gap-2">
                     <h2 class="mr-1 text-[14px] font-semibold">테마</h2>
@@ -473,6 +500,36 @@
         render();
     };
     document.querySelectorAll('.qr-preset').forEach((b) => b.addEventListener('click', () => applyPreset(PRESETS[b.dataset.preset])));
+
+    // ── AI 추천
+    const aiForm = $('ai-form');
+    if (aiForm) {
+        const ask = async (prompt) => {
+            const btn = $('ai-btn'), out = $('ai-result');
+            btn.disabled = true; btn.textContent = '고르는 중…'; out.textContent = '';
+            try {
+                const res = await fetch('{% url "tools:qrcode_ai" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': aiForm.querySelector('[name=csrfmiddlewaretoken]').value },
+                    body: JSON.stringify({ prompt, has_logo: !!logo }),
+                });
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.error || '추천을 받지 못했어요.');
+                applyPreset({
+                    'o-shape': d.shape, 'o-fg': d.fg, 'o-fg2': d.fg2, 'o-grad': d.grad, 'o-eye': d.eye, 'o-eyeball': d.eyeball,
+                    'o-eye-same': false, 'o-eyec': d.eyec, 'o-eyeballc': d.eyeballc, 'o-bg': d.bg,
+                    'o-frame': d.frame, 'o-caption': d.caption, 'o-framec': d.framec,
+                });
+                out.innerHTML = `<b class="text-[#6d28d9]">✨ ${esc(d.name)}</b> — ${esc(d.reason)} <button type="button" id="ai-again" class="ml-1 text-[#0066cc] underline">다시 추천</button>`;
+                $('ai-again').addEventListener('click', () => ask(prompt));
+            } catch (err) {
+                out.innerHTML = `<span class="text-[#d44c47]">${esc(err.message)}</span>`;
+            }
+            btn.disabled = false; btn.textContent = '추천받기';
+        };
+        aiForm.addEventListener('submit', (e) => { e.preventDefault(); const p = $('ai-prompt').value.trim(); if (p) ask(p); });
+        document.querySelectorAll('.ai-ex').forEach((b) => b.addEventListener('click', () => { $('ai-prompt').value = b.textContent.replace(/^\S+\s/, ''); ask($('ai-prompt').value); }));
+    }
 
     // ── 사진 · 로고
     const setLogo = (src) => {
