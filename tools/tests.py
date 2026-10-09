@@ -1109,3 +1109,76 @@ class PapersTests(TestCase):
 		self.assertEqual(post(f"/tools/papers/shelf/{saved['id']}/", {"delete": True}).status_code, 404)  # 남의 것은 못 건드림
 		self.client.force_login(user)
 		self.assertTrue(post(f"/tools/papers/shelf/{saved['id']}/", {"delete": True}).json()["deleted"])
+
+
+class PaperSectionsTests(TestCase):
+	HTML = """<html><body><article class="ltx_document"><h1 class="ltx_title ltx_title_document">Anti-Jamming in LEO</h1>
+	<div class="ltx_abstract"><p class="ltx_p">We study jamming.</p></div>
+	<section id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section"><span class="ltx_tag">I </span>Introduction</h2>
+	<div class="ltx_para"><p class="ltx_p">Satellites are everywhere <cite class="ltx_cite">[<a href="#bib.bib1" class="ltx_ref">1</a>, <a href="#bib.bib2" class="ltx_ref">2</a>]</cite>.</p></div>
+	<div class="ltx_para"><p class="ltx_p">However, jamming has not been studied in <a href="#x">LEO</a>.<script>alert(1)</script></p></div>
+	<div class="ltx_para"><p class="ltx_p">The main contributions are summarized as follows:</p>
+	<ul class="ltx_itemize"><li class="ltx_item">1. A new model <math alttext="x^2" display="inline"></math>.</li><li class="ltx_item">2. A new algorithm.</li></ul></div>
+	<div class="ltx_para"><p class="ltx_p">The rest of this paper is organized as follows.</p></div></section>
+	<section id="S2" class="ltx_section"><h2 class="ltx_title">II System Model</h2>
+	<section class="ltx_subsection"><h3 class="ltx_title">II-A Channel</h3><div class="ltx_para"><p class="ltx_p">The channel is</p>
+	<table class="ltx_equation ltx_eqn_table"><tr><td><math alttext="h = g\\sqrt{\\beta}" display="block"></math></td><td class="ltx_eqn_eqno">(1)</td></tr></table></div></section></section>
+	<section id="S3" class="ltx_section"><h2 class="ltx_title">III Simulation Results</h2><div class="ltx_para"><p class="ltx_p">Results.</p></div></section>
+	<section class="ltx_bibliography"><ul><li id="bib.bib1" class="ltx_bibitem"><span class="ltx_tag ltx_tag_bibitem">[1]</span><span class="ltx_bibblock">A. Kim, “LEO networks,” IEEE TWC, 2020.</span></li>
+	<li id="bib.bib2" class="ltx_bibitem"><span class="ltx_tag ltx_tag_bibitem">[2]</span><span class="ltx_bibblock">B. Lee, “NTN,” 2021.</span></li></ul></section></article></body></html>"""
+
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_arxiv_html(self):
+		import json
+		from . import paper_sections as ps
+		out = ps.from_arxiv_html(self.HTML)
+		self.assertEqual(out["title"], "Anti-Jamming in LEO")
+		self.assertEqual([s["kind"] for s in out["sections"]], ["abstract", "introduction", "system", "simulation"])
+		intro = out["sections"][1]
+		self.assertEqual([b.get("role") for b in intro["blocks"] if b["t"] == "p"], ["background", "gap", "this", "organization"])
+		self.assertEqual(len(intro["contributions"]), 2)
+		self.assertTrue(intro["contributions"][0].startswith("A new model"))
+		self.assertIn('data-latex="x^2"', intro["contributions"][0])
+		self.assertEqual(intro["cited"], ["bib.bib1", "bib.bib2"])
+		self.assertIn("LEO networks", out["refs"]["bib.bib1"]["text"])
+		self.assertNotIn("<script", json.dumps(out))  # 원문 HTML 은 그대로 안 넘김
+		system = out["sections"][2]["blocks"]
+		self.assertEqual([b["t"] for b in system], ["h", "p", "eq"])
+		self.assertEqual(system[2]["rows"][0], {"latex": "h = g\\sqrt{\\beta}", "no": "(1)"})
+
+	def test_pdf(self):
+		import fitz
+		from . import paper_sections as ps
+		doc = fitz.open()
+		lines = [("Abstract—We study jamming in LEO.", 9, False), ("I. INTRODUCTION", 11, True), ("Satellites matter [1], [2]–[3].", 10, False),
+				 ("", 0, False), ("In this paper, our contributions are:", 10, False), ("", 0, False), ("1) A model. 2) An algorithm.", 10, False),
+				 ("II. SYSTEM MODEL", 11, True), ("We consider a LEO satellite.", 10, False), ("REFERENCES", 11, True),
+				 ("[1] A. Kim, “LEO networks,” 2020.", 9, False), ("[2] B. Lee, “NTN,” 2021.", 9, False), ("[3] C. Park, “Jam,” 2022.", 9, False)]
+		page = doc.new_page()
+		y = 60
+		for text, size, bold in lines:
+			if text:
+				page.insert_text((60, y), text, fontsize=size, fontname="hebo" if bold else "helv")
+			y += 24 if text else 12
+		out = ps.from_pdf(doc.tobytes())
+		self.assertEqual([s["kind"] for s in out["sections"]], ["abstract", "introduction", "system"])
+		intro = out["sections"][1]
+		self.assertEqual(intro["cited"], ["ref.1", "ref.2", "ref.3"])  # [2]–[3] 범위도 풀기
+		self.assertIn("LEO networks", out["refs"]["ref.1"]["text"])
+
+	def test_view_cache_and_errors(self):
+		from unittest import mock
+		from . import paper_sections as ps
+		with mock.patch("tools.paper_sections._fetch", return_value=self.HTML.encode()) as m:
+			self.assertEqual(self.client.get("/tools/papers/sections/?arxiv=2401.09157").json()["arxiv"], "2401.09157")
+			self.client.get("/tools/papers/sections/?arxiv=2401.09157")
+		self.assertEqual(m.call_count, 1)  # 두 번째는 캐시
+		self.assertEqual(self.client.get("/tools/papers/sections/?arxiv=../../etc").status_code, 400)
+		with mock.patch("tools.paper_sections.find_arxiv", return_value=""):
+			res = self.client.get("/tools/papers/sections/?title=Some+paywalled+IEEE+paper+title")
+		self.assertEqual(res.status_code, 404)
+		self.assertTrue(res.json()["need_pdf"])
+		self.assertEqual(self.client.post("/tools/papers/sections/pdf/").status_code, 302)  # PDF 올리기는 회원만

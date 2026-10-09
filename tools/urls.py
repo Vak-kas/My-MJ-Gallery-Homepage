@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, papers, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, paper_sections, papers, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -25,6 +25,8 @@ urlpatterns = [
     path("cite/lookup/", cite.lookup, name="cite_lookup"),
     path("papers/", views.papers_page, name="papers"),
     path("papers/search/", papers.search_view, name="papers_search"),
+    path("papers/sections/", paper_sections.sections_view, name="papers_sections"),
+    path("papers/sections/pdf/", paper_sections.sections_pdf, name="papers_sections_pdf"),
     path("papers/shelf/", papers.shelf_list, name="papers_shelf"),
     path("papers/shelf/save/", papers.shelf_save, name="papers_shelf_save"),
     path("papers/shelf/<int:pk>/", papers.shelf_update, name="papers_shelf_update"),
