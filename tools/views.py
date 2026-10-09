@@ -51,6 +51,14 @@ def encode(request):
 	return render(request, "tools/encode.html")
 
 
+def json_tool(request):
+	return render(request, "tools/json.html")
+
+
+def regex(request):
+	return render(request, "tools/regex.html")
+
+
 def qrcode(request):
 	return render(request, "tools/qrcode.html", {"ai_enabled": bool(settings.ANTHROPIC_API_KEY)})
 
