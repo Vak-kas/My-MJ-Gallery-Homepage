@@ -18,6 +18,10 @@
             <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SECURITY</p>
             <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">보안</h1>
             <p class="mt-3 text-[16px] text-[#6e6e73]">누가, 어디서, 언제 로그인하고 글을 썼는지 남기고, 문제 있는 IP 를 막습니다. 기록은 {{ retention_days }}일 뒤 자동으로 지워져요. 지금 내 IP: <span class="font-mono text-[#1d1d1f]">{{ my_ip|default:"-" }}</span></p>
+            <form class="mt-4 flex max-w-[420px] gap-2" onsubmit="event.preventDefault(); const v=this.q.value.trim(); if (v) location.href='{% url 'studio:security' %}ip/'+encodeURIComponent(v)+'/';">
+                <input name="q" placeholder="🔎 IP 조회 (누구의 IP 인지, 신고 연락처, 우리 서버 기록)" class="h-10 flex-1 rounded-xl border border-black/[0.1] bg-white px-3 font-mono text-[13px]">
+                <button class="rounded-xl bg-[#1d1d1f] px-4 text-[13px] text-white">조회</button>
+            </form>
             <div class="mt-5 flex flex-wrap gap-2 text-[13px]">
                 {% for key, label in tabs %}
                 <a href="?tab={{ key }}" class="rounded-full px-4 py-1.5 {% if tab == key %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }}</a>
@@ -41,7 +45,7 @@
                     {% for e in admin_logins %}
                     <div class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5">
                         <span class="w-[110px] text-[#8e8e93]">{{ e.created_at|date:"m.d H:i:s" }}</span>
-                        <span class="font-mono">{{ e.ip|default:"-" }}</span>
+                        <span class="font-mono">{{ e.ip|default:"-" }}{% if e.ip %}<a href="{% url 'studio:security_ip' e.ip %}" class="ml-1 text-[12px] no-underline opacity-60 hover:opacity-100" title="IP 조회">🔎</a>{% endif %}</span>
                         {% if e.new_location %}<span class="rounded-full bg-[#b26a00]/10 px-2 py-0.5 text-[11px] text-[#b26a00]">새 IP</span>{% endif %}
                         <span class="min-w-0 flex-1 truncate text-[12px] text-[#8e8e93]">{{ e.user_agent }}</span>
                     </div>
@@ -55,7 +59,7 @@
                 <div class="mt-3 divide-y divide-black/[0.05] text-[13px]">
                     {% for row in top_failed %}
                     <div class="flex items-center gap-3 py-2.5">
-                        <a href="?tab=logins&ip={{ row.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ row.ip }}</a>
+                        <a href="?tab=logins&ip={{ row.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ row.ip }}</a><a href="{% url 'studio:security_ip' row.ip %}" class="ml-1 text-[12px] no-underline opacity-60 hover:opacity-100" title="IP 조회">🔎</a>
                         <span class="text-[#c4271d]">실패 {{ row.n }}번</span>
                         <form method="post" class="ml-auto" onsubmit="return confirm('{{ row.ip }} 을(를) 7일 동안 차단할까요?');">
                             {% csrf_token %}<input type="hidden" name="action" value="block"><input type="hidden" name="network" value="{{ row.ip }}"><input type="hidden" name="duration" value="7d"><input type="hidden" name="reason" value="로그인 반복 실패"><input type="hidden" name="return_qs" value="tab=overview">
@@ -95,7 +99,7 @@
                             {% else %}<span class="rounded-full bg-[#b26a00]/10 px-2 py-0.5 text-[12px] text-[#b26a00]">{{ e.get_result_display }}</span>{% endif %}
                         </td>
                         <td class="px-2 py-2.5">{{ e.username|default:"-" }}{% if e.is_admin %} <span class="text-[11px] text-[#0066cc]">관리자</span>{% endif %}</td>
-                        <td class="px-2 py-2.5 font-mono"><a href="?tab=logins&ip={{ e.ip }}" class="hover:underline">{{ e.ip|default:"-" }}</a></td>
+                        <td class="px-2 py-2.5 font-mono"><a href="?tab=logins&ip={{ e.ip }}" class="hover:underline">{{ e.ip|default:"-" }}</a>{% if e.ip %}<a href="{% url 'studio:security_ip' e.ip %}" class="ml-1 text-[12px] no-underline opacity-60 hover:opacity-100" title="IP 조회">🔎</a>{% endif %}</td>
                         <td class="max-w-[320px] truncate px-2 py-2.5 text-[12px] text-[#8e8e93]" title="{{ e.user_agent }}">{{ e.user_agent }}</td>
                         <td class="px-4 py-2.5 text-right">{% if e.ip and e.ip != my_ip %}<a href="?tab=blocks&prefill={{ e.ip }}" class="text-[12px] text-[#c4271d] hover:underline">차단…</a>{% endif %}</td>
                     </tr>
@@ -137,7 +141,7 @@
                         <span class="rounded bg-[#f5f5f7] px-1.5 text-[#1d1d1f]">{{ r.label }}</span>
                         <span class="font-semibold text-[#1d1d1f]">{{ r.author }}</span>
                         <span>{{ r.created_at|date:"Y.m.d H:i" }}</span>
-                        <a href="?tab=content&ip={{ r.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ r.ip }}</a>
+                        <a href="?tab=content&ip={{ r.ip }}" class="font-mono text-[#0066cc] hover:underline">{{ r.ip }}</a><a href="{% url 'studio:security_ip' r.ip %}" class="ml-1 text-[12px] no-underline opacity-60 hover:opacity-100" title="IP 조회">🔎</a>
                         <span class="max-w-[360px] truncate" title="{{ r.agent }}">{{ r.agent }}</span>
                     </div>
                     <p class="mt-1 truncate text-[14px]">{{ r.text|truncatechars:160 }}</p>

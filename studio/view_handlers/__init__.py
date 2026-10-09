@@ -95,7 +95,7 @@ from .posts import (
 )
 from .community import community
 from .users import users
-from .security import security
+from .security import security, security_ip
 from .settings import site_settings_view
 from .analytics import analytics
 from .server import server, server_logs

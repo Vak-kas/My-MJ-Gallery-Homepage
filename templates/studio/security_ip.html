@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .ip-card { border-radius: 20px; border: 1px solid rgba(0, 0, 0, 0.06); background: #fff; padding: 20px; }
+    .ip-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; padding: 7px 0; border-top: 1px solid rgba(0, 0, 0, 0.05); font-size: 13px; }
+    .ip-row:first-child { border-top: 0; }
+    .ip-row dt { color: #8e8e93; }
+    .ip-row dd { min-width: 0; word-break: break-all; }
+    .ip-tag { display: inline-block; border-radius: 999px; background: #f5f5f7; padding: 1px 9px; font-size: 12px; margin: 0 4px 4px 0; }
+    .ip-pre { max-height: 220px; overflow: auto; border-radius: 12px; background: #0d1117; color: #c9d1d9; padding: 10px 12px; font: 11.5px/1.55 ui-monospace, Menlo, monospace; white-space: pre; }
+</style>
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-6"><a href="{% url 'studio:security' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] hover:text-[#1d1d1f]"><span class="text-[18px]">←</span><span>보안으로</span></a></div>
+
+        <section class="mb-6 flex flex-wrap items-end gap-4">
+            <div class="min-w-0 flex-1">
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SECURITY · IP</p>
+                <h1 class="mt-3 font-mono text-[36px] font-semibold tracking-[-0.02em]">{{ ip }}</h1>
+                {% if is_me %}<p class="mt-1 text-[13px] font-semibold text-[#0f9f6e]">지금 내 IP 예요.</p>{% endif %}
+                {% if ext.verdict %}
+                <p class="mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[14px] font-semibold
+                    {% if ext.verdict.kind == 'scanner' or ext.verdict.kind == 'bot' %}bg-[#e8f1fb] text-[#0066cc]{% elif ext.verdict.kind == 'tor' or ext.verdict.kind == 'vpn' %}bg-[#fff1f0] text-[#c4271d]{% elif ext.verdict.kind == 'cloud' %}bg-[#fff8e6] text-[#8a5300]{% else %}bg-[#ecfdf5] text-[#0f9f6e]{% endif %}">
+                    {% if ext.verdict.kind == 'scanner' %}🔭{% elif ext.verdict.kind == 'bot' %}🤖{% elif ext.verdict.kind == 'tor' %}🧅{% elif ext.verdict.kind == 'vpn' %}🕶{% elif ext.verdict.kind == 'cloud' %}☁️{% else %}🏠{% endif %} {{ ext.verdict.label }}</p>
+                {% endif %}
+            </div>
+            <form method="get" action="{% url 'studio:security' %}" onsubmit="event.preventDefault(); const v=this.q.value.trim(); if (v) location.href='{% url 'studio:security' %}ip/'+encodeURIComponent(v)+'/';" class="flex gap-2">
+                <input name="q" placeholder="다른 IP 조회" class="h-10 w-[200px] rounded-xl border border-black/[0.1] bg-white px-3 font-mono text-[13px]">
+                <button class="rounded-xl bg-[#1d1d1f] px-4 text-[13px] text-white">조회</button>
+            </form>
+            {% if public %}<a href="?refresh=1" class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] hover:bg-[#f5f5f7]" title="하루 동안 저장된 결과를 버리고 다시 조회">↻ 다시 조회</a>{% endif %}
+        </section>
+
+        {% if not public %}
+        <div class="mb-6 rounded-2xl border border-black/[0.06] bg-white px-5 py-4 text-[13px] text-[#6e6e73]">사설·내부 IP 라서 외부 공개 정보는 없어요. 우리 서버 기록만 보여 줘요.</div>
+        {% endif %}
+
+        <div class="grid gap-5 xl:grid-cols-2">
+            {% if ext %}
+            <!-- 누구의 IP 인가 -->
+            <section class="ip-card">
+                <h2 class="text-[15px] font-semibold">🏢 누구의 IP 인가 <span class="text-[12px] font-normal text-[#8e8e93]">공개 등록 정보 (RDAP)</span></h2>
+                <dl class="mt-3">
+                    {% with r=ext.rdap i=ext.ipinfo %}
+                    <div class="ip-row"><dt>통신사·기관</dt><dd><b>{{ i.isp|default:"" }}</b>{% if r.orgs and r.orgs.0 != i.isp %}{% if i.isp %} · {% endif %}{{ r.orgs|join:", " }}{% endif %}{% if not i.isp and not r.orgs %}-{% endif %}</dd></div>
+                    <div class="ip-row"><dt>ASN</dt><dd class="font-mono">{{ i.asn|default:"-" }}</dd></div>
+                    <div class="ip-row"><dt>네트워크</dt><dd><span class="font-mono">{{ r.network|default:"-" }}</span>{% if r.registry %} <span class="text-[#8e8e93]">({{ r.registry }}{% if r.registered %}, {{ r.registered }} 등록{% endif %})</span>{% endif %}</dd></div>
+                    <div class="ip-row"><dt>대역</dt><dd class="font-mono">{{ r.range|default:"-" }}{% if r.cidr %} <span class="text-[#8e8e93]">= {{ r.cidr }}</span>{% endif %}</dd></div>
+                    <div class="ip-row"><dt>국가</dt><dd>{{ i.country|default:r.country|default:"-" }}</dd></div>
+                    <div class="ip-row"><dt>대략 위치</dt><dd>{% if i.city %}{{ i.city }}{% if i.region and i.region != i.city %}, {{ i.region }}{% endif %} <span class="text-[11px] text-[#8e8e93]">— 통신사 장비 기준이라 실제 사람 위치와 수십 km 다를 수 있어요</span>{% else %}-{% endif %}</dd></div>
+                    <div class="ip-row"><dt>역방향 DNS</dt><dd class="font-mono">{% if ext.rdns.0 %}{{ ext.rdns.0 }} {% if ext.rdns.1 %}<span class="text-[11px] text-[#0f9f6e]">✓ 확인됨</span>{% else %}<span class="text-[11px] text-[#b26a00]">정방향 불일치(위조 가능)</span>{% endif %}{% else %}-{% endif %}</dd></div>
+                    <div class="ip-row"><dt>신고 연락처</dt><dd>{% for m in r.abuse %}<a class="font-mono text-[#0066cc] hover:underline" href="mailto:{{ m }}">{{ m }}</a>{% if not forloop.last %}, {% endif %}{% empty %}-{% endfor %}</dd></div>
+                    {% if r.contacts %}<div class="ip-row"><dt>관리 담당</dt><dd>{% for m in r.contacts %}<a class="font-mono text-[#0066cc] hover:underline" href="mailto:{{ m }}">{{ m }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+                    {% endwith %}
+                </dl>
+            </section>
+
+            <!-- 평판 -->
+            <section class="ip-card">
+                <h2 class="text-[15px] font-semibold">🛡 평판 <span class="text-[12px] font-normal text-[#8e8e93]">다른 곳에서 이미 공개적으로 모은 정보</span></h2>
+                <dl class="mt-3">
+                    {% with d=ext.internetdb %}
+                    <div class="ip-row"><dt>Tor 출구</dt><dd>{% if ext.tor %}<b class="text-[#c4271d]">예</b>{% elif ext.tor is None %}-{% else %}아니요{% endif %}</dd></div>
+                    <div class="ip-row"><dt>태그</dt><dd>{% for t in d.tags %}<span class="ip-tag">{{ t }}</span>{% empty %}-{% endfor %}</dd></div>
+                    <div class="ip-row"><dt>열린 포트</dt><dd class="font-mono">{{ d.ports|join:", "|default:"-" }}</dd></div>
+                    <div class="ip-row"><dt>이름</dt><dd class="font-mono">{{ d.hostnames|join:", "|default:"-" }}</dd></div>
+                    <div class="ip-row"><dt>알려진 취약점</dt><dd>{% if d.vulns %}<span class="text-[#c4271d]">{{ d.vulns|length }}개</span> <span class="text-[11px] text-[#8e8e93]">— 해킹당해 봇으로 쓰이는 서버일 수도 있어요</span><br><span class="font-mono text-[11px] text-[#6e6e73]">{{ d.vulns|slice:":8"|join:", " }}{% if d.vulns|length > 8 %} …{% endif %}</span>{% else %}-{% endif %}</dd></div>
+                    {% endwith %}
+                    {% if ext.abuseipdb %}
+                    <div class="ip-row"><dt>AbuseIPDB</dt><dd><b class="{% if ext.abuseipdb.score >= 50 %}text-[#c4271d]{% elif ext.abuseipdb.score >= 10 %}text-[#b26a00]{% else %}text-[#0f9f6e]{% endif %}">{{ ext.abuseipdb.score }}%</b> 위험 · 90일간 신고 {{ ext.abuseipdb.reports }}건({{ ext.abuseipdb.users }}명){% if ext.abuseipdb.last %} · 마지막 {{ ext.abuseipdb.last }}{% endif %}{% if ext.abuseipdb.usage %} · {{ ext.abuseipdb.usage }}{% endif %}</dd></div>
+                    {% else %}
+                    <div class="ip-row"><dt>AbuseIPDB</dt><dd class="text-[12px] text-[#8e8e93]">서버 <code>.env</code> 에 <code>ABUSEIPDB_API_KEY</code>(abuseipdb.com 무료 키)를 넣으면 다른 사람들의 신고 점수도 보여요.</dd></div>
+                    {% endif %}
+                </dl>
+                {% if ext.errors %}<p class="mt-2 text-[11px] text-[#b26a00]">일부 조회 실패: {% for k, v in ext.errors.items %}{{ k }} ({{ v }}){% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+            </section>
+            {% endif %}
+
+            <!-- 우리 서버 기록 -->
+            <section class="ip-card">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-[15px] font-semibold">🌐 웹 접속 (nginx)</h2>
+                    <a class="ml-auto text-[12px] text-[#0066cc] hover:underline" href="{% url 'studio:server_logs' %}?source=access&q={{ ip }}">로그에서 보기 →</a>
+                </div>
+                {% with a=loc.access %}
+                {% if a.error %}<p class="mt-3 text-[13px] text-[#8e8e93]">{{ a.error }}</p>
+                {% elif not a.hits %}<p class="mt-3 text-[13px] text-[#8e8e93]">최근 {{ a.scanned }}줄 안에 이 IP 의 접속이 없어요.</p>
+                {% else %}
+                <p class="mt-2 text-[13px]">최근 {{ a.scanned }}줄 중 <b>{{ a.hits }}번</b> · {{ a.first }} ~ {{ a.last }}</p>
+                <div class="mt-2 flex gap-4 text-[13px]">{% for k, n in a.status %}<span><b class="tabular-nums {% if k == '5xx' and n %}text-[#c4271d]{% elif k == '4xx' and n %}text-[#b26a00]{% endif %}">{{ n }}</b> <span class="text-[#8e8e93]">{{ k }}</span></span>{% endfor %}</div>
+                <p class="mt-3 text-[12px] text-[#8e8e93]">요청한 주소</p>
+                <ul class="mt-1 space-y-0.5 font-mono text-[12px]">{% for p, n in a.paths %}<li class="flex justify-between gap-3"><span class="truncate">{{ p }}</span><span class="text-[#8e8e93]">{{ n }}</span></li>{% endfor %}</ul>
+                <p class="mt-3 text-[12px] text-[#8e8e93]">브라우저·프로그램 (User-Agent)</p>
+                <ul class="mt-1 space-y-0.5 text-[12px]">{% for u, n in a.uas %}<li class="truncate" title="{{ u }}">{{ u|default:"(없음)" }} <span class="text-[#8e8e93]">×{{ n }}</span></li>{% endfor %}</ul>
+                {% endif %}
+                {% endwith %}
+            </section>
+
+            <section class="ip-card">
+                <h2 class="text-[15px] font-semibold">🔑 로그인 · SSH · 작성</h2>
+                <dl class="mt-3">
+                    {% with l=loc.logins %}
+                    <div class="ip-row"><dt>사이트 로그인</dt><dd>{% if l.total %}{{ l.total }}번 — {% for k, n in l.by_result.items %}{{ k }} {{ n }}{% if not forloop.last %}, {% endif %}{% endfor %}<br><span class="text-[12px] text-[#8e8e93]">{{ l.first|date:"m.d H:i" }} ~ {{ l.last|date:"m.d H:i" }}</span> <a class="text-[12px] text-[#0066cc] hover:underline" href="{% url 'studio:security' %}?tab=logins&ip={{ ip }}">기록 보기</a>{% else %}없음{% endif %}</dd></div>
+                    {% if l.tried %}<div class="ip-row"><dt>시도한 아이디</dt><dd class="font-mono">{% for t in l.tried %}{{ t.username }}<span class="text-[#8e8e93]">×{{ t.n }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</dd></div>{% endif %}
+                    {% endwith %}
+                    {% with s=loc.ssh %}
+                    <div class="ip-row"><dt>서버 SSH</dt><dd>{% if s.error %}<span class="text-[#8e8e93]">{{ s.error }}</span>{% elif s.hits %}{{ s.hits }}줄 · 실패 <b class="text-[#c4271d]">{{ s.fails }}</b>{% if s.accepted %} · <b class="text-[#c4271d]">접속 성공 {{ s.accepted }}번!</b>{% endif %}{% if s.users %}<br><span class="font-mono text-[12px]">{% for u, n in s.users %}{{ u }}<span class="text-[#8e8e93]">×{{ n }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}{% else %}없음{% endif %}</dd></div>
+                    {% endwith %}
+                    <div class="ip-row"><dt>작성 기록</dt><dd>{% if loc.content.comment or loc.content.guestbook or loc.content.post %}댓글 {{ loc.content.comment }} · 방명록 {{ loc.content.guestbook }} · 글 {{ loc.content.post }} <a class="text-[12px] text-[#0066cc] hover:underline" href="{% url 'studio:security' %}?tab=content&ip={{ ip }}">보기</a>{% else %}없음{% endif %}</dd></div>
+                    <div class="ip-row"><dt>차단</dt><dd>{% for b in loc.blocks %}<span class="{% if b.is_active %}font-semibold text-[#c4271d]{% else %}text-[#8e8e93]{% endif %}">{{ b.network }}{% if b.is_active %} 차단 중{% if b.expires_at %} (~{{ b.expires_at|date:"m.d H:i" }}){% endif %}{% else %} (만료){% endif %}</span> {% empty %}없음{% endfor %}</dd></div>
+                </dl>
+
+                {% if not is_me %}
+                <form method="post" action="{% url 'studio:security' %}" class="mt-4 flex flex-wrap items-center gap-2 border-t border-black/[0.05] pt-4 text-[13px]">
+                    {% csrf_token %}<input type="hidden" name="action" value="block"><input type="hidden" name="return_qs" value="tab=blocks">
+                    <select name="network" class="h-9 rounded-xl border border-black/[0.1] px-2 font-mono text-[12px]"><option value="{{ ip }}">{{ ip }} 만</option><option value="{{ suggest_net }}">{{ suggest_net }} 대역</option></select>
+                    <select name="duration" class="h-9 rounded-xl border border-black/[0.1] px-2 text-[12px]">{% for k, label in durations %}<option value="{{ k }}" {% if k == '7d' %}selected{% endif %}>{{ label }}</option>{% endfor %}</select>
+                    <input name="reason" value="{% if ext.verdict %}{{ ext.verdict.label|truncatechars:60 }}{% endif %}" placeholder="이유" class="h-9 min-w-[160px] flex-1 rounded-xl border border-black/[0.1] px-3 text-[12px]">
+                    <button class="h-9 rounded-xl bg-[#c4271d] px-4 font-semibold text-white">차단</button>
+                </form>
+                {% endif %}
+            </section>
+        </div>
+
+        {% if loc.access.samples or loc.ssh.samples %}
+        <section class="ip-card mt-5">
+            <h2 class="text-[15px] font-semibold">📜 최근 기록</h2>
+            {% if loc.access.samples %}<p class="mt-3 text-[12px] text-[#8e8e93]">웹 접속</p><div class="ip-pre mt-1">{{ loc.access.samples|join:"&#10;" }}</div>{% endif %}
+            {% if loc.ssh.samples %}<p class="mt-3 text-[12px] text-[#8e8e93]">SSH (auth.log)</p><div class="ip-pre mt-1">{{ loc.ssh.samples|join:"&#10;" }}</div>{% endif %}
+        </section>
+        {% endif %}
+
+        {% if ext and not is_me %}
+        <!-- 신고 -->
+        <section class="ip-card mt-5">
+            <h2 class="text-[15px] font-semibold">📮 신고하기</h2>
+            <p class="mt-1 text-[13px] leading-6 text-[#6e6e73]">IP 주인이 누구인지(실제 사람)는 통신사만 알고, 수사기관이 아니면 받아낼 수 없어요. 우리가 할 수 있는 건 <b>IP 를 관리하는 기관의 신고(abuse) 창구에 기록을 보내는 것</b>이에요. 기관이 확인해서 그 회선·서버에 조치해요.</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-[13px]">
+                {% for m in ext.rdap.abuse %}
+                <a class="rounded-full bg-[#0066cc] px-4 py-1.5 font-semibold text-white" href="mailto:{{ m }}?subject={{ 'Abuse report: '|urlencode }}{{ ip|urlencode }}&body={{ report|truncatechars:1500|urlencode }}">✉️ {{ m }} 에 메일 쓰기</a>
+                {% endfor %}
+                <button type="button" class="rounded-full border border-black/[0.1] px-4 py-1.5" onclick="navigator.clipboard.writeText(document.getElementById('ip-report').value).then(() => { this.textContent = '✓ 복사됨'; })">신고 내용 복사</button>
+                {% if ext.ipinfo.country == 'KR' or ext.rdap.country == 'KR' %}
+                <a class="rounded-full border border-black/[0.1] px-4 py-1.5" href="https://www.boho.or.kr" target="_blank" rel="noopener">KISA 보호나라 (해킹 신고 118) ↗</a>
+                <span class="w-full text-[12px] text-[#8e8e93]">국내 IP 는 KISA 보호나라(118)로 신고하는 게 일반적이에요. 위 신고 연락처가 KRNIC(nic.or.kr)이면 주소 관리 기관이라, 통신사 담당({{ ext.rdap.contacts|join:", "|default:"관리 담당" }})에게 보내는 편이 빨라요.</span>
+                {% endif %}
+                {% if ext.verdict.kind == 'scanner' %}<span class="self-center text-[12px] text-[#8e8e93]">연구용 스캐너는 신고 대신 위 연락처로 "우리 서버는 빼 달라(opt-out)"고 요청할 수 있어요.</span>{% endif %}
+            </div>
+            <textarea id="ip-report" rows="9" class="mt-3 w-full rounded-xl border border-black/[0.1] bg-[#f5f5f7] p-3 font-mono text-[12px]">{{ report }}</textarea>
+            <p class="mt-2 text-[11px] leading-5 text-[#8e8e93]">⚠️ 상대 IP 로 포트 스캔·접속 시도 같은 "역추적"이나 반격은 하지 마세요. 정보통신망법 위반이 될 수 있어요. 이 화면은 이미 공개된 정보와 우리 서버 기록만 써요. 피해가 크면 경찰청 사이버수사국(ecrm.police.go.kr)에 신고하세요.</p>
+        </section>
+        {% endif %}
+        </main>
+    </div>
+</div>
+{% endblock %}
