@@ -1,0 +1,1 @@
+pdf.js 4.10.38 (Mozilla, Apache-2.0) — https://github.com/mozilla/pdf.js · npm pdfjs-dist build/pdf.min.mjs, pdf.worker.min.mjs 그대로 (nginx 가 .mjs 형식을 모를 수 있어 .js 로 이름만 바꿈). Tool → PDF 도구에서 페이지 미리보기에 사용.

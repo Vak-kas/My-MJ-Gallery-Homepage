@@ -75,6 +75,15 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "pdf",
+		"url_name": "tools:pdf",
+		"icon": "📄",
+		"title": "PDF 도구",
+		"description": "PDF 합치기·나누기, 페이지 빼기·돌리기·순서 바꾸기, 사진 여러 장을 PDF 하나로. 파일이 서버로 가지 않고 브라우저 안에서만 처리돼요.",
+		"tags": ["문서", "PDF"],
+		"access": "public",
+	},
+	{
 		"slug": "json",
 		"url_name": "tools:json",
 		"icon": "{ }",

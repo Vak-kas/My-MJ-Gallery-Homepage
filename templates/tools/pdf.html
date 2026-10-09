@@ -1,0 +1,279 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .pd-btn { border-radius: 999px; padding: 8px 16px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; }
+    .pd-btn.primary { background: #0066cc; border-color: #0066cc; color: #fff; font-weight: 600; }
+    .pd-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .pd-card { position: relative; border-radius: 16px; border: 2px solid transparent; background: #fff; padding: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05); cursor: grab; user-select: none; }
+    .pd-card.is-selected { border-color: #0066cc; }
+    .pd-card.is-dragging { opacity: 0.35; }
+    .pd-card.drop-before { box-shadow: -4px 0 0 #0066cc; }
+    .pd-card.drop-after { box-shadow: 4px 0 0 #0066cc; }
+    .pd-thumb { display: flex; aspect-ratio: 1 / 1.3; align-items: center; justify-content: center; overflow: hidden; border-radius: 10px; background: #f5f5f7; }
+    .pd-thumb img { max-width: 100%; max-height: 100%; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15); transition: transform .2s; }
+    .pd-icon { width: 28px; height: 28px; border-radius: 999px; background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(0, 0, 0, 0.1); font-size: 13px; line-height: 26px; text-align: center; }
+    html.theme-dark .pd-card { background: #171a20; }
+    html.theme-dark .pd-thumb { background: #111318; }
+    html.theme-dark .pd-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .pd-btn.primary { background: #0a84ff; border-color: #0a84ff; color: #fff; }
+    html.theme-dark .pd-icon { background: rgba(30, 33, 40, 0.92); color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DOCUMENT · PDF</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">PDF.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">
+            PDF 와 사진을 넣고 페이지를 끌어서 순서를 바꾸거나, 돌리거나, 빼고 새 PDF 로 저장하세요. <b class="text-[#1d1d1f]">파일은 서버로 가지 않고 이 브라우저 안에서만</b> 처리돼요.
+        </p>
+    </div>
+
+    <label id="pd-drop" class="mt-8 flex cursor-pointer flex-col items-center justify-center rounded-[22px] border-2 border-dashed border-black/[0.14] bg-white px-6 py-10 text-center transition hover:border-[#0066cc]/50">
+        <span class="text-[34px]">📄</span>
+        <span class="mt-2 text-[16px] font-semibold text-[#1d1d1f]">PDF·사진을 끌어놓거나 눌러서 고르세요</span>
+        <span class="mt-1 text-[13px] text-[#8e8e93]">여러 개를 한꺼번에 넣으면 넣은 순서대로 이어 붙여요 · PDF, JPG, PNG, WebP</span>
+        <input id="pd-file" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif" multiple class="hidden">
+    </label>
+    <p id="pd-status" class="mt-3 min-h-[20px] text-[13px] text-[#6e6e73]"></p>
+
+    <section id="pd-work" class="mt-2" hidden>
+        <div class="sticky top-[64px] z-10 flex flex-wrap items-center gap-2 rounded-[18px] border border-black/[0.06] bg-white/90 p-3 backdrop-blur">
+            <span id="pd-count" class="px-2 text-[13px] font-semibold text-[#1d1d1f]"></span>
+            <button type="button" class="pd-btn" id="pd-select-all">전체 선택</button>
+            <button type="button" class="pd-btn" id="pd-rotate-sel" disabled>↻ 선택 돌리기</button>
+            <button type="button" class="pd-btn" id="pd-delete-sel" disabled>선택 빼기</button>
+            <button type="button" class="pd-btn" id="pd-reverse">순서 뒤집기</button>
+            <button type="button" class="pd-btn" id="pd-clear">모두 비우기</button>
+            <span class="mx-1 h-6 w-px bg-black/[0.1]"></span>
+            <label class="flex items-center gap-1.5 text-[12px] text-[#6e6e73]">사진 페이지
+                <select id="pd-imgsize" class="pd-btn" style="padding:6px 10px"><option value="a4">A4 에 맞추기</option><option value="fit">사진 크기 그대로</option></select>
+            </label>
+            <input id="pd-name" class="pd-btn" style="width:160px;padding:7px 12px" value="합친문서" maxlength="60" aria-label="저장할 파일 이름">
+            <span class="ml-auto flex flex-wrap gap-2">
+                <button type="button" class="pd-btn" id="pd-save-each">페이지마다 따로 저장</button>
+                <button type="button" class="pd-btn" id="pd-save-sel" disabled>선택한 페이지만 저장</button>
+                <button type="button" class="pd-btn primary" id="pd-save">PDF 로 저장</button>
+            </span>
+        </div>
+        <p class="mt-2 text-[12px] text-[#8e8e93]">카드를 끌어서 순서 바꾸기 · 누르면 선택 (Shift 로 범위 선택) · ↻ 돌리기 · × 빼기</p>
+        <div id="pd-grid" class="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"></div>
+    </section>
+</main>
+
+<script src="{% static 'vendor/pdf-lib/pdf-lib-1.17.1.min.js' %}"></script>
+<script type="module">
+import * as pdfjsLib from "{% static 'vendor/pdfjs/pdf-4.10.38.min.js' %}";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'vendor/pdfjs/pdf.worker-4.10.38.min.js' %}";
+const { PDFDocument, degrees } = window.PDFLib;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const sources = [];  // { kind: 'pdf'|'image', name, bytes, pdfjs?, libDoc?, mime?, w?, h? }
+let pages = [];      // { id, src, index, rotation, thumb, selected }
+let seq = 0, lastClicked = null;
+const status = (msg, err) => { $('pd-status').innerHTML = err ? `<span class="text-[#d44c47]">${esc(msg)}</span>` : esc(msg); };
+
+// ── 파일 넣기
+async function addFiles(files) {
+    const list = [...files];
+    let hadError = false;
+    for (const file of list) {
+        status(`${file.name} 읽는 중…`);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        try {
+            if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+                const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+                const src = sources.push({ kind: 'pdf', name: file.name, bytes, pdfjs: doc }) - 1;
+                for (let i = 0; i < doc.numPages; i++) pages.push({ id: ++seq, src, index: i, rotation: 0, thumb: '', selected: false });
+                render();
+                for (let i = 0; i < doc.numPages; i++) await makeThumb(pages.find((p) => p.src === src && p.index === i));
+            } else if (file.type.startsWith('image/')) {
+                const img = await loadImage(URL.createObjectURL(file));
+                const src = sources.push({ kind: 'image', name: file.name, bytes, mime: file.type, w: img.naturalWidth, h: img.naturalHeight, url: img.src }) - 1;
+                pages.push({ id: ++seq, src, index: 0, rotation: 0, thumb: img.src, selected: false });
+            } else {
+                status(`${file.name}: PDF 나 사진만 넣을 수 있어요.`, true);
+                hadError = true;
+                continue;
+            }
+        } catch (err) {
+            status(err && err.name === 'PasswordException' ? `${file.name}: 비밀번호가 걸린 PDF 는 열 수 없어요.` : `${file.name}: 읽지 못했어요 (${err.message || err})`, true);
+            hadError = true;
+            continue;
+        }
+        render();
+    }
+    if (!hadError) status(`${pages.length}페이지 준비됐어요.`);
+}
+const loadImage = (url) => new Promise((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => fail(new Error('사진을 열 수 없어요 (HEIC 는 JPG 로 바꿔서 넣어 주세요)')); i.src = url; });
+
+async function makeThumb(page) {
+    if (!page) return;
+    const src = sources[page.src];
+    const p = await src.pdfjs.getPage(page.index + 1);
+    const vp = p.getViewport({ scale: 1 });
+    const scale = 260 / Math.max(vp.width, vp.height);
+    const view = p.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(view.width); canvas.height = Math.ceil(view.height);
+    await p.render({ canvasContext: canvas.getContext('2d'), viewport: view }).promise;
+    page.thumb = canvas.toDataURL('image/jpeg', 0.8);
+    const img = document.querySelector(`[data-id="${page.id}"] img`);
+    if (img) img.src = page.thumb;
+}
+
+// ── 그리기
+function render() {
+    $('pd-work').hidden = !pages.length;
+    const sel = pages.filter((p) => p.selected).length;
+    $('pd-count').textContent = `${pages.length}페이지${sel ? ` · ${sel}개 선택` : ''}`;
+    for (const id of ['pd-rotate-sel', 'pd-delete-sel', 'pd-save-sel']) $(id).disabled = !sel;
+    $('pd-select-all').textContent = sel === pages.length && sel ? '선택 해제' : '전체 선택';
+    $('pd-grid').innerHTML = pages.map((p, i) => {
+        const src = sources[p.src];
+        return `<div class="pd-card ${p.selected ? 'is-selected' : ''}" draggable="true" data-id="${p.id}">
+            <div class="pd-thumb"><img src="${p.thumb || 'data:image/gif;base64,R0lGODlhAQABAAAAACw='}" style="transform: rotate(${p.rotation}deg)" alt=""></div>
+            <div class="absolute right-3 top-3 flex gap-1">
+                <button type="button" class="pd-icon" data-act="rotate" title="돌리기">↻</button>
+                <button type="button" class="pd-icon" data-act="delete" title="빼기">×</button>
+            </div>
+            <div class="mt-2 flex items-center justify-between gap-2 px-1 text-[12px]">
+                <span class="font-semibold text-[#1d1d1f]">${i + 1}</span>
+                <span class="truncate text-[#8e8e93]" title="${esc(src.name)}">${src.kind === 'pdf' ? `${esc(src.name)} · ${p.index + 1}쪽` : `🖼 ${esc(src.name)}`}</span>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── 선택·버튼
+$('pd-grid').addEventListener('click', (e) => {
+    const card = e.target.closest('.pd-card');
+    if (!card) return;
+    const page = pages.find((p) => p.id === +card.dataset.id);
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'rotate') page.rotation = (page.rotation + 90) % 360;
+    else if (act === 'delete') pages = pages.filter((p) => p !== page);
+    else if (e.shiftKey && lastClicked) {
+        const a = pages.indexOf(lastClicked), b = pages.indexOf(page);
+        pages.slice(Math.min(a, b), Math.max(a, b) + 1).forEach((p) => { p.selected = true; });
+    } else { page.selected = !page.selected; lastClicked = page; }
+    render();
+});
+$('pd-select-all').addEventListener('click', () => { const all = pages.every((p) => p.selected); pages.forEach((p) => { p.selected = !all; }); render(); });
+$('pd-rotate-sel').addEventListener('click', () => { pages.filter((p) => p.selected).forEach((p) => { p.rotation = (p.rotation + 90) % 360; }); render(); });
+$('pd-delete-sel').addEventListener('click', () => { pages = pages.filter((p) => !p.selected); render(); });
+$('pd-reverse').addEventListener('click', () => { pages.reverse(); render(); });
+$('pd-clear').addEventListener('click', () => { if (confirm('넣은 파일을 모두 비울까요?')) { pages = []; sources.length = 0; render(); status(''); } });
+
+// ── 끌어서 순서 바꾸기
+let dragId = null;
+$('pd-grid').addEventListener('dragstart', (e) => { const c = e.target.closest('.pd-card'); if (!c) return; dragId = +c.dataset.id; c.classList.add('is-dragging'); e.dataTransfer.effectAllowed = 'move'; });
+$('pd-grid').addEventListener('dragend', () => { dragId = null; document.querySelectorAll('.pd-card').forEach((c) => c.classList.remove('is-dragging', 'drop-before', 'drop-after')); });
+$('pd-grid').addEventListener('dragover', (e) => {
+    if (dragId == null) return;
+    e.preventDefault();
+    const c = e.target.closest('.pd-card');
+    document.querySelectorAll('.pd-card').forEach((x) => x.classList.remove('drop-before', 'drop-after'));
+    if (!c || +c.dataset.id === dragId) return;
+    const r = c.getBoundingClientRect();
+    c.classList.add(e.clientX < r.left + r.width / 2 ? 'drop-before' : 'drop-after');
+});
+$('pd-grid').addEventListener('drop', (e) => {
+    if (dragId == null) return;
+    e.preventDefault();
+    const c = e.target.closest('.pd-card');
+    if (!c || +c.dataset.id === dragId) return;
+    const moving = pages.find((p) => p.id === dragId);
+    const r = c.getBoundingClientRect();
+    const after = e.clientX >= r.left + r.width / 2;
+    pages = pages.filter((p) => p !== moving);
+    const at = pages.findIndex((p) => p.id === +c.dataset.id) + (after ? 1 : 0);
+    pages.splice(at, 0, moving);
+    render();
+});
+
+// ── 파일 넣기 (끌어놓기·선택·붙여넣기)
+$('pd-file').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+const drop = $('pd-drop');
+['dragover', 'dragenter'].forEach((ev) => document.addEventListener(ev, (e) => { if (dragId == null && e.dataTransfer?.types.includes('Files')) { e.preventDefault(); drop.classList.add('border-[#0066cc]'); } }));
+document.addEventListener('dragleave', (e) => { if (!e.relatedTarget) drop.classList.remove('border-[#0066cc]'); });
+document.addEventListener('drop', (e) => { if (dragId == null && e.dataTransfer?.files.length) { e.preventDefault(); drop.classList.remove('border-[#0066cc]'); addFiles(e.dataTransfer.files); } });
+
+// ── 저장
+async function imageToEmbeddable(src) {
+    if (src.mime === 'image/jpeg' || src.mime === 'image/png') return { bytes: src.bytes, type: src.mime };
+    const img = await loadImage(src.url);  // WebP·GIF 등은 PNG 로 바꿔서
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    c.getContext('2d').drawImage(img, 0, 0);
+    const blob = await new Promise((ok) => c.toBlob(ok, 'image/png'));
+    return { bytes: new Uint8Array(await blob.arrayBuffer()), type: 'image/png' };
+}
+
+async function build(list) {
+    const out = await PDFDocument.create();
+    const A4 = [595.28, 841.89];
+    for (const p of list) {
+        const src = sources[p.src];
+        if (src.kind === 'pdf') {
+            if (!src.libDoc) src.libDoc = await PDFDocument.load(src.bytes, { ignoreEncryption: true });
+            const [copied] = await out.copyPages(src.libDoc, [p.index]);
+            const added = out.addPage(copied);
+            added.setRotation(degrees((copied.getRotation().angle + p.rotation) % 360));
+        } else {
+            const e = await imageToEmbeddable(src);
+            const img = e.type === 'image/png' ? await out.embedPng(e.bytes) : await out.embedJpg(e.bytes);
+            const landscape = img.width > img.height;
+            let pw, ph, w, h;
+            if ($('pd-imgsize').value === 'a4') {
+                [pw, ph] = landscape ? [A4[1], A4[0]] : A4;
+                const k = Math.min((pw - 40) / img.width, (ph - 40) / img.height);
+                w = img.width * k; h = img.height * k;
+            } else { pw = w = img.width * 0.75; ph = h = img.height * 0.75; }  // 96dpi 픽셀 → pt
+            const page = out.addPage([pw, ph]);
+            page.drawImage(img, { x: (pw - w) / 2, y: (ph - h) / 2, width: w, height: h });
+            if (p.rotation) page.setRotation(degrees(p.rotation));
+        }
+    }
+    return out.save();
+}
+
+const fileName = (suffix = '') => `${($('pd-name').value.trim() || '문서').replace(/[\\/:*?"<>|]/g, '_')}${suffix}.pdf`;
+function download(bytes, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    a.download = name; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function save(list, suffix) {
+    if (!list.length) return;
+    const btns = document.querySelectorAll('#pd-work .pd-btn');
+    btns.forEach((b) => { b.dataset.was = b.disabled; b.disabled = true; });
+    status('PDF 만드는 중…');
+    try {
+        const bytes = await build(list);
+        download(bytes, fileName(suffix));
+        status(`저장했어요 · ${list.length}페이지 · ${(bytes.length / 1048576).toFixed(2)} MB`);
+    } catch (err) {
+        status(`저장하지 못했어요: ${err.message || err}`, true);
+    }
+    btns.forEach((b) => { b.disabled = b.dataset.was === 'true'; });
+}
+$('pd-save').addEventListener('click', () => save(pages, ''));
+$('pd-save-sel').addEventListener('click', () => save(pages.filter((p) => p.selected), '_선택'));
+$('pd-save-each').addEventListener('click', async () => {
+    if (pages.length > 30 && !confirm(`${pages.length}개 파일이 한꺼번에 내려받아져요. 계속할까요?`)) return;
+    for (let i = 0; i < pages.length; i++) {
+        status(`${i + 1} / ${pages.length} 저장 중…`);
+        download(await build([pages[i]]), fileName(`_${String(i + 1).padStart(2, '0')}`));
+        await new Promise((r) => setTimeout(r, 250));
+    }
+    status(`${pages.length}개 파일로 저장했어요.`);
+});
+window.__pdfTool = { addFiles, build, pages: () => pages };  // 테스트용
+</script>
+{% endblock %}

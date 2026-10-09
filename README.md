@@ -63,6 +63,7 @@
 | 🔗 단축 URL | `smjgallery.kr/s/<코드>` 단축 링크, 클릭 수, 유효 기간 | 만들기는 회원, 열기는 누구나 |
 | 🤫 1회용 비밀 메모 | 브라우저에서 AES-GCM 암호화(키는 링크 `#` 뒤에만), 한 번 열면 서버에서 삭제 | 만들기는 회원, 열기는 누구나 |
 | ▦ QR 코드 만들기 | 주소·글·Wi-Fi·연락처·문자·메일 QR, 테마·점 모양·그라데이션·모서리 눈·테두리 문구·가운데 사진(사진 색 자동 테마), ✨ AI 스타일 추천(회원, 하루 20번), 실시간 스캔 확인, PNG·SVG 저장, 사진 속 QR 읽기 (브라우저 안에서만) | 누구나 |
+| 📄 PDF 도구 | PDF·사진 여러 개 합치기, 페이지 끌어서 순서 바꾸기·돌리기·빼기, 선택한 페이지만 / 페이지마다 따로 저장, 사진은 A4 맞춤 또는 원래 크기 (pdf.js + pdf-lib, 브라우저 안에서만) | 누구나 |
 | { } JSON 정리 | 정리·한 줄로·키 정렬, 느슨한 입력(주석·끝 쉼표), 오류 줄·칸 표시, 접는 트리·경로 복사, 문자열 JSON 풀기, CSV 변환 | 누구나 |
 | .* 정규식 테스트 | 실시간 하이라이트, 그룹·이름 그룹 표, 바꾸기, 패턴 풀이, 자주 쓰는 패턴, 1초 넘는 패턴 자동 중단(Web Worker) | 누구나 |
 | ⇄ 전이중/반이중 계산기 | 회선 속도·프레임 크기·전환 시간으로 Full/Half Duplex 처리량 비교, Wi-Fi 6/7 프리셋 | 누구나 |
@@ -245,7 +246,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/tools/` | Tool 메뉴 (`qrcode/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
+| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |

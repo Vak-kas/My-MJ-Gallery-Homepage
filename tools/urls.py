@@ -15,6 +15,7 @@ urlpatterns = [
     path("encode/", views.encode, name="encode"),
     path("qrcode/", views.qrcode, name="qrcode"),
     path("json/", views.json_tool, name="json"),
+    path("pdf/", views.pdf_tool, name="pdf"),
     path("regex/", views.regex, name="regex"),
     path("qrcode/ai-style/", qr_ai.qr_ai_style, name="qrcode_ai"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),

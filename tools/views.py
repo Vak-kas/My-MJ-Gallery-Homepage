@@ -51,6 +51,10 @@ def encode(request):
 	return render(request, "tools/encode.html")
 
 
+def pdf_tool(request):
+	return render(request, "tools/pdf.html")
+
+
 def json_tool(request):
 	return render(request, "tools/json.html")
 
