@@ -185,3 +185,24 @@ class MeetingResponse(models.Model):
 
 	def __str__(self):
 		return f"{self.meeting_id}:{self.name}"
+
+
+class AIUsage(models.Model):
+	"""AI 기능 한 번 부를 때마다 한 줄. 입력한 글·결과는 저장하지 않고 토큰 수·어림 비용만."""
+
+	FEATURES = [("qr", "QR 스타일 추천"), ("regex", "정규식 만들기"), ("diff", "글 비교 요약"), ("netcheck", "네트워크 결과 풀이")]
+
+	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="ai_usages")
+	feature = models.CharField(max_length=20, choices=FEATURES)
+	tier = models.CharField(max_length=10, blank=True)
+	input_tokens = models.PositiveIntegerField(default=0)
+	output_tokens = models.PositiveIntegerField(default=0)
+	cost_usd = models.DecimalField(max_digits=10, decimal_places=6, default=0)
+	ok = models.BooleanField(default=True)
+	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"{self.feature} {self.user_id} ${self.cost_usd}"

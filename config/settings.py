@@ -108,6 +108,7 @@ TEMPLATES = [
                 'notifications.context_processors.admin_notifications',
                 'studio.context_processors.site_nav',
                 'main.context_processors.seo_meta',
+                'tools.context_processors.user_tier',
             ],
         },
     },
@@ -251,6 +252,10 @@ TURN_PORT = int(os.getenv("TURN_PORT", "3478"))
 # QR AI 스타일 추천 (Claude API). 키가 없으면 AI 추천 버튼만 꺼짐
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
+# AI 사이트 전체 하루 예산(달러) — 넘으면 그날은 관리자 말고 AI 기능이 멈춤. 비용은 아래 단가로 어림한 값
+AI_DAILY_BUDGET_USD = float(os.getenv("AI_DAILY_BUDGET_USD", "1") or 0)
+AI_PRICE_INPUT_PER_MTOK = float(os.getenv("AI_PRICE_INPUT_PER_MTOK", "1") or 0)
+AI_PRICE_OUTPUT_PER_MTOK = float(os.getenv("AI_PRICE_OUTPUT_PER_MTOK", "5") or 0)
 # 서버 상태판: Lightsail 요금제의 월 데이터 전송 허용량 (GB, 선택 — 넣으면 사용 비율 표시)
 SERVER_TRANSFER_ALLOWANCE_GB = float(os.getenv("SERVER_TRANSFER_ALLOWANCE_GB", "0") or 0)
 

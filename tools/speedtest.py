@@ -15,6 +15,8 @@ from django.http import HttpResponse, JsonResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
+from .permissions import quota_multiplier
+
 CHUNK = os.urandom(1024 * 1024)  # 압축되지 않는 1MB 랜덤 데이터 (매 요청마다 만들지 않고 재사용)
 MAX_REQUEST_BYTES = 25 * 1024 * 1024
 GB = 1024 * 1024 * 1024
@@ -49,7 +51,9 @@ def _consume_quota(request, kind, amount):
 
 	now = time.time()
 	buckets = []
+	mult = quota_multiplier(user)  # 친한 사람은 몇 배
 	for window, quota in QUOTAS[kind]:
+		quota *= mult
 		key = f"speedtest:{kind}:{window}:u{user.id}"
 		bucket = cache.get(key)
 		if not bucket or now - bucket["start"] >= window:

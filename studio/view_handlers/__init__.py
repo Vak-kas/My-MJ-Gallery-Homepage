@@ -99,3 +99,4 @@ from .security import security
 from .settings import site_settings_view
 from .analytics import analytics
 from .server import server
+from .ai_usage import ai_usage

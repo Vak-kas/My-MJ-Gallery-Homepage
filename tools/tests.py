@@ -891,7 +891,7 @@ class QrAiTests(TestCase):
 		self.client.force_login(self.member)
 		with override_settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.qr_ai._ask_claude", return_value=raw) as ask:
 			data = self.post(has_logo=True).json()
-		ask.assert_called_once_with("피카츄 느낌", True)
+		self.assertEqual(ask.call_args.args[1:], ("피카츄 느낌", True))
 		from tools.qr_ai import _contrast
 		self.assertEqual(data["shape"], "heart")
 		self.assertEqual(data["eye"], "square")  # 허용되지 않은 값 → 기본값
@@ -909,7 +909,8 @@ class QrAiTests(TestCase):
 		from unittest import mock
 		from django.test import override_settings
 		self.client.force_login(self.member)
-		with override_settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.qr_ai._ask_claude", return_value={}):
+		fake = {"content": [{"type": "tool_use", "input": {}}], "usage": {"input_tokens": 10, "output_tokens": 5}}
+		with override_settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai._post", return_value=fake):
 			codes = [self.post().status_code for _ in range(21)]
 		self.assertEqual(codes[:20], [200] * 20)
 		self.assertEqual(codes[20], 429)
@@ -923,8 +924,8 @@ class QrAiTests(TestCase):
 		fake = mock.MagicMock()
 		fake.__enter__.return_value = io.BytesIO(json.dumps({"content": [{"type": "tool_use", "input": {"shape": "star"}}]}).encode())
 		with override_settings(ANTHROPIC_API_KEY="secret-k", ANTHROPIC_MODEL="claude-haiku-5-5"), \
-				mock.patch("tools.qr_ai.urllib.request.urlopen", return_value=fake) as urlopen:
-			result = qr_ai._ask_claude("사이버펑크", False)
+				mock.patch("tools.ai.urllib.request.urlopen", return_value=fake) as urlopen:
+			result = qr_ai._ask_claude(self.member, "사이버펑크", False)
 		req = urlopen.call_args.args[0]
 		body = json.loads(req.data)
 		self.assertEqual(result, {"shape": "star"})

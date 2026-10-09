@@ -2,22 +2,17 @@
 
 사용자가 원하는 분위기를 글로 적으면 Claude 가 QR 꾸미기 옵션(색·점 모양·눈·그라데이션·테두리 문구)을 골라 준다.
 - 도구 사용(tool_use)으로 정해진 형식의 값만 받고, 서버에서 한 번 더 검사·보정 (색 대비 등)
-- 입력 글·결과는 저장하지 않음
+- 입력 글·결과는 저장하지 않음, 하루 횟수·사이트 예산은 tools/ai.py 공통 한도
 """
 
 import json
 import re
-import time
-import urllib.error
-import urllib.request
 
-from django.conf import settings
-from django.core.cache import cache
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 
-API_URL = "https://api.anthropic.com/v1/messages"
-DAILY_LIMIT = 20
+from . import ai
+
 PROMPT_MAX = 200
 
 ENUMS = {
@@ -105,59 +100,23 @@ def sanitize(raw):
 	return out
 
 
-def _ask_claude(prompt, has_logo):
-	body = {
-		"model": settings.ANTHROPIC_MODEL,
-		"max_tokens": 600,
-		"system": SYSTEM,
-		"tools": [TOOL],
-		"tool_choice": {"type": "tool", "name": TOOL["name"]},
-		"messages": [{"role": "user", "content": f"원하는 분위기: {prompt}\n가운데 사진: {'있음' if has_logo else '없음'}"}],
-	}
-	req = urllib.request.Request(API_URL, data=json.dumps(body).encode(), method="POST", headers={
-		"x-api-key": settings.ANTHROPIC_API_KEY,
-		"anthropic-version": "2023-06-01",
-		"content-type": "application/json",
-	})
-	with urllib.request.urlopen(req, timeout=25) as res:
-		data = json.loads(res.read().decode())
-	for block in data.get("content", []):
-		if block.get("type") == "tool_use":
-			return block.get("input") or {}
-	raise ValueError("no tool_use")
-
-
-def _limited(user):
-	if user.is_superuser:
-		return False
-	key = f"qr-ai:{user.id}:{time.strftime('%Y-%m-%d')}"
-	used = cache.get(key, 0)
-	if used >= DAILY_LIMIT:
-		return True
-	cache.set(key, used + 1, 24 * 60 * 60)
-	return False
+def _ask_claude(user, prompt, has_logo):
+	return ai.call(user, "qr", system=SYSTEM, tool=TOOL, max_tokens=600,
+				   content=f"원하는 분위기: {prompt}\n가운데 사진: {'있음' if has_logo else '없음'}")
 
 
 @require_POST
 def qr_ai_style(request):
-	if not request.user.is_authenticated:
-		return JsonResponse({"error": "AI 추천은 로그인한 회원만 쓸 수 있어요."}, status=401)
-	if not settings.ANTHROPIC_API_KEY:
-		return JsonResponse({"error": "AI 기능이 아직 설정되지 않았어요."}, status=503)
 	try:
 		data = json.loads(request.body or b"{}")
 	except ValueError:
 		return JsonResponse({"error": "요청 형식이 올바르지 않아요."}, status=400)
 	prompt = " ".join(str(data.get("prompt") or "").split())[:PROMPT_MAX]
-	if len(prompt) < 2:
-		return JsonResponse({"error": "원하는 분위기를 적어 주세요."}, status=400)
-	if _limited(request.user):
-		return JsonResponse({"error": f"AI 추천은 하루 {DAILY_LIMIT}번까지 쓸 수 있어요."}, status=429)
 	try:
-		style = sanitize(_ask_claude(prompt, bool(data.get("has_logo"))))
-	except urllib.error.HTTPError as exc:
-		status = 429 if exc.code == 429 else 502
-		return JsonResponse({"error": "AI 가 지금 바빠요. 잠시 뒤 다시 시도해 주세요." if status == 429 else "AI 추천을 받지 못했어요."}, status=status)
-	except (OSError, ValueError):
-		return JsonResponse({"error": "AI 추천을 받지 못했어요. 잠시 뒤 다시 시도해 주세요."}, status=502)
+		ai.check(request.user, len(prompt))
+		if len(prompt) < 2:
+			raise ai.AIError("원하는 분위기를 적어 주세요.")
+		style = sanitize(_ask_claude(request.user, prompt, bool(data.get("has_logo"))))
+	except ai.AIError as exc:
+		return JsonResponse({"error": exc.message}, status=exc.status)
 	return JsonResponse(style)

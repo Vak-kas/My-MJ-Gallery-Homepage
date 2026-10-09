@@ -24,6 +24,8 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
+from .permissions import quota_multiplier
+
 _pool = ThreadPoolExecutor(max_workers=16)
 
 HOST_RE = re.compile(r"^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$")
@@ -55,7 +57,7 @@ def _rate_limited(user):
 	bucket = cache.get(key)
 	if not bucket or now - bucket["start"] >= RUN_WINDOW:
 		bucket = {"start": now, "count": 0}
-	if bucket["count"] >= RUN_LIMIT:
+	if bucket["count"] >= RUN_LIMIT * quota_multiplier(user):
 		return True
 	bucket["count"] += 1
 	cache.set(key, bucket, max(1, int(bucket["start"] + RUN_WINDOW - now)))
