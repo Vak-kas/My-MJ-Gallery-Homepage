@@ -41,6 +41,10 @@ def duplex(request):
 	return render(request, "tools/duplex.html")
 
 
+def time_tool(request):
+	return render(request, "tools/time.html")
+
+
 def subnet(request):
 	return render(request, "tools/subnet.html")
 

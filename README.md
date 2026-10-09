@@ -94,6 +94,7 @@
 | { } JSON 정리 | 정리·한 줄로·키 정렬, 느슨한 입력(주석·끝 쉼표), 오류 줄·칸 표시, 접는 트리·경로 복사, 문자열 JSON 풀기, CSV 변환 | 누구나 |
 | .* 정규식 테스트 | 실시간 하이라이트, 그룹·이름 그룹 표, 바꾸기, 패턴 풀이, 자주 쓰는 패턴, 1초 넘는 패턴 자동 중단(Web Worker), ✨ **말로 만들기**("휴대폰 번호 찾기" → 패턴·설명·주의점·예시 글, 회원) | 누구나 |
 | 🧮 인코딩 · 해시 | Base64·URL·Hex·HTML·유니코드 변환, MD5·SHA·HMAC·파일 해시, JWT 보기 (브라우저 안에서만) | 누구나 |
+| 🕒 시간 변환기 | 지금 유닉스 시간(초·ms) 실시간, 타임스탬프 → 날짜(초·ms·µs·ns 자릿수 자동, ISO·RFC 2822·상대 시간), 날짜+시간대 → 타임스탬프, 세계 시각·서울 기준 시차(도시 추가, 일하는 시간·밤 표시, 서머타임 반영), cron 식 한국어 풀이·다음 실행 5번(@daily·6필드 지원), 날짜 사이 일수·평일 수·D-day·N일/개월/평일 뒤, 기간 변환(5400 ↔ 1시간 30분 ↔ PT1H30M ↔ 01:30:00). 브라우저 안에서만 | 누구나 |
 | 🔑 키 생성기 | 길이·문자 종류·형식(Hex, Base64, UUID, PIN, API 키) 비밀번호/키 생성, RSA·ECDSA·Ed25519 키 쌍 PEM·OpenSSH 내보내기. 모두 브라우저 안에서만 생성 | 누구나 |
 
 - 데이터 전송 중계 데몬 `relay/mj_relay.py` (asyncio + pyzmq + aiohttp, systemd 서비스 `mj-relay`) — 라이브 방송(`mj_live.py`)·실시간 게임 방(`mj_game.py`)도 같이 돎, 자세한 내용은 [relay/README.md](relay/README.md)
@@ -328,7 +329,7 @@ python -m unittest discover -s relay/tests -t .
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
 | `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `seconds/`, `reaction/`, `bomb/`, `updown/`, `cards/`, `2048/`, `typing/`, `omok/`, `othello/`, `catchmind/`, `scores/<랭킹>/`) |
-| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
+| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `time/`, `cite/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |

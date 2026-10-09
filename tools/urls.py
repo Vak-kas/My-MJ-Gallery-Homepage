@@ -8,6 +8,7 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("duplex/", views.duplex, name="duplex"),
     path("subnet/", views.subnet, name="subnet"),
+    path("time/", views.time_tool, name="time"),
     path("speedtest/", views.speedtest, name="speedtest"),
     path("keygen/", views.keygen, name="keygen"),
     path("myip/", myip.myip, name="myip"),
