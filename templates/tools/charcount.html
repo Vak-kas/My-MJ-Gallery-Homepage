@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .cc-area { width: 100%; min-height: 420px; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 18px 20px; font-size: 16px; line-height: 1.8; outline: none; color: #1d1d1f; resize: vertical; }
+    .cc-area:focus { border-color: #0066cc; }
+    .cc-stat { border-radius: 16px; background: #f5f5f7; padding: 14px 16px; }
+    .cc-stat b { display: block; margin-top: 2px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: #1d1d1f; font-variant-numeric: tabular-nums; }
+    .cc-btn { border-radius: 999px; padding: 6px 12px; font-size: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; }
+    html.theme-dark .cc-area { background: #171a20; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .cc-stat { background: #111318; }
+    html.theme-dark .cc-stat b { color: #f3f4f6; }
+    html.theme-dark .cc-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">WRITING · COUNTER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">글자 수 세기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">쓰는 대로 바로 세요. 글은 서버로 가지 않고, 이 브라우저에만 잠깐 저장돼서 새로고침해도 남아 있어요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section class="min-w-0">
+            <div class="mb-2 flex flex-wrap items-center gap-1.5">
+                <button type="button" class="cc-btn" data-fix="spaces">연속 공백 하나로</button>
+                <button type="button" class="cc-btn" data-fix="blank">빈 줄 정리</button>
+                <button type="button" class="cc-btn" data-fix="oneline">줄바꿈 없애기</button>
+                <button type="button" class="cc-btn" data-fix="trim">앞뒤 공백 지우기</button>
+                <button type="button" class="cc-btn ml-auto" id="cc-copy">복사</button>
+                <button type="button" class="cc-btn" id="cc-clear">지우기</button>
+            </div>
+            <textarea id="cc-text" class="cc-area" placeholder="여기에 자기소개서나 글을 붙여넣거나 써 보세요."></textarea>
+            <p id="cc-saved" class="mt-1 text-right text-[12px] text-[#8e8e93]"></p>
+        </section>
+
+        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="cc-stat"><span class="text-[12px] text-[#6e6e73]">공백 포함</span><b id="s-all">0</b></div>
+                    <div class="cc-stat"><span class="text-[12px] text-[#6e6e73]">공백 제외</span><b id="s-nospace">0</b></div>
+                    <div class="cc-stat"><span class="text-[12px] text-[#6e6e73]">바이트 <span title="한글·한자 등 2바이트, 영문·숫자·공백 1바이트 (잡코리아·사람인 등 여러 채용 사이트가 쓰는 방식)">(한글 2)</span></span><b id="s-byte2">0</b></div>
+                    <div class="cc-stat"><span class="text-[12px] text-[#6e6e73]">바이트 <span title="UTF-8, 한글 3바이트">(UTF-8)</span></span><b id="s-byte3">0</b></div>
+                </div>
+                <label class="mt-3 flex items-center gap-2 text-[12px] text-[#6e6e73]"><input type="checkbox" id="cc-crlf" class="h-4 w-4"> 줄바꿈을 2바이트로 셈 (일부 사이트 방식)</label>
+                <dl class="mt-4 grid grid-cols-2 gap-y-2 text-[13px]">
+                    <dt class="text-[#8e8e93]">단어</dt><dd id="s-words" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">문장</dt><dd id="s-sentences" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">문단</dt><dd id="s-paras" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">원고지 (200자)</dt><dd id="s-manuscript" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">읽는 시간</dt><dd id="s-read" class="text-right">0초</dd>
+                    <dt class="text-[#8e8e93]">말하는 시간 (발표)</dt><dd id="s-speak" class="text-right">0초</dd>
+                </dl>
+            </section>
+
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-[14px] font-semibold">목표</h2>
+                    <input id="cc-goal" type="number" min="1" max="100000" placeholder="예: 1000" class="w-[100px] rounded-lg border border-black/[0.1] px-2 py-1 text-[13px]">
+                    <select id="cc-goal-type" class="rounded-lg border border-black/[0.1] px-2 py-1 text-[13px]">
+                        <option value="all">자 (공백 포함)</option><option value="nospace">자 (공백 제외)</option><option value="byte2">바이트</option>
+                    </select>
+                </div>
+                <div class="mt-2 flex gap-1.5">
+                    <button type="button" class="cc-btn" data-goal="500">500</button>
+                    <button type="button" class="cc-btn" data-goal="700">700</button>
+                    <button type="button" class="cc-btn" data-goal="1000">1000</button>
+                    <button type="button" class="cc-btn" data-goal="1500">1500</button>
+                </div>
+                <div class="mt-3 h-2.5 rounded-full bg-[#f5f5f7]"><div id="cc-bar" class="h-2.5 rounded-full bg-[#0066cc] transition-all" style="width:0%"></div></div>
+                <p id="cc-goal-text" class="mt-2 text-[13px] text-[#6e6e73]">목표 글자 수를 정하면 얼마 남았는지 보여줘요.</p>
+            </section>
+
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <h2 class="text-[14px] font-semibold">많이 쓴 단어</h2>
+                <ol id="cc-words" class="mt-2 space-y-1 text-[13px]"></ol>
+                <h2 class="mt-4 text-[14px] font-semibold">너무 긴 문장 <span class="text-[12px] font-normal text-[#8e8e93]">(100자 넘음)</span></h2>
+                <ul id="cc-long" class="mt-2 space-y-1.5 text-[13px] text-[#6e6e73]"></ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const KEY = 'mj-charcount-draft';
+    const ta = $('cc-text');
+    const enc = new TextEncoder();
+    // 조사·어미를 떼고 단어를 셈 (대략)
+    const PARTICLES = /(으로써|으로서|에서는|에게서|이라는|이라고|으로|에서|에게|까지|부터|처럼|보다|라는|라고|하고|이나|이며|이고|으며|하는|했다|합니다|입니다|했습니다|은|는|이|가|을|를|에|의|도|와|과|로|만|며)$/;
+    const STOP = new Set(['그리고', '하지만', '그러나', '또한', '그래서', '저는', '제가', '저의', '것을', '것이', '있는', '있습니다', '했습니다', '통해', '위해', '대한', '같은', 'the', 'and', 'to', 'of', 'a', 'in', 'is']);
+
+    function stats(text) {
+        const crlf = $('cc-crlf').checked;
+        const all = [...text].length;
+        const nospace = [...text.replace(/\s/g, '')].length;
+        let byte2 = 0;
+        for (const ch of text) byte2 += ch === '\n' ? (crlf ? 2 : 1) : ch.charCodeAt(0) < 128 ? 1 : 2;
+        const byte3 = enc.encode(text).length + (crlf ? (text.match(/\n/g) || []).length : 0);
+        const words = (text.match(/[^\s]+/g) || []).length;
+        const sentences = text.split(/(?<=[.!?。…])\s+|\n+/).map((s) => s.trim()).filter((s) => s.length > 1);
+        const paras = text.split(/\n\s*\n/).filter((p) => p.trim()).length;
+        // 원고지: 줄바꿈하면 그 줄의 남은 칸을 비우므로 문단마다 20칸 줄 단위로 셈
+        let cells = 0;
+        for (const line of text.split('\n')) cells += Math.max(1, Math.ceil([...line].length / 20)) * 20;
+        return { all, nospace, byte2, byte3, words, sentences, paras, manuscript: text.trim() ? Math.ceil(cells / 200 * 10) / 10 : 0 };
+    }
+
+    const fmtTime = (sec) => (sec < 60 ? `${Math.round(sec)}초` : `${Math.floor(sec / 60)}분 ${Math.round(sec % 60)}초`);
+
+    function topWords(text) {
+        const count = new Map();
+        for (const raw of text.match(/[가-힣A-Za-z0-9]+/g) || []) {
+            let w = raw.toLowerCase();
+            if (/[가-힣]/.test(w) && w.length > 2) w = w.replace(PARTICLES, '');
+            if (w.length < 2 || STOP.has(w) || /^\d+$/.test(w)) continue;
+            count.set(w, (count.get(w) || 0) + 1);
+        }
+        return [...count.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    }
+
+    function update() {
+        const text = ta.value;
+        const s = stats(text);
+        $('s-all').textContent = s.all.toLocaleString();
+        $('s-nospace').textContent = s.nospace.toLocaleString();
+        $('s-byte2').textContent = s.byte2.toLocaleString();
+        $('s-byte3').textContent = s.byte3.toLocaleString();
+        $('s-words').textContent = s.words.toLocaleString();
+        $('s-sentences').textContent = s.sentences.length.toLocaleString();
+        $('s-paras').textContent = s.paras.toLocaleString();
+        $('s-manuscript').textContent = `약 ${s.manuscript}매`;
+        $('s-read').textContent = fmtTime(s.nospace / 500 * 60);   // 한국어 묵독 분당 약 500자
+        $('s-speak').textContent = fmtTime(s.nospace / 300 * 60);  // 발표 분당 약 300자
+
+        const goal = +$('cc-goal').value;
+        const type = $('cc-goal-type').value;
+        const cur = s[type];
+        const unit = type === 'byte2' ? '바이트' : '자';
+        if (goal > 0) {
+            const pct = Math.min(100, cur / goal * 100);
+            $('cc-bar').style.width = pct + '%';
+            $('cc-bar').style.background = cur > goal ? '#ff3b30' : pct >= 90 ? '#34c759' : '#0066cc';
+            $('cc-goal-text').innerHTML = cur > goal
+                ? `<span class="text-[#d44c47]">${(cur - goal).toLocaleString()}${unit} 넘었어요</span> (${cur.toLocaleString()} / ${goal.toLocaleString()})`
+                : `${(goal - cur).toLocaleString()}${unit} 남았어요 · ${Math.round(pct)}%`;
+        } else {
+            $('cc-bar').style.width = '0%';
+            $('cc-goal-text').textContent = '목표 글자 수를 정하면 얼마 남았는지 보여줘요.';
+        }
+
+        const top = topWords(text);
+        $('cc-words').innerHTML = top.length
+            ? top.map(([w, n], i) => `<li class="flex justify-between"><span><span class="mr-2 text-[#8e8e93]">${i + 1}</span>${esc(w)}</span><span class="tabular-nums ${n >= 5 ? 'font-semibold text-[#b26a00]' : 'text-[#6e6e73]'}">${n}번</span></li>`).join('')
+            : '<li class="text-[#8e8e93]">두 번 이상 쓴 단어가 아직 없어요.</li>';
+        const long = s.sentences.filter((x) => [...x].length > 100);
+        $('cc-long').innerHTML = long.length
+            ? long.slice(0, 5).map((x) => `<li class="rounded-lg bg-[#fff8ec] px-2.5 py-1.5"><b class="text-[#b26a00]">${[...x].length}자</b> ${esc(x.slice(0, 60))}…</li>`).join('')
+            : '<li class="text-[#8e8e93]">없어요 👍</li>';
+
+        try { localStorage.setItem(KEY, JSON.stringify({ text, goal: $('cc-goal').value, type, crlf: $('cc-crlf').checked })); $('cc-saved').textContent = text ? '이 브라우저에 자동 저장됨' : ''; } catch {}
+    }
+
+    const FIX = {
+        spaces: (t) => t.replace(/[ \t]{2,}/g, ' '),
+        blank: (t) => t.replace(/\n{3,}/g, '\n\n'),
+        oneline: (t) => t.replace(/\s*\n+\s*/g, ' '),
+        trim: (t) => t.split('\n').map((l) => l.trim()).join('\n').trim(),
+    };
+    document.querySelectorAll('[data-fix]').forEach((b) => b.addEventListener('click', () => { ta.value = FIX[b.dataset.fix](ta.value); update(); }));
+    document.querySelectorAll('[data-goal]').forEach((b) => b.addEventListener('click', () => { $('cc-goal').value = b.dataset.goal; update(); }));
+    $('cc-clear').addEventListener('click', () => { if (!ta.value || confirm('글을 모두 지울까요?')) { ta.value = ''; update(); } });
+    $('cc-copy').addEventListener('click', async (e) => { try { await navigator.clipboard.writeText(ta.value); e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1000); } catch {} });
+    for (const el of [ta, $('cc-goal'), $('cc-goal-type'), $('cc-crlf')]) el.addEventListener('input', update);
+    $('cc-goal-type').addEventListener('change', update);
+    $('cc-crlf').addEventListener('change', update);
+    try {
+        const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (saved) { ta.value = saved.text || ''; $('cc-goal').value = saved.goal || ''; $('cc-goal-type').value = saved.type || 'all'; $('cc-crlf').checked = !!saved.crlf; }
+    } catch {}
+    window.__cc = { stats, topWords };
+    update();
+})();
+</script>
+{% endblock %}

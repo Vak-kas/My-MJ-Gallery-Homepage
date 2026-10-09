@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .df-area { width: 100%; min-height: 240px; border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 14px 16px; font-size: 14px; line-height: 1.7; outline: none; color: #1d1d1f; resize: vertical; }
+    .df-area:focus { border-color: #0066cc; }
+    .df-tab { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); }
+    .df-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .df-out { font-size: 14px; line-height: 1.75; white-space: pre-wrap; word-break: break-word; }
+    .df-out del { background: rgba(255, 59, 48, 0.16); color: #b3261e; text-decoration: line-through; text-decoration-color: rgba(179, 38, 30, 0.5); border-radius: 3px; }
+    .df-out ins { background: rgba(52, 199, 89, 0.2); color: #12632b; text-decoration: none; border-radius: 3px; }
+    .df-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); }
+    .df-row .ln { color: #8e8e93; font-size: 12px; text-align: right; padding-right: 10px; user-select: none; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .df-row.rm { background: rgba(255, 59, 48, 0.07); }
+    .df-row.add { background: rgba(52, 199, 89, 0.09); }
+    .df-side { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 12px; }
+    html.theme-dark .df-area { background: #171a20; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .df-tab { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .df-tab.is-active { background: #e8e8ea; color: #1d1d1f; }
+    html.theme-dark .df-out del { color: #ff8a80; }
+    html.theme-dark .df-out ins { color: #7ee2a0; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">TEXT · DIFF</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">글 비교.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">원본과 고친 글을 넣으면 <del class="rounded bg-[#ff3b30]/15 px-1 text-[#b3261e]">지운 부분</del>과 <ins class="rounded bg-[#34c759]/20 px-1 text-[#12632b] no-underline">더한 부분</ins>을 칠해 보여줘요. 글은 서버로 가지 않아요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div>
+            <div class="mb-1.5 flex items-center justify-between"><label for="df-a" class="text-[13px] font-semibold">원본</label><span id="df-a-count" class="text-[12px] text-[#8e8e93]"></span></div>
+            <textarea id="df-a" class="df-area" spellcheck="false">저는 문제를 끝까지 파고드는 사람입니다.
+학부 연구실에서 무선 신호를 분석하며 데이터를 다루는 법을 배웠습니다.
+팀 프로젝트에서는 일정 관리를 맡았습니다.</textarea>
+        </div>
+        <div>
+            <div class="mb-1.5 flex items-center justify-between"><label for="df-b" class="text-[13px] font-semibold">고친 글</label><span id="df-b-count" class="text-[12px] text-[#8e8e93]"></span></div>
+            <textarea id="df-b" class="df-area" spellcheck="false">저는 문제를 끝까지 파고들어 원인을 찾는 사람입니다.
+학부 연구실에서 HackRF 로 무선 신호를 분석하며 데이터를 다루는 법을 배웠습니다.
+팀 프로젝트에서는 일정 관리와 발표를 맡았습니다.
+새로운 기술을 빠르게 익히는 것이 제 강점입니다.</textarea>
+        </div>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+        <span class="text-[13px] text-[#6e6e73]">비교 단위</span>
+        <button type="button" class="df-tab is-active" data-unit="line">줄</button>
+        <button type="button" class="df-tab" data-unit="word">단어</button>
+        <button type="button" class="df-tab" data-unit="char">글자</button>
+        <span class="mx-2 h-5 w-px bg-black/[0.1]"></span>
+        <button type="button" class="df-tab is-active" data-view="inline">합쳐서 보기</button>
+        <button type="button" class="df-tab" data-view="side">나란히 보기</button>
+        <label class="ml-2 flex items-center gap-1.5 text-[13px]"><input id="df-ws" type="checkbox" class="h-4 w-4"> 공백 차이 무시</label>
+        <label class="flex items-center gap-1.5 text-[13px]"><input id="df-case" type="checkbox" class="h-4 w-4"> 대소문자 무시</label>
+        <button type="button" id="df-swap" class="df-tab ml-auto">⇄ 원본·고친 글 바꾸기</button>
+    </div>
+
+    <section class="mt-4 rounded-[22px] border border-black/[0.08] bg-white p-5">
+        <div class="flex flex-wrap items-center gap-4 text-[13px]">
+            <span id="df-summary" class="font-semibold"></span>
+            <span class="text-[#1e7a35]">+<span id="df-add">0</span></span>
+            <span class="text-[#c4271d]">−<span id="df-del">0</span></span>
+            <span id="df-similar" class="text-[#6e6e73]"></span>
+        </div>
+        <div id="df-out" class="df-out mt-4"></div>
+    </section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let unit = 'line', view = 'inline';
+
+    // Myers 차이 알고리즘 (O(ND)): 두 토큰 목록 → [{op:'='|'-'|'+', a, b}] (a/b 는 원래 토큰)
+    function diff(A, B, eq) {
+        const N = A.length, M = B.length, MAX = N + M;
+        const V = new Int32Array(2 * MAX + 2), trace = [];
+        const off = MAX + 1;
+        let found = false;
+        for (let d = 0; d <= MAX && !found; d++) {
+            trace.push(V.slice());
+            for (let k = -d; k <= d; k += 2) {
+                let x = (k === -d || (k !== d && V[off + k - 1] < V[off + k + 1])) ? V[off + k + 1] : V[off + k - 1] + 1;
+                let y = x - k;
+                while (x < N && y < M && eq(A[x], B[y])) { x++; y++; }
+                V[off + k] = x;
+                if (x >= N && y >= M) { found = true; break; }
+            }
+            if (d > 20000) return null;  // 너무 다르면 포기
+        }
+        const ops = [];
+        let x = N, y = M;
+        for (let d = trace.length - 1; d >= 0; d--) {
+            const Vd = trace[d], k = x - y;
+            const prevK = (k === -d || (k !== d && Vd[off + k - 1] < Vd[off + k + 1])) ? k + 1 : k - 1;
+            const px = Vd[off + prevK], py = px - prevK;
+            while (x > px && y > py) { ops.push({ op: '=', a: A[x - 1], b: B[y - 1] }); x--; y--; }
+            if (d > 0) { if (x === px) { ops.push({ op: '+', b: B[y - 1] }); y--; } else { ops.push({ op: '-', a: A[x - 1] }); x--; } }
+        }
+        return ops.reverse();
+    }
+
+    const norm = (s) => {
+        if ($('df-ws').checked) s = s.replace(/\s+/g, ' ').trim();
+        if ($('df-case').checked) s = s.toLowerCase();
+        return s;
+    };
+    const tokenize = (text, u) => (u === 'line' ? text.split('\n') : u === 'word' ? text.match(/\s+|[^\s]+/g) || [] : [...text]);
+
+    // 줄 단위에서 바뀐 줄 쌍은 글자 단위로 다시 비교해 바뀐 글자만 진하게
+    function inlineChars(a, b) {
+        const ops = diff([...a], [...b], (x, y) => x === y) || [{ op: '-', a }, { op: '+', b }];
+        let left = '', right = '';
+        for (const o of ops) {
+            if (o.op === '=') { left += esc(o.a); right += esc(o.b); }
+            else if (o.op === '-') left += `<del>${esc(o.a)}</del>`;
+            else right += `<ins>${esc(o.b)}</ins>`;
+        }
+        return [left, right];
+    }
+
+    function run() {
+        const a = $('df-a').value, b = $('df-b').value;
+        $('df-a-count').textContent = `${[...a].length}자 · ${a.split('\n').length}줄`;
+        $('df-b-count').textContent = `${[...b].length}자 · ${b.split('\n').length}줄`;
+        const A = tokenize(a, unit), B = tokenize(b, unit);
+        const ops = diff(A, B, (x, y) => norm(x) === norm(y));
+        const out = $('df-out');
+        if (!ops) { out.innerHTML = '<p class="text-[#d44c47]">두 글이 너무 달라서 비교할 수 없어요. 단위를 "줄"로 바꿔 보세요.</p>'; return; }
+        const added = ops.filter((o) => o.op === '+').length, removed = ops.filter((o) => o.op === '-').length;
+        const same = ops.filter((o) => o.op === '=').length;
+        const label = { line: '줄', word: '단어', char: '글자' }[unit];
+        $('df-add').textContent = `${added}${label}`; $('df-del').textContent = `${removed}${label}`;
+        $('df-summary').textContent = added || removed ? '바뀐 곳이 있어요' : '✓ 두 글이 같아요';
+        $('df-similar').textContent = `같은 부분 ${Math.round(same * 2 / Math.max(1, A.length + B.length) * 100)}%`;
+
+        if (unit !== 'line') {  // 단어·글자: 한 덩어리 글로
+            if (view === 'side') {
+                const L = ops.map((o) => (o.op === '=' ? esc(o.a) : o.op === '-' ? `<del>${esc(o.a)}</del>` : '')).join('');
+                const R = ops.map((o) => (o.op === '=' ? esc(o.b) : o.op === '+' ? `<ins>${esc(o.b)}</ins>` : '')).join('');
+                out.innerHTML = `<div class="df-side"><div>${L}</div><div>${R}</div></div>`;
+            } else {
+                out.innerHTML = ops.map((o) => (o.op === '=' ? esc(o.a) : o.op === '-' ? `<del>${esc(o.a)}</del>` : `<ins>${esc(o.b)}</ins>`)).join('');
+            }
+            return;
+        }
+
+        // 줄 단위: 연속된 지움/더함을 짝지어 줄 안에서 바뀐 글자만 표시
+        const rows = [];
+        let na = 0, nb = 0;
+        for (let i = 0; i < ops.length; i++) {
+            if (ops[i].op === '=') { na++; nb++; rows.push({ type: 'same', na, nb, a: esc(ops[i].a), b: esc(ops[i].b) }); continue; }
+            const dels = [], adds = [];
+            while (i < ops.length && ops[i].op !== '=') { (ops[i].op === '-' ? dels : adds).push(ops[i]); i++; }
+            i--;
+            const pairs = Math.min(dels.length, adds.length);
+            for (let j = 0; j < Math.max(dels.length, adds.length); j++) {
+                if (j < pairs) {
+                    const [L, R] = inlineChars(dels[j].a, adds[j].b);
+                    na++; nb++;
+                    rows.push({ type: 'change', na, nb, a: L, b: R });
+                } else if (j < dels.length) { na++; rows.push({ type: 'rm', na, a: `<del>${esc(dels[j].a)}</del>` }); }
+                else { nb++; rows.push({ type: 'add', nb, b: `<ins>${esc(adds[j].b)}</ins>` }); }
+            }
+        }
+        if (view === 'side') {
+            out.innerHTML = '<div class="df-side">' + rows.map((r) => {
+                const left = r.type === 'add' ? '<div></div>' : `<div class="df-row ${r.type === 'same' ? '' : 'rm'}"><span class="ln">${r.na}</span><span>${r.a || ' '}</span></div>`;
+                const right = r.type === 'rm' ? '<div></div>' : `<div class="df-row ${r.type === 'same' ? '' : 'add'}"><span class="ln">${r.nb}</span><span>${r.b || ' '}</span></div>`;
+                return left + right;
+            }).join('') + '</div>';
+        } else {
+            out.innerHTML = rows.map((r) => {
+                if (r.type === 'same') return `<div class="df-row"><span class="ln">${r.nb}</span><span>${r.b || ' '}</span></div>`;
+                if (r.type === 'change') return `<div class="df-row rm"><span class="ln">−</span><span>${r.a}</span></div><div class="df-row add"><span class="ln">+</span><span>${r.b}</span></div>`;
+                if (r.type === 'rm') return `<div class="df-row rm"><span class="ln">−</span><span>${r.a}</span></div>`;
+                return `<div class="df-row add"><span class="ln">+</span><span>${r.b}</span></div>`;
+            }).join('');
+        }
+    }
+
+    document.querySelectorAll('[data-unit]').forEach((b) => b.addEventListener('click', () => { unit = b.dataset.unit; document.querySelectorAll('[data-unit]').forEach((x) => x.classList.toggle('is-active', x === b)); run(); }));
+    document.querySelectorAll('[data-view]').forEach((b) => b.addEventListener('click', () => { view = b.dataset.view; document.querySelectorAll('[data-view]').forEach((x) => x.classList.toggle('is-active', x === b)); run(); }));
+    $('df-swap').addEventListener('click', () => { [$('df-a').value, $('df-b').value] = [$('df-b').value, $('df-a').value]; run(); });
+    let t;
+    for (const id of ['df-a', 'df-b']) $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 150); });
+    for (const id of ['df-ws', 'df-case']) $(id).addEventListener('change', run);
+    window.__diff = diff;
+    run();
+})();
+</script>
+{% endblock %}
