@@ -1,0 +1,490 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .tm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .tm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 11px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .tm-in:focus { border-color: #0066cc; }
+    .tm-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .tm-btn { border-radius: 999px; padding: 5px 11px; font-size: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .tm-btn:hover { background: #f5f5f7; }
+    .tm-row { display: flex; align-items: baseline; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0, 0, 0, 0.05); font-size: 13px; }
+    .tm-row:first-child { border-top: 0; }
+    .tm-row dt { width: 108px; flex-shrink: 0; color: #8e8e93; }
+    .tm-row dd { min-width: 0; flex: 1; word-break: break-all; }
+    .tm-copy { cursor: pointer; border-radius: 6px; padding: 0 3px; margin: 0 -3px; }
+    .tm-copy:hover { background: #e8f1fb; }
+    .tm-big { font-size: clamp(30px, 5vw, 44px); font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .tm-err { color: #c4271d; font-size: 13px; }
+    .tm-zone { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; font-size: 13px; }
+    .tm-zone.work { background: #ecfdf5; }
+    .tm-zone.night { background: #f5f5f7; color: #8e8e93; }
+    html.theme-dark .tm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .tm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; color-scheme: dark; }
+    html.theme-dark .tm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .tm-row { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .tm-copy:hover { background: #1c2a3a; }
+    html.theme-dark .tm-zone.work { background: #14432d; }
+    html.theme-dark .tm-zone.night { background: #111318; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">TIME · CONVERTER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">시간 변환기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">타임스탬프, 세계 시각, cron 식, 날짜 계산을 한곳에서. 서버로 보내지 않고 이 브라우저에서 바로 계산해요. 값을 누르면 복사돼요.</p>
+    </div>
+
+    <!-- 지금 -->
+    <section class="tm-card mt-8">
+        <div class="flex flex-wrap items-end gap-x-10 gap-y-3">
+            <div><p class="text-[12px] text-[#8e8e93]">지금 유닉스 시간 (초)</p><p class="tm-big tm-mono tm-copy" id="now-s"></p></div>
+            <div><p class="text-[12px] text-[#8e8e93]">밀리초</p><p class="tm-mono tm-copy text-[18px] tabular-nums" id="now-ms"></p></div>
+            <div><p class="text-[12px] text-[#8e8e93]">내 시간대 <span id="my-zone"></span></p><p class="text-[18px] tabular-nums" id="now-local"></p></div>
+            <div><p class="text-[12px] text-[#8e8e93]">UTC</p><p class="text-[18px] tabular-nums" id="now-utc"></p></div>
+        </div>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <!-- 타임스탬프 → 날짜 -->
+        <section class="tm-card">
+            <h2 class="text-[16px] font-semibold">⏱ 타임스탬프 → 날짜</h2>
+            <div class="mt-3 flex gap-2">
+                <input id="ts-in" class="tm-in tm-mono" placeholder="1791561155 · 1791561155000 · 2026-10-10T12:00:00Z" autocomplete="off">
+                <button type="button" class="tm-btn" id="ts-now">지금</button>
+            </div>
+            <p class="mt-1 text-[12px] text-[#8e8e93]" id="ts-unit">자릿수로 초·밀리초·마이크로초·나노초를 알아봐요. 날짜 글자(ISO 등)를 넣어도 돼요.</p>
+            <dl class="mt-2" id="ts-out"></dl>
+        </section>
+
+        <!-- 날짜 → 타임스탬프 -->
+        <section class="tm-card">
+            <h2 class="text-[16px] font-semibold">📅 날짜 → 타임스탬프</h2>
+            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                <input id="dt-in" type="datetime-local" step="1" class="tm-in">
+                <select id="dt-zone" class="tm-in"></select>
+            </div>
+            <dl class="mt-2" id="dt-out"></dl>
+        </section>
+
+        <!-- 세계 시각 -->
+        <section class="tm-card">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-[16px] font-semibold">🌏 세계 시각 · 시차</h2>
+                <label class="ml-auto flex items-center gap-1.5 text-[12px] text-[#6e6e73]"><input type="checkbox" id="wc-live" checked> 지금 시각</label>
+            </div>
+            <div class="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" id="wc-base-box">
+                <input id="wc-base" type="datetime-local" class="tm-in" disabled>
+                <select id="wc-base-zone" class="tm-in" disabled></select>
+            </div>
+            <div class="mt-3 space-y-1" id="wc-list"></div>
+            <div class="mt-3 flex gap-2">
+                <input id="wc-add" class="tm-in" list="zone-list" placeholder="도시·시간대 추가 (예: Berlin, America/Chicago)">
+                <button type="button" class="tm-btn" id="wc-add-btn">추가</button>
+                <button type="button" class="tm-btn" id="wc-reset">기본으로</button>
+            </div>
+            <p class="mt-2 text-[11px] text-[#8e8e93]">초록색은 그 도시의 평일 9~18시(일하는 시간), 회색은 밤(22~7시)이에요.</p>
+            <datalist id="zone-list"></datalist>
+        </section>
+
+        <!-- cron -->
+        <section class="tm-card">
+            <h2 class="text-[16px] font-semibold">⚙️ cron 식 풀이</h2>
+            <div class="mt-3 flex gap-2">
+                <input id="cr-in" class="tm-in tm-mono" value="0 9 * * 1-5" autocomplete="off" spellcheck="false">
+                <select id="cr-zone" class="tm-in max-w-[180px]"></select>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1.5" id="cr-ex">
+                <button type="button" class="tm-btn tm-mono">*/15 * * * *</button>
+                <button type="button" class="tm-btn tm-mono">0 */2 * * *</button>
+                <button type="button" class="tm-btn tm-mono">30 18 * * FRI</button>
+                <button type="button" class="tm-btn tm-mono">0 0 1,15 * *</button>
+                <button type="button" class="tm-btn tm-mono">0 4 * * *</button>
+                <button type="button" class="tm-btn tm-mono">@weekly</button>
+            </div>
+            <p class="mt-3 text-[17px] font-semibold" id="cr-desc"></p>
+            <p class="mt-1 text-[12px] text-[#8e8e93] tm-mono" id="cr-fields"></p>
+            <p class="mt-3 text-[12px] text-[#8e8e93]">다음 실행</p>
+            <ol class="mt-1 space-y-0.5 text-[13px] tabular-nums" id="cr-next"></ol>
+        </section>
+
+        <!-- 날짜 계산 -->
+        <section class="tm-card">
+            <h2 class="text-[16px] font-semibold">🧮 날짜 계산 · D-day</h2>
+            <div class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+                <input id="dd-a" type="date" class="tm-in">
+                <span class="text-[#8e8e93]">→</span>
+                <input id="dd-b" type="date" class="tm-in">
+            </div>
+            <dl class="mt-2" id="dd-out"></dl>
+            <div class="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
+                <input id="ad-base" type="date" class="tm-in max-w-[170px]">
+                <select id="ad-sign" class="tm-in max-w-[70px]"><option value="1">+</option><option value="-1">−</option></select>
+                <input id="ad-n" type="number" value="100" class="tm-in max-w-[90px]">
+                <select id="ad-unit" class="tm-in max-w-[110px]"><option value="d">일</option><option value="w">주</option><option value="m">개월</option><option value="y">년</option><option value="b">평일</option></select>
+                <span>=</span><b class="tm-copy text-[15px]" id="ad-out"></b>
+            </div>
+        </section>
+
+        <!-- 기간 -->
+        <section class="tm-card">
+            <h2 class="text-[16px] font-semibold">⌛ 기간 변환</h2>
+            <input id="du-in" class="tm-in tm-mono mt-3" value="PT1H30M" placeholder="5400 · 90m · 1h30m · 1일 2시간 · PT1H30M · 01:30:00" autocomplete="off">
+            <p class="mt-1 text-[12px] text-[#8e8e93]">숫자만 넣으면 초로 봐요. 끝에 ms 를 붙이면 밀리초.</p>
+            <dl class="mt-2" id="du-out"></dl>
+        </section>
+    </div>
+</main>
+
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const MY_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Seoul';
+    const ALL_ZONES = (Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : []).concat(['UTC']);
+    const DAYS = ['일', '월', '화', '수', '목', '금', '토'];
+    const pad = (n, w = 2) => String(n).padStart(w, '0');
+    const row = (k, v, copy = true) => `<div class="tm-row"><dt>${esc(k)}</dt><dd>${copy ? `<span class="tm-copy" title="눌러서 복사">${esc(v)}</span>` : v}</dd></div>`;
+
+    // ── 시간대 계산 ──
+    const fmtCache = {};
+    function parts(ms, zone) {
+        const f = fmtCache[zone] ||= new Intl.DateTimeFormat('en-US', { timeZone: zone, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', weekday: 'short' });
+        const o = {};
+        for (const p of f.formatToParts(new Date(ms))) o[p.type] = p.value;
+        return { y: +o.year, mo: +o.month, d: +o.day, h: +o.hour % 24, mi: +o.minute, s: +o.second, dow: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(o.weekday) };
+    }
+    function offsetMin(ms, zone) {
+        const p = parts(ms, zone);
+        return Math.round((Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s) - Math.floor(ms / 1000) * 1000) / 60000);
+    }
+    // 그 시간대의 벽시계 시각 → 실제 시각(ms)
+    function zoned(y, mo, d, h, mi, s, zone) {
+        const guess = Date.UTC(y, mo - 1, d, h, mi, s);
+        let t = guess - offsetMin(guess, zone) * 60000;
+        t = guess - offsetMin(t, zone) * 60000;  // 서머타임 경계 보정
+        return t;
+    }
+    const offStr = (m) => `UTC${m >= 0 ? '+' : '−'}${pad(Math.floor(Math.abs(m) / 60))}:${pad(Math.abs(m) % 60)}`;
+    const fmtWall = (ms, zone, withDow = true) => { const p = parts(ms, zone); return `${p.y}-${pad(p.mo)}-${pad(p.d)}${withDow ? ` (${DAYS[p.dow]})` : ''} ${pad(p.h)}:${pad(p.mi)}:${pad(p.s)}`; };
+    const isoIn = (ms, zone) => { const p = parts(ms, zone), off = offsetMin(ms, zone); const frac = ms % 1000 ? '.' + pad(((ms % 1000) + 1000) % 1000, 3) : ''; return `${p.y}-${pad(p.mo)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:${pad(p.s)}${frac}${off === 0 ? 'Z' : (off > 0 ? '+' : '-') + pad(Math.floor(Math.abs(off) / 60)) + ':' + pad(Math.abs(off) % 60)}`; };
+    function relative(ms) {
+        const diff = ms - Date.now(), a = Math.abs(diff) / 1000;
+        const [v, u] = a < 60 ? [a, '초'] : a < 3600 ? [a / 60, '분'] : a < 86400 ? [a / 3600, '시간'] : a < 86400 * 30 ? [a / 86400, '일'] : a < 86400 * 365 ? [a / 86400 / 30.44, '개월'] : [a / 86400 / 365.25, '년'];
+        return a < 1 ? '지금' : `${Math.floor(v)}${u} ${diff < 0 ? '전' : '후'}`;
+    }
+    function zoneOptions(sel, value) {
+        const common = ['Asia/Seoul', 'UTC', MY_ZONE, 'Asia/Tokyo', 'Asia/Shanghai', 'Asia/Singapore', 'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'America/New_York', 'America/Chicago', 'America/Los_Angeles', 'Australia/Sydney'];
+        const list = [...new Set(common.concat(ALL_ZONES))];
+        sel.innerHTML = list.map((z) => `<option value="${esc(z)}">${esc(z)}</option>`).join('');
+        sel.value = value;
+    }
+    const zoneLabel = (z) => ({ 'Asia/Seoul': '서울', UTC: 'UTC', 'Asia/Tokyo': '도쿄', 'Asia/Shanghai': '베이징·상하이', 'Asia/Singapore': '싱가포르', 'Asia/Kolkata': '인도', 'Europe/London': '런던', 'Europe/Paris': '파리', 'Europe/Berlin': '베를린', 'America/New_York': '뉴욕', 'America/Chicago': '시카고', 'America/Denver': '덴버', 'America/Los_Angeles': 'LA·샌프란시스코', 'Australia/Sydney': '시드니', 'Pacific/Auckland': '오클랜드', 'Asia/Dubai': '두바이', 'Asia/Ho_Chi_Minh': '호찌민', 'Asia/Hong_Kong': '홍콩', 'America/Sao_Paulo': '상파울루' }[z] || z.split('/').pop().replace(/_/g, ' '));
+
+    // ── 지금 ──
+    $('my-zone').textContent = `(${MY_ZONE})`;
+    function tickNow() {
+        const ms = Date.now();
+        $('now-s').textContent = Math.floor(ms / 1000);
+        $('now-ms').textContent = ms;
+        $('now-local').textContent = fmtWall(ms, MY_ZONE);
+        $('now-utc').textContent = fmtWall(ms, 'UTC');
+        if ($('wc-live').checked) renderWorld();
+    }
+
+    // ── 타임스탬프 → 날짜 ──
+    function parseTs(raw) {
+        const v = raw.trim().replace(/[,_\s]/g, '');
+        if (/^-?\d+(\.\d+)?$/.test(v)) {
+            const digits = v.replace(/^-/, '').split('.')[0].length;
+            const n = Number(v);
+            if (digits <= 11) return { ms: n * 1000, unit: '초 (s)' };
+            if (digits <= 14) return { ms: n, unit: '밀리초 (ms)' };
+            if (digits <= 17) return { ms: n / 1000, unit: '마이크로초 (µs)' };
+            return { ms: n / 1e6, unit: '나노초 (ns)' };
+        }
+        const t = Date.parse(raw.trim());
+        return Number.isNaN(t) ? null : { ms: t, unit: '날짜 글자' };
+    }
+    function renderTs() {
+        const raw = $('ts-in').value;
+        if (!raw.trim()) { $('ts-out').innerHTML = ''; return; }
+        const r = parseTs(raw);
+        if (!r || !Number.isFinite(r.ms) || Math.abs(r.ms) > 8.64e15) { $('ts-out').innerHTML = '<p class="tm-err">알아볼 수 없는 값이에요.</p>'; return; }
+        const ms = Math.round(r.ms);
+        const zones = [...new Set([MY_ZONE, 'Asia/Seoul', 'UTC'])];
+        $('ts-out').innerHTML = row('알아본 단위', r.unit, false)
+            + zones.map((z) => row(`${zoneLabel(z)}`, `${fmtWall(ms, z)} ${offStr(offsetMin(ms, z))}`)).join('')
+            + row('ISO 8601', new Date(ms).toISOString())
+            + row('RFC 2822', new Date(ms).toUTCString())
+            + row('유닉스 (초)', String(Math.floor(ms / 1000)))
+            + row('유닉스 (ms)', String(ms))
+            + row('상대 시간', relative(ms), false);
+    }
+
+    // ── 날짜 → 타임스탬프 ──
+    function renderDt() {
+        const v = $('dt-in').value, zone = $('dt-zone').value;
+        if (!v) { $('dt-out').innerHTML = ''; return; }
+        const m = v.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+        if (!m) return;
+        const ms = zoned(+m[1], +m[2], +m[3], +m[4], +m[5], +(m[6] || 0), zone);
+        $('dt-out').innerHTML = row('유닉스 (초)', String(Math.floor(ms / 1000))) + row('유닉스 (ms)', String(ms))
+            + row('ISO (그 시간대)', isoIn(ms, zone)) + row('ISO (UTC)', new Date(ms).toISOString())
+            + (zone !== MY_ZONE ? row(`내 시간대`, fmtWall(ms, MY_ZONE)) : '') + row('상대 시간', relative(ms), false);
+    }
+
+    // ── 세계 시각 ──
+    const DEFAULT_ZONES = ['Asia/Seoul', 'UTC', 'America/Los_Angeles', 'America/New_York', 'Europe/London', 'Europe/Berlin', 'Asia/Tokyo', 'Asia/Singapore'];
+    let zones = store.get('mj.time.zones', DEFAULT_ZONES);
+    function worldBase() {
+        if ($('wc-live').checked) return Date.now();
+        const m = ($('wc-base').value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+        return m ? zoned(+m[1], +m[2], +m[3], +m[4], +m[5], 0, $('wc-base-zone').value) : Date.now();
+    }
+    function renderWorld() {
+        const ms = worldBase(), baseOff = offsetMin(ms, 'Asia/Seoul'), baseDay = parts(ms, 'Asia/Seoul');
+        $('wc-list').innerHTML = zones.map((z, i) => {
+            const p = parts(ms, z), off = offsetMin(ms, z), diff = (off - baseOff) / 60;
+            const work = p.dow >= 1 && p.dow <= 5 && p.h >= 9 && p.h < 18, night = p.h >= 22 || p.h < 7;
+            const dayShift = Date.UTC(p.y, p.mo - 1, p.d) - Date.UTC(baseDay.y, baseDay.mo - 1, baseDay.d);
+            const shift = dayShift > 0 ? ' <span class="text-[11px] text-[#0066cc]">다음 날</span>' : dayShift < 0 ? ' <span class="text-[11px] text-[#b26a00]">전날</span>' : '';
+            return `<div class="tm-zone ${work ? 'work' : night ? 'night' : ''}"><span class="min-w-0 truncate"><b>${esc(zoneLabel(z))}</b> <span class="text-[11px] text-[#8e8e93]">${esc(offStr(off))}${z === 'Asia/Seoul' ? '' : ` · 서울과 ${diff === 0 ? '같음' : (diff > 0 ? '+' : '') + diff + '시간'}`}</span></span>
+                <span class="tabular-nums"><b class="text-[16px]">${pad(p.h)}:${pad(p.mi)}</b> <span class="text-[12px] text-[#6e6e73]">${p.mo}/${p.d} (${DAYS[p.dow]})</span>${shift}</span>
+                <button type="button" class="text-[#c7c7cc] hover:text-[#c4271d]" data-rm="${i}" title="빼기">✕</button></div>`;
+        }).join('');
+    }
+    function addZone() {
+        const q = $('wc-add').value.trim().toLowerCase().replace(/\s+/g, '_');
+        if (!q) return;
+        const z = ALL_ZONES.find((x) => x.toLowerCase() === q) || ALL_ZONES.find((x) => x.toLowerCase().endsWith('/' + q)) || ALL_ZONES.find((x) => x.toLowerCase().includes(q))
+            || Object.entries({ seoul: 'Asia/Seoul', 서울: 'Asia/Seoul', 도쿄: 'Asia/Tokyo', 뉴욕: 'America/New_York', 런던: 'Europe/London', 파리: 'Europe/Paris', 베를린: 'Europe/Berlin', 시드니: 'Australia/Sydney', 베이징: 'Asia/Shanghai', 상하이: 'Asia/Shanghai', 싱가포르: 'Asia/Singapore', la: 'America/Los_Angeles', 샌프란시스코: 'America/Los_Angeles', 시카고: 'America/Chicago', 두바이: 'Asia/Dubai', 홍콩: 'Asia/Hong_Kong', 인도: 'Asia/Kolkata', 하와이: 'Pacific/Honolulu' }).find(([k]) => k === q)?.[1];
+        if (!z) { $('wc-add').value = ''; $('wc-add').placeholder = '못 찾았어요. 예: Europe/Berlin'; return; }
+        if (!zones.includes(z)) zones.push(z);
+        store.set('mj.time.zones', zones);
+        $('wc-add').value = '';
+        renderWorld();
+    }
+
+    // ── cron ──
+    const NAMES = { mon: { jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12 }, dow: { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 } };
+    const MACROS = { '@yearly': '0 0 1 1 *', '@annually': '0 0 1 1 *', '@monthly': '0 0 1 * *', '@weekly': '0 0 * * 0', '@daily': '0 0 * * *', '@midnight': '0 0 * * *', '@hourly': '0 * * * *' };
+    function parseField(src, lo, hi, names) {
+        const set = new Set();
+        const val = (t) => { const k = t.toLowerCase(); if (names && k in names) return names[k]; if (!/^\d+$/.test(t)) throw new Error(`'${t}' 를 알아볼 수 없어요`); return +t; };
+        for (const part of src.split(',')) {
+            let [range, step] = part.split('/');
+            step = step === undefined ? 1 : +step;
+            if (!(step >= 1)) throw new Error(`간격 '${part}' 가 이상해요`);
+            let a, b;
+            if (range === '*' || range === '?') { a = lo; b = hi; }
+            else if (range.includes('-')) { [a, b] = range.split('-').map(val); }
+            else { a = val(range); b = part.includes('/') ? hi : a; }
+            if (a < lo || b > hi || a > b) throw new Error(`'${part}' 는 ${lo}~${hi} 범위를 벗어나요`);
+            for (let x = a; x <= b; x += step) set.add(x);
+        }
+        return { set, all: src === '*' || src === '?', src };
+    }
+    function parseCron(expr) {
+        let e = expr.trim().toLowerCase();
+        e = MACROS[e] || e;
+        const f = e.split(/\s+/);
+        if (f.length === 6) f.shift();  // 맨 앞 초 필드(Spring·Quartz)는 무시
+        if (f.length !== 5) throw new Error('필드가 5개(분 시 일 월 요일)여야 해요');
+        const dow = parseField(f[4], 0, 7, NAMES.dow);  // 일요일은 0 이나 7
+        if (dow.set.has(7)) { dow.set.delete(7); dow.set.add(0); }
+        if (dow.all) dow.set = new Set([0, 1, 2, 3, 4, 5, 6]);
+        return { min: parseField(f[0], 0, 59), hour: parseField(f[1], 0, 23), dom: parseField(f[2], 1, 31), mon: parseField(f[3], 1, 12, NAMES.mon), dow, raw: f };
+    }
+    const listKo = (arr, fmt = (x) => x) => arr.map(fmt).join(', ');
+    function rangeText(field, fmt, unit, key = (x) => x) {
+        const s = field.src;
+        if (/^\*\/\d+$/.test(s)) return `${s.split('/')[1]}${unit}마다`;
+        const vals = [...field.set].sort((a, b) => key(a) - key(b));
+        // 이어진 범위는 a~b 로
+        if (vals.length > 2 && vals.every((v, i) => i === 0 || key(v) === key(vals[i - 1]) + 1)) return `${fmt(vals[0])}~${fmt(vals[vals.length - 1])}`;
+        return listKo(vals, fmt);
+    }
+    function describe(c) {
+        const dowName = (d) => DAYS[d];
+        const monFirst = (d) => (d + 6) % 7;  // 요일은 월요일부터 세기
+        let when = '';
+        if (!c.mon.all) when += `${rangeText(c.mon, (m) => m + '월', '개월')} `;
+        if (!c.dom.all && !c.dow.all) when += `매월 ${rangeText(c.dom, (d) => d + '일', '일')} 또는 ${rangeText(c.dow, dowName, '일', monFirst)}요일 `;
+        else if (!c.dom.all) when += `${c.mon.all ? '매월 ' : ''}${rangeText(c.dom, (d) => d + '일', '일')} `;
+        else if (!c.dow.all) when += `${c.dow.set.size === 5 && [1, 2, 3, 4, 5].every((d) => c.dow.set.has(d)) ? '평일(월~금)' : c.dow.set.size === 2 && c.dow.set.has(0) && c.dow.set.has(6) ? '주말' : (c.dow.set.size === 1 ? '매주 ' : '') + rangeText(c.dow, dowName, '일', monFirst) + '요일'} `;
+        else when += c.hour.all || /^\*\/\d+$/.test(c.hour.src) ? '' : '매일 ';
+        const mins = [...c.min.set].sort((a, b) => a - b), hours = [...c.hour.set].sort((a, b) => a - b);
+        let time;
+        if (c.min.all && c.hour.all) time = '매분';
+        else if (c.hour.all && /^\*\/\d+$/.test(c.min.src)) time = `${c.min.src.split('/')[1]}분마다`;
+        else if (c.hour.all) time = `매시 ${listKo(mins, (m) => m + '분')}`;
+        else if (mins.length * hours.length <= 6 && !/\//.test(c.hour.src)) time = listKo(hours.flatMap((h) => mins.map((m) => `${pad(h)}:${pad(m)}`)));
+        else time = `${rangeText(c.hour, (h) => h + '시', '시간')} ${c.min.all ? '매분' : /^\*\/\d+$/.test(c.min.src) ? c.min.src.split('/')[1] + '분마다' : mins.length === 1 && mins[0] === 0 ? '정각' : listKo(mins, (m) => m + '분')}`;
+        return (when + time).trim();
+    }
+    function nextRuns(c, zone, count = 5) {
+        const out = [], now = Date.now();
+        const start = parts(now, zone);
+        const mins = [...c.min.set].sort((a, b) => a - b), hours = [...c.hour.set].sort((a, b) => a - b);
+        let day = Date.UTC(start.y, start.mo - 1, start.d);
+        for (let i = 0; i < 366 * 5 && out.length < count; i++, day += 86400000) {
+            const dt = new Date(day), y = dt.getUTCFullYear(), mo = dt.getUTCMonth() + 1, d = dt.getUTCDate(), dow = dt.getUTCDay();
+            if (!c.mon.set.has(mo)) continue;
+            const domOk = c.dom.set.has(d), dowOk = c.dow.set.has(dow);
+            if (!(c.dom.all || c.dow.all ? domOk && dowOk : domOk || dowOk)) continue;
+            for (const h of hours) {
+                for (const m of mins) {
+                    const t = zoned(y, mo, d, h, m, 0, zone);
+                    const p = parts(t, zone);
+                    if (t > now && p.h === h && p.mi === m) { out.push(t); if (out.length >= count) return out; }
+                }
+            }
+        }
+        return out;
+    }
+    function renderCron() {
+        const zone = $('cr-zone').value;
+        try {
+            const c = parseCron($('cr-in').value);
+            $('cr-desc').textContent = describe(c);
+            $('cr-fields').textContent = `분 ${c.raw[0]} · 시 ${c.raw[1]} · 일 ${c.raw[2]} · 월 ${c.raw[3]} · 요일 ${c.raw[4]}`;
+            const runs = nextRuns(c, zone);
+            $('cr-next').innerHTML = runs.map((t) => `<li><span class="tm-copy">${esc(fmtWall(t, zone))}</span> <span class="text-[12px] text-[#8e8e93]">${esc(relative(t))}</span></li>`).join('') || '<li class="text-[#8e8e93]">5년 안에는 실행되지 않아요 (예: 2월 30일).</li>';
+        } catch (err) {
+            $('cr-desc').innerHTML = `<span class="tm-err">${esc(err.message)}</span>`;
+            $('cr-fields').textContent = '형식: 분(0-59) 시(0-23) 일(1-31) 월(1-12) 요일(0-6, 일=0)';
+            $('cr-next').innerHTML = '';
+        }
+    }
+
+    // ── 날짜 계산 ──
+    const ymd = (v) => { const m = (v || '').match(/^(\d{4})-(\d{2})-(\d{2})$/); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : null; };
+    const fmtDay = (t) => { const d = new Date(t); return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} (${DAYS[d.getUTCDay()]})`; };
+    function weekdaysBetween(a, b) {
+        const sign = b >= a ? 1 : -1;
+        let lo = Math.min(a, b), hi = Math.max(a, b), n = 0;
+        const days = Math.round((hi - lo) / 86400000);
+        const full = Math.floor(days / 7);
+        n = full * 5;
+        for (let t = lo + full * 7 * 86400000; t < hi; t += 86400000) { const w = new Date(t).getUTCDay(); if (w !== 0 && w !== 6) n++; }
+        return n * sign;
+    }
+    function renderDd() {
+        const a = ymd($('dd-a').value), b = ymd($('dd-b').value);
+        if (a === null || b === null) { $('dd-out').innerHTML = ''; return; }
+        const days = Math.round((b - a) / 86400000), abs = Math.abs(days);
+        const da = new Date(a), db = new Date(b);
+        let months = (db.getUTCFullYear() - da.getUTCFullYear()) * 12 + db.getUTCMonth() - da.getUTCMonth();
+        let rest = db.getUTCDate() - da.getUTCDate();
+        if (days >= 0 && rest < 0) { months--; rest += new Date(Date.UTC(db.getUTCFullYear(), db.getUTCMonth(), 0)).getUTCDate(); }
+        const today = ymd(new Date().toLocaleDateString('sv-SE'));
+        const dd = Math.round((b - today) / 86400000);
+        $('dd-out').innerHTML = row('차이', `${days}일`) + row('주', `${Math.floor(abs / 7)}주 ${abs % 7}일`, false)
+            + (days >= 0 ? row('개월', `${Math.floor(months / 12) ? Math.floor(months / 12) + '년 ' : ''}${months % 12}개월 ${rest}일`, false) : '')
+            + row('평일(월~금)', `${weekdaysBetween(a, b)}일`, false)
+            + row('첫날 포함', `${days >= 0 ? days + 1 : days - 1}일째 (예: 100일 기념일 계산)`, false)
+            + row('오늘부터 끝 날짜', dd === 0 ? 'D-day 🎉' : dd > 0 ? `D-${dd}` : `D+${-dd}`, false);
+    }
+    function renderAdd() {
+        const base = ymd($('ad-base').value), n = (+$('ad-n').value || 0) * +$('ad-sign').value, unit = $('ad-unit').value;
+        if (base === null) { $('ad-out').textContent = ''; return; }
+        const d = new Date(base);
+        let t;
+        if (unit === 'd') t = base + n * 86400000;
+        else if (unit === 'w') t = base + n * 7 * 86400000;
+        else if (unit === 'm' || unit === 'y') {
+            const months = unit === 'm' ? n : n * 12;
+            const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1));
+            const last = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth() + 1, 0)).getUTCDate();
+            t = Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d.getUTCDate(), last));  // 1/31 + 1개월 = 2/28
+        } else {
+            t = base; let left = Math.abs(n); const step = n >= 0 ? 1 : -1;
+            while (left > 0) { t += step * 86400000; const w = new Date(t).getUTCDay(); if (w !== 0 && w !== 6) left--; }
+        }
+        $('ad-out').textContent = fmtDay(t);
+    }
+
+    // ── 기간 ──
+    function parseDuration(raw) {
+        const v = raw.trim();
+        if (!v) return null;
+        if (/^-?\d+(\.\d+)?$/.test(v)) return +v;
+        if (/^-?\d+(\.\d+)?\s*ms$/i.test(v)) return parseFloat(v) / 1000;
+        let m = v.match(/^P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)W)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i);
+        if (m && v.length > 1) { const [, y, mo, w, d, h, mi, s] = m.map((x) => +x || 0); return y * 31536000 + mo * 2592000 + w * 604800 + d * 86400 + h * 3600 + mi * 60 + s; }
+        m = v.match(/^(-)?(\d+):(\d{1,2})(?::(\d{1,2}(?:\.\d+)?))?$/);
+        if (m) return (m[1] ? -1 : 1) * (m[4] !== undefined ? +m[2] * 3600 + +m[3] * 60 + +m[4] : +m[2] * 60 + +m[3]);
+        const units = { y: 31536000, year: 31536000, years: 31536000, 년: 31536000, w: 604800, week: 604800, weeks: 604800, 주: 604800, d: 86400, day: 86400, days: 86400, 일: 86400, h: 3600, hr: 3600, hrs: 3600, hour: 3600, hours: 3600, 시간: 3600, m: 60, min: 60, mins: 60, minute: 60, minutes: 60, 분: 60, s: 1, sec: 1, secs: 1, second: 1, seconds: 1, 초: 1, ms: 0.001 };
+        let total = 0, matched = '';
+        const re = /(\d+(?:\.\d+)?)\s*(years?|weeks?|days?|hours?|hrs?|minutes?|mins?|seconds?|secs?|ms|시간|년|주|일|분|초|[ywdhms])(?![a-z])/gi;
+        let x;
+        while ((x = re.exec(v))) { total += +x[1] * units[x[2].toLowerCase()]; matched += x[0]; }
+        return matched.replace(/\s/g, '').length === v.replace(/\s/g, '').length ? total : null;
+    }
+    function human(sec) {
+        let s = Math.abs(sec); const out = [];
+        for (const [u, n] of [['일', 86400], ['시간', 3600], ['분', 60]]) { if (s >= n) { out.push(Math.floor(s / n) + u); s %= n; } }
+        if (s || !out.length) out.push((Math.round(s * 1000) / 1000) + '초');
+        return (sec < 0 ? '−' : '') + out.join(' ');
+    }
+    function iso(sec) {
+        let s = Math.abs(sec);
+        const d = Math.floor(s / 86400); s %= 86400;
+        const h = Math.floor(s / 3600); s %= 3600;
+        const m = Math.floor(s / 60); s = Math.round((s % 60) * 1000) / 1000;
+        const t = (h ? h + 'H' : '') + (m ? m + 'M' : '') + (s ? s + 'S' : '');
+        return (sec < 0 ? '-' : '') + 'P' + (d ? d + 'D' : '') + (t ? 'T' + t : d ? '' : 'T0S');
+    }
+    function renderDu() {
+        const sec = parseDuration($('du-in').value);
+        if (sec === null) { $('du-out').innerHTML = $('du-in').value.trim() ? '<p class="tm-err">알아볼 수 없어요. 예: 90m, 1h30m, 1일 2시간, PT1H30M</p>' : ''; return; }
+        const a = Math.abs(sec);
+        const hms = `${sec < 0 ? '-' : ''}${pad(Math.floor(a / 3600))}:${pad(Math.floor(a % 3600 / 60))}:${pad(Math.floor(a % 60))}`;
+        $('du-out').innerHTML = row('읽기', human(sec)) + row('초', String(sec)) + row('밀리초', String(Math.round(sec * 1000))) + row('분', String(Math.round(sec / 60 * 1000) / 1000)) + row('시간', String(Math.round(sec / 3600 * 10000) / 10000)) + row('일', String(Math.round(sec / 86400 * 10000) / 10000)) + row('HH:MM:SS', hms) + row('ISO 8601', iso(sec));
+    }
+
+    // ── 연결 ──
+    document.addEventListener('click', async (e) => {
+        const c = e.target.closest('.tm-copy');
+        if (!c || !c.textContent.trim()) return;
+        try { await navigator.clipboard.writeText(c.textContent.trim()); const old = c.style.background; c.style.background = '#d1fae5'; setTimeout(() => { c.style.background = old; }, 400); } catch (err) { /* 무시 */ }
+    });
+    $('ts-in').addEventListener('input', renderTs);
+    $('ts-now').addEventListener('click', () => { $('ts-in').value = Math.floor(Date.now() / 1000); renderTs(); });
+    ['dt-in', 'dt-zone'].forEach((id) => $(id).addEventListener('input', renderDt));
+    $('wc-live').addEventListener('change', () => { ['wc-base', 'wc-base-zone'].forEach((id) => { $(id).disabled = $('wc-live').checked; }); renderWorld(); });
+    ['wc-base', 'wc-base-zone'].forEach((id) => $(id).addEventListener('input', renderWorld));
+    $('wc-list').addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (!b) return; zones.splice(+b.dataset.rm, 1); store.set('mj.time.zones', zones); renderWorld(); });
+    $('wc-add-btn').addEventListener('click', addZone);
+    $('wc-add').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addZone(); } });
+    $('wc-reset').addEventListener('click', () => { zones = [...DEFAULT_ZONES]; store.set('mj.time.zones', zones); renderWorld(); });
+    $('cr-in').addEventListener('input', renderCron);
+    $('cr-zone').addEventListener('input', renderCron);
+    $('cr-ex').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; $('cr-in').value = b.textContent; renderCron(); });
+    ['dd-a', 'dd-b'].forEach((id) => $(id).addEventListener('input', renderDd));
+    ['ad-base', 'ad-sign', 'ad-n', 'ad-unit'].forEach((id) => $(id).addEventListener('input', renderAdd));
+    $('du-in').addEventListener('input', renderDu);
+
+    // ── 처음 값 ──
+    const now = Date.now(), p = parts(now, MY_ZONE);
+    const today = `${p.y}-${pad(p.mo)}-${pad(p.d)}`;
+    zoneOptions($('dt-zone'), MY_ZONE); zoneOptions($('cr-zone'), MY_ZONE); zoneOptions($('wc-base-zone'), 'Asia/Seoul');
+    $('zone-list').innerHTML = ALL_ZONES.map((z) => `<option value="${esc(z)}">`).join('');
+    $('ts-in').value = Math.floor(now / 1000);
+    $('dt-in').value = `${today}T${pad(p.h)}:${pad(p.mi)}:00`;
+    $('wc-base').value = `${today}T${pad(p.h)}:00`;
+    $('dd-a').value = today; $('ad-base').value = today;
+    $('dd-b').value = `${p.y}-12-25`;
+    tickNow(); renderTs(); renderDt(); renderCron(); renderDd(); renderAdd(); renderDu();
+    setInterval(tickNow, 1000);
+    window.__time = { parseTs, parseCron, describe, nextRuns, parseDuration, human, iso, zoned, parts, weekdaysBetween };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

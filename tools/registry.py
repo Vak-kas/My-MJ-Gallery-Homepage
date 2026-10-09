@@ -224,6 +224,16 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "time",
+		"url_name": "tools:time",
+		"icon": "🕒",
+		"title": "시간 변환기",
+		"description": "유닉스 타임스탬프 ↔ 날짜, 세계 시각·시차, cron 식 한국어 풀이와 다음 실행 시각, 날짜 사이 일수·D-day, 기간(PT1H30M ↔ 1시간 30분) 변환.",
+		"tags": ["타임스탬프", "cron"],
+		"category": "dev",
+		"access": "public",
+	},
+	{
 		"slug": "regex",
 		"url_name": "tools:regex",
 		"icon": ".*",
