@@ -1,0 +1,424 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .wf-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .wf-in { width: 100%; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 6px 9px; font-size: 14px; color: #1d1d1f; outline: none; font-variant-numeric: tabular-nums; }
+    .wf-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .wf-f label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 3px; }
+    .wf-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .wf-seg button { border-radius: 999px; padding: 4px 11px; font-size: 13px; color: #6e6e73; }
+    .wf-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .wf-seg button:disabled { opacity: 0.3; }
+    .wf-tab { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 6px 16px; font-size: 14px; }
+    .wf-tab.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .wf-big { font-size: 40px; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+    .wf-tbl { width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .wf-tbl th { text-align: right; font-weight: 600; color: #6e6e73; padding: 6px 6px; font-size: 12px; white-space: nowrap; }
+    .wf-tbl th:first-child, .wf-tbl td:first-child { text-align: left; }
+    .wf-tbl td { text-align: right; padding: 5px 6px; border-top: 1px solid rgba(0, 0, 0, 0.05); white-space: nowrap; }
+    .wf-tbl tr.cur td { background: #e8f1fb; font-weight: 700; }
+    .wf-tbl tr.cur td:first-child { border-radius: 8px 0 0 8px; } .wf-tbl tr.cur td:last-child { border-radius: 0 8px 8px 0; }
+    .wf-tbl tr.no td { color: #c7c7cc; }
+    .wf-stat { border-radius: 14px; background: #f5f5f7; padding: 10px 12px; }
+    .wf-stat p:first-child { font-size: 11px; color: #8e8e93; }
+    .wf-stat p:last-child { margin-top: 2px; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .wf-warn { border-radius: 12px; background: #fff8e6; color: #8a5300; padding: 8px 12px; font-size: 13px; }
+    .wall { display: grid; grid-template-columns: minmax(0, 1fr) 70px 90px; align-items: center; gap: 8px; font-size: 13px; }
+    #wf-rssi-chart, #wf-chan { width: 100%; display: block; }
+    #wf-rssi-chart { height: 230px; }
+    #wf-chan { height: 170px; }
+    .ap-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px 28px; gap: 6px; align-items: center; }
+    html.theme-dark .wf-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .wf-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .wf-seg, html.theme-dark .wf-stat { background: #111318; }
+    html.theme-dark .wf-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .wf-tab { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .wf-tab.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .wf-tbl td { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .wf-tbl tr.cur td { background: #1c2a3a; }
+    html.theme-dark .wf-warn { background: #3b2a10; color: #f6c86b; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">WI‑FI · CALCULATOR</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Wi‑Fi 계산기.</h1>
+        <p class="mt-3 max-w-[800px] text-[15px] leading-relaxed text-[#6e6e73]">규격·대역폭·MCS·안테나 수로 속도를, 거리·벽으로 신호 세기와 그 자리에서 나올 속도를, 채널 배치로 겹침을 계산해요. 브라우저 안에서만 계산해요.</p>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-1.5">
+        <button type="button" class="wf-tab is-on" data-tab="rate">⚡ 속도</button>
+        <button type="button" class="wf-tab" data-tab="cover">📍 신호 세기 · 거리</button>
+        <button type="button" class="wf-tab" data-tab="chan">🗂 채널</button>
+    </div>
+
+    <!-- 공통: 규격 -->
+    <section class="wf-card mt-4" id="phy-box">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div><p class="mb-1 text-[12px] text-[#6e6e73]">규격</p><span class="wf-seg" id="s-std"><button type="button" data-v="n">Wi‑Fi 4 (n)</button><button type="button" data-v="ac">Wi‑Fi 5 (ac)</button><button type="button" data-v="ax">Wi‑Fi 6/6E (ax)</button><button type="button" class="is-on" data-v="be">Wi‑Fi 7 (be)</button></span></div>
+            <div><p class="mb-1 text-[12px] text-[#6e6e73]">대역폭 (MHz)</p><span class="wf-seg" id="s-bw"><button type="button" data-v="20">20</button><button type="button" data-v="40">40</button><button type="button" data-v="80">80</button><button type="button" class="is-on" data-v="160">160</button><button type="button" data-v="320">320</button></span></div>
+            <div><p class="mb-1 text-[12px] text-[#6e6e73]">공간 스트림 (안테나)</p><span class="wf-seg" id="s-nss"><button type="button" data-v="1">1</button><button type="button" class="is-on" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="8">8</button><button type="button" data-v="16">16</button></span></div>
+            <div><p class="mb-1 text-[12px] text-[#6e6e73]">보호 구간 (GI)</p><span class="wf-seg" id="s-gi"></span></div>
+        </div>
+        <p class="mt-2 text-[12px] text-[#8e8e93]" id="phy-note"></p>
+    </section>
+
+    <!-- 속도 -->
+    <section id="tab-rate" class="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[380px_minmax(0,1fr)]">
+        <div class="space-y-4">
+            <div class="wf-card">
+                <div class="wf-f"><label>MCS</label><input type="range" id="mcs" min="0" max="13" value="13" class="w-full"></div>
+                <p class="mt-1 text-[14px]"><b id="mcs-name"></b> <span class="text-[#6e6e73]" id="mcs-mod"></span></p>
+                <p class="mt-4 text-[12px] text-[#8e8e93]">이론 최대 속도 (PHY)</p>
+                <p class="wf-big" id="rate-phy">–</p>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <div class="wf-stat"><p>실제 기대 (TCP)</p><p id="rate-real">–</p></div>
+                    <div class="wf-stat"><p>필요한 신호 (최소)</p><p id="rate-rssi">–</p></div>
+                    <div class="wf-stat"><p>1 GB 받는 시간</p><p id="rate-1gb">–</p></div>
+                    <div class="wf-stat"><p>심볼 길이</p><p id="rate-sym">–</p></div>
+                </div>
+                <div class="wf-f mt-3"><label>실제 효율 (%) <span title="MAC 오버헤드·경쟁·TCP 를 합친 대략값. 혼자 쓰는 좋은 환경 65~75%, 붐비는 곳 30~50%">ⓘ</span></label><input type="number" class="wf-in" id="eff" value="65" min="5" max="100"></div>
+                <p class="wf-warn mt-3 hidden" id="rate-warn"></p>
+            </div>
+        </div>
+        <div class="wf-card min-w-0">
+            <div class="flex items-center gap-2"><p class="text-[15px] font-semibold">MCS 표</p><span class="text-[12px] text-[#8e8e93]" id="tbl-cap"></span><button type="button" class="ml-auto rounded-full border border-black/10 px-3 py-1 text-[12px]" id="copy-tbl">마크다운 복사</button></div>
+            <div class="mt-2 overflow-x-auto"><table class="wf-tbl" id="mcs-tbl"></table></div>
+            <p class="mt-2 text-[11px] leading-5 text-[#8e8e93]">필요한 신호 = 규격이 정한 최소 수신 감도 (20 MHz 기준에 대역폭이 2배 될 때마다 +3 dB). 실제 칩은 보통 이보다 몇 dB 더 좋아요. 속도 = 데이터 부반송파 × 변조 비트 × 부호율 × 스트림 ÷ (심볼 + GI).</p>
+        </div>
+    </section>
+
+    <!-- 신호 세기 -->
+    <section id="tab-cover" class="mt-4 hidden grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div class="wf-card min-w-0 space-y-4">
+            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div class="wf-f"><label>주파수 대역</label><select class="wf-in" id="c-band"><option value="2.4">2.4 GHz</option><option value="5" selected>5 GHz</option><option value="6">6 GHz</option></select></div>
+                <div class="wf-f"><label>거리 (m)</label><input type="number" class="wf-in" id="c-dist" value="10" min="0.5" step="any"></div>
+                <div class="wf-f"><label>공유기 출력 (dBm)</label><input type="number" class="wf-in" id="c-ptx" value="20" step="any"></div>
+                <div class="wf-f"><label>안테나 이득 합 (dBi)</label><input type="number" class="wf-in" id="c-gain" value="5" step="any"></div>
+            </div>
+            <div>
+                <p class="mb-1 text-[12px] text-[#6e6e73]">공간 (거리에 따라 약해지는 정도)</p>
+                <span class="wf-seg" id="c-env"><button type="button" data-v="2.0">탁 트인 곳 (n=2.0)</button><button type="button" data-v="2.5">거실·카페 (2.5)</button><button type="button" class="is-on" data-v="3.0">집·사무실 (3.0)</button><button type="button" data-v="3.5">방 많은 집·병원 (3.5)</button></span>
+            </div>
+            <div>
+                <p class="mb-2 text-[12px] text-[#6e6e73]">사이에 있는 벽·문 (개수)</p>
+                <div class="space-y-1.5" id="walls"></div>
+            </div>
+        </div>
+        <aside class="space-y-4">
+            <div class="wf-card">
+                <p class="text-[12px] text-[#8e8e93]">예상 신호 세기 (RSSI)</p>
+                <p class="wf-big" id="c-rssi">–</p>
+                <p class="text-[13px]" id="c-verdict"></p>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <div class="wf-stat"><p>이 자리 최대 MCS</p><p id="c-mcs">–</p></div>
+                    <div class="wf-stat"><p>예상 속도 (실제)</p><p id="c-rate">–</p></div>
+                    <div class="wf-stat"><p>경로 손실</p><p id="c-pl">–</p></div>
+                    <div class="wf-stat"><p>벽 손실 합</p><p id="c-wall">–</p></div>
+                </div>
+                <p class="mt-2 text-[11px] text-[#8e8e93]">위 '규격' 칸의 규격·대역폭·스트림으로 계산. 넓은 대역폭은 같은 거리에서 신호 여유가 줄어요(2배마다 3 dB).</p>
+            </div>
+            <div class="wf-card"><p class="text-[13px] font-semibold">RSSI 보는 법</p>
+                <ul class="mt-1 space-y-0.5 text-[12.5px] text-[#424245] dark:text-[#c7c7cc]"><li><b class="text-[#0f9f6e]">−50 이상</b> 아주 좋음 · 최고 속도</li><li><b class="text-[#0f9f6e]">−60</b> 좋음 · 4K 영상·게임</li><li><b class="text-[#b26a00]">−67</b> 영상통화·VoIP 권장 한계</li><li><b class="text-[#b26a00]">−70</b> 웹·메신저 정도</li><li><b class="text-[#c4271d]">−80 이하</b> 자주 끊김</li></ul></div>
+        </aside>
+        <div class="wf-card lg:col-span-2"><p class="text-[13px] font-semibold">📈 거리에 따라 (벽 그대로)</p><canvas id="wf-rssi-chart" class="mt-2"></canvas></div>
+    </section>
+
+    <!-- 채널 -->
+    <section id="tab-chan" class="mt-4 hidden space-y-4">
+        <div class="wf-card">
+            <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span class="wf-seg" id="ch-band"><button type="button" class="is-on" data-v="2.4">2.4 GHz</button><button type="button" data-v="5">5 GHz</button><button type="button" data-v="6">6 GHz</button></span>
+                <span class="wf-seg" id="ch-bw"><button type="button" class="is-on" data-v="20">20</button><button type="button" data-v="40">40</button><button type="button" data-v="80">80</button><button type="button" data-v="160">160</button><button type="button" data-v="320">320</button></span>
+                <span class="text-[12px] text-[#8e8e93]">MHz 묶음으로 보기</span>
+            </div>
+            <canvas id="wf-chan" class="mt-3"></canvas>
+            <p class="mt-2 text-[12px] leading-5 text-[#6e6e73]" id="ch-note"></p>
+        </div>
+        <div class="wf-card">
+            <div class="flex items-center gap-2"><p class="text-[15px] font-semibold">📡 주변 공유기 겹침 확인</p><button type="button" class="ml-auto rounded-full border border-black/10 px-3 py-1 text-[12px]" id="ap-add">＋ 공유기 추가</button></div>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">스마트폰 Wi‑Fi 분석 앱 등에서 본 주변 공유기의 채널·폭을 넣으면, 겹치는 것과 비어 있는 채널을 알려 줘요.</p>
+            <div class="mt-3 space-y-1.5" id="ap-list"></div>
+            <div class="mt-3 text-[13px] leading-6" id="ap-result"></div>
+        </div>
+    </section>
+</main>
+
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const fx = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '–');
+    const fmtRate = (m) => (m >= 1000 ? `${fx(m / 1000, 2)} Gbps` : `${fx(m, m >= 100 ? 0 : 1)} Mbps`);
+
+    // ── 규격 표 ──
+    const STD = {
+        n: { label: 'Wi‑Fi 4 (802.11n, HT)', bws: [20, 40], maxNss: 4, maxMcs: 7, sym: 3.2, gis: [0.8, 0.4], nsd: { 20: 52, 40: 108 }, bands: '2.4·5 GHz' },
+        ac: { label: 'Wi‑Fi 5 (802.11ac, VHT)', bws: [20, 40, 80, 160], maxNss: 8, maxMcs: 9, sym: 3.2, gis: [0.8, 0.4], nsd: { 20: 52, 40: 108, 80: 234, 160: 468 }, bands: '5 GHz' },
+        ax: { label: 'Wi‑Fi 6/6E (802.11ax, HE)', bws: [20, 40, 80, 160], maxNss: 8, maxMcs: 11, sym: 12.8, gis: [0.8, 1.6, 3.2], nsd: { 20: 234, 40: 468, 80: 980, 160: 1960 }, bands: '2.4·5·6 GHz' },
+        be: { label: 'Wi‑Fi 7 (802.11be, EHT)', bws: [20, 40, 80, 160, 320], maxNss: 16, maxMcs: 13, sym: 12.8, gis: [0.8, 1.6, 3.2], nsd: { 20: 234, 40: 468, 80: 980, 160: 1960, 320: 3920 }, bands: '2.4·5·6 GHz (320 MHz 는 6 GHz)' },
+    };
+    const MCS = [['BPSK', 1, 1 / 2], ['QPSK', 2, 1 / 2], ['QPSK', 2, 3 / 4], ['16-QAM', 4, 1 / 2], ['16-QAM', 4, 3 / 4], ['64-QAM', 6, 2 / 3], ['64-QAM', 6, 3 / 4], ['64-QAM', 6, 5 / 6],
+        ['256-QAM', 8, 3 / 4], ['256-QAM', 8, 5 / 6], ['1024-QAM', 10, 3 / 4], ['1024-QAM', 10, 5 / 6], ['4096-QAM', 12, 3 / 4], ['4096-QAM', 12, 5 / 6]];
+    const RATE_TXT = { 0.5: '1/2', 0.75: '3/4' };
+    const rateTxt = (r) => RATE_TXT[r] || (Math.abs(r - 2 / 3) < 1e-9 ? '2/3' : '5/6');
+    // 규격의 최소 수신 감도 (20 MHz, dBm). 대역폭 2배마다 +3 dB
+    const SENS20 = [-82, -79, -77, -74, -70, -66, -65, -64, -59, -57, -54, -52, -49, -46];
+    const sensOf = (mcs, bw) => SENS20[mcs] + 3 * Math.log2(bw / 20);
+
+    const st = { std: 'be', bw: 160, nss: 2, gi: 0.8, ...store.get('mj.wifi.phy', {}) };
+    function vhtInvalid(bw, mcs, nss) {  // 802.11ac 에서 정의되지 않은 조합
+        if (st.std !== 'ac') return false;
+        return (bw === 20 && mcs === 9 && ![3, 6].includes(nss)) || (bw === 80 && mcs === 6 && [3, 7].includes(nss)) || (bw === 80 && mcs === 9 && nss === 6) || (bw === 160 && mcs === 9 && nss === 3);
+    }
+    function rate(mcs, o = st) {
+        const S = STD[o.std];
+        const [, bits, r] = MCS[mcs];
+        return S.nsd[o.bw] * bits * r * o.nss / (S.sym + o.gi);  // Mbps (µs 단위라서)
+    }
+    function fixState() {
+        const S = STD[st.std];
+        if (!S.bws.includes(st.bw)) st.bw = S.bws[S.bws.length - 1];
+        if (st.nss > S.maxNss) st.nss = S.maxNss;
+        if (!S.gis.includes(st.gi)) st.gi = S.gis[0];
+        const m = $('mcs');
+        m.max = S.maxMcs;
+        if (+m.value > S.maxMcs) m.value = S.maxMcs;
+    }
+    function renderPhy() {
+        fixState();
+        const S = STD[st.std];
+        const seg = (id, v) => $(id).querySelectorAll('[data-v]').forEach((b) => b.classList.toggle('is-on', b.dataset.v === String(v)));
+        seg('s-std', st.std); seg('s-bw', st.bw); seg('s-nss', st.nss);
+        $('s-bw').querySelectorAll('[data-v]').forEach((b) => { b.disabled = !S.bws.includes(+b.dataset.v); });
+        $('s-nss').querySelectorAll('[data-v]').forEach((b) => { b.disabled = +b.dataset.v > S.maxNss; });
+        $('s-gi').innerHTML = S.gis.map((g) => `<button type="button" data-v="${g}" class="${g === st.gi ? 'is-on' : ''}">${S.sym === 3.2 ? (g === 0.4 ? '짧은 400 ns' : '보통 800 ns') : `${g} µs`}</button>`).join('');
+        $('phy-note').textContent = `${S.label} · ${S.bands} · 데이터 부반송파 ${S.nsd[st.bw]}개 · 심볼 ${S.sym} µs + GI ${st.gi} µs · MCS 0~${S.maxMcs} · 스트림 최대 ${S.maxNss}`;
+        store.set('mj.wifi.phy', { std: st.std, bw: st.bw, nss: st.nss, gi: st.gi });
+        renderRate(); renderCover();
+    }
+    const bindSeg = (id, key, num = true) => $(id).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]'); if (!b || b.disabled) return;
+        st[key] = num ? +b.dataset.v : b.dataset.v;
+        renderPhy();
+    });
+    bindSeg('s-std', 'std', false); bindSeg('s-bw', 'bw'); bindSeg('s-nss', 'nss'); bindSeg('s-gi', 'gi');
+
+    // ── 속도 ──
+    function renderRate() {
+        const S = STD[st.std], mcs = +$('mcs').value, [mod, bits, r] = MCS[mcs];
+        const phy = rate(mcs), eff = Math.min(100, Math.max(5, +$('eff').value || 65)) / 100;
+        $('mcs-name').textContent = `MCS ${mcs}`;
+        $('mcs-mod').textContent = `${mod} · 부호율 ${rateTxt(r)} · 부반송파당 ${bits}비트`;
+        $('rate-phy').textContent = fmtRate(phy);
+        $('rate-real').textContent = `≈ ${fmtRate(phy * eff)}`;
+        $('rate-rssi').textContent = `${fx(sensOf(mcs, st.bw), 0)} dBm`;
+        const sec = 8000 / (phy * eff);
+        $('rate-1gb').textContent = sec < 60 ? `${fx(sec, 1)}초` : `${Math.floor(sec / 60)}분 ${Math.round(sec % 60)}초`;
+        $('rate-sym').textContent = `${fx(S.sym + st.gi, 1)} µs`;
+        const warn = [];
+        if (vhtInvalid(st.bw, mcs, st.nss)) warn.push('802.11ac 표준에는 이 대역폭·MCS·스트림 조합이 없어요 (정의되지 않은 조합).');
+        if (st.std === 'be' && st.bw === 320) warn.push('320 MHz 는 6 GHz 대역에서만 쓸 수 있어요.');
+        if (mcs >= 12) warn.push('4096-QAM(MCS 12·13)은 공유기 바로 옆(아주 강한 신호)에서만 나와요.');
+        $('rate-warn').classList.toggle('hidden', !warn.length);
+        $('rate-warn').innerHTML = warn.map(esc).join('<br>');
+        $('tbl-cap').textContent = `${S.label.split(' (')[0]} · ${st.bw} MHz · ${st.nss}스트림 · GI ${st.gi} µs`;
+        const gis = S.gis;
+        $('mcs-tbl').innerHTML = `<tr><th>MCS</th><th>변조</th><th>부호율</th>${gis.map((g) => `<th>GI ${S.sym === 3.2 ? g * 1000 + ' ns' : g + ' µs'}</th>`).join('')}<th>최소 신호</th></tr>` +
+            MCS.slice(0, S.maxMcs + 1).map(([m, , rr], i) => `<tr class="${i === mcs ? 'cur' : ''} ${vhtInvalid(st.bw, i, st.nss) ? 'no' : ''}" data-mcs="${i}"><td>${i}</td><td>${m}</td><td>${rateTxt(rr)}</td>${gis.map((g) => `<td>${vhtInvalid(st.bw, i, st.nss) ? '–' : fmtRate(rate(i, { ...st, gi: g }))}</td>`).join('')}<td>${fx(sensOf(i, st.bw), 0)} dBm</td></tr>`).join('');
+    }
+    $('mcs').addEventListener('input', renderRate);
+    $('eff').addEventListener('input', () => { renderRate(); renderCover(); });
+    $('mcs-tbl').addEventListener('click', (e) => { const tr = e.target.closest('[data-mcs]'); if (tr) { $('mcs').value = tr.dataset.mcs; renderRate(); } });
+    $('copy-tbl').addEventListener('click', (e) => {
+        const rows = [...$('mcs-tbl').querySelectorAll('tr')].map((tr) => '| ' + [...tr.children].map((c) => c.textContent).join(' | ') + ' |');
+        rows.splice(1, 0, '|' + ' --- |'.repeat($('mcs-tbl').rows[0].children.length));
+        navigator.clipboard.writeText(`${$('tbl-cap').textContent}\n\n` + rows.join('\n')).then(() => { e.target.textContent = '✓ 복사됨'; });
+    });
+
+    // ── 신호 세기 ──
+    // 벽 하나 손실 (dB) — 2.4 / 5 / 6 GHz 대략값
+    const WALLS = [['석고보드·가벽', [3, 4, 5]], ['나무 문', [3, 4, 6]], ['유리·창문 (일반)', [2, 3, 4]], ['로이(Low-E) 유리', [10, 15, 20]], ['벽돌 벽', [8, 12, 15]], ['콘크리트 벽', [12, 18, 22]], ['층 (바닥·천장)', [15, 20, 25]], ['엘리베이터·금속', [25, 30, 32]]];
+    const wallCounts = store.get('mj.wifi.walls', WALLS.map(() => 0));
+    $('walls').innerHTML = WALLS.map(([n], i) => `<div class="wall"><span>${n}</span><input type="number" class="wf-in" min="0" max="20" value="${wallCounts[i] || 0}" data-wall="${i}"><span class="text-right text-[12px] text-[#8e8e93]" data-wall-db="${i}"></span></div>`).join('');
+    let envN = 3.0;
+    $('c-env').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; envN = +b.dataset.v; $('c-env').querySelectorAll('[data-v]').forEach((x) => x.classList.toggle('is-on', x === b)); renderCover(); });
+    const bandIdx = () => ({ 2.4: 0, 5: 1, 6: 2 }[$('c-band').value]);
+    const fMHz = () => ({ 2.4: 2437, 5: 5500, 6: 6500 }[$('c-band').value]);
+    function rssiAt(d) {
+        const pl1 = 20 * Math.log10(fMHz()) - 27.55;  // 1 m 자유공간 손실
+        const pl = pl1 + 10 * envN * Math.log10(Math.max(d, 0.5));
+        const wall = WALLS.reduce((s, [, l], i) => s + (+document.querySelector(`[data-wall="${i}"]`).value || 0) * l[bandIdx()], 0);
+        return { rssi: +$('c-ptx').value + +$('c-gain').value - pl - wall, pl, wall };
+    }
+    function bestMcs(rssi) {
+        let best = -1;
+        for (let i = 0; i <= STD[st.std].maxMcs; i++) if (rssi >= sensOf(i, st.bw) && !vhtInvalid(st.bw, i, st.nss)) best = i;
+        return best;
+    }
+    function renderCover() {
+        WALLS.forEach(([, l], i) => { const el = document.querySelector(`[data-wall-db="${i}"]`); if (el) el.textContent = `개당 ${l[bandIdx()]} dB`; });
+        store.set('mj.wifi.walls', WALLS.map((_, i) => +document.querySelector(`[data-wall="${i}"]`).value || 0));
+        const { rssi, pl, wall } = rssiAt(+$('c-dist').value || 1);
+        const m = bestMcs(rssi), eff = (+$('eff').value || 65) / 100;
+        $('c-rssi').textContent = `${fx(rssi, 0)} dBm`;
+        $('c-rssi').style.color = rssi >= -60 ? '#0f9f6e' : rssi >= -70 ? '#b26a00' : '#c4271d';
+        $('c-verdict').textContent = rssi >= -50 ? '아주 좋아요 — 최고 속도' : rssi >= -60 ? '좋아요 — 영상·게임 문제없음' : rssi >= -67 ? '괜찮아요 — 영상통화까지 무난' : rssi >= -70 ? '웹·메신저 정도' : rssi >= -80 ? '불안정 — 자주 느려지거나 끊겨요' : '거의 안 잡혀요';
+        $('c-mcs').textContent = m < 0 ? '연결 어려움' : `MCS ${m} (${MCS[m][0]})`;
+        $('c-rate').textContent = m < 0 ? '–' : `≈ ${fmtRate(rate(m) * eff)}`;
+        $('c-pl').textContent = `${fx(pl, 1)} dB`;
+        $('c-wall').textContent = `${fx(wall, 0)} dB`;
+        drawRssi();
+    }
+    ['c-band', 'c-dist', 'c-ptx', 'c-gain'].forEach((id) => $(id).addEventListener('input', renderCover));
+    $('walls').addEventListener('input', renderCover);
+
+    function canvasCtx(cv) {
+        const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+        cv.width = W * dpr; cv.height = H * dpr;
+        const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+        const dark = document.documentElement.classList.contains('theme-dark');
+        return { ctx, W, H, ink: dark ? '#c7c7cc' : '#6e6e73', grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', dark };
+    }
+    function drawRssi() {
+        const cv = $('wf-rssi-chart'); if (!cv.clientWidth) return;
+        const { ctx, W, H, ink, grid } = canvasCtx(cv);
+        const dmax = Math.max(30, (+$('c-dist').value || 10) * 2);
+        const L = 48, R = 14, T = 10, B = 26, lo = -95, hi = -20;
+        const X = (d) => L + d / dmax * (W - L - R), Y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+        ctx.font = '11px -apple-system, sans-serif';
+        [[-50, '#34c759'], [-67, '#f59e0b'], [-80, '#ef4444']].forEach(([v, c]) => { ctx.fillStyle = c + '22'; ctx.fillRect(L, Y(v), W - L - R, Y(v === -50 ? -67 : v === -67 ? -80 : lo) - Y(v)); });
+        ctx.strokeStyle = grid; ctx.fillStyle = ink;
+        for (let v = -90; v <= -20; v += 10) { ctx.beginPath(); ctx.moveTo(L, Y(v)); ctx.lineTo(W - R, Y(v)); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(v, L - 6, Y(v) + 4); }
+        ctx.textAlign = 'center';
+        for (let i = 0; i <= 5; i++) { const d = dmax * i / 5; ctx.fillText(`${fx(d, 0)} m`, X(d), H - 8); }
+        ctx.strokeStyle = '#0066cc'; ctx.lineWidth = 2; ctx.beginPath();
+        for (let i = 0; i <= 200; i++) { const d = Math.max(0.5, dmax * i / 200), y = Y(Math.max(lo, Math.min(hi, rssiAt(d).rssi))); i ? ctx.lineTo(X(d), y) : ctx.moveTo(X(d), y); }
+        ctx.stroke();
+        const d0 = +$('c-dist').value || 1, v0 = rssiAt(d0).rssi;
+        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(X(d0), Y(Math.max(lo, Math.min(hi, v0))), 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.lineWidth = 1;
+    }
+
+    // ── 채널 ──
+    // 20 MHz 채널 번호 → 중심 주파수
+    const freqOf = (band, ch) => (band === '2.4' ? 2407 + 5 * ch : band === '5' ? 5000 + 5 * ch : 5950 + 5 * ch);
+    const CH = {
+        '2.4': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+        '5': [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165],
+        '6': Array.from({ length: 59 }, (_, i) => 1 + 4 * i),
+    };
+    const DFS5 = (ch) => ch >= 52 && ch <= 144;
+    let chBand = '2.4', chBw = 20;
+    const aps = store.get('mj.wifi.aps', [{ name: '우리 집', ch: 6, bw: 20 }, { name: '옆집', ch: 1, bw: 20 }]);
+    // 묶음(40/80/160/320) 블록 — 정해진 경계로만 묶임
+    const START5 = { 20: CH['5'], 40: [36, 44, 52, 60, 100, 108, 116, 124, 132, 140, 149, 157], 80: [36, 52, 100, 116, 132, 149], 160: [36, 100], 320: [] };
+    function blocks(band, bw) {
+        const n = bw / 20;
+        const make = (c, step) => { const chs = Array.from({ length: n }, (_, i) => c + step * i); return { chs, center: (freqOf(band, chs[0]) + freqOf(band, chs[n - 1])) / 2, w: bw }; };
+        if (band === '2.4') return bw === 20 ? CH['2.4'].map((c) => make(c, 4)) : bw === 40 ? [1, 9].map((c) => make(c, 4)) : [];
+        if (band === '5') return START5[bw].filter((c) => Array.from({ length: n }, (_, i) => c + 4 * i).every((x) => CH['5'].includes(x))).map((c) => make(c, 4));
+        const list = CH['6'];
+        return list.filter((c, i) => i % n === 0 && i + n <= list.length).map((c) => make(c, 4));
+    }
+    function apRange(ap, band) {
+        const f = freqOf(band, ap.ch);
+        if (band === '2.4') return [f - 10, f + 10 + (ap.bw === 40 ? 20 : 0)];
+        const bl = blocks(band, ap.bw).find((b) => b.chs.includes(ap.ch));
+        return bl ? [bl.center - bl.w / 2, bl.center + bl.w / 2] : [f - 10, f + 10];
+    }
+    function drawChan() {
+        const cv = $('wf-chan'); if (!cv.clientWidth) return;
+        const { ctx, W, H, ink, grid } = canvasCtx(cv);
+        const list = CH[chBand];
+        const fLo = freqOf(chBand, list[0]) - 12, fHi = freqOf(chBand, list[list.length - 1]) + 12;
+        const L = 8, R = 8, X = (f) => L + (f - fLo) / (fHi - fLo) * (W - L - R);
+        ctx.font = '10px -apple-system, sans-serif'; ctx.textAlign = 'center';
+        // DFS 구역
+        if (chBand === '5') { ctx.fillStyle = 'rgba(245,158,11,0.12)'; ctx.fillRect(X(5250), 0, X(5730) - X(5250), H - 18); ctx.fillStyle = '#b26a00'; ctx.fillText('DFS (레이더 감지 시 채널 이동)', (X(5250) + X(5730)) / 2, 12); }
+        // 묶음 블록
+        const bl = blocks(chBand, chBw);
+        bl.forEach((b, i) => {
+            const x0 = X(b.center - b.w / 2), x1 = X(b.center + b.w / 2);
+            ctx.fillStyle = i % 2 ? 'rgba(0,102,204,0.10)' : 'rgba(0,102,204,0.18)';
+            ctx.fillRect(x0 + 1, 22, x1 - x0 - 2, 34);
+            ctx.fillStyle = ink; ctx.fillText(chBw === 20 ? b.chs[0] : `${b.chs[0]}–${b.chs[b.chs.length - 1]}`, (x0 + x1) / 2, 43);
+        });
+        // 주변 공유기
+        const myAps = aps.filter((a) => (a.band || bandGuess(a.ch)) === chBand);
+        myAps.forEach((a, i) => {
+            const [f0, f1] = apRange(a, chBand), y = 64 + i * 18;
+            ctx.fillStyle = `hsla(${(i * 67) % 360},70%,50%,0.35)`; ctx.fillRect(X(f0), y, X(f1) - X(f0), 14);
+            ctx.fillStyle = ink; ctx.textAlign = 'left'; ctx.fillText(`${a.name} (${a.ch}, ${a.bw})`, X(f0) + 3, y + 11); ctx.textAlign = 'center';
+        });
+        ctx.strokeStyle = grid; ctx.beginPath(); ctx.moveTo(L, H - 18); ctx.lineTo(W - R, H - 18); ctx.stroke();
+        ctx.fillStyle = ink;
+        const step = Math.max(1, Math.ceil(list.length / 26));
+        list.forEach((c, i) => { if (i % step === 0) ctx.fillText(c, X(freqOf(chBand, c)), H - 5); });
+        const notes = {
+            '2.4': '2.4 GHz 는 채널 간격이 5 MHz 라서 20 MHz 폭이면 1·6·11 (한국은 1·5·9·13 도 가능)만 서로 안 겹쳐요. 40 MHz 는 거의 항상 겹치니 2.4 GHz 에선 20 MHz 를 권장해요.',
+            '5': '5 GHz 는 20 MHz 채널이 겹치지 않아요. 묶음(40·80·160)은 정해진 경계로만 묶여요. 52~144 는 DFS 채널이라 근처 레이더가 감지되면 공유기가 채널을 옮겨요(잠깐 끊김). 쓸 수 있는 채널은 나라 설정마다 달라요.',
+            '6': '6 GHz (Wi‑Fi 6E·7)는 넓고 비어 있어서 80·160·320 MHz 를 쓰기 좋아요. 벽을 잘 못 뚫어서 같은 방 안에서 가장 빨라요. 한국은 5925~7125 MHz 전체를 실내용으로 쓸 수 있어요.',
+        };
+        $('ch-note').textContent = notes[chBand] + (chBw > 20 && !bl.length ? ` (${chBand} GHz 에서는 ${chBw} MHz 묶음을 쓸 수 없어요)` : '');
+    }
+    const bandGuess = (ch) => (ch <= 14 ? '2.4' : '5');
+    function renderAps() {
+        $('ap-list').innerHTML = aps.map((a, i) => `<div class="ap-row"><input class="wf-in" data-ap="${i}" data-k="name" value="${esc(a.name)}"><select class="wf-in" data-ap="${i}" data-k="band">${['2.4', '5', '6'].map((b) => `<option value="${b}" ${(a.band || bandGuess(a.ch)) === b ? 'selected' : ''}>${b} GHz</option>`).join('')}</select>
+            <input class="wf-in" type="number" data-ap="${i}" data-k="ch" value="${a.ch}" title="채널"><button type="button" class="text-[#8e8e93] hover:text-[#c4271d]" data-rm="${i}">✕</button>
+            <span class="col-span-4 -mt-1 flex items-center gap-1 text-[12px] text-[#8e8e93]">폭 ${[20, 40, 80, 160, 320].map((w) => `<button type="button" class="rounded-full px-2 ${a.bw === w ? 'bg-[#1d1d1f] text-white' : ''}" data-ap="${i}" data-bw="${w}">${w}</button>`).join('')}</span></div>`).join('');
+        // 겹침 계산
+        const res = [];
+        for (let i = 0; i < aps.length; i++) for (let j = i + 1; j < aps.length; j++) {
+            const bi = aps[i].band || bandGuess(aps[i].ch), bj = aps[j].band || bandGuess(aps[j].ch);
+            if (bi !== bj) continue;
+            const [a0, a1] = apRange(aps[i], bi), [b0, b1] = apRange(aps[j], bj);
+            const ov = Math.min(a1, b1) - Math.max(a0, b0);
+            if (ov > 0) res.push(`⚠️ <b>${esc(aps[i].name)}</b> 와 <b>${esc(aps[j].name)}</b> 가 ${fx(ov, 0)} MHz 겹쳐요${aps[i].ch === aps[j].ch ? ' (같은 채널 — 번갈아 쓰지만 느려져요)' : ' (옆 채널 겹침 — 서로 잡음이 돼서 더 나빠요)'}`);
+        }
+        // 2.4 GHz 빈 채널 추천
+        const used24 = aps.filter((a) => (a.band || bandGuess(a.ch)) === '2.4');
+        if (used24.length) {
+            const score = [1, 6, 11].map((c) => ({ c, n: used24.filter((a) => { const [x0, x1] = apRange(a, '2.4'); return Math.min(x1, freqOf('2.4', c) + 10) - Math.max(x0, freqOf('2.4', c) - 10) > 0; }).length }));
+            score.sort((a, b) => a.n - b.n);
+            res.push(`💡 2.4 GHz 추천: <b>${score[0].c}번</b> (겹치는 공유기 ${score[0].n}대) — 1·6·11 중 가장 한산한 채널`);
+        }
+        res.push('💡 5 GHz 는 36~48 이 DFS 가 없어 안정적이고, 6 GHz 가 되면 6 GHz 를 쓰는 게 가장 빨라요.');
+        $('ap-result').innerHTML = res.join('<br>') || '겹치는 공유기가 없어요 👍';
+        store.set('mj.wifi.aps', aps);
+        drawChan();
+    }
+    $('ap-add').addEventListener('click', () => { aps.push({ name: `공유기 ${aps.length + 1}`, ch: chBand === '2.4' ? 11 : chBand === '5' ? 36 : 37, bw: 20, band: chBand }); renderAps(); });
+    $('ap-list').addEventListener('click', (e) => {
+        const rm = e.target.closest('[data-rm]'); if (rm) { aps.splice(+rm.dataset.rm, 1); renderAps(); return; }
+        const b = e.target.closest('[data-bw]'); if (b) { aps[+b.dataset.ap].bw = +b.dataset.bw; renderAps(); }
+    });
+    $('ap-list').addEventListener('change', (e) => { const el = e.target.closest('[data-k]'); if (!el) return; const a = aps[+el.dataset.ap]; a[el.dataset.k] = el.dataset.k === 'ch' ? +el.value : el.value; renderAps(); });
+    const chSeg = (id, fn) => $(id).addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; $(id).querySelectorAll('[data-v]').forEach((x) => x.classList.toggle('is-on', x === b)); fn(b.dataset.v); drawChan(); });
+    chSeg('ch-band', (v) => { chBand = v; }); chSeg('ch-bw', (v) => { chBw = +v; });
+
+    // ── 탭 ──
+    function showTab(t) {
+        document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === t));
+        ['rate', 'cover', 'chan'].forEach((k) => { $(`tab-${k}`).classList.toggle('hidden', k !== t); $(`tab-${k}`).classList.toggle('grid', k !== 'chan' && k === t); });
+        $('phy-box').classList.toggle('hidden', t === 'chan');
+        store.set('mj.wifi.tab', t);
+        if (t === 'cover') drawRssi(); if (t === 'chan') renderAps();
+    }
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+    window.addEventListener('resize', () => { drawRssi(); drawChan(); });
+
+    renderPhy();
+    showTab(store.get('mj.wifi.tab', 'rate'));
+    window.__wifi = { rate, st, sensOf, blocks, apRange, rssiAt, bestMcs, renderPhy };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

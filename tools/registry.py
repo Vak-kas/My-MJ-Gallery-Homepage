@@ -204,6 +204,16 @@ TOOLS = [
 		"access": "member",
 	},
 	{
+		"slug": "wifi",
+		"url_name": "tools:wifi",
+		"icon": "📶",
+		"title": "Wi‑Fi 계산기",
+		"description": "Wi‑Fi 4·5·6·7(802.11n/ac/ax/be) 속도(대역폭·MCS·스트림·GI), 거리·벽으로 신호 세기와 예상 속도, 2.4·5·6 GHz 채널 겹침과 추천.",
+		"tags": ["Wi‑Fi", "계산기"],
+		"category": "network",
+		"access": "public",
+	},
+	{
 		"slug": "linkbudget",
 		"url_name": "tools:linkbudget",
 		"icon": "📡",

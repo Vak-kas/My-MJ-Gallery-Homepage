@@ -9,6 +9,7 @@ urlpatterns = [
     path("duplex/", views.duplex, name="duplex"),
     path("subnet/", views.subnet, name="subnet"),
     path("linkbudget/", views.linkbudget, name="linkbudget"),
+    path("wifi/", views.wifi, name="wifi"),
     path("time/", views.time_tool, name="time"),
     path("units/", views.units_tool, name="units"),
     path("speedtest/", views.speedtest, name="speedtest"),
