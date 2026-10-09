@@ -1,0 +1,614 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .im-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .im-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .im-in:focus { border-color: #0066cc; }
+    .im-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .im-btn:hover { background: #f5f5f7; }
+    .im-btn:disabled { opacity: 0.45; cursor: default; }
+    .im-primary { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .im-primary:hover { background: #0058b0; }
+    .im-drop { border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 22px; background: #fafafc; transition: border-color 0.15s, background 0.15s; }
+    .im-drop.is-over { border-color: #0066cc; background: #f0f7ff; }
+    .im-thumb { width: 88px; height: 88px; border-radius: 14px; object-fit: cover; background: #f5f5f7; }
+    .im-badge { border-radius: 999px; padding: 2px 8px; font-size: 11px; background: #f5f5f7; color: #6e6e73; }
+    .im-gps { background: #fff1e6; color: #b45309; }
+    .im-save { color: #1e7a35; }
+    .im-grow { color: #c4271d; }
+    #crop-stage { position: relative; display: inline-block; touch-action: none; user-select: none; }
+    #crop-box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55); cursor: move; }
+    #crop-box::before, #crop-box::after { content: ""; position: absolute; inset: 33.33% 0; border-top: 1px solid rgba(255, 255, 255, 0.5); border-bottom: 1px solid rgba(255, 255, 255, 0.5); pointer-events: none; }
+    #crop-box::after { inset: 0 33.33%; border: 0; border-left: 1px solid rgba(255, 255, 255, 0.5); border-right: 1px solid rgba(255, 255, 255, 0.5); }
+    .crop-h { position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 4px; border: 2px solid #0066cc; }
+    html.theme-dark .im-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .im-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .im-btn:not(.im-primary) { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .im-drop { background: #111318; border-color: rgba(255, 255, 255, 0.18); }
+    html.theme-dark .im-drop.is-over { background: #142e43; border-color: #0a85ff; }
+    html.theme-dark .im-thumb, html.theme-dark .im-badge { background: #111318; color: #a1a1a6; }
+    html.theme-dark .im-gps { background: #3b2410; color: #f6ad55; }
+    html.theme-dark .im-save { color: #4cc38a; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">IMAGE · CONVERTER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">이미지 도구.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">사진 용량 줄이기, 크기·형식 바꾸기(HEIC → JPG, PNG ↔ WebP), 자르기·돌리기. 위치정보 같은 사진 정보도 지워져요. 사진은 서버로 가지 않고 이 브라우저 안에서만 처리돼요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="min-w-0 space-y-4">
+            <label id="im-drop" class="im-drop flex cursor-pointer flex-col items-center justify-center px-6 py-10 text-center">
+                <span class="text-[34px]">🖼</span>
+                <span class="mt-2 text-[15px] font-semibold text-[#1d1d1f]">사진을 끌어놓거나 눌러서 고르세요</span>
+                <span class="mt-1 text-[13px] text-[#8e8e93]">JPG · PNG · WebP · GIF · BMP · HEIC(아이폰), 여러 장 한꺼번에 · ⌘V 로 붙여넣기도 돼요</span>
+                <input id="im-file" type="file" accept="image/*,.heic,.heif" multiple class="hidden">
+            </label>
+
+            <div id="im-bar" class="hidden flex-wrap items-center gap-2">
+                <span id="im-count" class="text-[13px] text-[#6e6e73]"></span>
+                <button type="button" class="im-btn ml-auto" id="im-clear">모두 빼기</button>
+                <button type="button" class="im-btn" id="im-zip">⬇ 모두 받기 (ZIP)</button>
+            </div>
+            <ul id="im-list" class="space-y-3"></ul>
+        </section>
+
+        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <section class="im-card space-y-3">
+                <h2 class="text-[15px] font-semibold">모든 사진에 적용</h2>
+                <label class="block text-[12px] text-[#6e6e73]">형식
+                    <select id="o-format" class="im-in mt-1">
+                        <option value="keep">원래대로 (HEIC·BMP 는 JPG)</option>
+                        <option value="image/jpeg">JPG — 사진에 알맞음, 작음</option>
+                        <option value="image/png">PNG — 글자·투명 배경, 화질 그대로</option>
+                        <option value="image/webp">WebP — JPG 보다 더 작음</option>
+                    </select>
+                </label>
+                <label id="o-quality-wrap" class="block text-[12px] text-[#6e6e73]">화질 <b id="o-quality-v" class="text-[#1d1d1f]">85</b>
+                    <input id="o-quality" type="range" min="30" max="100" value="85" class="mt-1 w-full">
+                </label>
+                <div>
+                    <label class="block text-[12px] text-[#6e6e73]">크기
+                        <select id="o-resize" class="im-in mt-1">
+                            <option value="none">원래 크기</option>
+                            <option value="long">긴 쪽을 … px 로</option>
+                            <option value="width">가로를 … px 로</option>
+                            <option value="percent">… % 로</option>
+                        </select>
+                    </label>
+                    <input id="o-resize-v" type="number" min="1" class="im-in mt-2 hidden" placeholder="예: 1920">
+                    <div id="o-resize-presets" class="mt-2 hidden flex-wrap gap-1.5"></div>
+                </div>
+                <div>
+                    <label class="flex items-center gap-2 text-[13px] text-[#1d1d1f]"><input id="o-target-on" type="checkbox" class="h-4 w-4"> 용량 맞추기 (이 크기 이하로)</label>
+                    <div id="o-target-wrap" class="mt-2 hidden grid-cols-[1fr_90px] gap-2">
+                        <input id="o-target" type="number" min="10" step="10" value="500" class="im-in">
+                        <select id="o-target-unit" class="im-in"><option value="1024">KB</option><option value="1048576">MB</option></select>
+                    </div>
+                    <p class="mt-1 text-[11px] leading-4 text-[#8e8e93]">화질을 자동으로 찾고, 그래도 크면 사진 크기를 줄여요. PNG 는 크기만 줄여요.</p>
+                </div>
+                <label class="flex items-center gap-2 text-[13px] text-[#1d1d1f]"><input id="o-bg" type="checkbox" class="h-4 w-4" checked> 투명한 부분은 흰색으로 (JPG 로 바꿀 때)</label>
+                <p class="rounded-xl bg-[#f0f7ff] px-3 py-2 text-[12px] leading-5 text-[#0b4f8a]">🔒 다시 저장하면 위치(GPS)·카메라·찍은 날짜 같은 사진 정보가 모두 지워져요. 사진 방향은 그대로 맞춰져요.</p>
+            </section>
+            <section class="im-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">이렇게 쓰면 좋아요</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>과제·지원서 "5MB 이하" → 용량 맞추기 5 MB</li>
+                    <li>아이폰 사진 → 형식 JPG, 긴 쪽 2048 px</li>
+                    <li>증명사진 → 자르기 3:4</li>
+                    <li>블로그·웹 → WebP, 긴 쪽 1600 px</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<!-- 자르기 창 -->
+<div id="crop-modal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/70 p-4">
+    <div class="w-full max-w-[920px] rounded-[22px] bg-white p-5 dark:bg-[#171a20]" style="max-height: 96vh;">
+        <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-[16px] font-semibold text-[#1d1d1f]">자르기</h2>
+            <div id="crop-ratios" class="ml-2 flex flex-wrap gap-1.5"></div>
+            <span id="crop-size" class="ml-auto text-[12px] tabular-nums text-[#8e8e93]"></span>
+        </div>
+        <div class="mt-4 flex justify-center overflow-hidden">
+            <div id="crop-stage"><img id="crop-img" alt="" class="block max-h-[68vh] max-w-full" draggable="false"><div id="crop-box"></div></div>
+        </div>
+        <div class="mt-4 flex flex-wrap justify-end gap-2">
+            <button type="button" class="im-btn" id="crop-reset">자르기 없애기</button>
+            <button type="button" class="im-btn" id="crop-cancel">취소</button>
+            <button type="button" class="im-btn im-primary" id="crop-ok">적용</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(() => {
+    const HEIC_SRC = "{% static 'vendor/heic2any/heic2any-0.0.4.min.js' %}";
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const size = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(2)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+    const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+    const items = [];  // { id, file, name, bitmap, w, h, exif, rot, flip, crop, out, outUrl, thumbUrl, busy, error }
+    let seq = 0;
+
+    // ── EXIF (JPEG APP1) 에서 위치·카메라·날짜만 읽기 ──
+    function readExif(buf) {
+        const v = new DataView(buf);
+        if (v.byteLength < 4 || v.getUint16(0) !== 0xFFD8) return null;
+        let p = 2;
+        while (p + 4 < v.byteLength) {
+            const marker = v.getUint16(p), len = v.getUint16(p + 2);
+            if (marker === 0xFFE1 && v.getUint32(p + 4) === 0x45786966) return parseTiff(v, p + 10);
+            if ((marker & 0xFF00) !== 0xFF00 || marker === 0xFFDA) break;
+            p += 2 + len;
+        }
+        return null;
+    }
+    function parseTiff(v, t) {
+        const le = v.getUint16(t) === 0x4949;
+        const u16 = (o) => v.getUint16(t + o, le), u32 = (o) => v.getUint32(t + o, le);
+        const ifd = (off) => {
+            const out = {};
+            if (!off || t + off + 2 > v.byteLength) return out;
+            const n = u16(off);
+            for (let i = 0; i < n; i++) {
+                const e = off + 2 + i * 12;
+                if (t + e + 12 > v.byteLength) break;
+                const tag = u16(e), type = u16(e + 2), count = u32(e + 4);
+                const unit = { 1: 1, 2: 1, 3: 2, 4: 4, 5: 8, 7: 1 }[type] || 1;
+                const dataOff = count * unit > 4 ? u32(e + 8) : e + 8;
+                if (type === 2) {
+                    let s = '';
+                    for (let k = 0; k < count - 1 && t + dataOff + k < v.byteLength; k++) s += String.fromCharCode(v.getUint8(t + dataOff + k));
+                    out[tag] = s.trim();
+                } else if (type === 5) {
+                    out[tag] = Array.from({ length: count }, (_, k) => u32(dataOff + k * 8) / (u32(dataOff + k * 8 + 4) || 1));
+                } else if (type === 3) out[tag] = u16(e + 8);
+                else if (type === 4) out[tag] = u32(e + 8);
+            }
+            return out;
+        };
+        try {
+            const zero = ifd(u32(4));
+            const sub = zero[0x8769] ? ifd(zero[0x8769]) : {};
+            const gps = zero[0x8825] ? ifd(zero[0x8825]) : {};
+            const res = { camera: [zero[0x010F], zero[0x0110]].filter(Boolean).join(' '), date: sub[0x9003] || zero[0x0132] || '' };
+            const dms = (a) => (Array.isArray(a) && a.length >= 3 ? a[0] + a[1] / 60 + a[2] / 3600 : null);
+            const lat = dms(gps[2]), lon = dms(gps[4]);
+            if (lat !== null && lon !== null && (lat || lon)) {
+                res.gps = { lat: lat * (gps[1] === 'S' ? -1 : 1), lon: lon * (gps[3] === 'W' ? -1 : 1) };
+            }
+            return res;
+        } catch (e) { return null; }
+    }
+
+    // ── 읽기: 브라우저가 못 여는 HEIC 는 heic2any 로 ──
+    let heicLoading = null;
+    const loadHeic = () => heicLoading || (heicLoading = new Promise((ok, bad) => {
+        const s = document.createElement('script');
+        s.src = HEIC_SRC; s.onload = () => ok(window.heic2any); s.onerror = () => bad(new Error('HEIC 변환기를 못 불러왔어요.'));
+        document.head.appendChild(s);
+    }));
+    const isHeic = (f) => /image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+
+    async function decode(file) {
+        try {
+            return await createImageBitmap(file, { imageOrientation: 'from-image' });
+        } catch (e) {
+            if (!isHeic(file)) throw new Error('이 브라우저가 열 수 없는 그림이에요.');
+            const heic2any = await loadHeic();
+            const png = await heic2any({ blob: file, toType: 'image/png' });
+            return createImageBitmap(Array.isArray(png) ? png[0] : png);
+        }
+    }
+
+    async function addFiles(files) {
+        const list = [...files].filter((f) => f.type.startsWith('image/') || isHeic(f));
+        for (const file of list) {
+            const it = { id: ++seq, file, name: file.name || `붙여넣은 사진 ${seq}.png`, rot: 0, flip: false, crop: null, busy: true };
+            items.push(it);
+            render();
+            try {
+                const [bitmap, buf] = await Promise.all([decode(file), file.slice(0, 256 * 1024).arrayBuffer()]);
+                Object.assign(it, { bitmap, w: bitmap.width, h: bitmap.height, exif: readExif(buf) });
+                it.thumbUrl = await toThumb(bitmap);
+            } catch (e) {
+                it.error = e.message || '열 수 없어요.';
+            }
+            it.busy = false;
+            schedule(it);
+        }
+    }
+
+    async function toThumb(bitmap) {
+        const s = 176 / Math.max(bitmap.width, bitmap.height);
+        const c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(bitmap.width * Math.min(1, s)));
+        c.height = Math.max(1, Math.round(bitmap.height * Math.min(1, s)));
+        c.getContext('2d').drawImage(bitmap, 0, 0, c.width, c.height);
+        return c.toDataURL('image/jpeg', 0.8);
+    }
+
+    // ── 설정 ──
+    const opts = () => ({
+        format: $('o-format').value,
+        quality: +$('o-quality').value / 100,
+        resize: $('o-resize').value,
+        resizeV: parseFloat($('o-resize-v').value),
+        target: $('o-target-on').checked ? parseFloat($('o-target').value) * parseFloat($('o-target-unit').value) : 0,
+        white: $('o-bg').checked,
+    });
+    function outType(it, o) {
+        if (o.format !== 'keep') return o.format;
+        return EXT[it.file.type] ? it.file.type : 'image/jpeg';
+    }
+
+    // 돌리기·뒤집기·자르기를 적용한 캔버스 (원본 해상도)
+    function baseCanvas(it) {
+        const turned = it.rot % 180 !== 0;
+        const W = turned ? it.h : it.w, H = turned ? it.w : it.h;
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const g = c.getContext('2d');
+        g.translate(W / 2, H / 2);
+        g.rotate(it.rot * Math.PI / 180);
+        if (it.flip) g.scale(-1, 1);
+        g.drawImage(it.bitmap, -it.w / 2, -it.h / 2);
+        if (!it.crop) return c;
+        const [x, y, w, h] = [it.crop.x * W, it.crop.y * H, it.crop.w * W, it.crop.h * H].map(Math.round);
+        const out = document.createElement('canvas');
+        out.width = Math.max(1, w); out.height = Math.max(1, h);
+        out.getContext('2d').drawImage(c, x, y, w, h, 0, 0, out.width, out.height);
+        return out;
+    }
+
+    function targetDims(W, H, o) {
+        let s = 1;
+        if (o.resize === 'long' && o.resizeV > 0) s = o.resizeV / Math.max(W, H);
+        if (o.resize === 'width' && o.resizeV > 0) s = o.resizeV / W;
+        if (o.resize === 'percent' && o.resizeV > 0) s = o.resizeV / 100;
+        s = Math.min(s, 1);  // 키우지는 않음
+        return [Math.max(1, Math.round(W * s)), Math.max(1, Math.round(H * s))];
+    }
+
+    function draw(src, w, h, type, white) {
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const g = c.getContext('2d');
+        if (type === 'image/jpeg' && white) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); }
+        g.imageSmoothingQuality = 'high';
+        // 크게 줄일 때 계단 현상을 줄이려고 반씩 줄임
+        let cur = src;
+        while (cur.width / 2 > w && cur.height / 2 > h) {
+            const half = document.createElement('canvas');
+            half.width = Math.round(cur.width / 2); half.height = Math.round(cur.height / 2);
+            const hg = half.getContext('2d'); hg.imageSmoothingQuality = 'high';
+            hg.drawImage(cur, 0, 0, half.width, half.height);
+            cur = half;
+        }
+        g.drawImage(cur, 0, 0, w, h);
+        return c;
+    }
+    const encode = (canvas, type, q) => new Promise((ok) => canvas.toBlob((b) => ok(b), type, q));
+
+    async function process(it) {
+        const o = opts();
+        const type = outType(it, o);
+        const base = baseCanvas(it);
+        let [w, h] = targetDims(base.width, base.height, o);
+        const lossy = type !== 'image/png';
+        let blob = await encode(draw(base, w, h, type, o.white), type, o.quality);
+        if (o.target > 0 && blob.size > o.target) {
+            for (let shrink = 0; shrink < 8; shrink++) {
+                const canvas = draw(base, w, h, type, o.white);
+                if (lossy) {  // 화질 이분 탐색
+                    let lo = 0.3, hi = Math.min(o.quality, 0.95), best = null;
+                    for (let i = 0; i < 7; i++) {
+                        const mid = (lo + hi) / 2;
+                        const b = await encode(canvas, type, mid);
+                        if (b.size <= o.target) { best = b; lo = mid; } else hi = mid;
+                    }
+                    if (best) { blob = best; break; }
+                } else {
+                    const b = await encode(canvas, type);
+                    if (b.size <= o.target) { blob = b; break; }
+                }
+                w = Math.max(1, Math.round(w * 0.82)); h = Math.max(1, Math.round(h * 0.82));
+                blob = await encode(draw(base, w, h, type, o.white), type, lossy ? 0.3 : undefined);
+                if (blob.size <= o.target) break;
+            }
+        }
+        it.typeFallback = blob.type !== type;  // WebP 를 못 만드는 브라우저(옛 Safari)는 PNG 로 나옴
+        return { blob, w, h };
+    }
+
+    // 설정이 바뀌면 다시 만듦 (여러 번 바뀌어도 마지막 것만)
+    const pending = new Set();
+    let timer = null;
+    function schedule(it) {
+        (it ? [it] : items).forEach((x) => pending.add(x));
+        clearTimeout(timer);
+        timer = setTimeout(runPending, 150);
+        render();
+    }
+    async function runPending() {
+        const todo = [...pending];
+        pending.clear();
+        for (const it of todo) {
+            if (!it.bitmap || !items.includes(it)) continue;
+            it.busy = true; render();
+            try {
+                const r = await process(it);
+                if (it.outUrl) URL.revokeObjectURL(it.outUrl);
+                it.out = r; it.outUrl = URL.createObjectURL(r.blob); it.error = null;
+            } catch (e) { it.error = '변환하지 못했어요.'; }
+            it.busy = false; render();
+        }
+    }
+
+    function outName(it) {
+        const ext = EXT[it.out?.blob.type] || 'jpg';
+        return it.name.replace(/\.[^.]+$/, '') + '.' + ext;
+    }
+
+    function render() {
+        $('im-bar').classList.toggle('hidden', !items.length);
+        $('im-bar').classList.toggle('flex', !!items.length);
+        const done = items.filter((i) => i.out);
+        const before = done.reduce((a, i) => a + i.file.size, 0), after = done.reduce((a, i) => a + i.out.blob.size, 0);
+        $('im-count').textContent = items.length ? `${items.length}장${done.length ? ` · ${size(before)} → ${size(after)}` : ''}` : '';
+        $('im-zip').disabled = !done.length || items.some((i) => i.busy);
+        $('im-list').innerHTML = items.map((it) => {
+            const ex = it.exif || {};
+            const badges = [
+                ex.gps ? `<a class="im-badge im-gps" target="_blank" rel="noopener" href="https://www.openstreetmap.org/?mlat=${ex.gps.lat.toFixed(5)}&mlon=${ex.gps.lon.toFixed(5)}#map=15/${ex.gps.lat.toFixed(5)}/${ex.gps.lon.toFixed(5)}" title="이 사진에 찍힌 위치 (저장하면 지워져요)">📍 위치정보 있음</a>` : '',
+                ex.camera ? `<span class="im-badge">📷 ${esc(ex.camera)}</span>` : '',
+                ex.date ? `<span class="im-badge">🕒 ${esc(ex.date)}</span>` : '',
+                it.crop ? '<span class="im-badge">✂ 자름</span>' : '',
+                it.rot ? `<span class="im-badge">↻ ${it.rot}°</span>` : '',
+                it.flip ? '<span class="im-badge">⇋ 뒤집음</span>' : '',
+            ].join('');
+            let result = '<span class="text-[#8e8e93]">만드는 중…</span>';
+            if (it.error) result = `<span class="text-[#c4271d]">${esc(it.error)}</span>`;
+            else if (it.out && !it.busy) {
+                const pct = Math.round((1 - it.out.blob.size / it.file.size) * 100);
+                result = `→ <b>${size(it.out.blob.size)}</b> · ${it.out.w}×${it.out.h} · ${EXT[it.out.blob.type]?.toUpperCase() || ''}
+                    <span class="${pct >= 0 ? 'im-save' : 'im-grow'}">${pct >= 0 ? `${pct}% 줄어듦` : `${-pct}% 커짐`}</span>
+                    ${it.typeFallback ? '<span class="text-[#b26a00]">(이 브라우저는 WebP 를 못 만들어 PNG 로 저장)</span>' : ''}
+                    ${opts().target && it.out.blob.size > opts().target ? '<span class="text-[#c4271d]">목표보다 커요</span>' : ''}`;
+            }
+            return `<li class="im-card flex flex-wrap items-center gap-4 !p-4" data-id="${it.id}">
+                ${it.thumbUrl ? `<img class="im-thumb" src="${it.thumbUrl}" alt="" style="transform:rotate(${it.rot}deg) scaleX(${it.flip ? -1 : 1})">` : '<div class="im-thumb"></div>'}
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-[14px] font-semibold text-[#1d1d1f]" title="${esc(it.name)}">${esc(it.name)}</p>
+                    <p class="mt-0.5 text-[13px] text-[#6e6e73]">${size(it.file.size)}${it.w ? ` · ${it.w}×${it.h}` : ''} ${result}</p>
+                    <div class="mt-1.5 flex flex-wrap gap-1.5">${badges}</div>
+                </div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" class="im-btn" data-act="rot" title="오른쪽으로 90° 돌리기" ${it.bitmap ? '' : 'disabled'}>↻</button>
+                    <button type="button" class="im-btn" data-act="flip" title="좌우 뒤집기" ${it.bitmap ? '' : 'disabled'}>⇋</button>
+                    <button type="button" class="im-btn" data-act="crop" ${it.bitmap ? '' : 'disabled'}>✂ 자르기</button>
+                    <a class="im-btn im-primary ${it.out && !it.busy ? '' : 'pointer-events-none opacity-40'}" href="${it.outUrl || '#'}" download="${esc(it.out ? outName(it) : '')}">⬇ 받기</a>
+                    <button type="button" class="im-btn" data-act="del" title="빼기">×</button>
+                </div>
+            </li>`;
+        }).join('');
+    }
+
+    $('im-list').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const it = items.find((x) => x.id === +btn.closest('[data-id]').dataset.id);
+        const act = btn.dataset.act;
+        if (act === 'del') {
+            items.splice(items.indexOf(it), 1);
+            if (it.outUrl) URL.revokeObjectURL(it.outUrl);
+            it.bitmap?.close?.();
+            render();
+            return;
+        }
+        if (act === 'rot') { it.rot = (it.rot + 90) % 360; it.crop = null; }
+        if (act === 'flip') { it.flip = !it.flip; it.crop = null; }
+        if (act === 'crop') { openCrop(it); return; }
+        schedule(it);
+    });
+
+    // ── 자르기 창 ──
+    const RATIOS = [['자유', 0], ['1:1', 1], ['4:3', 4 / 3], ['3:4 증명', 3 / 4], ['16:9', 16 / 9], ['9:16', 9 / 16]];
+    let cropItem = null, cropRatio = 0, box = null;
+    const stage = $('crop-stage'), cbox = $('crop-box'), cimg = $('crop-img');
+    $('crop-ratios').innerHTML = RATIOS.map(([l, r], i) => `<button type="button" class="im-btn" data-r="${i}">${l}</button>`).join('');
+    ['nw', 'ne', 'sw', 'se'].forEach((k) => {
+        const h = document.createElement('div');
+        h.className = 'crop-h'; h.dataset.h = k;
+        h.style[k.includes('n') ? 'top' : 'bottom'] = '-9px';
+        h.style[k.includes('w') ? 'left' : 'right'] = '-9px';
+        h.style.cursor = `${k}-resize`;
+        cbox.appendChild(h);
+    });
+
+    function openCrop(it) {
+        cropItem = it;
+        const c = baseCanvas({ ...it, crop: null });
+        cimg.src = c.toDataURL('image/jpeg', 0.9);
+        cimg.onload = () => {
+            box = it.crop ? { ...it.crop } : { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+            cropRatio = 0;
+            markRatio();
+            drawBox();
+        };
+        $('crop-modal').classList.remove('hidden');
+        $('crop-modal').classList.add('flex');
+    }
+    function closeCrop() { $('crop-modal').classList.add('hidden'); $('crop-modal').classList.remove('flex'); cropItem = null; }
+    function markRatio() { document.querySelectorAll('#crop-ratios [data-r]').forEach((b) => b.classList.toggle('im-primary', RATIOS[+b.dataset.r][1] === cropRatio)); }
+    function fitRatio() {
+        if (!cropRatio) return;
+        const W = cimg.clientWidth, H = cimg.clientHeight;
+        // 실제 픽셀 비율 기준으로 지금 상자 안에 들어가게
+        let wPx = box.w * W, hPx = wPx / cropRatio;
+        if (hPx > box.h * H) { hPx = box.h * H; wPx = hPx * cropRatio; }
+        if (hPx > H) { hPx = H; wPx = hPx * cropRatio; }
+        if (wPx > W) { wPx = W; hPx = wPx / cropRatio; }
+        const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+        box.w = wPx / W; box.h = hPx / H;
+        box.x = Math.min(Math.max(0, cx - box.w / 2), 1 - box.w);
+        box.y = Math.min(Math.max(0, cy - box.h / 2), 1 - box.h);
+    }
+    function drawBox() {
+        const W = cimg.clientWidth, H = cimg.clientHeight;
+        Object.assign(cbox.style, { left: `${box.x * W}px`, top: `${box.y * H}px`, width: `${box.w * W}px`, height: `${box.h * H}px` });
+        const c = cropItem; const turned = c.rot % 180 !== 0;
+        const PW = turned ? c.h : c.w, PH = turned ? c.w : c.h;
+        $('crop-size').textContent = `${Math.round(box.w * PW)} × ${Math.round(box.h * PH)} px`;
+    }
+    $('crop-ratios').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-r]');
+        if (!b) return;
+        cropRatio = RATIOS[+b.dataset.r][1];
+        markRatio(); fitRatio(); drawBox();
+    });
+    let drag = null;
+    stage.addEventListener('pointerdown', (e) => {
+        if (!box) return;
+        const r = cimg.getBoundingClientRect();
+        drag = { mode: e.target.dataset.h || (e.target === cbox ? 'move' : null), sx: e.clientX, sy: e.clientY, start: { ...box }, W: r.width, H: r.height };
+        if (!drag.mode) {  // 바깥을 누르면 새 상자를 그림
+            const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+            box = { x, y, w: 0.001, h: 0.001 };
+            drag = { ...drag, mode: 'se', start: { ...box } };
+        }
+        stage.setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    stage.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const dx = (e.clientX - drag.sx) / drag.W, dy = (e.clientY - drag.sy) / drag.H, s = drag.start;
+        const MIN = 0.02;
+        if (drag.mode === 'move') {
+            box.x = Math.min(Math.max(0, s.x + dx), 1 - s.w);
+            box.y = Math.min(Math.max(0, s.y + dy), 1 - s.h);
+        } else {
+            let x1 = s.x, y1 = s.y, x2 = s.x + s.w, y2 = s.y + s.h;
+            if (drag.mode.includes('w')) x1 = Math.min(Math.max(0, s.x + dx), x2 - MIN); else x2 = Math.max(Math.min(1, x2 + dx), x1 + MIN);
+            if (drag.mode.includes('n')) y1 = Math.min(Math.max(0, s.y + dy), y2 - MIN); else y2 = Math.max(Math.min(1, y2 + dy), y1 + MIN);
+            if (cropRatio) {  // 비율 고정: 가로를 기준으로 세로를 맞춤
+                const wPx = (x2 - x1) * drag.W;
+                let hN = wPx / cropRatio / drag.H;
+                if (drag.mode.includes('n')) { y1 = y2 - hN; if (y1 < 0) { y1 = 0; hN = y2; const w2 = hN * drag.H * cropRatio / drag.W; if (drag.mode.includes('w')) x1 = x2 - w2; else x2 = x1 + w2; } }
+                else { y2 = y1 + hN; if (y2 > 1) { y2 = 1; hN = 1 - y1; const w2 = hN * drag.H * cropRatio / drag.W; if (drag.mode.includes('w')) x1 = x2 - w2; else x2 = x1 + w2; } }
+            }
+            box = { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+        }
+        drawBox();
+    });
+    const endDrag = () => { drag = null; };
+    stage.addEventListener('pointerup', endDrag);
+    stage.addEventListener('pointercancel', endDrag);
+    window.addEventListener('resize', () => { if (cropItem && box) drawBox(); });
+    $('crop-cancel').addEventListener('click', closeCrop);
+    $('crop-reset').addEventListener('click', () => { const it = cropItem; it.crop = null; closeCrop(); schedule(it); });
+    $('crop-ok').addEventListener('click', () => {
+        const it = cropItem;
+        const full = box.w > 0.995 && box.h > 0.995;
+        it.crop = full ? null : { ...box };
+        closeCrop();
+        schedule(it);
+    });
+    $('crop-modal').addEventListener('click', (e) => { if (e.target.id === 'crop-modal') closeCrop(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && cropItem) closeCrop(); });
+
+    // ── ZIP (압축 없이 묶기, 한글 이름 UTF-8) ──
+    const CRC = new Uint32Array(256).map((_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+    const crc32 = (u8) => { let c = 0xFFFFFFFF; for (let i = 0; i < u8.length; i++) c = CRC[(c ^ u8[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+    async function makeZip(files) {
+        const enc = new TextEncoder();
+        const chunks = [], central = [];
+        let offset = 0;
+        const used = new Set();
+        for (const { name, blob } of files) {
+            let n = name, k = 1;
+            while (used.has(n)) n = name.replace(/(\.[^.]+)?$/, ` (${++k})$1`);
+            used.add(n);
+            const data = new Uint8Array(await blob.arrayBuffer());
+            const nm = enc.encode(n), crc = crc32(data);
+            const head = new DataView(new ArrayBuffer(30));
+            [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, 0, 2], [12, 0x21, 2], [14, crc, 4], [18, data.length, 4], [22, data.length, 4], [26, nm.length, 2], [28, 0, 2]]
+                .forEach(([o, val, sz]) => (sz === 4 ? head.setUint32(o, val, true) : head.setUint16(o, val, true)));
+            chunks.push(head.buffer, nm, data);
+            const cd = new DataView(new ArrayBuffer(46));
+            [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, 0, 2], [14, 0x21, 2], [16, crc, 4], [20, data.length, 4], [24, data.length, 4], [28, nm.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
+                .forEach(([o, val, sz]) => (sz === 4 ? cd.setUint32(o, val, true) : cd.setUint16(o, val, true)));
+            central.push(cd.buffer, nm);
+            offset += 30 + nm.length + data.length;
+        }
+        const cdSize = central.reduce((a, b) => a + (b.byteLength ?? b.length), 0);
+        const end = new DataView(new ArrayBuffer(22));
+        [[0, 0x06054b50, 4], [8, files.length, 2], [10, files.length, 2], [12, cdSize, 4], [16, offset, 4]]
+            .forEach(([o, val, sz]) => (sz === 4 ? end.setUint32(o, val, true) : end.setUint16(o, val, true)));
+        return new Blob([...chunks, ...central, end.buffer], { type: 'application/zip' });
+    }
+    $('im-zip').addEventListener('click', async () => {
+        const done = items.filter((i) => i.out);
+        const zip = await makeZip(done.map((i) => ({ name: outName(i), blob: i.out.blob })));
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(zip);
+        a.download = `images-${new Date().toISOString().slice(0, 10)}.zip`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    });
+    $('im-clear').addEventListener('click', () => {
+        items.splice(0).forEach((it) => { if (it.outUrl) URL.revokeObjectURL(it.outUrl); it.bitmap?.close?.(); });
+        render();
+    });
+
+    // ── 입력 ──
+    const drop = $('im-drop');
+    $('im-file').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('is-over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('is-over'); }));
+    drop.addEventListener('drop', (e) => addFiles(e.dataTransfer.files));
+    document.addEventListener('paste', (e) => {
+        if (e.target.closest('input, textarea')) return;
+        const files = [...(e.clipboardData?.files || [])];
+        if (files.length) addFiles(files);
+    });
+
+    const PRESETS = { long: [1080, 1600, 2048, 3000], width: [800, 1200, 1920], percent: [25, 50, 75] };
+    function syncControls() {
+        const o = opts();
+        const lossy = o.format !== 'image/png';
+        $('o-quality-wrap').classList.toggle('opacity-40', !lossy);
+        $('o-quality').disabled = !lossy;
+        $('o-quality-v').textContent = $('o-quality').value;
+        const r = $('o-resize').value;
+        $('o-resize-v').classList.toggle('hidden', r === 'none');
+        $('o-resize-v').placeholder = r === 'percent' ? '예: 50' : '예: 1920';
+        $('o-resize-presets').classList.toggle('hidden', r === 'none');
+        $('o-resize-presets').classList.toggle('flex', r !== 'none');
+        $('o-resize-presets').innerHTML = (PRESETS[r] || []).map((v) => `<button type="button" class="im-btn !px-2.5 !py-1 !text-[12px]" data-v="${v}">${v}${r === 'percent' ? '%' : ''}</button>`).join('');
+        $('o-target-wrap').classList.toggle('hidden', !$('o-target-on').checked);
+        $('o-target-wrap').classList.toggle('grid', $('o-target-on').checked);
+    }
+    $('o-resize-presets').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]');
+        if (!b) return;
+        $('o-resize-v').value = b.dataset.v;
+        schedule();
+    });
+    ['o-format', 'o-quality', 'o-resize', 'o-resize-v', 'o-target-on', 'o-target', 'o-target-unit', 'o-bg'].forEach((id) => {
+        $(id).addEventListener('input', () => { syncControls(); schedule(); });
+    });
+    syncControls();
+    window.__img = { items, addFiles, readExif, makeZip, opts, process };
+})();
+</script>
+{% endblock %}

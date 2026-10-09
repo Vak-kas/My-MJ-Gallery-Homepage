@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .gp-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gp-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gp-in:focus { border-color: #0066cc; }
+    .gp-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; }
+    .gp-btn:hover { background: #f5f5f7; }
+    .gp-seg { display: inline-flex; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .gp-seg button { border-radius: 999px; padding: 5px 12px; font-size: 13px; color: #6e6e73; }
+    .gp-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .gp-stat { border-radius: 16px; background: #f5f5f7; padding: 12px 14px; }
+    .gp-stat b { display: block; margin-top: 2px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: #1d1d1f; font-variant-numeric: tabular-nums; }
+    .gp-row td { padding: 4px 3px; }
+    .gp-x { color: #8e8e93; padding: 4px 8px; border-radius: 8px; }
+    .gp-x:hover { background: #fff1f0; color: #c4271d; }
+    html.theme-dark .gp-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gp-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gp-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gp-seg { background: #111318; }
+    html.theme-dark .gp-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .gp-stat { background: #111318; }
+    html.theme-dark .gp-stat b { color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">GPA · CALCULATOR</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">학점 계산기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">4.5 · 4.3 · 100점 환산, 학기별 평균, 목표 학점까지 필요한 점수. 입력한 성적은 서버로 가지 않고 이 브라우저에만 저장돼요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <!-- 학기별 계산 -->
+        <section class="min-w-0 space-y-4">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[13px] text-[#6e6e73]">우리 학교 만점</span>
+                <div class="gp-seg" id="gp-scale">
+                    <button type="button" data-v="4.5">4.5</button>
+                    <button type="button" data-v="4.3">4.3</button>
+                </div>
+                <button type="button" class="gp-btn ml-auto" id="gp-add-sem">＋ 학기 추가</button>
+                <button type="button" class="gp-btn" id="gp-reset">모두 지우기</button>
+            </div>
+            <div id="gp-sems" class="space-y-4"></div>
+        </section>
+
+        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <section class="gp-card">
+                <h2 class="text-[15px] font-semibold">누적 결과</h2>
+                <div class="mt-3 grid grid-cols-2 gap-2.5">
+                    <div class="gp-stat"><span class="text-[12px] text-[#6e6e73]">전체 평점</span><b id="r-gpa">–</b></div>
+                    <div class="gp-stat"><span class="text-[12px] text-[#6e6e73]">전공 평점</span><b id="r-major">–</b></div>
+                </div>
+                <dl class="mt-3 grid grid-cols-2 gap-y-1.5 text-[13px]">
+                    <dt class="text-[#8e8e93]">이수 학점</dt><dd id="r-credits" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">평점에 들어간 학점</dt><dd id="r-graded" class="text-right tabular-nums">0</dd>
+                    <dt class="text-[#8e8e93]">100점 환산 (비례)</dt><dd id="r-100" class="text-right tabular-nums">–</dd>
+                    <dt class="text-[#8e8e93]">다른 만점으로 (비례)</dt><dd id="r-other" class="text-right tabular-nums">–</dd>
+                </dl>
+                <div id="r-chart" class="mt-4 flex h-[90px] items-end gap-1.5"></div>
+            </section>
+
+            <section class="gp-card">
+                <h2 class="text-[15px] font-semibold">🎯 목표 학점</h2>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <label class="text-[12px] text-[#6e6e73]">목표 누적 평점<input id="t-goal" class="gp-in mt-1" type="number" step="0.01" min="0" placeholder="예: 4.0"></label>
+                    <label class="text-[12px] text-[#6e6e73]">앞으로 들을 학점<input id="t-left" class="gp-in mt-1" type="number" step="1" min="1" placeholder="예: 36"></label>
+                </div>
+                <p id="t-out" class="mt-3 text-[14px] leading-6 text-[#6e6e73]">목표와 남은 학점을 넣으면, 앞으로 매 학기 받아야 할 평균을 알려줘요.</p>
+            </section>
+
+            <section class="gp-card">
+                <h2 class="text-[15px] font-semibold">⇄ 환산기</h2>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <label class="text-[12px] text-[#6e6e73]">평점<input id="c-val" class="gp-in mt-1" type="number" step="0.01" min="0" placeholder="예: 3.85"></label>
+                    <label class="text-[12px] text-[#6e6e73]">만점<select id="c-max" class="gp-in mt-1"><option>4.5</option><option>4.3</option><option>4.0</option></select></label>
+                </div>
+                <label class="mt-2 block text-[12px] text-[#6e6e73]">100점 환산 방식
+                    <select id="c-formula" class="gp-in mt-1">
+                        <option value="ratio">비례 (평점 ÷ 만점 × 100)</option>
+                        <option value="x20">평점 × 20 + 10 (4.5 제 여러 대학)</option>
+                        <option value="custom">직접 입력 (a × 평점 + b)</option>
+                    </select>
+                </label>
+                <div id="c-custom" class="mt-2 hidden grid-cols-2 gap-2">
+                    <label class="text-[12px] text-[#6e6e73]">a<input id="c-a" class="gp-in mt-1" type="number" step="any" value="20"></label>
+                    <label class="text-[12px] text-[#6e6e73]">b<input id="c-b" class="gp-in mt-1" type="number" step="any" value="10"></label>
+                </div>
+                <dl id="c-out" class="mt-3 grid grid-cols-2 gap-y-1.5 text-[13px]"></dl>
+                <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">만점 사이 환산은 비례식이에요. 지원하는 회사·대학원이 정한 환산표가 있으면 그걸 따르세요.</p>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const SCALES = {
+        '4.5': [['A+', 4.5], ['A0', 4.0], ['B+', 3.5], ['B0', 3.0], ['C+', 2.5], ['C0', 2.0], ['D+', 1.5], ['D0', 1.0], ['F', 0]],
+        '4.3': [['A+', 4.3], ['A0', 4.0], ['A-', 3.7], ['B+', 3.3], ['B0', 3.0], ['B-', 2.7], ['C+', 2.3], ['C0', 2.0], ['C-', 1.7], ['D+', 1.3], ['D0', 1.0], ['D-', 0.7], ['F', 0]],
+    };
+    const NONGRADED = [['P', 'P (패스)'], ['NP', 'NP (논패스)']];
+    const KEY = 'mj-gpa-v1';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : '–');
+    const uid = () => Math.random().toString(36).slice(2, 9);
+
+    const blankCourse = () => ({ id: uid(), name: '', credit: 3, grade: '', major: false });
+    const blankSem = (n) => ({ id: uid(), name: `${n}학기`, mode: 'course', gpa: '', credits: '', majorGpa: '', majorCredits: '', courses: [blankCourse(), blankCourse(), blankCourse()] });
+    let state;
+    try { state = JSON.parse(localStorage.getItem(KEY)); } catch (e) { state = null; }
+    if (!state || !Array.isArray(state.sems)) state = { scale: '4.5', sems: [blankSem(1)], goal: '', left: '' };
+
+    const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* 저장 못 해도 계산은 됨 */ } };
+    const points = (grade) => {
+        const hit = SCALES[state.scale].find(([g]) => g === grade);
+        return hit ? hit[1] : null;
+    };
+
+    // 학기 하나의 합계: 평점에 들어간 학점·점수합, 이수 학점(P·F 처리 포함), 전공 따로
+    function semTotals(sem) {
+        const t = { gCred: 0, gSum: 0, earned: 0, mCred: 0, mSum: 0 };
+        if (sem.mode === 'total') {
+            const c = parseFloat(sem.credits), g = parseFloat(sem.gpa);
+            if (c > 0 && Number.isFinite(g)) { t.gCred = c; t.gSum = c * g; t.earned = c; }
+            const mc = parseFloat(sem.majorCredits), mg = parseFloat(sem.majorGpa);
+            if (mc > 0 && Number.isFinite(mg)) { t.mCred = mc; t.mSum = mc * mg; }
+            return t;
+        }
+        sem.courses.forEach((c) => {
+            const cr = parseFloat(c.credit);
+            if (!(cr > 0) || !c.grade) return;
+            if (c.grade === 'P') { t.earned += cr; return; }
+            if (c.grade === 'NP') return;
+            const p = points(c.grade);
+            if (p === null) return;
+            t.gCred += cr; t.gSum += cr * p;
+            if (p > 0) t.earned += cr;
+            if (c.major) { t.mCred += cr; t.mSum += cr * p; }
+        });
+        return t;
+    }
+
+    function gradeOptions(sel) {
+        const opts = SCALES[state.scale].map(([g, p]) => `<option value="${g}" ${g === sel ? 'selected' : ''}>${g} (${p})</option>`);
+        const extra = NONGRADED.map(([g, label]) => `<option value="${g}" ${g === sel ? 'selected' : ''}>${label}</option>`);
+        return `<option value="">성적</option>${opts.join('')}<optgroup label="평점에 안 들어감">${extra.join('')}</optgroup>`;
+    }
+
+    function semHTML(sem, i) {
+        const t = semTotals(sem);
+        const avg = t.gCred ? t.gSum / t.gCred : NaN;
+        const body = sem.mode === 'total' ? `
+            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <label class="text-[12px] text-[#6e6e73]">학기 평점<input class="gp-in mt-1" data-f="gpa" type="number" step="0.01" min="0" value="${esc(sem.gpa)}"></label>
+                <label class="text-[12px] text-[#6e6e73]">평점 학점<input class="gp-in mt-1" data-f="credits" type="number" step="0.5" min="0" value="${esc(sem.credits)}"></label>
+                <label class="text-[12px] text-[#6e6e73]">전공 평점 (선택)<input class="gp-in mt-1" data-f="majorGpa" type="number" step="0.01" min="0" value="${esc(sem.majorGpa)}"></label>
+                <label class="text-[12px] text-[#6e6e73]">전공 학점<input class="gp-in mt-1" data-f="majorCredits" type="number" step="0.5" min="0" value="${esc(sem.majorCredits)}"></label>
+            </div>` : `
+            <div class="mt-2 overflow-x-auto">
+            <table class="w-full min-w-[520px] text-[14px]">
+                <thead><tr class="text-left text-[12px] text-[#8e8e93]"><th class="px-1 font-normal">과목 (선택)</th><th class="w-[80px] px-1 font-normal">학점</th><th class="w-[150px] px-1 font-normal">성적</th><th class="w-[52px] px-1 text-center font-normal">전공</th><th class="w-[36px]"></th></tr></thead>
+                <tbody>${sem.courses.map((c) => `
+                    <tr class="gp-row" data-cid="${c.id}">
+                        <td><input class="gp-in" data-c="name" value="${esc(c.name)}" placeholder="과목 이름"></td>
+                        <td><input class="gp-in" data-c="credit" type="number" step="0.5" min="0" value="${esc(c.credit)}"></td>
+                        <td><select class="gp-in" data-c="grade">${gradeOptions(c.grade)}</select></td>
+                        <td class="text-center"><input type="checkbox" data-c="major" class="h-4 w-4" ${c.major ? 'checked' : ''}></td>
+                        <td><button type="button" class="gp-x" data-act="del-course" title="과목 빼기">×</button></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table></div>
+            <button type="button" class="gp-btn mt-2" data-act="add-course">＋ 과목</button>`;
+        return `
+        <div class="gp-card" data-sid="${sem.id}">
+            <div class="flex flex-wrap items-center gap-2">
+                <input class="gp-in !w-[140px] font-semibold" data-f="name" value="${esc(sem.name)}">
+                <div class="gp-seg">
+                    <button type="button" data-act="mode" data-v="course" class="${sem.mode !== 'total' ? 'is-on' : ''}">과목별</button>
+                    <button type="button" data-act="mode" data-v="total" class="${sem.mode === 'total' ? 'is-on' : ''}">학기 합계만</button>
+                </div>
+                <span class="ml-auto text-[13px] text-[#6e6e73]">평점 <b class="sem-avg text-[18px] text-[#1d1d1f] tabular-nums">${fmt(avg)}</b> · <span class="sem-cred">${t.earned}</span>학점</span>
+                <button type="button" class="gp-x" data-act="del-sem" title="학기 지우기">🗑</button>
+            </div>
+            ${body}
+        </div>`;
+    }
+
+    const findSem = (el) => state.sems.find((s) => s.id === el.closest('[data-sid]')?.dataset.sid);
+
+    function renderSems() {
+        $('gp-sems').innerHTML = state.sems.map(semHTML).join('');
+        document.querySelectorAll('#gp-scale button').forEach((b) => b.classList.toggle('is-on', b.dataset.v === state.scale));
+        renderTotals();
+    }
+
+    function totals() {
+        return state.sems.reduce((a, s) => {
+            const t = semTotals(s);
+            Object.keys(a).forEach((k) => { a[k] += t[k]; });
+            return a;
+        }, { gCred: 0, gSum: 0, earned: 0, mCred: 0, mSum: 0 });
+    }
+
+    function renderTotals() {
+        const max = parseFloat(state.scale);
+        const t = totals();
+        const gpa = t.gCred ? t.gSum / t.gCred : NaN;
+        $('r-gpa').textContent = fmt(gpa);
+        $('r-major').textContent = t.mCred ? fmt(t.mSum / t.mCred) : '–';
+        $('r-credits').textContent = t.earned;
+        $('r-graded').textContent = t.gCred;
+        $('r-100').textContent = Number.isFinite(gpa) ? `${fmt(gpa / max * 100, 1)}점` : '–';
+        const other = state.scale === '4.5' ? 4.3 : 4.5;
+        $('r-other').textContent = Number.isFinite(gpa) ? `${fmt(gpa / max * other)} / ${other}` : '–';
+        // 학기별 막대
+        const bars = state.sems.map((s) => { const x = semTotals(s); return { name: s.name, v: x.gCred ? x.gSum / x.gCred : null }; });
+        $('r-chart').innerHTML = bars.map((b) => `<div class="flex flex-1 flex-col items-center justify-end gap-1" title="${esc(b.name)}: ${b.v === null ? '없음' : fmt(b.v)}">
+            <span class="text-[10px] tabular-nums text-[#6e6e73]">${b.v === null ? '' : fmt(b.v)}</span>
+            <div class="w-full rounded-t-md bg-[#0066cc]/70" style="height:${b.v === null ? 2 : Math.max(4, b.v / max * 60)}px"></div></div>`).join('');
+        // 화면의 학기 평균도 같이 갱신
+        state.sems.forEach((s) => {
+            const card = document.querySelector(`[data-sid="${s.id}"]`);
+            if (!card) return;
+            const x = semTotals(s);
+            card.querySelector('.sem-avg').textContent = fmt(x.gCred ? x.gSum / x.gCred : NaN);
+            card.querySelector('.sem-cred').textContent = x.earned;
+        });
+        renderGoal(t);
+        save();
+    }
+
+    function renderGoal(t = totals()) {
+        const max = parseFloat(state.scale);
+        const goal = parseFloat(state.goal), left = parseFloat(state.left);
+        const out = $('t-out');
+        if (!(goal > 0) || !(left > 0)) { out.textContent = '목표와 남은 학점을 넣으면, 앞으로 매 학기 받아야 할 평균을 알려줘요.'; return; }
+        if (goal > max) { out.innerHTML = `<b class="text-[#c4271d]">만점(${max})보다 높은 목표예요.</b>`; return; }
+        const need = (goal * (t.gCred + left) - t.gSum) / left;
+        const now = t.gCred ? `지금 ${fmt(t.gSum / t.gCred)}(${t.gCred}학점)에서, ` : '';
+        if (need <= 0) out.innerHTML = `${now}남은 ${left}학점을 모두 F 로 받아도 <b class="text-[#1e7a35]">이미 ${fmt(goal)} 이상</b>이에요.`;
+        else if (need > max) {
+            const best = (t.gSum + max * left) / (t.gCred + left);
+            out.innerHTML = `${now}남은 ${left}학점에서 평균 <b class="text-[#c4271d]">${fmt(need)}</b> 가 필요해서 <b>만점으로도 어려워요.</b> 전부 ${max} 를 받으면 최대 <b>${fmt(best)}</b> 까지 올라요.`;
+        } else {
+            const pct = need / max;
+            const tone = pct > 0.9 ? 'text-[#c4271d]' : pct > 0.75 ? 'text-[#b26a00]' : 'text-[#1e7a35]';
+            out.innerHTML = `${now}남은 ${left}학점에서 평균 <b class="text-[18px] ${tone}">${fmt(need)}</b> 이상을 받으면 누적 ${fmt(goal)} 이 돼요.`;
+        }
+    }
+
+    // ── 입력 처리 ──
+    $('gp-sems').addEventListener('input', (e) => {
+        const sem = findSem(e.target);
+        if (!sem) return;
+        if (e.target.dataset.f) sem[e.target.dataset.f] = e.target.value;
+        const cid = e.target.closest('[data-cid]')?.dataset.cid;
+        if (cid && e.target.dataset.c) {
+            const c = sem.courses.find((x) => x.id === cid);
+            c[e.target.dataset.c] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+        }
+        renderTotals();
+    });
+    $('gp-sems').addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const sem = findSem(btn);
+        const act = btn.dataset.act;
+        if (act === 'add-course') sem.courses.push(blankCourse());
+        if (act === 'del-course') sem.courses = sem.courses.filter((c) => c.id !== btn.closest('[data-cid]').dataset.cid);
+        if (act === 'mode') sem.mode = btn.dataset.v;
+        if (act === 'del-sem') {
+            if (!confirm(`${sem.name} 을(를) 지울까요?`)) return;
+            state.sems = state.sems.filter((s) => s !== sem);
+            if (!state.sems.length) state.sems.push(blankSem(1));
+        }
+        renderSems();
+    });
+    $('gp-add-sem').addEventListener('click', () => { state.sems.push(blankSem(state.sems.length + 1)); renderSems(); });
+    $('gp-reset').addEventListener('click', () => {
+        if (!confirm('입력한 성적을 모두 지울까요?')) return;
+        state = { scale: state.scale, sems: [blankSem(1)], goal: '', left: '' };
+        $('t-goal').value = ''; $('t-left').value = '';
+        renderSems();
+    });
+    document.querySelectorAll('#gp-scale button').forEach((b) => b.addEventListener('click', () => {
+        if (b.dataset.v === state.scale) return;
+        // 새 만점에 없는 성적(A- 등)은 비움
+        const allowed = new Set(SCALES[b.dataset.v].map(([g]) => g).concat(['P', 'NP']));
+        state.scale = b.dataset.v;
+        state.sems.forEach((s) => s.courses.forEach((c) => { if (c.grade && !allowed.has(c.grade)) c.grade = ''; }));
+        renderSems();
+    }));
+    $('t-goal').value = state.goal || ''; $('t-left').value = state.left || '';
+    $('t-goal').addEventListener('input', (e) => { state.goal = e.target.value; renderTotals(); });
+    $('t-left').addEventListener('input', (e) => { state.left = e.target.value; renderTotals(); });
+
+    // ── 환산기 ──
+    function convert() {
+        const v = parseFloat($('c-val').value), max = parseFloat($('c-max').value), f = $('c-formula').value;
+        $('c-custom').classList.toggle('hidden', f !== 'custom');
+        $('c-custom').classList.toggle('grid', f === 'custom');
+        const out = $('c-out');
+        if (!Number.isFinite(v)) { out.innerHTML = ''; return; }
+        if (v > max) { out.innerHTML = `<dt class="col-span-2 text-[#c4271d]">만점(${max})보다 커요.</dt>`; return; }
+        let hundred;
+        if (f === 'ratio') hundred = v / max * 100;
+        else if (f === 'x20') hundred = v / max * 4.5 * 20 + 10;  // 4.5 제로 바꾼 뒤 적용
+        else hundred = parseFloat($('c-a').value) * v + parseFloat($('c-b').value);
+        const rows = [['100점', `${fmt(hundred, 1)}점`]].concat(['4.5', '4.3', '4.0'].filter((m) => parseFloat(m) !== max).map((m) => [`${m} 만점`, fmt(v / max * parseFloat(m))]));
+        out.innerHTML = rows.map(([k, val]) => `<dt class="text-[#8e8e93]">${k}</dt><dd class="text-right text-[15px] font-semibold tabular-nums">${val}</dd>`).join('');
+    }
+    ['c-val', 'c-max', 'c-formula', 'c-a', 'c-b'].forEach((id) => $(id).addEventListener('input', convert));
+    $('c-max').value = state.scale;
+
+    renderSems();
+    convert();
+    window.__gpa = { state: () => state, totals, semTotals };
+})();
+</script>
+{% endblock %}

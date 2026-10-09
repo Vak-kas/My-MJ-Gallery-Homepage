@@ -1,0 +1,408 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .mr-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .mr-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .mr-in:focus { border-color: #0066cc; }
+    .mr-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .mr-btn:hover { background: #f5f5f7; }
+    .grid-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tgrid { display: grid; gap: 0; user-select: none; }
+    .tgrid .hd { position: sticky; top: 0; z-index: 1; background: inherit; padding: 2px 0 6px; text-align: center; font-size: 12px; line-height: 1.25; color: #6e6e73; }
+    .tgrid .hd b { display: block; font-size: 13px; color: #1d1d1f; }
+    .tgrid .hd.sun b { color: #c4271d; }
+    .tgrid .hd.sat b { color: #0066cc; }
+    .tgrid .tl { font-size: 11px; color: #8e8e93; text-align: right; padding-right: 6px; transform: translateY(-7px); font-variant-numeric: tabular-nums; }
+    .tgrid .c { height: 20px; border-left: 1px solid rgba(0, 0, 0, 0.08); border-top: 1px dotted rgba(0, 0, 0, 0.06); background: #fafafc; }
+    .tgrid .c.hr { border-top: 1px solid rgba(0, 0, 0, 0.12); }
+    .tgrid .c.last { border-right: 1px solid rgba(0, 0, 0, 0.08); }
+    .tgrid .c.end { border-bottom: 1px solid rgba(0, 0, 0, 0.12); }
+    #my-grid { touch-action: none; }
+    #my-grid .c { cursor: pointer; }
+    #my-grid .c.on { background: #34c759; }
+    #my-grid.is-off .c { cursor: not-allowed; opacity: 0.5; }
+    #all-grid .c.all { box-shadow: inset 0 0 0 2px #1e7a35; }
+    #all-grid .c.hl { box-shadow: inset 0 0 0 2px #ff9500; }
+    #all-grid .c.pin { outline: 2px solid #1d1d1f; outline-offset: -2px; }
+    .who { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: #f5f5f7; padding: 4px 10px; font-size: 13px; color: #1d1d1f; }
+    .who.no { color: #8e8e93; text-decoration: line-through; }
+    html.theme-dark .mr-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .mr-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .mr-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .tgrid .hd b { color: #f3f4f6; }
+    html.theme-dark .tgrid .c { background: #111318; border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .tgrid .c.hr, html.theme-dark .tgrid .c.end { border-color: rgba(255, 255, 255, 0.16); }
+    html.theme-dark #my-grid .c.on { background: #2ea44f; }
+    html.theme-dark .who { background: #2a2a2e; color: #e8e8ea; }
+    html.theme-dark #all-grid .c.pin { outline-color: #fff; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:meet' %}" class="text-[13px] text-[#0066cc]">← 팀플 일정 맞추기</a>
+    <div class="mt-4 flex flex-wrap items-end gap-4">
+        <div class="min-w-0 flex-1">
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MEETING</p>
+            <h1 class="apple-display mt-2 break-words text-[34px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[44px]">{{ meeting.title }}</h1>
+            {% if meeting.note %}<p class="mt-2 text-[15px] text-[#6e6e73]">{{ meeting.note }}</p>{% endif %}
+            <p class="mt-1 text-[13px] text-[#8e8e93]">만든 사람 {{ meeting.owner.username }} · 칸 {{ meeting.slot_min }}분</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button type="button" class="mr-btn" id="mr-copy" data-url="{{ share_url }}">🔗 링크 복사</button>
+            <button type="button" class="mr-btn hidden" id="mr-share">공유하기</button>
+            {% if is_owner %}
+            <form method="post" action="{% url 'tools:meet_delete' meeting.meet_id %}" onsubmit="return confirm('이 일정을 지울까요? 참여한 사람들의 응답도 같이 지워져요.')">
+                {% csrf_token %}<button class="mr-btn">🗑 일정 지우기</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 이름 넣기 -->
+    <section id="mr-join" class="mr-card mt-6 hidden">
+        <h2 class="text-[16px] font-semibold">이름을 넣고 되는 시간을 칠하세요</h2>
+        <form id="mr-join-form" class="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+            <input id="mr-name" maxlength="30" required class="mr-in" placeholder="이름 (다른 사람에게 보여요)" autocomplete="nickname">
+            <input id="mr-pin" maxlength="64" type="password" class="mr-in" placeholder="비밀번호 (선택 · 다른 기기에서 고칠 때)" autocomplete="off">
+            <button class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0058b0]">들어가기</button>
+        </form>
+        <p id="mr-join-err" class="mt-2 hidden text-[13px] text-[#c4271d]"></p>
+        <p class="mt-2 text-[12px] text-[#8e8e93]">이 기기에서는 자동으로 기억돼요. 이미 넣은 이름으로 다른 기기에서 고치려면 그때 정한 비밀번호를 넣으세요.</p>
+    </section>
+
+    <!-- 휴대폰: 탭 -->
+    <div class="mt-6 flex gap-2 lg:hidden" id="mr-tabs">
+        <button type="button" class="mr-btn" data-tab="mine">✏️ 내 시간</button>
+        <button type="button" class="mr-btn" data-tab="all">👥 모두의 시간</button>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-6 lg:mt-6 lg:grid-cols-2">
+        <section class="mr-card min-w-0" data-pane="mine">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-[16px] font-semibold">✏️ <span id="mr-me">내 시간</span></h2>
+                <span id="mr-saved" class="text-[12px] text-[#8e8e93]"></span>
+                <div class="ml-auto flex gap-1.5">
+                    <button type="button" class="mr-btn" id="mr-fill">모두 됨</button>
+                    <button type="button" class="mr-btn" id="mr-empty">비우기</button>
+                    <button type="button" class="mr-btn hidden" id="mr-leave" title="내 응답 지우기">나가기</button>
+                </div>
+            </div>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">되는 시간을 누르거나 끌어서 칠해요. 칠한 칸을 다시 끌면 지워져요. 칠하면 바로 저장돼요.</p>
+            <div class="grid-wrap mt-3"><div id="my-grid" class="tgrid is-off"></div></div>
+        </section>
+
+        <section class="mr-card min-w-0" data-pane="all">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-[16px] font-semibold">👥 모두의 시간</h2>
+                <span id="mr-count" class="text-[13px] text-[#6e6e73]"></span>
+                <span class="ml-auto flex items-center gap-1 text-[11px] text-[#8e8e93]">0명 <span id="mr-legend" class="inline-flex"></span> 모두</span>
+            </div>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">진할수록 되는 사람이 많아요. 칸에 올리거나 누르면 누가 되는지 보여요.</p>
+            <div class="grid-wrap mt-3"><div id="all-grid" class="tgrid"></div></div>
+            <div id="mr-who" class="mt-3 min-h-[44px] rounded-2xl bg-[#f5f5f7] px-4 py-3 text-[13px] text-[#6e6e73] dark:bg-[#111318]">칸에 마우스를 올려 보세요.</div>
+        </section>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section class="mr-card">
+            <h2 class="text-[16px] font-semibold" id="mr-best-title">🎯 모두 되는 시간</h2>
+            <ul id="mr-best" class="mt-3 space-y-2 text-[14px]"></ul>
+        </section>
+        <section class="mr-card">
+            <h2 class="text-[16px] font-semibold">참여한 사람 <span id="mr-people-n" class="text-[#8e8e93]"></span></h2>
+            <ul id="mr-people" class="mt-3 flex flex-wrap gap-2"></ul>
+            <p class="mt-2 text-[12px] text-[#8e8e93]">이름에 올리면 그 사람의 시간이 주황 테두리로 보여요.</p>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const MEET = "{{ meeting.meet_id }}";
+    const IS_OWNER = {{ is_owner|yesno:"true,false" }};
+    const URLS = {
+        state: "{% url 'tools:meet_state' meeting.meet_id %}",
+        join: "{% url 'tools:meet_join' meeting.meet_id %}",
+        save: "{% url 'tools:meet_save' meeting.meet_id %}",
+        remove: "{% url 'tools:meet_remove' meeting.meet_id %}",
+    };
+    const STORE = `mj-meet-${MEET}`;
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const pad = (n) => String(n).padStart(2, '0');
+    const hm = (m) => (m === 1440 ? '24:00' : `${pad(Math.floor(m / 60))}:${pad(m % 60)}`);
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const post = async (url, body) => {
+        const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body) });
+        return r.json().catch(() => ({ ok: false, error: '서버 응답을 읽지 못했어요.' }));
+    };
+
+    let S = null;          // 서버 상태 { version, dates, start, end, slot, responses }
+    let me = null;         // { id, name, key }
+    let mine = new Set();  // 내 칸
+    let pinned = null;     // 휴대폰에서 누른 칸
+    const store = { get() { try { return JSON.parse(localStorage.getItem(STORE)); } catch (e) { return null; } }, set(v) { try { v ? localStorage.setItem(STORE, JSON.stringify(v)) : localStorage.removeItem(STORE); } catch (e) { /* 저장 못 해도 이번 화면에서는 됨 */ } } };
+
+    const perDay = () => (S.end - S.start) / S.slot;
+    const dayLabel = (iso) => {
+        const d = new Date(`${iso}T00:00:00`);
+        return { md: `${d.getMonth() + 1}/${d.getDate()}`, dow: '일월화수목금토'[d.getDay()], dn: d.getDay() };
+    };
+    const slotTime = (i) => S.start + (i % perDay()) * S.slot;
+
+    // ── 칸 그리기 (내 칸 / 모두의 칸 같은 모양) ──
+    function buildGrid(el) {
+        const days = S.dates.length, n = perDay();
+        el.style.gridTemplateColumns = `44px repeat(${days}, minmax(${days > 7 ? 40 : 52}px, 1fr))`;
+        const html = ['<div></div>'];
+        S.dates.forEach((d) => { const l = dayLabel(d); html.push(`<div class="hd ${l.dn === 0 ? 'sun' : l.dn === 6 ? 'sat' : ''}"><b>${l.md}</b>${l.dow}</div>`); });
+        for (let t = 0; t < n; t++) {
+            const m = S.start + t * S.slot;
+            html.push(`<div class="tl">${m % 60 === 0 || t === 0 ? hm(m) : ''}</div>`);
+            for (let d = 0; d < days; d++) {
+                const i = d * n + t;
+                html.push(`<div class="c ${m % 60 === 0 ? 'hr' : ''} ${d === days - 1 ? 'last' : ''} ${t === n - 1 ? 'end' : ''}" data-i="${i}"></div>`);
+            }
+        }
+        html.push(`<div class="tl">${hm(S.end)}</div>`);
+        el.innerHTML = html.join('');
+    }
+
+    function paintMine() {
+        $('my-grid').querySelectorAll('.c').forEach((c) => c.classList.toggle('on', mine.has(+c.dataset.i)));
+    }
+
+    // 다른 사람 + 내 칸(저장 전 것도) 을 합친 응답 목록
+    function people() {
+        const list = (S.responses || []).map((r) => (me && r.id === me.id ? { ...r, slots: [...mine] } : r));
+        return list;
+    }
+
+    function heat(ratio, dark) {
+        if (ratio <= 0) return '';
+        const a = 0.12 + ratio * 0.78;
+        return dark ? `rgba(10, 133, 255, ${a})` : `rgba(0, 102, 204, ${a})`;
+    }
+
+    function paintAll() {
+        const ps = people(), N = ps.length;
+        const counts = new Map();
+        ps.forEach((p) => p.slots.forEach((i) => counts.set(i, (counts.get(i) || 0) + 1)));
+        const dark = document.documentElement.classList.contains('theme-dark');
+        $('all-grid').querySelectorAll('.c').forEach((c) => {
+            const k = counts.get(+c.dataset.i) || 0;
+            c.style.background = N ? heat(k / N, dark) : '';
+            c.classList.toggle('all', N > 1 && k === N);
+            c.title = N ? `${k}/${N}명` : '';
+        });
+        $('mr-count').textContent = N ? `${N}명 참여` : '아직 아무도 없어요';
+        $('mr-legend').innerHTML = [0.15, 0.4, 0.7, 1].map((r) => `<i style="display:inline-block;width:14px;height:10px;background:${heat(r, dark)}"></i>`).join('');
+        renderPeople(ps);
+        renderBest(ps, counts);
+        if (pinned !== null) showWho(pinned);
+    }
+
+    function renderPeople(ps) {
+        $('mr-people-n').textContent = ps.length ? `${ps.length}명` : '';
+        $('mr-people').innerHTML = ps.length ? ps.map((p) => `<li class="who" data-pid="${p.id}">${esc(p.name)}${me && p.id === me.id ? ' (나)' : ''} <span class="text-[11px] text-[#8e8e93]">${p.slots.length ? `${p.slots.length * S.slot / 60}h` : '아직'}</span>
+            ${IS_OWNER && !(me && p.id === me.id) ? `<button type="button" class="text-[#8e8e93] hover:text-[#c4271d]" data-kick="${p.id}" title="빼기">×</button>` : ''}</li>`).join('')
+            : '<li class="text-[13px] text-[#8e8e93]">링크를 보내서 사람들을 불러 보세요.</li>';
+    }
+
+    // 같은 날 이어진 칸을 묶어서 "10/12 (일) 14:00–16:00" 처럼
+    function runs(pred) {
+        const n = perDay(), out = [];
+        S.dates.forEach((d, di) => {
+            let st = null;
+            for (let t = 0; t <= n; t++) {
+                const ok = t < n && pred(di * n + t);
+                if (ok && st === null) st = t;
+                if (!ok && st !== null) { out.push({ di, from: st, to: t }); st = null; }
+            }
+        });
+        return out;
+    }
+    function renderBest(ps, counts) {
+        const N = ps.length, ul = $('mr-best');
+        const filled = ps.filter((p) => p.slots.length);
+        if (!filled.length) { $('mr-best-title').textContent = '🎯 모두 되는 시간'; ul.innerHTML = '<li class="text-[#8e8e93]">시간을 칠한 사람이 생기면 여기에 정리돼요.</li>'; return; }
+        const max = Math.max(0, ...counts.values());
+        const target = N;
+        let list = runs((i) => (counts.get(i) || 0) === target);
+        let title = `🎯 모두 되는 시간 (${N}명)`;
+        let k = target;
+        if (!list.length) {
+            k = max;
+            list = runs((i) => (counts.get(i) || 0) === max);
+            title = `🎯 모두 되는 시간은 없어요 — 가장 많이 되는 시간 (${max}/${N}명)`;
+        }
+        $('mr-best-title').textContent = title;
+        list.sort((a, b) => (b.to - b.from) - (a.to - a.from) || a.di - b.di || a.from - b.from);
+        ul.innerHTML = list.slice(0, 10).map((r) => {
+            const l = dayLabel(S.dates[r.di]);
+            const startM = S.start + r.from * S.slot, endM = S.start + r.to * S.slot;
+            const mins = endM - startM;
+            const firstSlot = r.di * perDay() + r.from;
+            const who = k < N ? ps.filter((p) => p.slots.includes(firstSlot)).map((p) => esc(p.name)).join(', ') : '';
+            return `<li class="flex flex-wrap items-baseline gap-x-3 rounded-2xl bg-[#e8f8ee] px-4 py-2.5 text-[#1d1d1f] dark:bg-[#123222]">
+                <b class="tabular-nums">${l.md} (${l.dow}) ${hm(startM)}–${hm(endM)}</b>
+                <span class="text-[13px] text-[#1e7a35]">${mins >= 60 ? `${Math.floor(mins / 60)}시간${mins % 60 ? ` ${mins % 60}분` : ''}` : `${mins}분`}</span>
+                ${who ? `<span class="text-[12px] text-[#6e6e73]">${who}</span>` : ''}</li>`;
+        }).join('') + (list.length > 10 ? `<li class="text-[12px] text-[#8e8e93]">외 ${list.length - 10}개</li>` : '');
+    }
+
+    function showWho(i) {
+        const ps = people();
+        if (!ps.length) return;
+        const yes = ps.filter((p) => p.slots.includes(i)), no = ps.filter((p) => !p.slots.includes(i));
+        const l = dayLabel(S.dates[Math.floor(i / perDay())]);
+        const t = slotTime(i);
+        $('mr-who').innerHTML = `<b class="text-[#1d1d1f]">${l.md} (${l.dow}) ${hm(t)}–${hm(t + S.slot)}</b> · ${yes.length}/${ps.length}명<div class="mt-2 flex flex-wrap gap-1.5">`
+            + yes.map((p) => `<span class="who">✓ ${esc(p.name)}</span>`).join('') + no.map((p) => `<span class="who no">${esc(p.name)}</span>`).join('') + '</div>';
+    }
+
+    // ── 모두의 칸: 올리기 / 누르기 ──
+    $('all-grid').addEventListener('pointerover', (e) => { const c = e.target.closest('.c'); if (c && pinned === null) showWho(+c.dataset.i); });
+    $('all-grid').addEventListener('click', (e) => {
+        const c = e.target.closest('.c');
+        if (!c) return;
+        $('all-grid').querySelector('.pin')?.classList.remove('pin');
+        pinned = pinned === +c.dataset.i ? null : +c.dataset.i;
+        if (pinned !== null) { c.classList.add('pin'); showWho(pinned); }
+    });
+    $('mr-people').addEventListener('pointerover', (e) => {
+        const li = e.target.closest('[data-pid]');
+        const p = li && people().find((x) => x.id === +li.dataset.pid);
+        $('all-grid').querySelectorAll('.c').forEach((c) => c.classList.toggle('hl', !!p && p.slots.includes(+c.dataset.i)));
+    });
+    $('mr-people').addEventListener('pointerleave', () => $('all-grid').querySelectorAll('.hl').forEach((c) => c.classList.remove('hl')));
+    $('mr-people').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-kick]');
+        if (!b) return;
+        const p = people().find((x) => x.id === +b.dataset.kick);
+        if (!confirm(`${p?.name} 님을 뺄까요? 칠한 시간도 지워져요.`)) return;
+        const r = await post(URLS.remove, { id: +b.dataset.kick });
+        if (r.ok) refresh(true); else alert(r.error);
+    });
+
+    // ── 내 칸 칠하기: 누른 칸에서 끈 칸까지 사각형으로 ──
+    let drag = null;
+    const cellAt = (x, y) => document.elementFromPoint(x, y)?.closest('#my-grid .c');
+    function applyDrag(cell) {
+        if (!cell) return;
+        const n = perDay(), a = drag.anchor, b = +cell.dataset.i;
+        const d0 = Math.min(Math.floor(a / n), Math.floor(b / n)), d1 = Math.max(Math.floor(a / n), Math.floor(b / n));
+        const t0 = Math.min(a % n, b % n), t1 = Math.max(a % n, b % n);
+        mine = new Set(drag.before);
+        for (let d = d0; d <= d1; d++) for (let t = t0; t <= t1; t++) { const i = d * n + t; if (drag.on) mine.add(i); else mine.delete(i); }
+        paintMine();
+    }
+    $('my-grid').addEventListener('pointerdown', (e) => {
+        const c = e.target.closest('.c');
+        if (!c || !me) return;
+        drag = { anchor: +c.dataset.i, on: !mine.has(+c.dataset.i), before: new Set(mine) };
+        applyDrag(c);
+        $('my-grid').setPointerCapture(e.pointerId);
+        e.preventDefault();
+    });
+    $('my-grid').addEventListener('pointermove', (e) => { if (drag) applyDrag(cellAt(e.clientX, e.clientY)); });
+    const endDrag = () => { if (!drag) return; drag = null; paintAll(); queueSave(); };
+    $('my-grid').addEventListener('pointerup', endDrag);
+    $('my-grid').addEventListener('pointercancel', endDrag);
+
+    let saveTimer = null, saving = false, dirty = false;
+    function queueSave() { dirty = true; $('mr-saved').textContent = '저장 중…'; clearTimeout(saveTimer); saveTimer = setTimeout(save, 400); }
+    async function save() {
+        if (!me || saving) { if (saving) saveTimer = setTimeout(save, 300); return; }
+        saving = true; dirty = false;
+        const r = await post(URLS.save, { key: me.key, slots: [...mine] });
+        saving = false;
+        if (r.ok) { $('mr-saved').textContent = dirty ? '저장 중…' : '✓ 저장됨'; refresh(true); }
+        else { $('mr-saved').textContent = r.error || '저장 못 했어요'; if (r.error && r.error.includes('다시 이름')) logout(); }
+    }
+    $('mr-fill').addEventListener('click', () => { if (!me) return; mine = new Set(Array.from({ length: S.dates.length * perDay() }, (_, i) => i)); paintMine(); paintAll(); queueSave(); });
+    $('mr-empty').addEventListener('click', () => { if (!me) return; mine.clear(); paintMine(); paintAll(); queueSave(); });
+    $('mr-leave').addEventListener('click', async () => {
+        if (!me || !confirm('내 이름과 칠한 시간을 이 일정에서 지울까요?')) return;
+        const r = await post(URLS.remove, { key: me.key });
+        if (r.ok) { logout(); refresh(true); }
+    });
+
+    // ── 이름 넣기 ──
+    function setMe(r) {
+        me = { id: r.id, name: r.name, key: r.key };
+        store.set(me);
+        mine = new Set(r.slots || []);
+        $('mr-join').classList.add('hidden');
+        $('mr-me').textContent = `${r.name} 님의 시간`;
+        $('my-grid').classList.remove('is-off');
+        $('mr-leave').classList.remove('hidden');
+        paintMine(); paintAll();
+    }
+    function logout() {
+        me = null; mine = new Set(); store.set(null);
+        $('mr-join').classList.remove('hidden');
+        $('mr-me').textContent = '내 시간';
+        $('my-grid').classList.add('is-off');
+        $('mr-leave').classList.add('hidden');
+        paintMine();
+    }
+    $('mr-join-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const err = $('mr-join-err');
+        err.classList.add('hidden');
+        const r = await post(URLS.join, { name: $('mr-name').value, pin: $('mr-pin').value });
+        if (!r.ok) { err.textContent = r.error; err.classList.remove('hidden'); return; }
+        $('mr-pin').value = '';
+        setMe(r);
+        refresh(true);
+    });
+
+    // ── 서버 상태 (4초마다, 화면을 보고 있을 때만) ──
+    async function refresh(force) {
+        const url = URLS.state + (S && !force ? `?v=${encodeURIComponent(S.version)}` : '');
+        const r = await fetch(url, { cache: 'no-store' }).then((x) => x.json()).catch(() => null);
+        if (!r || !r.ok || r.same) return;
+        const first = !S;
+        S = r;
+        if (first) { buildGrid($('my-grid')); buildGrid($('all-grid')); }
+        if (me && !S.responses.some((x) => x.id === me.id)) logout();  // 만든 사람이 뺐거나 나갔음
+        paintMine();
+        paintAll();
+    }
+    setInterval(() => { if (document.visibilityState === 'visible' && !drag && !saving) refresh(false); }, 4000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(false); });
+
+    // ── 링크 / 탭 ──
+    $('mr-copy').addEventListener('click', async () => {
+        const url = $('mr-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('mr-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('mr-copy').textContent = '🔗 링크 복사'; }, 1500); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    if (navigator.share) {
+        $('mr-share').classList.remove('hidden');
+        $('mr-share').addEventListener('click', () => navigator.share({ title: document.querySelector('h1').textContent.trim(), text: '되는 시간을 칠해 주세요', url: $('mr-copy').dataset.url }).catch(() => {}));
+    }
+    function tab(name) {
+        document.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('max-lg:hidden', p.dataset.pane !== name));
+        document.querySelectorAll('[data-tab]').forEach((b) => { b.style.background = b.dataset.tab === name ? '#1d1d1f' : ''; b.style.color = b.dataset.tab === name ? '#fff' : ''; });
+    }
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => tab(b.dataset.tab)));
+    tab('mine');
+
+    // ── 시작 ──
+    (async () => {
+        await refresh(true);
+        const saved = store.get();
+        if (saved && saved.key) {
+            const r = await post(URLS.join, { name: saved.name, key: saved.key });
+            if (r.ok) { setMe(r); return; }
+            store.set(null);
+        }
+        logout();
+    })();
+    window.__meet = { state: () => S, me: () => me, mine: () => mine, refresh, people };
+})();
+</script>
+{% endblock %}

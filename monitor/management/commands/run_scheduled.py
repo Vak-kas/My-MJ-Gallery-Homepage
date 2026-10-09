@@ -43,10 +43,12 @@ class Command(BaseCommand):
     def daily_cleanup(self):
         from analytics import stats
         from security.utils import cleanup_old_records
+        from tools.meet_views import cleanup_expired as cleanup_meetings
         from tools.share_views import cleanup_expired
 
         cleanup_old_records()
         stats.cleanup()
         cleanup_expired()
+        cleanup_meetings()
         uptime.cleanup()
         traffic.cleanup()

@@ -16,7 +16,7 @@
 """
 
 CATEGORIES = [
-	("docs", "📝", "문서 · 글", "자소서·과제·PDF 를 다듬는 도구"),
+	("docs", "📝", "문서 · 공부", "자소서·과제·PDF·학점, 공부할 때 쓰는 도구"),
 	("share", "🔗", "공유 · 전송", "파일·글·화면을 다른 사람이나 내 다른 기기로"),
 	("network", "🌐", "네트워크", "내 인터넷과 서버 상태 확인, 네트워크 계산기"),
 	("dev", "🛠", "개발 · 보안", "데이터 변환, 정규식, 해시와 키 만들기"),
@@ -54,6 +54,26 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "image",
+		"url_name": "tools:image",
+		"icon": "🖼",
+		"title": "이미지 도구",
+		"description": "사진 용량 줄이기(“5MB 이하로”), 크기·형식 바꾸기(HEIC → JPG, PNG ↔ WebP), 자르기·돌리기, 위치정보 지우기. 여러 장을 한꺼번에 ZIP 으로 받아요. 브라우저 안에서만 처리돼요.",
+		"tags": ["사진", "변환"],
+		"category": "docs",
+		"access": "public",
+	},
+	{
+		"slug": "gpa",
+		"url_name": "tools:gpa",
+		"icon": "🎓",
+		"title": "학점 계산기",
+		"description": "과목별·학기별 평점과 전공 평점, 4.5 ↔ 4.3 ↔ 100점 환산, 목표 학점까지 앞으로 몇 점이 필요한지 계산해요. 성적은 이 브라우저에만 저장돼요.",
+		"tags": ["대학생", "계산기"],
+		"category": "docs",
+		"access": "public",
+	},
+	{
 		"slug": "stream",
 		"url_name": "tools:stream",
 		"icon": "📁",
@@ -62,6 +82,16 @@ TOOLS = [
 		"tags": ["파일", "스트리밍"],
 		"category": "share",
 		"access": "member",  # 방 만들기는 회원(한도 있음), 받는 쪽은 링크만 있으면 누구나 — tools/permissions.py
+	},
+	{
+		"slug": "meet",
+		"url_name": "tools:meet",
+		"icon": "📅",
+		"title": "팀플 일정 맞추기",
+		"description": "날짜와 시간대를 정해 링크를 돌리면, 각자 되는 시간을 드래그로 칠해요. 겹치는 시간이 진하게 보이고 '모두 되는 시간'을 바로 찾아줘요. 참여는 로그인 없이.",
+		"tags": ["팀플", "약속"],
+		"category": "share",
+		"access": "member",  # 만들기는 회원, 링크로 참여는 누구나
 	},
 	{
 		"slug": "clipboard",
