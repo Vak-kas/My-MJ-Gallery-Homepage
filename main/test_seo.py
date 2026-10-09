@@ -57,6 +57,23 @@ class LinkPreviewTests(TestCase):
 		robots = self.client.get("/robots.txt").content.decode()
 		self.assertIn("Disallow: /studio/", robots)
 		self.assertIn("Sitemap: https://smjgallery.kr/sitemap.xml", robots)
+		self.assertIn("Disallow: /games/omok/*?t=", robots)  # 오목 방 초대 링크만 (로비는 허용)
+		self.assertNotIn("Disallow: /games/omok/\n", robots)
+
+	def test_search_verification_meta(self):
+		from django.test import override_settings
+
+		with override_settings(NAVER_SITE_VERIFICATION="", GOOGLE_SITE_VERIFICATION=""):  # .env 값과 상관없이
+			self.assertNotIn("naver-site-verification", self.client.get("/").content.decode())
+		with override_settings(NAVER_SITE_VERIFICATION="abc12345", GOOGLE_SITE_VERIFICATION="g-xyz-1234"):
+			html = self.client.get("/").content.decode()
+		self.assertIn('<meta name="naver-site-verification" content="abc12345">', html)
+		self.assertIn('<meta name="google-site-verification" content="g-xyz-1234">', html)
+		tag = '<meta name="naver-site-verification" content="ad0edbba19bbbb2e42abaca0171acc7ca918fef8" />'
+		with override_settings(NAVER_SITE_VERIFICATION=tag, GOOGLE_SITE_VERIFICATION='"><script>x</script>'):
+			html = self.client.get("/").content.decode()
+		self.assertIn('<meta name="naver-site-verification" content="ad0edbba19bbbb2e42abaca0171acc7ca918fef8">', html)  # 태그째 넣어도 값만
+		self.assertNotIn("google-site-verification", html)  # 이상한 값은 안 넣음
 		feed = self.client.get("/blog/feed/").content.decode()
 		self.assertIn("<title>HackRF 입문</title>", feed)
 		self.assertNotIn("비밀 글", feed)

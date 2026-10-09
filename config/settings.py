@@ -132,6 +132,9 @@ KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
 # 카카오톡 공유하기 (JavaScript 키, 카카오 개발자 콘솔 > 앱 > 플랫폼 > Web 에 사이트 도메인 등록 필요). 비우면 휴대폰 공유창/링크 복사
 KAKAO_JS_KEY = os.getenv("KAKAO_JS_KEY", "")
+# 검색엔진 소유 확인 (HTML 태그 방식의 content 값) — 구글 서치 콘솔 / 네이버 서치어드바이저
+GOOGLE_SITE_VERIFICATION = os.getenv("GOOGLE_SITE_VERIFICATION", "")
+NAVER_SITE_VERIFICATION = os.getenv("NAVER_SITE_VERIFICATION", "")
 
 
 # Database

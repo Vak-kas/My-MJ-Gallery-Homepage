@@ -277,7 +277,8 @@ def photo_bulk_delete(request):
 
 
 ROBOTS_DISALLOW = ["/studio/", "/accounts/", "/notifications/", "/admin/", "/s/",
-				   "/tools/share/", "/tools/secret/", "/tools/live/", "/tools/stream/", "/tools/clipboard/"]
+				   "/tools/share/", "/tools/secret/", "/tools/live/", "/tools/stream/", "/tools/clipboard/",
+				   "/tools/meet/", "/games/omok/*?t="]  # 팀플 일정·오목 방 초대 링크 (오목 로비는 검색에 나와도 됨)
 
 
 def robots_txt(request):
