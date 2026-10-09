@@ -1023,3 +1023,89 @@ class CiteTests(TestCase):
 
 	def test_page(self):
 		self.assertContains(self.client.get(reverse("tools:cite")), "논문 인용 만들기")
+
+
+class PapersTests(TestCase):
+	WORK = {
+		"id": "https://openalex.org/W123", "doi": "https://doi.org/10.1109/JIOT.2023.1", "ids": {}, "title": "Anti-Jamming for <i>Satellite</i> IoT",
+		"publication_year": 2023, "publication_date": "2023-06-01", "type": "article", "cited_by_count": 20, "referenced_works_count": 40,
+		"authorships": [{"author": {"display_name": "Gil Dong Hong"}}, {"author": {"display_name": "Jane Doe"}}],
+		"primary_location": {"source": {"id": "https://openalex.org/S2480266640", "display_name": "IEEE Internet of Things Journal", "type": "journal", "host_organization_name": "IEEE"}},
+		"locations": [{"landing_page_url": "https://arxiv.org/abs/2301.01234v2", "pdf_url": ""}],
+		"open_access": {"is_oa": True}, "best_oa_location": {"pdf_url": "https://arxiv.org/pdf/2301.01234"},
+		"biblio": {"volume": "10", "issue": "5", "first_page": "100", "last_page": "110"},
+		"abstract_inverted_index": {"Jamming": [0], "is": [1], "bad": [2]},
+	}
+
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_build_query(self):
+		from . import papers
+		q, groups = papers.build_query("NTN jamming")
+		self.assertIn('"non-terrestrial"', q)
+		self.assertIn("AND (jamming OR jammer", q)
+		self.assertEqual(papers.build_query("physical layer security UAV")[0].split(" AND ")[0], '"physical layer security"')
+		self.assertEqual(papers.build_query("위성, 재밍")[0].split(" AND ")[1], "(jamming OR jammer)")  # 한국어 → 영어, 쉼표는 지움
+		self.assertEqual(papers.build_query("(LEO OR GEO) AND jamming")[0], "(LEO OR GEO) AND jamming")  # 직접 쓴 건 그대로
+		self.assertEqual(papers.build_query("ntn", expand=False)[0], "ntn")
+
+	def test_normalize(self):
+		from . import papers
+		p = papers.normalize(self.WORK)
+		self.assertEqual((p["id"], p["doi"], p["arxiv"], p["title"], p["pages"], p["venue_type"]), ("W123", "10.1109/JIOT.2023.1", "2301.01234", "Anti-Jamming for Satellite IoT", "100-110", "journal"))
+		self.assertEqual(p["abstract"], "Jamming is bad")
+
+	def search(self, url, response):
+		from unittest import mock
+		with mock.patch("tools.papers._openalex", return_value=response) as m:
+			res = self.client.get(url)
+		return res, m
+
+	def test_search_sort_and_cache(self):
+		other = {**self.WORK, "id": "https://openalex.org/W9", "doi": None, "title": "Older", "cited_by_count": 99, "publication_date": "2020-01-01"}
+		data = {"meta": {"count": 2}, "results": [self.WORK, other]}
+		res, m = self.search("/tools/papers/search/?q=NTN+jamming&sort=cited&venues=iotj,nope", data)
+		body = res.json()
+		self.assertEqual([i["id"] for i in body["items"]], ["W9", "W123"])
+		flt = m.call_args[0][0]["filter"]
+		self.assertIn("primary_location.source.id:S2480266640", flt)
+		self.assertNotIn("primary_topic.subfield", flt)  # 저널을 고르면 분야 필터는 안 씀
+		res, m = self.search("/tools/papers/search/?q=NTN+jamming&sort=recent&venues=iotj", data)
+		self.assertFalse(m.called)  # 정렬만 바꾸면 캐시
+		self.assertEqual([i["id"] for i in res.json()["items"]], ["W123", "W9"])
+
+	def test_related_and_errors(self):
+		res, m = self.search("/tools/papers/search/?rel=refs:W123", {"meta": {"count": 1}, "results": [self.WORK]})
+		self.assertEqual(m.call_args[0][0]["filter"], "cited_by:W123")
+		self.assertEqual(self.client.get("/tools/papers/search/?rel=refs:bad").status_code, 400)
+		self.assertEqual(self.client.get("/tools/papers/search/?q=a").status_code, 400)
+
+	def test_budget_guard(self):
+		from django.core.cache import cache
+		from . import papers
+		cache.set(papers.BUDGET_KEY, 0.001)
+		res = self.client.get("/tools/papers/search/?q=NTN+jamming")
+		self.assertEqual(res.status_code, 503)
+
+	def test_shelf(self):
+		import json
+		from django.contrib.auth import get_user_model
+		from . import papers
+		self.assertEqual(self.client.get("/tools/papers/shelf/").status_code, 302)
+		user = get_user_model().objects.create_user("u", "u@example.com", "pw")
+		self.client.force_login(user)
+		item = papers.normalize(self.WORK)
+		post = lambda url, body: self.client.post(url, json.dumps(body), content_type="application/json")
+		saved = post("/tools/papers/shelf/save/", {"data": item}).json()["item"]
+		post("/tools/papers/shelf/save/", {"data": item})  # 같은 논문은 하나만
+		self.assertEqual(len(self.client.get("/tools/papers/shelf/").json()["items"]), 1)
+		self.assertEqual(saved["key"], "10.1109/jiot.2023.1")
+		upd = post(f"/tools/papers/shelf/{saved['id']}/", {"status": "done", "starred": True, "note": "시스템 모델 참고"}).json()["item"]
+		self.assertEqual((upd["status"], upd["starred"], upd["note"]), ("done", True, "시스템 모델 참고"))
+		other = get_user_model().objects.create_user("v", "v@example.com", "pw")
+		self.client.force_login(other)
+		self.assertEqual(post(f"/tools/papers/shelf/{saved['id']}/", {"delete": True}).status_code, 404)  # 남의 것은 못 건드림
+		self.client.force_login(user)
+		self.assertTrue(post(f"/tools/papers/shelf/{saved['id']}/", {"delete": True}).json()["deleted"])

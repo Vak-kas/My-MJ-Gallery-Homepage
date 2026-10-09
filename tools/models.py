@@ -206,3 +206,28 @@ class AIUsage(models.Model):
 
 	def __str__(self):
 		return f"{self.feature} {self.user_id} ${self.cost_usd}"
+
+
+class SavedPaper(models.Model):
+	"""논문 찾기의 '내 논문함' — 계정별로 담아 둔 논문 (검색 결과 그대로 data 에)."""
+
+	STATUS_TODO = "todo"
+	STATUS_READING = "reading"
+	STATUS_DONE = "done"
+	STATUS_CHOICES = [(STATUS_TODO, "읽을 것"), (STATUS_READING, "읽는 중"), (STATUS_DONE, "다 읽음")]
+
+	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="saved_papers")
+	key = models.CharField(max_length=255)  # doi / arxiv:번호 / OpenAlex 번호 — 같은 논문을 두 번 담지 않게
+	data = models.JSONField(default=dict)
+	status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_TODO)
+	starred = models.BooleanField(default=False)
+	note = models.TextField(blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["-starred", "-created_at", "-id"]
+		constraints = [models.UniqueConstraint(fields=["user", "key"], name="unique_saved_paper")]
+
+	def __str__(self):
+		return f"{self.user_id}:{self.key}"
