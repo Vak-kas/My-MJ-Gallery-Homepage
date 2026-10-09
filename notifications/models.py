@@ -9,14 +9,16 @@ class Notification(models.Model):
     KIND_GUESTBOOK = "guestbook"
     KIND_POST = "post"
     KIND_SECURITY = "security"
+    KIND_MONITOR = "monitor"
     KIND_CHOICES = [
         (KIND_SIGNUP, "가입 요청"),
         (KIND_COMMENT, "댓글"),
         (KIND_GUESTBOOK, "방명록"),
         (KIND_POST, "글"),
         (KIND_SECURITY, "보안"),
+        (KIND_MONITOR, "서버 감시"),
     ]
-    ICONS = {KIND_SIGNUP: "🙋", KIND_COMMENT: "💬", KIND_GUESTBOOK: "📝", KIND_POST: "📄", KIND_SECURITY: "🛡"}
+    ICONS = {KIND_SIGNUP: "🙋", KIND_COMMENT: "💬", KIND_GUESTBOOK: "📝", KIND_POST: "📄", KIND_SECURITY: "🛡", KIND_MONITOR: "🛰"}
 
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, db_index=True)
     title = models.CharField(max_length=200)
