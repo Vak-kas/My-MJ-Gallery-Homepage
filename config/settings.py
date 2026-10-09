@@ -266,6 +266,18 @@ AI_PRICE_OUTPUT_PER_MTOK = float(os.getenv("AI_PRICE_OUTPUT_PER_MTOK", "5") or 0
 # 서버 상태판: Lightsail 요금제의 월 데이터 전송 허용량 (GB, 선택 — 넣으면 사용 비율 표시)
 SERVER_TRANSFER_ALLOWANCE_GB = float(os.getenv("SERVER_TRANSFER_ALLOWANCE_GB", "0") or 0)
 
+# 500 오류 traceback 등을 stderr 로 → 서버에서는 journal(gunicorn)에 남아 Studio > Server > 로그에서 보임
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"plain": {"format": "{levelname} {name}: {message}", "style": "{"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "loggers": {
+        "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
+        "django.security": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+    },
+}
+
 # S3 백업 (monitor/backup.py) — 버킷에만 권한이 있는 IAM 키를 따로 씀
 BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
 BACKUP_S3_REGION = os.getenv("BACKUP_S3_REGION", "ap-northeast-2")

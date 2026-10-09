@@ -4,13 +4,14 @@ from datetime import datetime
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.http import JsonResponse
 from django.core.cache import cache
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import SignupRequest
-from monitor import backup, system, traffic, uptime
+from monitor import backup, logs, system, traffic, uptime
 from monitor.management.commands.run_scheduled import HEARTBEAT_KEY
 from monitor.models import UptimeTarget
 
@@ -137,4 +138,26 @@ def server(request):
         "backup": _backup_status(),
         "targets": targets,
         "intervals": UptimeTarget.INTERVALS,
+    })
+
+
+@admin_view
+def server_logs(request):
+    source = request.GET.get("source") or "app"
+    try:
+        lines = int(request.GET.get("lines") or 200)
+    except ValueError:
+        lines = 200
+    q = request.GET.get("q", "")
+    level = request.GET.get("level", "")
+    data = logs.read(source, lines=lines, q=q, level=level)
+    if request.GET.get("format") == "json":
+        return JsonResponse(data)
+    return render(request, "studio/server_logs.html", {
+        "data": data,
+        "sources": [(k, v[0], v[1]) for k, v in logs.SOURCES.items()],
+        "line_choices": logs.LINE_CHOICES,
+        "lines": lines if lines in logs.LINE_CHOICES else logs.LINE_CHOICES[0],
+        "q": q,
+        "level": level,
     })

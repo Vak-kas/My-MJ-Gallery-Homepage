@@ -20,7 +20,10 @@
                 <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">서버 상태</h1>
                 <p class="mt-2 text-[14px] text-[#6e6e73]">{{ sys.hostname }} · {{ sys.os }} · Python {{ sys.python }}{% if sys.uptime_text %} · 켜진 지 {{ sys.uptime_text }}{% endif %}</p>
             </div>
-            <a href="{% url 'studio:server' %}" class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] hover:bg-[#f5f5f7]">↻ 새로고침</a>
+            <div class="flex gap-2">
+                <a href="{% url 'studio:server_logs' %}" class="rounded-full bg-[#1d1d1f] px-4 py-2 text-[13px] text-white hover:bg-black">📜 로그 보기</a>
+                <a href="{% url 'studio:server' %}" class="rounded-full border border-black/[0.1] bg-white px-4 py-2 text-[13px] hover:bg-[#f5f5f7]">↻ 새로고침</a>
+            </div>
         </section>
 
         {% if not scheduler_ok %}
@@ -68,7 +71,7 @@
                 <h2 class="text-[15px] font-semibold">서비스</h2>
                 <ul class="mt-3 space-y-2 text-[13px]">
                     {% for svc in sys.services %}
-                    <li class="flex items-center justify-between"><span class="font-mono">{{ svc.name }}</span>
+                    <li class="flex items-center justify-between"><a href="{% url 'studio:server_logs' %}?source={% if svc.name == 'mj-relay' %}relay{% elif svc.name == 'nginx' %}nginx_error{% elif svc.name == 'gunicorn' %}app{% else %}system{% endif %}" class="font-mono hover:underline" title="로그 보기">{{ svc.name }}</a>
                         <span class="rounded-full px-2.5 py-0.5 text-[12px] {% if svc.state == 'active' %}bg-[#34c759]/15 text-[#1e7a35]{% else %}bg-[#ff3b30]/10 text-[#c4271d]{% endif %}">{% if svc.state == 'active' %}● 실행 중{% else %}{{ svc.state }}{% endif %}</span></li>
                     {% empty %}
                     <li class="text-[#8e8e93]">systemd 가 없는 환경이에요.</li>

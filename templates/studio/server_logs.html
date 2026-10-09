@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    .lg-pill { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 7px 14px; font-size: 13px; color: #1d1d1f; white-space: nowrap; }
+    .lg-pill:hover { background: #f5f5f7; }
+    .lg-pill.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .lg-box { height: calc(100vh - 360px); min-height: 380px; overflow: auto; border-radius: 20px; background: #0d1117; color: #c9d1d9; padding: 14px 0; font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .lg-box .ln { padding: 0 16px; white-space: pre; }
+    .lg-box.wrap .ln { white-space: pre-wrap; word-break: break-all; }
+    .lg-box .ln:hover { background: rgba(255, 255, 255, 0.05); }
+    .lg-box .ln.err { color: #ff7b72; background: rgba(248, 81, 73, 0.08); }
+    .lg-box .ln.warn { color: #e3b341; }
+    .lg-box mark { background: #9e6a03; color: #fff; border-radius: 2px; }
+    .lg-empty { padding: 40px 16px; text-align: center; color: #8b949e; }
+</style>
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-16">
+        <div class="mb-6">
+            <a href="{% url 'studio:server' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span><span>서버 상태로</span>
+            </a>
+        </div>
+
+        <section class="mb-5 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SERVER · LOGS</p>
+                <h1 class="mt-3 text-[40px] font-semibold tracking-[-0.04em]">로그</h1>
+                <p class="mt-1 text-[13px] text-[#6e6e73]">서버 로그를 읽기만 해요. 주소에 붙은 토큰·초대 코드는 <code>•••</code> 로 가려서 보여 줘요.</p>
+            </div>
+        </section>
+
+        <div class="flex flex-wrap gap-1.5" id="lg-sources">
+            {% for key, name, desc in sources %}
+            <button type="button" class="lg-pill {% if key == data.source %}is-on{% endif %}" data-source="{{ key }}" title="{{ desc }}">{{ name }}</button>
+            {% endfor %}
+        </div>
+        <p class="mt-2 text-[12px] text-[#8e8e93]" id="lg-desc"></p>
+
+        <form id="lg-form" class="mt-4 flex flex-wrap items-center gap-2">
+            <input id="lg-q" value="{{ q }}" placeholder="검색 (예: 500, /games/, 아이피)" class="h-9 w-[280px] rounded-full border border-black/[0.1] bg-white px-4 text-[13px] outline-none focus:border-[#0066cc]">
+            <div class="flex gap-1" id="lg-level">
+                <button type="button" class="lg-pill {% if not level %}is-on{% endif %}" data-level="">전체</button>
+                <button type="button" class="lg-pill {% if level == 'warn' %}is-on{% endif %}" data-level="warn">⚠ 경고 이상</button>
+                <button type="button" class="lg-pill {% if level == 'err' %}is-on{% endif %}" data-level="err">⛔ 오류만</button>
+            </div>
+            <select id="lg-lines" class="h-9 rounded-full border border-black/[0.1] bg-white px-3 text-[13px]">
+                {% for n in line_choices %}<option value="{{ n }}" {% if n == lines %}selected{% endif %}>최근 {{ n }}줄</option>{% endfor %}
+            </select>
+            <span class="mx-1 h-5 w-px bg-black/[0.1]"></span>
+            <label class="flex items-center gap-1.5 text-[13px]"><input type="checkbox" id="lg-live"> 5초마다 새로고침</label>
+            <label class="flex items-center gap-1.5 text-[13px]"><input type="checkbox" id="lg-wrap"> 줄바꿈</label>
+            <button type="button" class="lg-pill" id="lg-reload">↻</button>
+            <button type="button" class="lg-pill" id="lg-copy">복사</button>
+        </form>
+
+        <div id="lg-summary" class="mt-4 hidden grid-cols-1 gap-3 lg:grid-cols-3"></div>
+
+        <div class="mt-4 flex items-center justify-between text-[12px] text-[#8e8e93]">
+            <span id="lg-meta"></span>
+            <button type="button" id="lg-bottom" class="hover:text-[#1d1d1f]">⤓ 맨 아래로</button>
+        </div>
+        <div class="lg-box mt-2" id="lg-box"></div>
+        </main>
+    </div>
+</div>
+{{ data|json_script:"lg-data" }}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const descs = { {% for key, name, desc in sources %}"{{ key }}": "{{ desc|escapejs }}",{% endfor %} };
+    let state = { source: '{{ data.source|escapejs }}', level: '{{ level|escapejs }}', lines: {{ lines }}, q: $('lg-q').value };
+    let data = JSON.parse($('lg-data').textContent);
+    let timer = null, busy = false;
+    try { $('lg-wrap').checked = localStorage.getItem('mj.logs.wrap') === '1'; } catch (e) {}
+
+    function highlight(text) {
+        const q = state.q.trim();
+        if (!q) return esc(text);
+        const i = text.toLowerCase().indexOf(q.toLowerCase());
+        if (i < 0) return esc(text);
+        return esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + highlight(text.slice(i + q.length));
+    }
+    function renderSummary(s) {
+        const box = $('lg-summary');
+        if (!s || !s.total) { box.classList.add('hidden'); box.classList.remove('grid'); return; }
+        box.classList.remove('hidden'); box.classList.add('grid');
+        const colors = { '2xx': '#1e7a35', '3xx': '#0066cc', '4xx': '#b26a00', '5xx': '#c4271d' };
+        const list = (rows) => rows.map(([k, n]) => `<li class="flex justify-between gap-3"><span class="truncate font-mono">${esc(k)}</span><span class="tabular-nums text-[#6e6e73]">${n}</span></li>`).join('');
+        box.innerHTML = `
+            <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">상태 코드 (보이는 ${s.total}건)</p>
+                <div class="mt-2 flex gap-4">${s.status.map(([k, n]) => `<div><p class="text-[20px] font-semibold tabular-nums" style="color:${colors[k]}">${n}</p><p class="text-[11px] text-[#8e8e93]">${k}</p></div>`).join('')}</div></div>
+            <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">많이 요청된 주소</p><ul class="mt-2 space-y-0.5 text-[12px]">${list(s.paths)}</ul></div>
+            <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">많이 요청한 IP</p><ul class="mt-2 space-y-0.5 text-[12px]">${list(s.ips)}</ul></div>`;
+    }
+    function render(keepScroll) {
+        const box = $('lg-box');
+        const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+        const top = box.scrollTop;
+        box.classList.toggle('wrap', $('lg-wrap').checked);
+        $('lg-desc').textContent = descs[state.source] || '';
+        if (data.error) {
+            box.innerHTML = `<div class="lg-empty">${esc(data.error)}</div>`;
+        } else if (!data.lines.length) {
+            box.innerHTML = `<div class="lg-empty">${state.q || state.level ? '조건에 맞는 줄이 없어요.' : '로그가 비어 있어요.'}</div>`;
+        } else {
+            box.innerHTML = data.lines.map((l) => `<div class="ln ${l.level}">${highlight(l.text)}</div>`).join('');
+        }
+        const errs = data.lines.filter((l) => l.level === 'err').length;
+        const filtered = state.q || state.level;
+        $('lg-meta').textContent = data.error ? '' : `${data.lines.length}줄 표시${filtered ? ` (최근 ${data.scanned}줄에서 찾음)` : ''}${errs ? ` · 오류 ${errs}줄` : ''} · ${new Date().toLocaleTimeString('ko-KR')} 기준`;
+        renderSummary(data.summary);
+        if (!keepScroll || atBottom) box.scrollTop = box.scrollHeight; else box.scrollTop = top;
+    }
+    async function load(keepScroll) {
+        if (busy) return;
+        busy = true;
+        const params = new URLSearchParams({ source: state.source, lines: state.lines, q: state.q, level: state.level });
+        history.replaceState(null, '', '?' + params);
+        params.set('format', 'json');
+        try {
+            const res = await fetch('?' + params, { headers: { Accept: 'application/json' } });
+            if (res.ok) { data = await res.json(); render(keepScroll); }
+        } finally { busy = false; }
+    }
+    const pick = (groupId, attr, val) => document.querySelectorAll(`#${groupId} [data-${attr}]`).forEach((b) => b.classList.toggle('is-on', b.dataset[attr] === val));
+    $('lg-sources').addEventListener('click', (e) => { const b = e.target.closest('[data-source]'); if (!b) return; state.source = b.dataset.source; pick('lg-sources', 'source', state.source); load(false); });
+    $('lg-level').addEventListener('click', (e) => { const b = e.target.closest('[data-level]'); if (!b) return; state.level = b.dataset.level; pick('lg-level', 'level', state.level); load(false); });
+    $('lg-lines').addEventListener('change', (e) => { state.lines = +e.target.value; load(false); });
+    $('lg-form').addEventListener('submit', (e) => { e.preventDefault(); state.q = $('lg-q').value; load(false); });
+    let typing;
+    $('lg-q').addEventListener('input', () => { clearTimeout(typing); typing = setTimeout(() => { state.q = $('lg-q').value; load(false); }, 350); });
+    $('lg-summary').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (!b) return; $('lg-q').value = b.dataset.q; state.q = b.dataset.q; load(false); });
+    $('lg-reload').addEventListener('click', () => load(true));
+    $('lg-bottom').addEventListener('click', () => { $('lg-box').scrollTop = $('lg-box').scrollHeight; });
+    $('lg-wrap').addEventListener('change', () => { try { localStorage.setItem('mj.logs.wrap', $('lg-wrap').checked ? '1' : '0'); } catch (e) {} render(true); });
+    $('lg-live').addEventListener('change', () => { clearInterval(timer); timer = $('lg-live').checked ? setInterval(() => { if (!document.hidden) load(true); }, 5000) : null; });
+    $('lg-copy').addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(data.lines.map((l) => l.text).join('\n')); $('lg-copy').textContent = '복사됨 ✓'; }
+        catch (e) { $('lg-copy').textContent = '복사 실패'; }
+        setTimeout(() => { $('lg-copy').textContent = '복사'; }, 1500);
+    });
+    render(false);
+})();
+</script>
+{% endblock %}

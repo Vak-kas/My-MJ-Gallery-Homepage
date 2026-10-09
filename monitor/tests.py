@@ -254,3 +254,62 @@ class BackupTests(TestCase):
 			self.assertFalse(backup.due())
 			with self.assertRaises(RuntimeError):
 				backup.run()
+
+
+class LogsTests(TestCase):
+	def setUp(self):
+		import tempfile
+		from pathlib import Path
+
+		self.tmp = tempfile.TemporaryDirectory()
+		root = Path(self.tmp.name)
+		(root / "nginx").mkdir()
+		(root / "nginx" / "access.log.1").write_text('1.1.1.1 - - [09/Oct/2026:23:00:00 +0900] "GET /old HTTP/1.1" 200 10 "-" "x"\n')
+		lines = [f'2.2.2.2 - - [10/Oct/2026:00:00:{i:02d} +0900] "GET /games/{i} HTTP/1.1" 200 10 "-" "x"' for i in range(30)]
+		lines.append('3.3.3.3 - - [10/Oct/2026:00:01:00 +0900] "GET /relay/ws/game/abc?token=SECRET123&pid=1 HTTP/1.1" 502 10 "-" "x"')
+		lines.append('4.4.4.4 - - [10/Oct/2026:00:01:01 +0900] "GET /nope HTTP/1.1" 404 10 "-" "x"')
+		(root / "nginx" / "access.log").write_text("\n".join(lines) + "\n")
+		(root / "auth.log").write_text("Oct 10 sshd[1]: Failed password for invalid user root from 5.5.5.5\nOct 10 sudo: ubuntu : COMMAND=/bin/ls\n")
+		self.patch = mock.patch("monitor.logs.LOG_ROOT", root)
+		self.patch.start()
+
+	def tearDown(self):
+		self.patch.stop()
+		self.tmp.cleanup()
+
+	def test_tail_masks_and_levels(self):
+		from . import logs
+
+		data = logs.read("access", lines=200)
+		texts = [l["text"] for l in data["lines"]]
+		self.assertIn("/old", texts[0])  # 줄이 모자라면 어제 로그(.1)도 앞에 붙임
+		self.assertTrue(all("SECRET123" not in t for t in texts))
+		self.assertIn("token=•••", texts[-2])
+		self.assertEqual([l["level"] for l in data["lines"][-2:]], ["err", "warn"])
+		self.assertEqual(dict(data["summary"]["status"])["5xx"], 1)
+
+	def test_filters(self):
+		from . import logs
+
+		self.assertEqual(len(logs.read("access", lines=200, level="err")["lines"]), 1)
+		self.assertEqual(len(logs.read("access", lines=200, level="warn")["lines"]), 2)
+		self.assertEqual(len(logs.read("access", lines=200, q="/GAMES/1")["lines"]), 11)  # 1, 10~19
+		auth = logs.read("auth", lines=200)["lines"]
+		self.assertEqual(auth[0]["level"], "warn")  # SSH 무작위 대입은 경고
+		self.assertEqual(auth[1]["level"], "")
+
+	def test_missing_source_and_page(self):
+		from . import logs
+
+		self.assertIn("없어요", logs.read("nginx_error")["error"])
+		admin = get_user_model().objects.create_superuser("admin", "a@example.com", "pw")
+		self.client.force_login(admin)
+		self.assertContains(self.client.get(reverse("studio:server_logs") + "?source=access"), "nginx 접속")
+		res = self.client.get(reverse("studio:server_logs") + "?source=access&format=json&level=err")
+		self.assertEqual(len(res.json()["lines"]), 1)
+
+	def test_admin_only(self):
+		user = get_user_model().objects.create_user("u", "u@example.com", "pw")
+		self.client.force_login(user)
+		res = self.client.get(reverse("studio:server_logs") + "?format=json")
+		self.assertNotEqual(res.status_code, 200)
