@@ -23,6 +23,8 @@
     .pp-res mark { background: #fff3b0; color: inherit; border-radius: 2px; padding: 0 1px; }
     .pp-label { font-size: 12px; color: #8e8e93; margin-right: 4px; }
     .pp-tog { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #424245; }
+    /* hidden 이 아래 display 보다 늦게 오면 덮이므로 명시 */
+    .rd-wrap.hidden, .cmp-bar.hidden, .rd-pop.hidden { display: none !important; }
     .rd-wrap { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.35); display: flex; justify-content: flex-end; }
     .rd-panel { width: min(100%, 900px); height: 100%; overflow-y: auto; background: #fff; box-shadow: -10px 0 40px rgba(0, 0, 0, 0.18); }
     .rd-panel.wide { width: min(100%, 1180px); }
