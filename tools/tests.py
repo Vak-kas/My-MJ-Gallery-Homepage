@@ -21,7 +21,7 @@ class ToolPagesTests(TestCase):
 			status = self.client.get(reverse(tool["url_name"])).status_code
 			if tool["access"] == "public":
 				self.assertEqual(status, 200, tool["slug"])
-			elif tool["access"] == "member":
+			elif tool["access"] in ("member", "vip"):
 				self.assertEqual(status, 302, tool["slug"])
 
 	def test_nav_has_tool_link(self):
@@ -1233,3 +1233,104 @@ class PaperAITests(TestCase):
 		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=graw):
 			g = self.post({"mode": "group", "papers": [{"title": "A", "fields": [{"key": "method", "value": "DRL"}]}, {"title": "B", "fields": []}]}).json()
 		self.assertEqual(g["groups"][0]["papers"], [1, 2])
+
+
+class StdLibTests(TestCase):
+	def setUp(self):
+		import shutil
+		import tempfile
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		from .permissions import set_vip
+		cache.clear()
+		self.tmp = tempfile.mkdtemp()
+		self.addCleanup(shutil.rmtree, self.tmp, True)
+		self.override = override_settings(PRIVATE_MEDIA_ROOT=self.tmp)
+		self.override.enable()
+		self.addCleanup(self.override.disable)
+		User = get_user_model()
+		self.vip = User.objects.create_user("vip", "v@example.com", "pw")
+		set_vip(self.vip, True)
+		self.member = User.objects.create_user("m", "m@example.com", "pw")
+
+	def make_pdf(self):
+		import fitz
+		doc = fitz.open()
+		lines = [("IEEE Std 802.11be-2024", 9, False), ("36. Extremely high throughput (EHT) PHY specification", 14, True),
+				 ("36.3.12.11 Preamble puncturing", 11, True), ("The EHT PPDU may be transmitted with preamble puncturing.", 10, False),
+				 ("A 320 MHz PPDU supports the puncturing patterns listed below.\x00", 10, False),
+				 ("Table 36-30: Puncturing patterns for 320 MHz PPDU", 9, True), ("Pattern 1 1 1 1 0 1 1 1", 9, False),
+				 ("36.3.12.12 Pilot subcarriers", 11, True), ("Pilot tones are inserted in each symbol.", 10, False)]
+		for p in range(6):
+			page = doc.new_page()
+			y = 50
+			for text, size, bold in (lines if p == 2 else [("IEEE Std 802.11be-2024", 9, False), (f"Filler text page {p} about OFDM symbols.", 10, False)]):
+				page.insert_text((50, y), text, fontsize=size, fontname="hebo" if bold else "helv")
+				y += 30
+		return doc.tobytes()
+
+	def upload(self):
+		from unittest import mock
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		self.client.force_login(self.vip)
+		with mock.patch("tools.stdlib.start_index") as start:
+			res = self.client.post("/tools/stdlib/upload/", {"file": SimpleUploadedFile("be.pdf", self.make_pdf(), content_type="application/pdf"), "title": "802.11be"})
+		self.assertEqual(res.status_code, 200, res.content)
+		start.assert_called_once()
+		from . import stdlib
+		stdlib.index_doc(res.json()["item"]["id"])
+		return res.json()["item"]["id"]
+
+	def test_access(self):
+		self.assertEqual(self.client.get("/tools/stdlib/").status_code, 302)
+		self.client.force_login(self.member)
+		self.assertEqual(self.client.get("/tools/stdlib/").status_code, 403)
+		self.assertEqual(self.client.get("/tools/stdlib/docs/", HTTP_ACCEPT="application/json").status_code, 403)
+		self.client.force_login(self.vip)
+		self.assertEqual(self.client.get("/tools/stdlib/").status_code, 200)
+
+	def test_index_search_page_and_privacy(self):
+		from .models import StdDoc
+		doc_id = self.upload()
+		doc = StdDoc.objects.get(pk=doc_id)
+		self.assertEqual((doc.status, doc.pages), ("ready", 6), doc.error)
+		clauses = list(doc.parts.values_list("clause", flat=True))
+		self.assertIn("36.3.12.11", clauses)
+		self.assertIn("Table 36-30", clauses)
+		res = self.client.get("/tools/stdlib/search/", {"q": "펑처링 pattern"}).json()
+		self.assertEqual(res["query"], "puncturing pattern")
+		self.assertTrue(any(i["clause"] in ("36.3.12.11", "Table 36-30") for i in res["items"]))
+		self.assertIn("<mark>", res["items"][0]["snippet"])
+		by_num = self.client.get("/tools/stdlib/search/", {"q": "36.3.12.11"}).json()["items"]
+		self.assertEqual(by_num[0]["title"], "Preamble puncturing")
+		self.assertEqual(by_num[0]["page"], 3)
+		png = self.client.get(f"/tools/stdlib/doc/{doc_id}/page/3.png")
+		self.assertEqual((png.status_code, png["Content-Type"]), (200, "image/png"))
+		full = self.client.get(f"/tools/stdlib/chunk/{by_num[0]['id']}/", {"q": "puncturing"}).json()
+		self.assertIn("<mark>", full["parts"][0]["html"])
+		# 다른 VIP 는 남의 문서를 못 봄
+		from django.contrib.auth import get_user_model
+		from .permissions import set_vip
+		other = get_user_model().objects.create_user("o", "o@example.com", "pw")
+		set_vip(other, True)
+		self.client.force_login(other)
+		self.assertEqual(self.client.get("/tools/stdlib/search/", {"q": "puncturing"}).json()["items"], [])
+		self.assertEqual(self.client.get(f"/tools/stdlib/doc/{doc_id}/page/3.png").status_code, 404)
+		self.assertEqual(self.client.get(f"/tools/stdlib/chunk/{by_num[0]['id']}/").status_code, 404)
+
+	def test_ask_uses_found_clauses(self):
+		import json
+		from unittest import mock
+		self.upload()
+		raw = {"answer": "320 MHz 에서는 표의 패턴을 쓴다 [1].", "quotes": [{"n": 1, "quote": "A 320 MHz PPDU supports the puncturing patterns"}, {"n": 9, "quote": "x"}], "confident": True}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=raw) as call:
+			d = self.client.post("/tools/stdlib/ask/", json.dumps({"q": "320 MHz puncturing patterns?", "search": "puncturing"}), content_type="application/json").json()
+		self.assertIn("p.3", call.call_args.kwargs["content"])
+		self.assertEqual([q["n"] for q in d["quotes"]], [1])
+		self.assertTrue(d["sources"][0]["clause"])
+
+	def test_rejects_non_pdf(self):
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		self.client.force_login(self.vip)
+		res = self.client.post("/tools/stdlib/upload/", {"file": SimpleUploadedFile("x.pdf", b"hello", content_type="application/pdf")})
+		self.assertEqual(res.status_code, 400)
