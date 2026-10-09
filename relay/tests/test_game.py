@@ -255,3 +255,68 @@ class CatchTestCase(_GameBase):
 		self.assertEqual([p["name"] for p in st["players"]], ["나", "다"])
 		await b.close()
 		await c.close()
+
+
+class _Room:
+	def __init__(self):
+		self.peers, self.notices = {}, []
+
+	def notice(self, text):
+		self.notices.append(text)
+
+
+class _Peer:
+	def __init__(self, pid, name):
+		self.pid, self.name = pid, name
+
+
+class OthelloTestCase(unittest.TestCase):
+	def setup(self):
+		logic, room = mj_game.OthelloLogic(), _Room()
+		a, b = _Peer("a", "흑돌"), _Peer("b", "백돌")
+		logic.on_message(room, a, {"type": "sit", "seat": "black"})
+		logic.on_message(room, b, {"type": "sit", "seat": "white"})
+		return logic, room, a, b
+
+	def test_start_flip_and_illegal(self):
+		logic, room, a, b = self.setup()
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["counts"]), ("playing", {"black": 2, "white": 2}))
+		self.assertEqual(sorted(map(tuple, st["legal"])), [(2, 3), (3, 2), (4, 5), (5, 4)])
+		ok, err = logic.on_message(room, a, {"type": "move", "x": 0, "y": 0})
+		self.assertIn("끼워서", err)
+		logic.on_message(room, a, {"type": "move", "x": 2, "y": 3})  # (3,3) 백이 뒤집힘
+		st = logic.snapshot(room)
+		self.assertEqual(st["counts"], {"black": 4, "white": 1})
+		self.assertEqual(st["flipped"], [[3, 3]])
+		self.assertEqual(st["turn"], "white")
+		# 무르기
+		logic.on_message(room, a, {"type": "undo-req"})
+		logic.on_message(room, b, {"type": "undo-ok"})
+		st = logic.snapshot(room)
+		self.assertEqual((st["counts"], st["turn"], st["move_count"]), ({"black": 2, "white": 2}, "black", 0))
+
+	def test_pass_and_finish(self):
+		logic, room, a, b = self.setup()
+		n = 8
+		# 흑이 거의 다 차지하고, 백이 둘 곳이 없게 만들어 봄: 빈칸 하나(7,7), 그 옆에 백 하나
+		logic.board = ["b"] * (n * n)
+		logic.board[7 * n + 7] = "."
+		logic.board[7 * n + 6] = "w"
+		logic.board[0] = "."
+		logic.board[1] = "w"
+		logic.history = []
+		# 흑이 (0,0)에 두면 (1,0) 백이 뒤집힘 → 백은 둘 곳 없음 → 흑이 한 번 더
+		logic.on_message(room, a, {"type": "move", "x": 0, "y": 0})
+		st = logic.snapshot(room)
+		self.assertEqual((st["turn"], st["passed"]), ("black", "white"))
+		self.assertIn("쉬어요", room.notices[-1])
+		logic.on_message(room, a, {"type": "move", "x": 7, "y": 7})
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["winner"]), ("over", "black"))
+		self.assertEqual(st["counts"], {"black": 64, "white": 0})
+		self.assertIn("64 대 0", st["reason"])
+		# 다시 하기 → 흑백 바뀌고 처음 판
+		logic.on_message(room, b, {"type": "rematch"})
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["counts"], st["seats"]["black"]["name"]), ("playing", {"black": 2, "white": 2}, "백돌"))

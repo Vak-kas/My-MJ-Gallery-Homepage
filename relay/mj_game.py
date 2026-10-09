@@ -236,6 +236,112 @@ class OmokLogic:
 		}
 
 
+class OthelloLogic(OmokLogic):
+	"""8×8 오셀로(리버시). 자리·기권·무르기·다시 하기는 오목과 같고, 두는 규칙만 다름.
+
+	상대 돌을 내 돌 사이에 끼우는 곳에만 둘 수 있고, 끼운 돌은 모두 뒤집힘.
+	둘 곳이 없으면 자동으로 넘어가고, 둘 다 둘 곳이 없으면 끝나서 돌이 많은 쪽이 이김.
+	"""
+
+	kind = "othello"
+	SIZE = 8
+	DIRS = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+
+	def reset(self):
+		super().reset()
+		n = self.SIZE
+		for x, y, c in ((3, 3, "w"), (4, 4, "w"), (3, 4, "b"), (4, 3, "b")):
+			self.board[y * n + x] = c
+		self.history = []  # 수마다 두기 전 (판, 차례) — 무르기용
+		self.flipped = []
+		self.passed = ""  # 방금 넘어간 쪽
+
+	def flips(self, x, y, c, board=None):
+		board = board or self.board
+		n = self.SIZE
+		if board[y * n + x] != ".":
+			return []
+		other = "w" if c == "b" else "b"
+		out = []
+		for dx, dy in self.DIRS:
+			run = []
+			nx, ny = x + dx, y + dy
+			while 0 <= nx < n and 0 <= ny < n and board[ny * n + nx] == other:
+				run.append((nx, ny))
+				nx, ny = nx + dx, ny + dy
+			if run and 0 <= nx < n and 0 <= ny < n and board[ny * n + nx] == c:
+				out += run
+		return out
+
+	def legal(self, c):
+		n = self.SIZE
+		return [(x, y) for y in range(n) for x in range(n) if self.flips(x, y, c)]
+
+	def counts(self):
+		return {"black": self.board.count("b"), "white": self.board.count("w")}
+
+	def on_message(self, room, peer, data):
+		kind = data.get("type")
+		seat = self.seat_of(peer.pid)
+		if kind == "move":
+			if self.status != "playing":
+				return False, "아직 대국이 시작되지 않았어요."
+			if seat != self.turn:
+				return False, "내 차례가 아니에요." if seat else "구경 중이에요."
+			try:
+				x, y = int(data.get("x")), int(data.get("y"))
+			except (TypeError, ValueError):
+				return False, None
+			n = self.SIZE
+			c = seat[0]
+			got = self.flips(x, y, c) if 0 <= x < n and 0 <= y < n else []
+			if not got:
+				return False, "상대 돌을 끼워서 뒤집을 수 있는 곳에만 둘 수 있어요."
+			self.history.append((self.board[:], self.turn))
+			self.board[y * n + x] = c
+			for fx, fy in got:
+				self.board[fy * n + fx] = c
+			self.moves.append((x, y, c))
+			self.flipped = [list(p) for p in got]
+			self.undo_from = None
+			self.passed = ""
+			other = "white" if seat == "black" else "black"
+			if self.legal(other[0]):
+				self.turn = other
+			elif self.legal(c):
+				self.passed = other
+				room.notice(f"{self.names[other]} 님은 둘 곳이 없어서 한 번 쉬어요.")
+			else:
+				cnt = self.counts()
+				if cnt["black"] == cnt["white"]:
+					self._finish(None, f"{cnt['black']} 대 {cnt['white']}, 무승부!")
+				else:
+					win = "black" if cnt["black"] > cnt["white"] else "white"
+					lose = "white" if win == "black" else "black"
+					self._finish(win, f"{self.names[win]} 님 승리! {cnt[win]} 대 {cnt[lose]}")
+			return True, None
+		if kind == "undo-ok":
+			if not self.undo_from or not seat or seat == self.undo_from or not self.history:
+				return False, None
+			self.board, _ = self.history.pop()
+			self.moves.pop()
+			self.turn = self.undo_from
+			self.flipped = []
+			self.passed = ""
+			self.undo_from = None
+			room.notice("한 수 물렀어요.")
+			return True, None
+		return super().on_message(room, peer, data)
+
+	def snapshot(self, room, pid=None):
+		data = super().snapshot(room, pid)
+		data["counts"] = self.counts()
+		data["flipped"] = self.flipped
+		data["passed"] = self.passed
+		data["legal"] = [list(p) for p in self.legal(self.turn[0])] if self.status == "playing" else []
+		return data
+
+
 # ── 그림 맞추기 ─────────────────────────────
 
 def _norm(text):
@@ -517,7 +623,7 @@ class CatchLogic:
 		}
 
 
-LOGICS = {"omok": OmokLogic, "catchmind": CatchLogic}
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic}
 
 
 @dataclass

@@ -102,6 +102,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "othello",
+		"url_name": "games:othello",
+		"icon": "⚪",
+		"title": "오셀로",
+		"description": "상대 돌을 끼워 뒤집는 8×8 리버시. 둘 수 있는 자리 표시, 뒤집히는 애니메이션, 돌 개수 실시간. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["1:1", "실시간"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",

@@ -1,4 +1,4 @@
-"""실시간 대전 게임 (오목·그림 맞추기) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
+"""실시간 대전 게임 (오목·오셀로·그림 맞추기) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
 
 방 만들기는 로그인 회원, 링크를 받은 사람은 로그인 없이 닉네임만으로 참여.
 게임 종류는 KINDS 에 한 줄 + 방 화면 템플릿 하나.
@@ -24,6 +24,12 @@ KINDS = {
 		"intro": "방을 만들고 링크를 보내면 실시간으로 같이 둬요. 받은 사람은 로그인 없이 닉네임만 넣으면 돼요. 15×15, 흑 먼저, 다섯 개 이상 이으면 승리(자유룰).",
 		"invite": "님이 오목 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.",
 		"placeholder": "방 이름 (예: 점심 내기 한 판)",
+	},
+	"othello": {
+		"title": "오셀로", "icon": "⚪", "eyebrow": "VERSUS · OTHELLO", "template": "games/othello_room.html",
+		"intro": "방을 만들고 링크를 보내면 실시간으로 같이 둬요. 받은 사람은 로그인 없이 닉네임만 넣으면 돼요. 8×8, 흑 먼저, 상대 돌을 끼우면 뒤집혀요. 끝났을 때 돌이 많은 쪽이 승리.",
+		"invite": "님이 오셀로 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.",
+		"placeholder": "방 이름 (예: 커피 내기 오셀로)",
 	},
 	"catchmind": {
 		"title": "그림 맞추기", "icon": "🎨", "eyebrow": "VERSUS · DRAW & GUESS", "template": "games/catchmind_room.html",
