@@ -1,0 +1,458 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .ct-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .ct-in { width: 100%; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .ct-in:focus { border-color: #0066cc; }
+    .ct-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .ct-btn:hover { background: #f5f5f7; }
+    .ct-btn:disabled { opacity: 0.45; cursor: default; }
+    .ct-go { border-radius: 999px; background: #0066cc; color: #fff; padding: 9px 20px; font-size: 14px; font-weight: 600; }
+    .ct-go:disabled { opacity: 0.5; }
+    .ct-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .ct-seg button { border-radius: 999px; padding: 5px 12px; font-size: 13px; color: #6e6e73; }
+    .ct-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .ct-ex { border-radius: 999px; background: #f5f5f7; padding: 3px 10px; font-size: 12px; color: #424245; font-family: ui-monospace, Menlo, monospace; }
+    .ct-ex:hover { background: #e8e8ed; }
+    .ct-out { margin-top: 10px; border-radius: 14px; background: #f5f5f7; padding: 12px 14px; font-size: 14px; line-height: 1.6; color: #1d1d1f; word-break: break-word; }
+    .ct-out.mono { font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
+    .ct-badge { border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; }
+    .ct-list li { padding: 8px 0; border-top: 1px solid rgba(0, 0, 0, 0.06); }
+    .ct-list li:first-child { border-top: 0; }
+    html.theme-dark .ct-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .ct-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .ct-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .ct-seg, html.theme-dark .ct-ex { background: #111318; color: #c7c7cc; }
+    html.theme-dark .ct-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .ct-out { background: #111318; color: #e8e8ea; }
+    html.theme-dark .ct-list li { border-color: rgba(255, 255, 255, 0.08); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">CITATION · BIBTEX</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">논문 인용 만들기.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">DOI · arXiv 번호 · 논문 제목 · 3GPP 규격 번호를 넣으면 BibTeX와 APA·IEEE·MLA·Chicago 인용을 바로 만들어요. 서지 정보는 Crossref·arXiv·3GPP 포털에서 가져와요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_400px]">
+        <section class="min-w-0 space-y-4">
+            <div class="ct-card">
+                <div class="ct-seg" id="ct-mode">
+                    <button type="button" class="is-on" data-mode="find">🔎 찾기</button>
+                    <button type="button" data-mode="bib">📋 BibTeX 붙여넣기</button>
+                </div>
+                <form id="ct-form" class="mt-3">
+                    <textarea id="ct-q" class="ct-in" rows="3" placeholder="한 줄에 하나씩 (최대 20개)&#10;예) 10.1109/CVPR.2016.90 · arXiv:1706.03762 · TS 38.321 · Attention is all you need"></textarea>
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5" id="ct-examples">
+                        <span class="mr-1 text-[12px] text-[#8e8e93]">예시</span>
+                        <button type="button" class="ct-ex">10.1109/CVPR.2016.90</button>
+                        <button type="button" class="ct-ex">arXiv:1706.03762</button>
+                        <button type="button" class="ct-ex">TS 38.321</button>
+                        <button type="button" class="ct-ex">TR 38.901 v17.0.0</button>
+                        <button type="button" class="ct-ex">Attention is all you need</button>
+                        <button type="submit" class="ct-go ml-auto" id="ct-go">찾기</button>
+                    </div>
+                </form>
+                <p class="mt-2 hidden text-[12px] text-[#8e8e93]" id="ct-bib-help">갖고 있는 BibTeX(여러 개도 돼요)를 붙여넣으면 다른 형식으로 바꿔 줘요. 서버로 보내지 않고 이 브라우저에서 바로 바꿔요.</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="text-[13px] text-[#6e6e73]">형식</span>
+                <div class="ct-seg" id="ct-style">
+                    <button type="button" data-style="bibtex">BibTeX</button>
+                    <button type="button" data-style="apa">APA 7</button>
+                    <button type="button" data-style="ieee">IEEE</button>
+                    <button type="button" data-style="mla">MLA 9</button>
+                    <button type="button" data-style="chicago">Chicago</button>
+                </div>
+            </div>
+
+            <div id="ct-results" class="space-y-3"></div>
+        </section>
+
+        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <section class="ct-card">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-[15px] font-semibold">📚 내 참고문헌</h2>
+                    <span class="text-[12px] text-[#8e8e93]" id="ct-count"></span>
+                </div>
+                <p class="mt-1 text-[12px] text-[#8e8e93]">위에서 고른 형식으로 보여요. 이 브라우저에만 저장돼요.</p>
+                <ol class="ct-list mt-3 max-h-[52vh] overflow-y-auto text-[13px] leading-5" id="ct-list"></ol>
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                    <button type="button" class="ct-btn" id="ct-copy-all">모두 복사</button>
+                    <button type="button" class="ct-btn" id="ct-bib-dl">.bib 저장</button>
+                    <button type="button" class="ct-btn ml-auto text-[#c4271d]" id="ct-clear">비우기</button>
+                </div>
+            </section>
+            <section class="ct-card text-[12px] leading-5 text-[#6e6e73]">
+                <p>· 복사하면 기울임(이탤릭)까지 같이 복사돼서 워드·한글에 그대로 붙어요.</p>
+                <p>· 3GPP는 최신 버전이 기본이고, 릴리스별 버전을 고를 수 있어요. BibTeX는 <a class="underline" href="https://github.com/martisak/3gpp-citations" target="_blank" rel="noopener">3gpp-citations</a> 형식을 따라요.</p>
+                <p>· 자동으로 만든 인용이라 제출 전에 학교·학회 양식과 한 번 맞춰 보세요.</p>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>window.CITE_LOOKUP = '{% url "tools:cite_lookup" %}';</script>
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const LOOKUP = window.CITE_LOOKUP;
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const MON = ['', 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'Jun.', 'Jul.', 'Aug.', 'Sep.', 'Oct.', 'Nov.', 'Dec.'];
+    const MON_FULL = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const MON_BIB = ['', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+    let style = store.get('mj.cite.style', 'bibtex');
+    let mode = 'find';
+    let results = [];  // [{ q, item } | { q, error } | { q, candidates }]
+    let list = store.get('mj.cite.list', []);
+
+    // ── 이름 ──
+    const hangul = (s) => /[가-힣]/.test(s || '');
+    const initials = (given) => (given || '').split(/\s+/).filter(Boolean).map((w) => w.split('-').map((p) => p[0] ? p[0].toUpperCase() + '.' : '').join('-')).join(' ');
+    const fullName = (a) => a.literal || !a.given ? a.family : hangul(a.family) ? a.family + a.given : `${a.given} ${a.family}`;
+    const joinAnd = (arr, and, serial = true) => arr.length <= 1 ? arr.join('') : arr.length === 2 ? `${arr[0]} ${and} ${arr[1]}` : `${arr.slice(0, -1).join(', ')}${serial ? ',' : ''} ${and} ${arr[arr.length - 1]}`;
+    function authorsAPA(as) {
+        const one = (a) => a.literal || !a.given ? a.family : hangul(a.family) ? a.family + a.given : `${a.family}, ${initials(a.given)}`;
+        if (!as.length) return '';
+        if (as.length > 20) return as.slice(0, 19).map(one).join(', ') + ', . . . ' + one(as[as.length - 1]);
+        return as.length === 1 ? one(as[0]) : as.slice(0, -1).map(one).join(', ') + ', & ' + one(as[as.length - 1]);
+    }
+    function authorsIEEE(as) {
+        const one = (a) => a.literal || !a.given ? a.family : hangul(a.family) ? a.family + a.given : `${initials(a.given)} ${a.family}`;
+        if (as.length > 6) return one(as[0]) + ' et al.';
+        return joinAnd(as.map(one), 'and', as.length > 2);
+    }
+    function authorsMLA(as) {
+        const first = (a) => a.literal || !a.given ? a.family : hangul(a.family) ? a.family + a.given : `${a.family}, ${a.given}`;
+        if (!as.length) return '';
+        if (as.length === 1) return first(as[0]);
+        if (as.length === 2) return `${first(as[0])}, and ${fullName(as[1])}`;
+        return `${first(as[0])}, et al`;
+    }
+    function authorsChicago(as) {
+        const first = (a) => a.literal || !a.given ? a.family : hangul(a.family) ? a.family + a.given : `${a.family}, ${a.given}`;
+        if (!as.length) return '';
+        const shown = as.length > 10 ? as.slice(0, 7) : as;
+        const names = [first(shown[0]), ...shown.slice(1).map(fullName)];
+        return as.length > 10 ? names.join(', ') + ', et al' : names.length === 1 ? names[0] : names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+    }
+    const dot = (s) => (s && !/[.?!]$/.test(s) ? s + '.' : s);
+    const pagesDash = (p) => (p || '').replace(/\s*-+\s*/g, '–');
+    const doiUrl = (it) => it.doi ? `https://doi.org/${it.doi}` : it.arxiv ? `https://doi.org/10.48550/arXiv.${it.arxiv}` : it.url || '';
+    const I = (s) => (s ? `<i>${esc(s)}</i>` : '');
+    const E = esc;
+
+    // ── 형식별 (HTML 로 만들고, 복사할 때 글자만도 같이) ──
+    const F = {
+        apa(it) {
+            const au = authorsAPA(it.authors);
+            const date = it.type === 'standard' && it.month ? `${it.year}, ${MON_FULL[it.month]}${it.day ? ' ' + it.day : ''}` : it.year || 'n.d.';
+            const head = au ? `${E(dot(au))} (${date}). ` : '';
+            const link = doiUrl(it) ? ' ' + E(doiUrl(it)) : '';
+            if (it.type === 'article') {
+                const vol = it.volume ? `, ${I(it.volume)}${it.issue ? `(${E(it.issue)})` : ''}` : '';
+                const pg = it.pages ? `, ${E(pagesDash(it.pages))}` : it.article_number ? `, Article ${E(it.article_number)}` : '';
+                return `${head}${E(dot(it.title))} ${I(it.container)}${vol}${pg}.${link}`;
+            }
+            if (it.type === 'inproceedings' || it.type === 'incollection') {
+                return `${head}${E(dot(it.title))} In ${I(it.container)}${it.pages ? ` (pp. ${E(pagesDash(it.pages))})` : ''}. ${it.publisher ? E(dot(it.publisher)) : ''}${link}`.replace(/\s+$/, '');
+            }
+            if (it.type === 'preprint') {
+                return `${head}${I(it.title)}${it.arxiv ? ` (arXiv:${E(it.arxiv)})` : ''}. arXiv.${link}`;
+            }
+            if (it.type === 'standard') {
+                return `${head}${I(it.title)} (${E(it.number)}${it.version ? `, Version ${E(it.version)}` : ''}). 3rd Generation Partnership Project. ${E(it.url)}`;
+            }
+            return `${head}${I(it.title)}.${it.publisher ? ' ' + E(dot(it.publisher)) : ''}${link}`;
+        },
+        ieee(it) {
+            const au = authorsIEEE(it.authors);
+            const head = au ? `${E(au)}, ` : '';
+            const when = `${it.month ? MON[it.month] + ' ' : ''}${it.year || ''}`;
+            const doi = it.doi ? `, doi: ${E(it.doi)}` : '';
+            if (it.type === 'article') {
+                const parts = [I(it.container), it.volume && `vol. ${E(it.volume)}`, it.issue && `no. ${E(it.issue)}`, it.pages ? `pp. ${E(pagesDash(it.pages))}` : it.article_number && `Art. no. ${E(it.article_number)}`, when].filter(Boolean);
+                return `${head}“${E(it.title)},” ${parts.join(', ')}${doi}.`;
+            }
+            if (it.type === 'inproceedings') {
+                return `${head}“${E(it.title)},” in ${I(it.container)}, ${it.year || ''}${it.pages ? `, pp. ${E(pagesDash(it.pages))}` : ''}${doi}.`;
+            }
+            if (it.type === 'incollection') return `${head}“${E(it.title)},” in ${I(it.container)}${it.publisher ? `, ${E(it.publisher)}` : ''}, ${it.year || ''}${it.pages ? `, pp. ${E(pagesDash(it.pages))}` : ''}${doi}.`;
+            if (it.type === 'preprint') return `${head}“${E(it.title)},” ${I(it.arxiv ? 'arXiv:' + it.arxiv : 'preprint')}, ${when}${doi}.`;
+            if (it.type === 'standard') return `${head}“${E(it.title)},” ${E(it.institution)}, ${E(it.number)}, ${when}${it.version ? `, version ${E(it.version)}` : ''}.`;
+            if (it.type === 'book') return `${head}${I(it.title)}. ${it.publisher ? E(it.publisher) + ', ' : ''}${it.year || ''}${doi}.`;
+            return `${head}“${E(it.title)},” ${it.publisher ? E(it.publisher) + ', ' : ''}${when}${doi}.`;
+        },
+        mla(it) {
+            const au = authorsMLA(it.authors);
+            const head = au ? `${E(dot(au))} ` : '';
+            const link = doiUrl(it) ? ' ' + E(doiUrl(it).replace(/^https?:\/\//, '')) + '.' : '';
+            if (it.type === 'article') {
+                const parts = [I(it.container), it.volume && `vol. ${E(it.volume)}`, it.issue && `no. ${E(it.issue)}`, it.year, it.pages && `pp. ${E(pagesDash(it.pages))}`].filter(Boolean);
+                return `${head}“${E(dot(it.title))}” ${parts.join(', ')}.${link}`;
+            }
+            if (it.type === 'inproceedings' || it.type === 'incollection') {
+                const parts = [I(it.container), it.publisher && E(it.publisher), it.year, it.pages && `pp. ${E(pagesDash(it.pages))}`].filter(Boolean);
+                return `${head}“${E(dot(it.title))}” ${parts.join(', ')}.${link}`;
+            }
+            if (it.type === 'preprint') return `${head}“${E(dot(it.title))}” ${I('arXiv')}, ${it.year || ''}${it.arxiv ? `, arXiv:${E(it.arxiv)}` : ''}.${link}`;
+            if (it.type === 'standard') return `${head}${I(dot(it.title))} ${E(it.number)}${it.version ? `, version ${E(it.version)}` : ''}, 3rd Generation Partnership Project, ${it.day ? it.day + ' ' : ''}${it.month ? MON[it.month] + ' ' : ''}${it.year || ''}.`;
+            return `${head}${I(dot(it.title))} ${it.publisher ? E(it.publisher) + ', ' : ''}${it.year || ''}.${link}`;
+        },
+        chicago(it) {
+            const au = authorsChicago(it.authors);
+            const head = au ? `${E(dot(au))} ` : '';
+            const link = doiUrl(it) ? ' ' + E(doiUrl(it)) + '.' : '';
+            if (it.type === 'article') {
+                return `${head}“${E(dot(it.title))}” ${I(it.container)}${it.volume ? ' ' + E(it.volume) : ''}${it.issue ? `, no. ${E(it.issue)}` : ''} (${it.year || 'n.d.'})${it.pages ? `: ${E(pagesDash(it.pages))}` : ''}.${link}`;
+            }
+            if (it.type === 'inproceedings' || it.type === 'incollection') {
+                return `${head}“${E(dot(it.title))}” In ${I(it.container)}${it.pages ? `, ${E(pagesDash(it.pages))}` : ''}. ${it.publisher ? E(it.publisher) + ', ' : ''}${it.year || ''}.${link}`;
+            }
+            if (it.type === 'preprint') return `${head}“${E(dot(it.title))}” Preprint, arXiv, ${it.month ? MON_FULL[it.month] + ' ' : ''}${it.year || ''}.${link}`;
+            if (it.type === 'standard') return `${head}${I(dot(it.title))} ${E(it.number)}${it.version ? `, version ${E(it.version)}` : ''}. 3rd Generation Partnership Project, ${it.year || ''}. ${E(it.url)}.`;
+            return `${head}${I(dot(it.title))} ${it.publisher ? E(it.publisher) + ', ' : ''}${it.year || ''}.${link}`;
+        },
+        bibtex(it) { return E(bibtex(it)); },
+    };
+
+    // ── BibTeX ──
+    const texEsc = (s) => String(s ?? '').replace(/([&%#_$])/g, '\\$1');
+    const ascii = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9]/g, '');
+    const STOP = new Set(['a', 'an', 'the', 'on', 'of', 'in', 'for', 'and', 'to', 'with', 'is', 'are', 'via', 'towards', 'toward', 'from', 'by', 'at']);
+    function bibKey(it) {
+        if (it.type === 'standard') return `3gpp.${it.spec_number || it.number}`;
+        const fam = ascii(it.authors[0]?.family).toLowerCase() || 'ref';
+        const word = (it.title || '').split(/\s+/).map((w) => ascii(w).toLowerCase()).find((w) => w && !STOP.has(w)) || '';
+        return `${fam}${it.year || ''}${word}`;
+    }
+    const bibAuthors = (as) => as.map((a) => (a.literal || !a.given ? `{${texEsc(a.family)}}` : `${texEsc(a.family)}, ${texEsc(a.given)}`)).join(' and ');
+    function bibtex(it) {
+        const f = [];
+        const add = (k, v, raw) => { if (v !== undefined && v !== null && String(v).trim() !== '') f.push([k, raw ? String(v) : `{${texEsc(v)}}`]); };
+        let type = { article: 'article', inproceedings: 'inproceedings', incollection: 'incollection', book: 'book', thesis: 'phdthesis', report: 'techreport', standard: 'techreport', preprint: 'misc' }[it.type] || 'misc';
+        if (it.type === 'standard') {
+            // martisak/3gpp-citations 와 같은 모양
+            f.push(['author', '{3GPP}']);
+            f.push(['title', `{{${texEsc(it.title)}}}`]);
+            f.push(['institution', `{{${texEsc(it.institution)}}}`]);
+            add('type', it.report_type);
+            add('number', it.spec_number);
+            if (it.version) add('note', `Version ${it.version}`);
+            if (it.day) add('day', String(it.day).padStart(2, '0'));
+            if (it.month) add('month', String(it.month).padStart(2, '0'));
+            add('year', it.year);
+            if (it.url) f.push(['url', `{${it.url}}`]);
+        } else {
+            if (it.authors.length) f.push(['author', `{${bibAuthors(it.authors)}}`]);
+            add('title', it.title);
+            if (type === 'article') add('journal', it.container);
+            if (type === 'inproceedings' || type === 'incollection') add('booktitle', it.container);
+            add('year', it.year);
+            if (it.month) f.push(['month', MON_BIB[it.month]]);
+            add('volume', it.volume);
+            add('number', it.issue);
+            add('pages', (it.pages || '').replace(/\s*[-–]+\s*/g, '--'));
+            if (!it.pages && it.article_number && type === 'article') add('articleno', it.article_number);
+            if (type !== 'article' && type !== 'misc') add('publisher', it.publisher);
+            if (it.type === 'preprint' && it.arxiv) { add('eprint', it.arxiv); add('archivePrefix', 'arXiv'); add('primaryClass', it.primary_class); }
+            add('isbn', it.isbn);
+            if (it.doi) f.push(['doi', `{${it.doi}}`]);
+            if (it.url && !it.doi) f.push(['url', `{${it.url}}`]);
+        }
+        const w = Math.max(...f.map(([k]) => k.length));
+        return `@${type}{${it.key || bibKey(it)},\n${f.map(([k, v]) => `  ${k.padEnd(w)} = ${v}`).join(',\n')}\n}`;
+    }
+
+    // ── BibTeX 읽기 (붙여넣기) ──
+    function parseBib(src) {
+        const out = [];
+        let i = 0;
+        while ((i = src.indexOf('@', i)) !== -1) {
+            const m = /^@(\w+)\s*\{\s*([^,\s]*)\s*,/.exec(src.slice(i));
+            if (!m) { i++; continue; }
+            if (/^(comment|string|preamble)$/i.test(m[1])) { i += m[0].length; continue; }
+            let j = i + m[0].length, depth = 1;
+            const start = j;
+            while (j < src.length && depth > 0) { if (src[j] === '{') depth++; else if (src[j] === '}') depth--; j++; }
+            const body = src.slice(start, j - 1);
+            const fields = {};
+            const re = /(\w[\w-]*)\s*=\s*/g;
+            let fm;
+            while ((fm = re.exec(body))) {
+                let k = fm[1].toLowerCase(), p = re.lastIndex, v = '';
+                if (body[p] === '{') { let d = 0, q = p; do { if (body[q] === '{') d++; else if (body[q] === '}') d--; q++; } while (q < body.length && d > 0); v = body.slice(p + 1, q - 1); re.lastIndex = q; }
+                else if (body[p] === '"') { const q = body.indexOf('"', p + 1); v = body.slice(p + 1, q); re.lastIndex = q + 1; }
+                else { const q = body.slice(p).search(/[,\n}]/); v = body.slice(p, q < 0 ? undefined : p + q).trim(); re.lastIndex = p + Math.max(q, 0); }
+                fields[k] = v.replace(/[{}]/g, '').replace(/\\([&%#_$])/g, '$1').replace(/\s+/g, ' ').trim();
+            }
+            out.push(fromBib(m[1].toLowerCase(), m[2], fields));
+            i = j;
+        }
+        return out;
+    }
+    function fromBib(type, key, f) {
+        const authors = (f.author || '').split(/\s+and\s+/i).filter(Boolean).map((n) => {
+            if (n.includes(',')) { const [fam, ...g] = n.split(','); return { family: fam.trim(), given: g.join(',').trim() }; }
+            const parts = n.trim().split(/\s+/);
+            return parts.length === 1 ? { family: parts[0], given: '', literal: true } : { family: parts.pop(), given: parts.join(' ') };
+        });
+        const mon = f.month ? (MON_BIB.indexOf(f.month.slice(0, 3).toLowerCase()) > 0 ? MON_BIB.indexOf(f.month.slice(0, 3).toLowerCase()) : parseInt(f.month, 10) || null) : null;
+        const is3gpp = /3gpp/i.test(f.author || '') && /3rd generation|3gpp/i.test(f.institution || '');
+        const kind = is3gpp ? 'standard' : ({ article: 'article', inproceedings: 'inproceedings', conference: 'inproceedings', incollection: 'incollection', inbook: 'incollection', book: 'book', phdthesis: 'thesis', mastersthesis: 'thesis', techreport: 'report' }[type] || (f.eprint || /arxiv/i.test(f.journal || '') ? 'preprint' : 'misc'));
+        const version = (f.note || '').match(/(\d+\.\d+\.\d+)/)?.[1] || '';
+        const specType = /report/i.test(f.type || '') ? 'TR' : 'TS';
+        return {
+            key, type: kind, title: f.title || '', authors, editors: [],
+            year: parseInt(f.year, 10) || null, month: mon, day: parseInt(f.day, 10) || null,
+            container: f.journal || f.booktitle || '', volume: f.volume || '', issue: f.number && kind !== 'standard' && kind !== 'report' ? f.number : '',
+            pages: (f.pages || '').replace(/-+/g, '-'), article_number: f.articleno || '', publisher: f.publisher || f.institution || f.school || '',
+            institution: f.institution || '3rd Generation Partnership Project (3GPP)', doi: (f.doi || '').replace(/^https?:\/\/(dx\.)?doi\.org\//, '').toLowerCase(),
+            url: f.url || '', isbn: f.isbn || '', arxiv: f.eprint || '', primary_class: f.primaryclass || '',
+            number: kind === 'standard' ? `${specType} ${f.number || ''}` : f.number || '', spec_number: f.number || '', spec_type: specType,
+            report_type: f.type || (specType === 'TR' ? 'Technical Report (TR)' : 'Technical Specification (TS)'), version, source: 'bibtex',
+        };
+    }
+
+    // ── 화면 ──
+    const plain = (htmlStr) => { const d = document.createElement('div'); d.innerHTML = htmlStr; return d.textContent; };
+    async function copyRich(htmlStr, btn) {
+        const text = plain(htmlStr);
+        try {
+            if (style !== 'bibtex' && window.ClipboardItem) {
+                await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([htmlStr], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+            } else await navigator.clipboard.writeText(text);
+            if (btn) { const old = btn.textContent; btn.textContent = '✓ 복사됨'; setTimeout(() => { btn.textContent = old; }, 1300); }
+        } catch (e) { prompt('복사하세요', text); }
+    }
+    const sameItem = (a, b) => (a.doi && a.doi.toLowerCase() === (b.doi || '').toLowerCase()) || (a.arxiv && a.arxiv === b.arxiv) || (a.type === 'standard' ? a.spec_number === b.spec_number && a.version === b.version : !a.doi && !a.arxiv && a.title && a.title.toLowerCase() === (b.title || '').toLowerCase());
+    const badge = (it) => ({ crossref: ['DOI', '#e8f1fb', '#0066cc'], arxiv: ['arXiv', '#fdecec', '#b31b1b'], '3gpp': ['3GPP', '#ecfdf5', '#0f9f6e'], bibtex: ['BibTeX', '#f5f5f7', '#424245'] }[it.source] || ['', '#f5f5f7', '#424245']);
+    function meta(it) {
+        const au = it.authors.slice(0, 3).map(fullName).join(', ') + (it.authors.length > 3 ? ` 외 ${it.authors.length - 3}명` : '');
+        return [au, it.container && it.container !== 'arXiv' ? it.container : '', it.type === 'standard' ? `${it.number} · v${it.version} (Rel-${it.release ?? it.version.split('.')[0]})` : '', it.year].filter(Boolean).join(' · ');
+    }
+    function itemCard(it, idx) {
+        const [b, bg, fg] = badge(it);
+        const out = F[style](it);
+        const inList = list.some((x) => sameItem(x, it));
+        const releases = it.type === 'standard' && it.releases?.length ? `<select class="ct-btn" data-ver="${idx}">${it.releases.map((r) => `<option value="${esc(r.version)}" ${r.version === it.version ? 'selected' : ''}>Rel-${esc(r.version.split('.')[0])} · v${esc(r.version)} (${esc(r.date)})</option>`).join('')}${it.releases.some((r) => r.version === it.version) ? '' : `<option selected>v${esc(it.version)}</option>`}</select>` : '';
+        return `<div class="ct-card">
+            <div class="flex items-start gap-2"><span class="ct-badge mt-0.5" style="background:${bg};color:${fg}">${b}</span>
+                <div class="min-w-0 flex-1"><p class="text-[15px] font-semibold leading-snug">${esc(it.title)}</p><p class="mt-0.5 text-[12px] text-[#8e8e93]">${esc(meta(it))}</p></div></div>
+            <div class="ct-out ${style === 'bibtex' ? 'mono' : ''}">${out}</div>
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <button type="button" class="ct-btn" data-copy="${idx}">복사</button>
+                <button type="button" class="ct-btn" data-add="${idx}" ${inList ? 'disabled' : ''}>${inList ? '✓ 목록에 있음' : '＋ 내 참고문헌에'}</button>
+                ${releases}
+                ${it.url ? `<a class="ml-auto text-[12px] text-[#0066cc]" href="${esc(it.url)}" target="_blank" rel="noopener">원문 ↗</a>` : ''}
+            </div></div>`;
+    }
+    function renderResults() {
+        $('ct-results').innerHTML = results.map((r, idx) => {
+            if (r.loading) return `<div class="ct-card text-[13px] text-[#8e8e93]">⏳ ${esc(r.q)} 찾는 중…</div>`;
+            if (r.error) return `<div class="ct-card text-[13px]"><b>${esc(r.q)}</b> <span class="text-[#c4271d]">— ${esc(r.error)}</span></div>`;
+            if (r.candidates) return `<div class="ct-card"><p class="text-[13px] text-[#6e6e73]">“${esc(r.q)}” 검색 결과 — 찾는 논문을 고르세요</p><ul class="mt-2 space-y-1">${r.candidates.map((c, j) => {
+                const [b, bg, fg] = badge(c);
+                return `<li><button type="button" class="w-full rounded-xl px-3 py-2 text-left hover:bg-[#f5f5f7] dark:hover:bg-[#111318]" data-pick="${idx}:${j}"><span class="ct-badge" style="background:${bg};color:${fg}">${b}</span> <b class="text-[14px]">${esc(c.title)}</b><span class="block text-[12px] text-[#8e8e93]">${esc(meta(c))}</span></button></li>`;
+            }).join('') || '<li class="text-[13px] text-[#8e8e93]">찾지 못했어요. DOI 로 넣어 보세요.</li>'}</ul></div>`;
+            return itemCard(r.item, idx);
+        }).join('');
+    }
+    function sortedList() {
+        if (style === 'ieee') return list;
+        return [...list].sort((a, b) => (a.authors[0]?.family || a.title).localeCompare(b.authors[0]?.family || b.title, 'en') || (a.year || 0) - (b.year || 0));
+    }
+    function renderList() {
+        $('ct-count').textContent = list.length ? `${list.length}개` : '';
+        const items = sortedList();
+        $('ct-list').innerHTML = items.map((it, i) => `<li class="flex gap-2"><span class="w-6 shrink-0 text-[#8e8e93]">${style === 'ieee' ? `[${i + 1}]` : '·'}</span><span class="min-w-0 flex-1 ${style === 'bibtex' ? 'font-mono text-[11px] whitespace-pre-wrap' : ''}">${style === 'bibtex' ? esc(bibKey(it)) + ' — ' + esc(it.title) : F[style](it)}</span><button type="button" class="text-[#8e8e93] hover:text-[#c4271d]" data-del="${list.indexOf(it)}" title="빼기">✕</button></li>`).join('') || '<li class="py-6 text-center text-[#8e8e93]">“＋ 내 참고문헌에”로 모아 보세요</li>';
+        $('ct-copy-all').disabled = $('ct-bib-dl').disabled = $('ct-clear').disabled = !list.length;
+    }
+    function renderAll() {
+        document.querySelectorAll('#ct-style [data-style]').forEach((b) => b.classList.toggle('is-on', b.dataset.style === style));
+        renderResults(); renderList();
+    }
+
+    async function lookup(q) {
+        const res = await fetch(`${LOOKUP}?q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!res.ok) throw new Error(data.error || '찾지 못했어요.');
+        return data;
+    }
+    async function run() {
+        const raw = $('ct-q').value;
+        if (mode === 'bib') {
+            const items = parseBib(raw);
+            results = items.length ? items.map((item) => ({ q: item.key, item })) : [{ q: 'BibTeX', error: '@article{…} 같은 BibTeX 항목을 찾지 못했어요.' }];
+            renderResults();
+            return;
+        }
+        const qs = [...new Set(raw.split('\n').map((s) => s.trim()).filter(Boolean))].slice(0, 20);
+        if (!qs.length) return;
+        $('ct-go').disabled = true;
+        results = qs.map((q) => ({ q, loading: true }));
+        renderResults();
+        for (let k = 0; k < qs.length; k++) {  // 하나씩 차례로 (외부 서버에 몰아서 보내지 않게)
+            try {
+                const data = await lookup(qs[k]);
+                results[k] = data.kind === 'search' ? { q: qs[k], candidates: data.items } : { q: qs[k], item: data.items[0] };
+            } catch (e) { results[k] = { q: qs[k], error: e.message }; }
+            renderResults();
+        }
+        $('ct-go').disabled = false;
+    }
+
+    $('ct-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    $('ct-q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } });
+    $('ct-examples').addEventListener('click', (e) => { const b = e.target.closest('.ct-ex'); if (!b) return; $('ct-q').value = b.textContent; run(); });
+    $('ct-mode').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-mode]'); if (!b) return;
+        mode = b.dataset.mode;
+        document.querySelectorAll('#ct-mode [data-mode]').forEach((x) => x.classList.toggle('is-on', x === b));
+        $('ct-examples').querySelectorAll('.ct-ex, span').forEach((x) => x.classList.toggle('hidden', mode === 'bib'));
+        $('ct-bib-help').classList.toggle('hidden', mode !== 'bib');
+        $('ct-go').textContent = mode === 'bib' ? '변환' : '찾기';
+        $('ct-q').rows = mode === 'bib' ? 8 : 3;
+        $('ct-q').placeholder = mode === 'bib' ? '@article{key,\n  author = {...},\n  title = {...},\n  ...\n}' : '한 줄에 하나씩 (최대 20개)\n예) 10.1109/CVPR.2016.90 · arXiv:1706.03762 · TS 38.321 · Attention is all you need';
+    });
+    $('ct-style').addEventListener('click', (e) => { const b = e.target.closest('[data-style]'); if (!b) return; style = b.dataset.style; store.set('mj.cite.style', style); renderAll(); });
+    $('ct-results').addEventListener('click', (e) => {
+        const c = e.target.closest('[data-copy]'), a = e.target.closest('[data-add]'), p = e.target.closest('[data-pick]');
+        if (c) copyRich(F[style](results[+c.dataset.copy].item), c);
+        if (a) { const it = results[+a.dataset.add].item; if (!list.some((x) => sameItem(x, it))) { list.push(it); store.set('mj.cite.list', list); } renderAll(); }
+        if (p) { const [i, j] = p.dataset.pick.split(':').map(Number); results[i] = { q: results[i].q, item: results[i].candidates[j] }; renderResults(); }
+    });
+    $('ct-results').addEventListener('change', async (e) => {
+        const s = e.target.closest('[data-ver]'); if (!s) return;
+        const i = +s.dataset.ver, it = results[i].item;
+        try { const data = await lookup(`${it.spec_type} ${it.spec_number} v${s.value}`); results[i] = { q: results[i].q, item: data.items[0] }; }
+        catch (err) { results[i] = { q: results[i].q, error: err.message }; }
+        renderResults();
+    });
+    $('ct-list').addEventListener('click', (e) => { const d = e.target.closest('[data-del]'); if (!d) return; list.splice(+d.dataset.del, 1); store.set('mj.cite.list', list); renderAll(); });
+    $('ct-copy-all').addEventListener('click', (e) => {
+        const items = sortedList();
+        const htmlStr = style === 'bibtex' ? items.map((it) => esc(bibtex(it))).join('\n\n') : items.map((it, i) => `<p>${style === 'ieee' ? `[${i + 1}] ` : ''}${F[style](it)}</p>`).join('');
+        if (style === 'bibtex') { navigator.clipboard.writeText(plain(htmlStr)).then(() => { e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '모두 복사'; }, 1300); }); }
+        else copyRich(htmlStr, e.target);
+    });
+    $('ct-bib-dl').addEventListener('click', () => {
+        const blob = new Blob([list.map(bibtex).join('\n\n') + '\n'], { type: 'application/x-bibtex' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'references.bib'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+    $('ct-clear').addEventListener('click', () => { if (confirm('내 참고문헌을 모두 지울까요?')) { list = []; store.set('mj.cite.list', list); renderAll(); } });
+    renderAll();
+    window.__cite = { F, bibtex, parseBib, results: () => results, list: () => list };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

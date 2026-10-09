@@ -135,6 +135,8 @@ KAKAO_JS_KEY = os.getenv("KAKAO_JS_KEY", "")
 # 검색엔진 소유 확인 (HTML 태그 방식의 content 값) — 구글 서치 콘솔 / 네이버 서치어드바이저
 GOOGLE_SITE_VERIFICATION = os.getenv("GOOGLE_SITE_VERIFICATION", "")
 NAVER_SITE_VERIFICATION = os.getenv("NAVER_SITE_VERIFICATION", "")
+# 논문 인용 도구가 Crossref API 를 부를 때 알려 주는 연락처 (선택, 넣으면 더 안정적인 'polite pool' 사용)
+CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "")
 
 
 # Database

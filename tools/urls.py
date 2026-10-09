@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -19,6 +19,8 @@ urlpatterns = [
     path("charcount/", views.charcount, name="charcount"),
     path("diff/", views.textdiff, name="textdiff"),
     path("gpa/", views.gpa, name="gpa"),
+    path("cite/", views.cite_page, name="cite"),
+    path("cite/lookup/", cite.lookup, name="cite_lookup"),
     path("image/", views.image_tool, name="image"),
     path("meet/", meet_views.meet, name="meet"),
     path("meet/<str:meet_id>/", meet_views.meet_room, name="meet_room"),
