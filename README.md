@@ -24,6 +24,8 @@
 - **발행 / 임시저장** 구분: 임시저장 글은 작성자만 보이고, 이어서 쓰기·발행 취소 지원 (처음 발행일 유지)
 - 댓글 · 좋아요(글/댓글)
 - **방명록은 로그인한 회원만** 작성 가능 + 작성 빈도 제한 (스팸 방지)
+- **시리즈 글**: 글쓰기 화면에서 시리즈 이름·몇 편 입력 → 글 위 목차(n/전체편), 아래 이전·다음 편 버튼, 시리즈 페이지 `/blog/series/<slug>/`
+- RSS `/blog/feed/` (공개 글 최신 20개)
 
 ### 1.3 노션형 에디터 (Tiptap)
 - `/` 슬래시 메뉴로 블록 추가: 제목, 목록, 체크리스트, 인용, 코드, 표, 토글, 수식(KaTeX), 구분선, 이미지, 링크 카드
@@ -33,13 +35,21 @@
 - 저장 형식: `{"format":"tiptap","version":1,"doc":...}` → 서버에서 HTML 로 렌더링(`blog/content.py`), 예전 형식 글도 그대로 표시
 - 소스: `frontend/editor/` (빌드 결과 `static/editor/mj-editor.js` 는 저장소에 포함)
 
-### 1.4 Gallery
+### 1.4 링크 미리보기 · 검색 노출 · 다크 모드
+- 모든 페이지에 Open Graph·트위터 카드 메타 태그 → 카톡·디스코드 등에 링크를 보내면 카드로 표시
+  - 블로그 글: 제목·요약·대표 이미지(커버 → 본문 첫 사진 → **제목이 들어간 카드 이미지 자동 생성**), 비밀번호 글은 내용·이미지 숨김
+  - Tool 목록·각 도구·블로그·카테고리·갤러리·시리즈·라이브 방송 링크도 **페이지 전용 카드**를 자동 생성 (`/og/<종류>/<키>.png`, `media/og/` 에 저장·재사용)
+  - 카드 글꼴: 나눔고딕(SIL OFL, `blog/fonts/`), 기본 이미지 `static/images/og-default.png`
+- `/sitemap.xml`(공개 페이지·글, Settings 에서 닫은 메뉴 제외), `/robots.txt`(관리·공유 링크 크롤링 금지), 개인·공유 페이지는 noindex
+- **다크 모드**: `scripts/gen_dark_css.py` 가 템플릿 전체의 색(클래스·`<style>`)을 훑어 `static/css/theme-dark.css` 를 자동 생성 — 밝은 배경은 어둡게, 대비가 모자란 글자는 밝게
+
+### 1.5 Gallery
 - `/photos/` 사진 갤러리, 태그 검색 + 인기 태그, 촬영시각(EXIF) 우선 최신순
 - 관리자 업로드: 드래그앤드롭 다중 파일, 미리보기 / 개별 삭제, 태그 입력
 - 서버측 처리: EXIF 방향 보정, 최대 변 2400px 리사이즈, JPEG 품질 82 최적화, 10MB 제한
 - 관리자 삭제: 단건(`×`) / 클릭·드래그 범위 선택 일괄 삭제
 
-### 1.5 Tool (`/tools/`)
+### 1.6 Tool (`/tools/`)
 허브는 **누구나 / 🔒 회원 전용 / 🛠 관리자 전용** 칸으로 나뉘고, 도구가 없는 칸은 보이지 않습니다 (`tools/registry.py` 의 `access`).
 
 | 도구 | 설명 | 이용 |
@@ -63,19 +73,19 @@
 - 데이터 전송 중계 데몬 `relay/mj_relay.py` (asyncio + pyzmq + aiohttp, systemd 서비스 `mj-relay`) — 자세한 내용은 [relay/README.md](relay/README.md)
 - 맡겨두기·클립보드 파일은 nginx 가 서빙하지 않는 `private_media/` 에 저장하고, Django 가 권한 확인 후에만 내려줌
 
-### 1.6 회원 · 가입 승인
+### 1.7 회원 · 가입 승인
 - 회원가입: 아이디, **이름(실명)**, 이메일, 비밀번호, 가입 인사(선택) + **개인정보 수집·이용 동의(필수)**
 - 가입 신청 시 계정은 **승인 대기(비활성)** → 관리자가 승인해야 로그인 가능
 - 로그인 시 승인 대기 / 거절 / 정지 사유 안내, 안전한 `next` 리다이렉트 검증
 - 관리자 로그인 시 Studio 로 이동
 
-### 1.7 관리자 알림
+### 1.8 관리자 알림
 - Logout 옆 **🔔 + 안 읽은 개수** (관리자에게만 표시)
 - 알림 종류: 가입 요청, 다른 회원의 댓글 · 방명록 · 새 글 발행 (관리자 본인 활동은 제외)
 - `/notifications/`: 종류별 필터, 누르면 읽음 처리 후 해당 화면으로 이동, 모두 읽음 / 읽은 알림 지우기
 - **카카오톡 '나에게 보내기'** 연동: 알림 화면에서 카카오톡 연결 → 새 알림을 나와의 채팅으로 전송 (토큰 자동 갱신)
 
-### 1.8 Studio (관리자 전용 CMS, `/studio/`)
+### 1.9 Studio (관리자 전용 CMS, `/studio/`)
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
 - **Posts**: 검색·작성자·기간·**제목 포함(예: 555)** 필터, 발행/임시저장 상태 필터, 공개 범위 변경
   - 일괄 작업(발행, 발행 취소, 공개 범위, 삭제)을 체크한 글 또는 **필터 결과 전체(모든 페이지)** 에 적용
@@ -118,15 +128,16 @@
 ```
 MjGallery/
 ├─ accounts/          # 회원가입(승인 요청)/로그인/로그아웃
-├─ blog/              # 블로그/댓글/좋아요/방명록, 에디터 콘텐츠 렌더링(content.py)
-├─ main/              # 홈/갤러리/프로젝트 상세
+├─ blog/              # 블로그/댓글/좋아요/방명록/시리즈, 에디터 렌더링(content.py), 미리보기 카드(og_image.py, fonts/)
+├─ main/              # 홈/갤러리/프로젝트 상세, 메타 태그·sitemap·페이지 카드(seo.py, og_cards.py)
 ├─ studio/            # 관리자 CMS (Posts, Community, Users 포함)
 ├─ notifications/     # 관리자 알림, 카카오톡 푸시
 ├─ analytics/         # 방문 기록 미들웨어, 통계 집계
 ├─ monitor/           # 서버 상태·트래픽·업타임 모니터, 예약 작업(run_scheduled)
 ├─ security/          # 로그인 기록·잠금, IP 차단 미들웨어, 작성 IP 보관 기간 정리
-├─ tools/             # Tool 메뉴 (키 생성기, 클립보드, 속도 측정, 계산기, 데이터 전송·맡겨두기)
-├─ relay/             # 데이터 전송 중계 데몬(mj_relay.py), CLI(mj_stream.py), 서버 설치 스크립트
+├─ tools/             # Tool 메뉴 (QR·JSON·정규식·키 생성기·네트워크 진단·단축 URL·비밀 메모·클립보드·라이브 방송·데이터 전송 등)
+├─ relay/             # 중계 데몬(mj_relay.py: 데이터 전송, mj_live.py: 라이브 방송 시그널링), CLI(mj_stream.py), 설치 스크립트(TURN 포함)
+├─ scripts/           # gen_dark_css.py (다크 모드 CSS 생성)
 ├─ frontend/editor/   # 노션형 에디터 소스 (Tiptap)
 ├─ config/            # Django 설정/라우팅
 ├─ templates/         # 전역 템플릿
@@ -176,6 +187,13 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # RELAY_PORT_MAX=5599
 # RELAY_PUBLIC_HOST=smjgallery.kr
 
+# 선택: 라이브 방송 TURN 중계 (relay/deploy/install_turn.sh 가 TURN_SECRET 생성)
+# TURN_SECRET=...
+# TURN_HOST=smjgallery.kr
+
+# 선택: 서버 상태판의 월 데이터 전송 허용량 (GB)
+# SERVER_TRANSFER_ALLOWANCE_GB=3072
+
 # 선택: QR 코드 AI 스타일 추천 (Claude API)
 # ANTHROPIC_API_KEY=sk-ant-...
 # ANTHROPIC_MODEL=claude-haiku-5-5
@@ -223,9 +241,12 @@ python -m unittest discover -s relay/tests -t .
 | `/` | Home |
 | `/blog/`, `/blog/tech/`, `/blog/board/`, `/blog/life/`, `/blog/secret/` | 블로그 |
 | `/blog/write/` | 글 작성 (로그인 필요) |
+| `/blog/series/<slug>/` | 시리즈 모아보기 |
+| `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
+| `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/tools/` | Tool 메뉴 (`keygen/`, `clipboard/`, `speedtest/`, `duplex/`, `subnet/`, `stream/`, `share/`) |
-| `/studio/` | 관리자 CMS (`posts/`, `community/`, `users/` 등) |
+| `/tools/` | Tool 메뉴 (`qrcode/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
+| `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |
 | `/admin/` | Django Admin |
@@ -239,14 +260,23 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 - `main` 브랜치 push 시 Lightsail 서버에 SSH 접속해 `deploy.sh` 실행
   - `git pull` → `pip install` → `migrate` → `collectstatic` → gunicorn 재시작 → `mj-relay` 재시작
 - 데이터 전송 중계 데몬 최초 설치: `sudo bash relay/deploy/install.sh` + 방화벽 TCP `5550-5599` 개방 ([relay/README.md](relay/README.md))
+- 라이브 방송 TURN 서버 최초 설치: `sudo bash relay/deploy/install_turn.sh` + 방화벽 UDP·TCP `3478`, UDP `49160-49200`
+- 예약 작업(cron) 1회 등록 — 1분마다 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 오래된 기록 정리:
+  ```
+  (crontab -l 2>/dev/null; echo "* * * * * cd /home/ubuntu/projects/smjgallery && venv/bin/python manage.py run_scheduled >/dev/null 2>&1") | crontab -
+  ```
 
 ---
 
 ## 7) 운영 메모
 
 - 관리 명령
+  - `python manage.py run_scheduled` — 예약 작업 (위 cron), 업타임·트래픽·정리를 한 번에
+  - `python manage.py security_cleanup` — 90일 지난 로그인 기록·작성 IP 정리 (run_scheduled 가 하루 한 번 실행)
   - `python manage.py cleanup_shared_files` — 만료된 맡겨두기 파일 정리 (업로드·다운로드 때도 자동 정리)
   - `python manage.py clear_guestbook` — 방명록 정리 (평소에는 Studio → Community 사용 권장)
+- 새 색을 쓰는 템플릿을 추가하면 `venv/bin/python scripts/gen_dark_css.py` 로 다크 모드 CSS 다시 생성
+- 카카오톡은 링크 미리보기를 저장해 두므로, 예전에 보낸 링크는 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 캐시 초기화
 - 업로드 한도는 `config/settings.py` 의 `DATA_UPLOAD_MAX_MEMORY_SIZE`, `FILE_UPLOAD_MAX_MEMORY_SIZE` (nginx `client_max_body_size` 와 함께 조정)
 - 프로덕션에서는 `DEBUG=False`, 안전한 `ALLOWED_HOSTS` 사용, `.env` 는 git 에 올리지 않기
 - 회원 개인정보(이름·이메일)는 가입 승인·회원 관리 목적으로만 사용하고, 탈퇴·거절 후 요청 시 삭제
