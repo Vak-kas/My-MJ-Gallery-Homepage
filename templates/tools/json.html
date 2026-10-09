@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .js-area { width: 100%; min-height: 420px; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 14px; font-size: 13px; line-height: 1.6; outline: none; color: #1d1d1f; font-family: SFMono-Regular, Menlo, Consolas, monospace; resize: vertical; tab-size: 2; }
+    .js-area:focus { border-color: #0066cc; }
+    .js-btn { border-radius: 999px; padding: 7px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; }
+    .js-btn.primary { background: #0066cc; border-color: #0066cc; color: #fff; font-weight: 600; }
+    .js-tab { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); }
+    .js-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .js-tree { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.75; max-height: 560px; overflow: auto; }
+    .js-tree details > summary { list-style: none; cursor: pointer; }
+    .js-tree details > summary::-webkit-details-marker { display: none; }
+    .js-tree details > summary::before { content: '▸'; display: inline-block; width: 14px; color: #8e8e93; transition: transform .15s; }
+    .js-tree details[open] > summary::before { transform: rotate(90deg); }
+    .js-tree .kids { margin-left: 18px; border-left: 1px dashed rgba(0, 0, 0, 0.12); padding-left: 8px; }
+    .js-tree .k { color: #8e44ad; cursor: pointer; }
+    .js-tree .k:hover { text-decoration: underline; }
+    .js-tree .s { color: #1e7a35; } .js-tree .n { color: #0066cc; } .js-tree .b { color: #c2185b; } .js-tree .z { color: #8e8e93; }
+    .js-tree .meta { color: #8e8e93; font-size: 12px; }
+    html.theme-dark .js-area { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .js-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .js-tab.is-active { background: #e8e8ea; color: #1d1d1f; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DEV · JSON</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">JSON.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">붙여넣으면 바로 검사하고 정리해요. 이 브라우저 안에서만 처리돼서 API 응답·토큰이 들어 있어도 서버로 가지 않아요.</p>
+    </div>
+
+    <div class="mt-6 flex flex-wrap items-center gap-2">
+        <button type="button" class="js-btn primary" data-act="pretty">✨ 정리</button>
+        <select id="js-indent" class="js-btn"><option value="2">들여쓰기 2칸</option><option value="4">4칸</option><option value="tab">탭</option></select>
+        <button type="button" class="js-btn" data-act="minify">한 줄로</button>
+        <button type="button" class="js-btn" data-act="sort">키 정렬</button>
+        <button type="button" class="js-btn" data-act="unwrap" title="&quot;{\&quot;a\&quot;:1}&quot; 처럼 문자열 안에 든 JSON">문자열 JSON 풀기</button>
+        <button type="button" class="js-btn" data-act="wrap">문자열로 감싸기</button>
+        <label class="ml-1 flex items-center gap-1.5 text-[13px] text-[#6e6e73]"><input id="js-loose" type="checkbox" class="h-4 w-4" checked> 느슨하게 (주석·끝 쉼표 허용)</label>
+        <span class="ml-auto flex gap-2">
+            <button type="button" class="js-btn" data-act="sample">예시</button>
+            <button type="button" class="js-btn" data-act="clear">비우기</button>
+        </span>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section class="min-w-0">
+            <textarea id="js-in" class="js-area" spellcheck="false" placeholder='{"여기에": "JSON 을 붙여넣으세요"}'></textarea>
+            <p id="js-status" class="mt-2 min-h-[20px] text-[13px]"></p>
+        </section>
+        <section class="min-w-0 rounded-[22px] border border-black/[0.08] bg-white p-5">
+            <div class="flex flex-wrap items-center gap-2">
+                <button type="button" class="js-tab is-active" data-view="tree">트리</button>
+                <button type="button" class="js-tab" data-view="text">결과</button>
+                <button type="button" class="js-tab" data-view="csv">CSV</button>
+                <span class="ml-auto flex gap-2">
+                    <button type="button" class="js-btn" id="js-expand">모두 펼치기</button>
+                    <button type="button" class="js-btn" id="js-copy">복사</button>
+                    <button type="button" class="js-btn" id="js-save">저장</button>
+                </span>
+            </div>
+            <p id="js-path" class="mt-3 min-h-[20px] truncate font-mono text-[12px] text-[#6e6e73]">키를 누르면 경로를 복사해요 (예: $.users[0].name)</p>
+            <div id="js-view-tree" class="js-tree mt-2"></div>
+            <textarea id="js-view-text" class="js-area mt-2" style="min-height:480px" readonly hidden></textarea>
+            <div id="js-view-csv" hidden>
+                <textarea id="js-csv" class="js-area mt-2" style="min-height:480px" readonly></textarea>
+            </div>
+            <p id="js-stats" class="mt-3 text-[12px] text-[#8e8e93]"></p>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    let data, ok = false, view = 'tree', resultText = '';
+
+    // 주석·끝 쉼표 제거 (문자열 안은 건드리지 않음)
+    function loosen(src) {
+        let out = '', i = 0, inStr = false;
+        while (i < src.length) {
+            const ch = src[i], nx = src[i + 1];
+            if (inStr) {
+                out += ch;
+                if (ch === '\\') { out += nx ?? ''; i += 2; continue; }
+                if (ch === '"') inStr = false;
+                i++; continue;
+            }
+            if (ch === '"') { inStr = true; out += ch; i++; continue; }
+            if (ch === '/' && nx === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+            if (ch === '/' && nx === '*') { i += 2; while (i < src.length && !(src[i] === '*' && src[i + 1] === '/')) i++; i += 2; continue; }
+            out += ch; i++;
+        }
+        return out.replace(/,(\s*[}\]])/g, '$1');
+    }
+
+    // 브라우저 오류 메시지에 위치가 없을 때를 위해, 첫 오류 위치만 찾는 작은 검사기
+    function findErrorPos(src) {
+        let i = 0;
+        const fail = () => { throw i; };
+        const ws = () => { while (i < src.length && ' \t\n\r'.includes(src[i])) i++; };
+        const lit = (w) => { if (src.startsWith(w, i)) i += w.length; else fail(); };
+        const str = () => {
+            i++;
+            while (i < src.length && src[i] !== '"') {
+                if (src[i] === '\\') { i++; if (!'"\\/bfnrtu'.includes(src[i])) fail(); if (src[i] === 'u') { if (!/^[0-9a-fA-F]{4}$/.test(src.substr(i + 1, 4))) fail(); i += 4; } }
+                else if (src.charCodeAt(i) < 0x20) fail();
+                i++;
+            }
+            if (src[i] !== '"') fail();
+            i++;
+        };
+        const num = () => { const m = /^-?(0|[1-9]\d*)(\.\d+)?([eE][+-]?\d+)?/.exec(src.slice(i)); if (!m || !m[0]) fail(); i += m[0].length; };
+        const val = () => {
+            ws();
+            const c = src[i];
+            if (c === '{') { i++; ws(); if (src[i] === '}') { i++; return; } for (;;) { ws(); if (src[i] !== '"') fail(); str(); ws(); if (src[i] !== ':') fail(); i++; val(); ws(); if (src[i] === ',') { i++; continue; } if (src[i] === '}') { i++; return; } fail(); } }
+            if (c === '[') { i++; ws(); if (src[i] === ']') { i++; return; } for (;;) { val(); ws(); if (src[i] === ',') { i++; continue; } if (src[i] === ']') { i++; return; } fail(); } }
+            if (c === '"') return str();
+            if (c === 't') return lit('true'); if (c === 'f') return lit('false'); if (c === 'n') return lit('null');
+            return num();
+        };
+        try { val(); ws(); if (i < src.length) fail(); return null; } catch (pos) { return typeof pos === 'number' ? pos : null; }
+    }
+
+    function posToLineCol(src, pos) {
+        const before = src.slice(0, pos).split('\n');
+        return { line: before.length, col: before[before.length - 1].length + 1 };
+    }
+
+    function parse() {
+        const raw = $('js-in').value;
+        const status = $('js-status');
+        if (!raw.trim()) { ok = false; status.textContent = ''; renderView(); return; }
+        const src = $('js-loose').checked ? loosen(raw) : raw;
+        try {
+            data = JSON.parse(src);
+            ok = true;
+            status.innerHTML = '<span class="text-[#1e7a35]">✓ 올바른 JSON</span>';
+        } catch (err) {
+            ok = false;
+            let line = null, col = null;
+            const lm = /line (\d+) column (\d+)/.exec(err.message);
+            const m = /position (\d+)/.exec(err.message);
+            if (lm) { line = +lm[1]; col = +lm[2]; }
+            else if (m) ({ line, col } = posToLineCol(src, +m[1]));
+            else { const pos = findErrorPos(src); if (pos != null) ({ line, col } = posToLineCol(src, pos)); }
+            const where = line ? `${line}번째 줄 ${col}번째 글자 근처: ` : '';
+            status.innerHTML = `<span class="text-[#d44c47]">✗ ${where}${esc(err.message.replace(/^JSON\.parse: /, ''))}</span>`
+                + (line ? ` <button type="button" class="text-[#0066cc] underline" id="js-goto">그 줄로 이동</button>` : '');
+            if (line) $('js-goto').addEventListener('click', () => {
+                const ta = $('js-in'), lines = ta.value.split('\n');
+                const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+                ta.focus(); ta.setSelectionRange(start, start + (lines[line - 1] || '').length);
+                ta.scrollTop = Math.max(0, (line - 5) * 20.8);
+            });
+        }
+        renderView();
+    }
+
+    // ── 트리
+    const keyPath = (path, key) => (typeof key === 'number' ? `${path}[${key}]` : /^[A-Za-z_$][\w$]*$/.test(key) ? `${path}.${key}` : `${path}[${JSON.stringify(key)}]`);
+    function node(value, key, path, depth) {
+        const label = key === undefined ? '' : `<span class="k" data-path="${esc(path)}">${typeof key === 'number' ? key : esc(JSON.stringify(key))}</span>: `;
+        if (value && typeof value === 'object') {
+            const isArr = Array.isArray(value);
+            const entries = isArr ? value.map((v, i) => [i, v]) : Object.entries(value);
+            const meta = `<span class="meta">${isArr ? `[${entries.length}]` : `{${entries.length}}`}</span>`;
+            if (!entries.length) return `<div>${label}${isArr ? '[]' : '{}'}</div>`;
+            const kids = entries.slice(0, 2000).map(([k, v]) => node(v, k, keyPath(path, k), depth + 1)).join('')
+                + (entries.length > 2000 ? `<div class="meta">… ${entries.length - 2000}개 더</div>` : '');
+            return `<details ${depth < 2 ? 'open' : ''}><summary>${label}${meta}</summary><div class="kids">${kids}</div></details>`;
+        }
+        const cls = typeof value === 'string' ? 's' : typeof value === 'number' ? 'n' : typeof value === 'boolean' ? 'b' : 'z';
+        const text = typeof value === 'string' ? JSON.stringify(value) : String(value);
+        return `<div style="padding-left:14px">${label}<span class="${cls}">${esc(text.length > 300 ? text.slice(0, 300) + '…"' : text)}</span></div>`;
+    }
+
+    function stats(v) {
+        let keys = 0, depth = 0, values = 0;
+        const walk = (x, d) => {
+            depth = Math.max(depth, d);
+            if (x && typeof x === 'object') for (const [, y] of Object.entries(x)) { keys += Array.isArray(x) ? 0 : 1; walk(y, d + 1); }
+            else values++;
+        };
+        walk(v, 0);
+        return { keys, depth, values };
+    }
+
+    // ── CSV (객체 배열일 때)
+    function toCsv(v) {
+        const rows = Array.isArray(v) ? v : (v && typeof v === 'object' ? Object.values(v).find(Array.isArray) : null);
+        if (!rows || !rows.length || typeof rows[0] !== 'object') return null;
+        const flat = (o, prefix = '', acc = {}) => {
+            for (const [k, x] of Object.entries(o || {})) {
+                const key = prefix ? `${prefix}.${k}` : k;
+                if (x && typeof x === 'object' && !Array.isArray(x)) flat(x, key, acc); else acc[key] = Array.isArray(x) ? JSON.stringify(x) : x;
+            }
+            return acc;
+        };
+        const flats = rows.map((r) => flat(r));
+        const cols = [...new Set(flats.flatMap(Object.keys))];
+        const cell = (x) => { const s = x == null ? '' : String(x); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+        return [cols.map(cell).join(','), ...flats.map((r) => cols.map((c) => cell(r[c])).join(','))].join('\n');
+    }
+
+    const indent = () => ($('js-indent').value === 'tab' ? '\t' : +$('js-indent').value);
+    function renderView() {
+        ['tree', 'text', 'csv'].forEach((v) => { $(`js-view-${v}`).hidden = v !== view; });
+        if (!ok) { $('js-view-tree').innerHTML = ''; $('js-view-text').value = ''; $('js-csv').value = ''; $('js-stats').textContent = ''; return; }
+        resultText = JSON.stringify(data, null, indent());
+        if (view === 'tree') $('js-view-tree').innerHTML = node(data, undefined, '$', 0);
+        if (view === 'text') $('js-view-text').value = resultText;
+        if (view === 'csv') $('js-csv').value = toCsv(data) ?? '객체 배열( [{…}, {…}] )일 때만 CSV 로 바꿀 수 있어요.';
+        const st = stats(data);
+        const size = new TextEncoder().encode(JSON.stringify(data)).length;
+        $('js-stats').textContent = `키 ${st.keys}개 · 값 ${st.values}개 · 깊이 ${st.depth} · 한 줄 크기 ${size.toLocaleString()} 바이트`;
+    }
+
+    const sortKeys = (v) => (Array.isArray(v) ? v.map(sortKeys) : v && typeof v === 'object' ? Object.fromEntries(Object.keys(v).sort().map((k) => [k, sortKeys(v[k])])) : v);
+    const ACTIONS = {
+        pretty: () => ok && ($('js-in').value = JSON.stringify(data, null, indent())),
+        minify: () => ok && ($('js-in').value = JSON.stringify(data)),
+        sort: () => ok && ($('js-in').value = JSON.stringify(sortKeys(data), null, indent())),
+        unwrap: () => { if (ok && typeof data === 'string') { try { $('js-in').value = JSON.stringify(JSON.parse(data), null, indent()); } catch { $('js-status').innerHTML = '<span class="text-[#d44c47]">문자열 안의 내용이 JSON 이 아니에요.</span>'; return false; } } },
+        wrap: () => ok && ($('js-in').value = JSON.stringify(JSON.stringify(data))),
+        sample: () => ($('js-in').value = '{\n  // 주석과 끝 쉼표도 "느슨하게"면 괜찮아요\n  "site": "smjgallery.kr",\n  "users": [\n    {"id": 1, "name": "민재", "tags": ["admin"], "profile": {"city": "서울"}},\n    {"id": 2, "name": "친구", "tags": [], "profile": {"city": "대전"}},\n  ],\n  "active": true,\n  "score": 98.5,\n  "nothing": null\n}'),
+        clear: () => ($('js-in').value = ''),
+    };
+    document.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => { if (ACTIONS[b.dataset.act]() !== false) parse(); }));
+    document.querySelectorAll('.js-tab').forEach((b) => b.addEventListener('click', () => {
+        view = b.dataset.view;
+        document.querySelectorAll('.js-tab').forEach((t) => t.classList.toggle('is-active', t === b));
+        renderView();
+    }));
+    let timer;
+    $('js-in').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(parse, 200); });
+    $('js-loose').addEventListener('change', parse);
+    $('js-indent').addEventListener('change', renderView);
+    $('js-in').addEventListener('keydown', (e) => {
+        if (e.key === 'Tab') { e.preventDefault(); const t = e.target, s = t.selectionStart; t.setRangeText('  ', s, t.selectionEnd, 'end'); }
+    });
+    $('js-view-tree').addEventListener('click', async (e) => {
+        const k = e.target.closest('.k');
+        if (!k) return;
+        e.preventDefault();
+        $('js-path').textContent = `${k.dataset.path} — 복사됨`;
+        try { await navigator.clipboard.writeText(k.dataset.path); } catch {}
+    });
+    $('js-expand').addEventListener('click', () => {
+        const all = [...document.querySelectorAll('#js-view-tree details')];
+        const open = all.some((d) => !d.open);
+        all.forEach((d) => { d.open = open; });
+        $('js-expand').textContent = open ? '모두 접기' : '모두 펼치기';
+    });
+    const currentOut = () => (view === 'csv' ? $('js-csv').value : resultText);
+    $('js-copy').addEventListener('click', async (e) => { if (!ok) return; try { await navigator.clipboard.writeText(currentOut()); e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1000); } catch {} });
+    $('js-save').addEventListener('click', () => {
+        if (!ok) return;
+        const csv = view === 'csv';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([(csv ? '﻿' : '') + currentOut()], { type: csv ? 'text/csv' : 'application/json' }));
+        a.download = csv ? 'data.csv' : 'data.json';
+        a.click();
+    });
+    ACTIONS.sample(); parse();
+})();
+</script>
+{% endblock %}

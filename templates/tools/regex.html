@@ -1,0 +1,264 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .rx-input { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 10px 14px; font-size: 15px; outline: none; color: #1d1d1f; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .rx-input:focus { border-color: #0066cc; }
+    .rx-input.is-error { border-color: #d44c47; }
+    .rx-text { min-height: 220px; resize: vertical; font-size: 14px; line-height: 1.7; }
+    .rx-flag { border-radius: 8px; padding: 4px 10px; font-size: 13px; font-family: SFMono-Regular, Menlo, Consolas, monospace; border: 1px solid rgba(0, 0, 0, 0.1); }
+    .rx-flag.on { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .rx-hl { white-space: pre-wrap; word-break: break-word; font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; line-height: 1.7; min-height: 120px; max-height: 420px; overflow: auto; }
+    .rx-hl mark { border-radius: 3px; padding: 1px 0; color: inherit; }
+    .rx-hl mark.m0 { background: rgba(0, 102, 204, 0.18); box-shadow: inset 0 -2px #0066cc; }
+    .rx-hl mark.m1 { background: rgba(194, 24, 91, 0.16); box-shadow: inset 0 -2px #c2185b; }
+    .rx-hl mark.empty { background: none; box-shadow: inset 2px 0 #d44c47; padding: 0 1px; }
+    .rx-table td, .rx-table th { padding: 6px 8px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); text-align: left; vertical-align: top; font-size: 13px; }
+    .rx-table th { font-size: 11px; color: #8e8e93; font-weight: 600; }
+    html.theme-dark .rx-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .rx-flag { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DEV · REGEX</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Regex.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">JavaScript 정규식으로 바로 테스트해요. 너무 오래 걸리는 패턴(무한 되돌아가기)은 1초 뒤 자동으로 멈춰요.</p>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div class="min-w-0 space-y-5">
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <div class="flex items-center gap-2">
+                    <span class="font-mono text-[20px] text-[#8e8e93]">/</span>
+                    <input id="rx-pattern" class="rx-input" spellcheck="false" autocomplete="off" value="(?<user>[\w.+-]+)@(?<domain>[\w-]+\.[\w.]+)">
+                    <span class="font-mono text-[20px] text-[#8e8e93]">/</span>
+                    <span id="rx-flags-text" class="min-w-[44px] font-mono text-[15px] text-[#0066cc]"></span>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-1.5" id="rx-flags">
+                    <button type="button" class="rx-flag on" data-flag="g" title="전체에서 모두 찾기">g 전체</button>
+                    <button type="button" class="rx-flag" data-flag="i" title="대소문자 무시">i 대소문자 무시</button>
+                    <button type="button" class="rx-flag" data-flag="m" title="^ $ 가 줄마다 적용">m 여러 줄</button>
+                    <button type="button" class="rx-flag" data-flag="s" title=". 이 줄바꿈도 포함">s 점=모든 문자</button>
+                    <button type="button" class="rx-flag on" data-flag="u" title="유니코드(한글·이모지 정확히)">u 유니코드</button>
+                    <button type="button" class="rx-flag" data-flag="y" title="정확히 이어지는 위치에서만">y 고정</button>
+                </div>
+                <p id="rx-error" class="mt-2 min-h-[18px] text-[13px] text-[#d44c47]"></p>
+            </section>
+
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <div class="flex items-center justify-between">
+                    <h2 class="text-[15px] font-semibold">테스트할 글</h2>
+                    <span id="rx-count" class="text-[13px] text-[#6e6e73]"></span>
+                </div>
+                <textarea id="rx-text" class="rx-input rx-text mt-2" spellcheck="false">문의는 seo@smjgallery.kr 로 보내 주세요.
+예전 주소 minjae.seo+blog@example.co.kr 도 받아요.
+잘못된 주소: hello@, @nobody.com</textarea>
+                <h3 class="mt-4 text-[13px] font-semibold text-[#6e6e73]">찾은 결과</h3>
+                <div id="rx-hl" class="rx-hl mt-2 rounded-xl bg-[#f9f9fb] p-3"></div>
+            </section>
+
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">일치 목록</h2>
+                <div class="mt-2 overflow-x-auto"><table class="rx-table w-full" id="rx-table"></table></div>
+            </section>
+
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">바꾸기</h2>
+                <input id="rx-replace" class="rx-input mt-2" spellcheck="false" value="$<user> (at) $<domain>" placeholder="바꿀 내용 — $1, $<이름>, $& 사용 가능">
+                <div id="rx-replaced" class="rx-hl mt-3 rounded-xl bg-[#f9f9fb] p-3"></div>
+                <div class="mt-2 flex justify-end"><button type="button" id="rx-copy-replaced" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px]">결과 복사</button></div>
+            </section>
+        </div>
+
+        <aside class="min-w-0 space-y-5 lg:sticky lg:top-6 lg:self-start">
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">자주 쓰는 패턴</h2>
+                <div class="mt-3 flex flex-wrap gap-1.5" id="rx-presets"></div>
+            </section>
+            <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">패턴 풀이</h2>
+                <ol id="rx-explain" class="mt-2 space-y-1 text-[13px]"></ol>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const MAX_MATCHES = 1000;
+
+    // ── 매칭은 Web Worker 에서 (오래 걸리면 terminate)
+    const WORKER_SRC = `
+        self.onmessage = (e) => {
+            const { pattern, flags, text, replacement, max } = e.data;
+            try {
+                const re = new RegExp(pattern, flags);
+                const matches = [];
+                if (flags.includes('g') || flags.includes('y')) {
+                    let m, guard = 0;
+                    re.lastIndex = 0;
+                    while ((m = re.exec(text)) !== null && matches.length < max) {
+                        matches.push({ index: m.index, text: m[0], groups: m.slice(1), named: m.groups || null });
+                        if (m[0] === '') re.lastIndex += (flags.includes('u') && text.codePointAt(re.lastIndex) > 0xffff) ? 2 : 1;
+                        if (++guard > 200000) break;
+                        if (!flags.includes('g')) break;
+                    }
+                } else {
+                    const m = re.exec(text);
+                    if (m) matches.push({ index: m.index, text: m[0], groups: m.slice(1), named: m.groups || null });
+                }
+                let replaced = null;
+                if (replacement !== null) replaced = text.replace(re, replacement);
+                self.postMessage({ ok: true, matches, replaced, capped: matches.length >= max });
+            } catch (err) {
+                self.postMessage({ ok: false, error: err.message });
+            }
+        };`;
+    const workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+    let worker = null, timer = null, seq = 0;
+
+    const flags = () => [...document.querySelectorAll('.rx-flag.on')].map((b) => b.dataset.flag).join('');
+
+    function run() {
+        const pattern = $('rx-pattern').value, text = $('rx-text').value, f = flags();
+        $('rx-flags-text').textContent = f;
+        explain(pattern);
+        if (!pattern) { show({ ok: true, matches: [], replaced: text }, text); return; }
+        try { new RegExp(pattern, f); } catch (err) {
+            $('rx-pattern').classList.add('is-error');
+            $('rx-error').textContent = '패턴 오류: ' + err.message.replace(/^Invalid regular expression: /, '');
+            return;
+        }
+        $('rx-pattern').classList.remove('is-error');
+        $('rx-error').textContent = '';
+        worker?.terminate();
+        clearTimeout(timer);
+        worker = new Worker(workerUrl);
+        const my = ++seq;
+        worker.onmessage = (e) => { if (my !== seq) return; clearTimeout(timer); worker.terminate(); worker = null; show(e.data, text); };
+        timer = setTimeout(() => {
+            if (my !== seq) return;
+            worker?.terminate(); worker = null;
+            $('rx-error').textContent = '⏱ 1초가 넘게 걸려 멈췄어요. (a+)+ 처럼 겹치는 반복이 있으면 되돌아가기가 폭발해요. 반복을 단순하게 바꿔 보세요.';
+            $('rx-hl').textContent = text; $('rx-table').innerHTML = ''; $('rx-count').textContent = '';
+        }, 1000);
+        worker.postMessage({ pattern, flags: f, text, replacement: $('rx-replace').value, max: MAX_MATCHES });
+    }
+
+    function show(res, text) {
+        if (!res.ok) { $('rx-error').textContent = res.error; return; }
+        const ms = res.matches;
+        $('rx-count').textContent = ms.length ? `${ms.length}${res.capped ? '+' : ''}개 일치` : '일치 없음';
+        // 칠하기
+        let html = '', pos = 0;
+        ms.forEach((m, i) => {
+            html += esc(text.slice(pos, m.index));
+            html += m.text === '' ? '<mark class="empty" title="빈 일치"></mark>' : `<mark class="m${i % 2}" title="#${i + 1}">${esc(m.text)}</mark>`;
+            pos = m.index + m.text.length;
+        });
+        html += esc(text.slice(pos));
+        $('rx-hl').innerHTML = html || '<span class="text-[#8e8e93]">글을 입력하세요</span>';
+        // 표
+        const names = ms[0]?.named ? Object.keys(ms[0].named) : [];
+        const groupCount = Math.max(0, ...ms.map((m) => m.groups.length));
+        const head = `<tr><th>#</th><th>위치</th><th>일치</th>${Array.from({ length: groupCount }, (_, g) => `<th>그룹 ${g + 1}${names[g] ? ` <span class="text-[#8e44ad]">&lt;${esc(names[g])}&gt;</span>` : ''}</th>`).join('')}</tr>`;
+        const body = ms.slice(0, 200).map((m, i) => `<tr><td class="text-[#8e8e93]">${i + 1}</td><td class="font-mono text-[#8e8e93]">${m.index}</td><td class="font-mono">${esc(m.text) || '<span class="text-[#8e8e93]">(빈 문자열)</span>'}</td>${Array.from({ length: groupCount }, (_, g) => `<td class="font-mono">${m.groups[g] == null ? '<span class="text-[#8e8e93]">—</span>' : esc(m.groups[g])}</td>`).join('')}</tr>`).join('');
+        $('rx-table').innerHTML = ms.length ? head + body + (ms.length > 200 ? `<tr><td colspan="9" class="text-[#8e8e93]">… ${ms.length - 200}개 더</td></tr>` : '') : '<tr><td class="text-[#8e8e93]">일치하는 부분이 없어요.</td></tr>';
+        $('rx-replaced').textContent = res.replaced ?? text;
+    }
+
+    // ── 패턴 풀이 (자주 쓰는 문법만)
+    const ESC = { d: '숫자 0-9', D: '숫자가 아닌 것', w: '영문·숫자·_', W: '영문·숫자·_ 가 아닌 것', s: '공백(스페이스·탭·줄바꿈)', S: '공백이 아닌 것', b: '단어 경계', B: '단어 경계가 아닌 곳', n: '줄바꿈', t: '탭', r: '캐리지 리턴' };
+    function quant(p, i) {
+        const m = /^(\*|\+|\?|\{\d+(,\d*)?\})(\??)/.exec(p.slice(i));
+        if (!m) return null;
+        let q = m[1];
+        const lazy = m[3] ? ' (가능한 짧게)' : '';
+        const t = q === '*' ? '0번 이상' : q === '+' ? '1번 이상' : q === '?' ? '있어도 없어도 됨'
+            : (() => { const [a, b] = q.slice(1, -1).split(','); return b === undefined ? `정확히 ${a}번` : b === '' ? `${a}번 이상` : `${a}~${b}번`; })();
+        return { len: m[0].length, text: t + lazy };
+    }
+    function explain(p) {
+        const out = [];
+        let i = 0, depth = 0;
+        const add = (tok, desc) => out.push(`<li style="padding-left:${depth * 14}px"><code class="rounded bg-[#f5f5f7] px-1.5 font-mono text-[#0066cc]">${esc(tok)}</code> ${desc}</li>`);
+        while (i < p.length && out.length < 60) {
+            const ch = p[i];
+            let tok = ch, desc = '';
+            if (ch === '\\') {
+                const nx = p[i + 1] ?? '';
+                tok = '\\' + nx;
+                if (/\d/.test(nx)) desc = `${nx}번째 그룹과 같은 글자`;
+                else if (nx === 'k') { const m = /^\\k<([^>]+)>/.exec(p.slice(i)); tok = m ? m[0] : tok; desc = `&lt;${esc(m ? m[1] : '')}&gt; 그룹과 같은 글자`; }
+                else if (nx === 'p' || nx === 'P') { const m = /^\\[pP]\{[^}]+\}/.exec(p.slice(i)); tok = m ? m[0] : tok; desc = (nx === 'P' ? '아닌 것: ' : '') + '유니코드 속성 ' + esc(tok.slice(3, -1)) + (/Script=Hangul/.test(tok) ? ' (한글)' : ''); }
+                else desc = ESC[nx] || `글자 "${esc(nx)}" 그대로`;
+            } else if (ch === '[') {
+                let j = i + 1;
+                while (j < p.length && p[j] !== ']') j += p[j] === '\\' ? 2 : 1;
+                tok = p.slice(i, j + 1);
+                const neg = tok[1] === '^';
+                const inner = tok.slice(neg ? 2 : 1, -1);
+                const hints = [];
+                if (/가-힣/.test(inner)) hints.push('한글'); if (/a-z/.test(inner)) hints.push('영어 소문자'); if (/A-Z/.test(inner)) hints.push('영어 대문자'); if (/0-9|\\d/.test(inner)) hints.push('숫자');
+                desc = `${neg ? '이 중 <b>아닌</b>' : '이 중'} 글자 하나${hints.length ? ` (${hints.join(', ')}…)` : ''}`;
+            } else if (ch === '(') {
+                const rest = p.slice(i);
+                const m = /^\((\?:|\?=|\?!|\?<=|\?<!|\?<([A-Za-z_]\w*)>)?/.exec(rest);
+                tok = m[0];
+                desc = m[1] === '?:' ? '묶기만 (번호 안 붙음)' : m[1] === '?=' ? '뒤에 이게 와야 함 (포함 안 함)' : m[1] === '?!' ? '뒤에 이게 오면 안 됨' : m[1] === '?<=' ? '앞에 이게 있어야 함' : m[1] === '?<!' ? '앞에 이게 있으면 안 됨' : m[2] ? `이름 있는 그룹 &lt;${esc(m[2])}&gt; 시작` : '그룹 시작 (번호 붙음)';
+                add(tok, desc); depth++; i += tok.length; continue;
+            } else if (ch === ')') {
+                depth = Math.max(0, depth - 1);
+                const q = quant(p, i + 1);
+                add(')' + (q ? p.substr(i + 1, q.len) : ''), '그룹 끝' + (q ? ` — 그룹 전체를 ${q.text}` : ''));
+                i += 1 + (q ? q.len : 0); continue;
+            } else if (ch === '.') desc = '아무 글자 하나 (줄바꿈 제외, s 플래그면 포함)';
+            else if (ch === '^') desc = '시작 위치 (m 플래그면 줄마다)';
+            else if (ch === '$') desc = '끝 위치 (m 플래그면 줄마다)';
+            else if (ch === '|') desc = '또는';
+            else desc = `글자 "${esc(ch)}"`;
+            const q = quant(p, i + tok.length);
+            if (q) { desc += ` — ${q.text}`; tok += p.substr(i + tok.length, q.len); }
+            add(tok, desc);
+            i += tok.length;
+        }
+        $('rx-explain').innerHTML = out.join('') || '<li class="text-[#8e8e93]">패턴을 입력하면 한 조각씩 풀어 줘요.</li>';
+    }
+
+    // ── 패턴 모음
+    const PRESETS = [
+        ['이메일', '[\\w.+-]+@[\\w-]+\\.[\\w.]+', 'gu', 'seo@smjgallery.kr, test.user+tag@mail.co.kr'],
+        ['휴대폰 번호', '01[016789]-?\\d{3,4}-?\\d{4}', 'gu', '010-1234-5678 / 01098765432 / 02-123-4567'],
+        ['URL', 'https?://[^\\s<>"]+', 'gu', '자세한 건 https://smjgallery.kr/tools/ 와 http://example.com?a=1 참고'],
+        ['IPv4', '\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b', 'g', '서버 43.202.189.130, 내부 192.168.0.1, 잘못된 999.1.1.1'],
+        ['날짜 YYYY-MM-DD', '(?<y>\\d{4})-(?<m>0[1-9]|1[0-2])-(?<d>0[1-9]|[12]\\d|3[01])', 'gu', '가입 2026-10-09, 만료 2027-01-31, 이상한 2026-13-40'],
+        ['한글만', '[가-힣]+', 'gu', 'Hello 서민재 갤러리 123 반가워요!'],
+        ['비밀번호 규칙', '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^\\w\\s]).{8,}$', 'gmu', 'weakpass\nStrong-Pass1\nNoSpecial123'],
+        ['16진수 색', '#(?:[0-9a-fA-F]{3}){1,2}\\b', 'gu', 'color: #0066cc; background: #fff; border: #12345'],
+    ];
+    $('rx-presets').innerHTML = PRESETS.map((p, i) => `<button type="button" data-i="${i}" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px] hover:bg-[#f5f5f7]">${esc(p[0])}</button>`).join('');
+    $('rx-presets').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-i]');
+        if (!b) return;
+        const [, pat, fl, sample] = PRESETS[+b.dataset.i];
+        $('rx-pattern').value = pat;
+        $('rx-text').value = sample;
+        $('rx-replace').value = '[$&]';
+        document.querySelectorAll('.rx-flag').forEach((f) => f.classList.toggle('on', fl.includes(f.dataset.flag)));
+        run();
+    });
+
+    document.querySelectorAll('.rx-flag').forEach((b) => b.addEventListener('click', () => { b.classList.toggle('on'); run(); }));
+    let t;
+    for (const id of ['rx-pattern', 'rx-text', 'rx-replace']) $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 120); });
+    $('rx-copy-replaced').addEventListener('click', async (e) => { try { await navigator.clipboard.writeText($('rx-replaced').textContent); e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '결과 복사'; }, 1000); } catch {} });
+    run();
+})();
+</script>
+{% endblock %}
