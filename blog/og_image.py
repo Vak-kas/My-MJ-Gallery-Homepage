@@ -65,6 +65,14 @@ def _wrap(draw, text, font, max_width, max_lines):
 
 def render(post):
     accent, label = ACCENT.get(post.category, ((10, 132, 255), post.category.upper()))
+    author = post.author.get_full_name() or post.author.username if post.author else ""
+    when = timezone.localtime(post.published_at).strftime("%Y.%m.%d") if post.published_at else ""
+    return render_card(title=post.title, pill=label, accent=accent, eyebrow="SMJ GALLERY · BLOG",
+                       footer=" · ".join(x for x in (author, when) if x))
+
+
+def render_card(title, pill="", accent=(10, 132, 255), eyebrow="SMJ GALLERY", subtitle="", footer=""):
+    """카드 이미지 공통 틀: 위 로고·이름·배지 / 가운데 제목(+설명) / 아래 부가 정보·주소."""
     img = Image.new("RGB", (W, H), (15, 17, 21))
     d = ImageDraw.Draw(img)
     for y in range(H):
@@ -76,34 +84,41 @@ def render(post):
     img = Image.blend(img, Image.composite(glow, img, Image.new("L", (W, H), 110)), 1)
     d = ImageDraw.Draw(img)
 
-    # 위: 로고 + 사이트 이름 + 카테고리
+    # 위: 로고 + 사이트 이름 + 배지
     d.ellipse((72, 62, 132, 122), outline=GOLD, width=3)
     d.text((102, 93), "MJ", font=ImageFont.truetype(str(XBOLD), 26), fill=GOLD, anchor="mm")
-    d.text((150, 92), "SMJ GALLERY · BLOG", font=ImageFont.truetype(str(BOLD), 26), fill=MUTED, anchor="lm")
-    pill_font = ImageFont.truetype(str(XBOLD), 22)
-    pw = d.textlength(label, font=pill_font) + 40
-    d.rounded_rectangle((W - 72 - pw, 72, W - 72, 114), radius=21, fill=tuple(int(c * 0.28) for c in accent), outline=accent, width=2)
-    d.text((W - 72 - pw / 2, 93), label, font=pill_font, fill=WHITE, anchor="mm")
+    d.text((150, 92), eyebrow, font=ImageFont.truetype(str(BOLD), 26), fill=MUTED, anchor="lm")
+    if pill:
+        pill_font = ImageFont.truetype(str(XBOLD), 22)
+        pw = d.textlength(pill, font=pill_font) + 40
+        d.rounded_rectangle((W - 72 - pw, 72, W - 72, 114), radius=21, fill=tuple(int(c * 0.28) for c in accent), outline=accent, width=2)
+        d.text((W - 72 - pw / 2, 93), pill, font=pill_font, fill=WHITE, anchor="mm")
 
-    # 가운데: 제목 (길이에 따라 글자 크기 조절)
-    title = " ".join(post.title.split()) or "제목 없음"
+    # 가운데: 제목 (길이에 따라 글자 크기 조절) + 설명
+    title = " ".join(str(title).split()) or "제목 없음"
+    max_lines = 2 if subtitle else 3
     for size in (76, 68, 60, 54):
         font = ImageFont.truetype(str(XBOLD), size)
-        lines = _wrap(d, title, font, W - 144, 3)
-        if len(lines) <= 2 or size == 54:
+        lines = _wrap(d, title, font, W - 144, max_lines)
+        if len(lines) <= max(1, max_lines - 1) or size == 54:
             break
     line_h = int(size * 1.32)
-    top = 200 + (3 - len(lines)) * line_h // 2
+    sub_font = ImageFont.truetype(str(BOLD), 30)
+    sub_lines = _wrap(d, " ".join(subtitle.split()), sub_font, W - 144, 2) if subtitle else []
+    block = len(lines) * line_h + (len(sub_lines) * 44 + 18 if sub_lines else 0)
+    top = max(170, 330 - block // 2)
+    d.rectangle((72, top - 34, 72 + 64, top - 28), fill=accent)
     for i, line in enumerate(lines):
         d.text((72, top + i * line_h), line, font=font, fill=WHITE)
-    d.rectangle((72, top - 34, 72 + 64, top - 28), fill=accent)
+    y = top + len(lines) * line_h + 18
+    for line in sub_lines:
+        d.text((72, y), line, font=sub_font, fill=(200, 200, 208))
+        y += 44
 
-    # 아래: 작성자 · 날짜 / 주소
+    # 아래: 부가 정보 / 주소
     small = ImageFont.truetype(str(BOLD), 26)
-    author = post.author.get_full_name() or post.author.username if post.author else ""
-    when = timezone.localtime(post.published_at).strftime("%Y.%m.%d") if post.published_at else ""
-    meta = " · ".join(x for x in (author, when) if x)
-    d.text((72, H - 78), meta, font=small, fill=MUTED, anchor="ls")
+    if footer:
+        d.text((72, H - 78), footer, font=small, fill=MUTED, anchor="ls")
     d.text((W - 72, H - 78), "smjgallery.kr", font=small, fill=GOLD, anchor="rs")
 
     out = BytesIO()

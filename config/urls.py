@@ -21,7 +21,7 @@ from django.contrib.sitemaps.views import sitemap
 
 from blog.feeds import LatestPostsFeed
 from main.sitemaps import PostSitemap, StaticSitemap
-from main.views import robots_txt
+from main.views import og_card, robots_txt
 from tools.link_views import short_redirect
 from django.conf import settings
 from django.conf.urls.static import static
@@ -33,6 +33,7 @@ urlpatterns = [
     path('s/<str:code>', short_redirect, name='short_redirect'),
     path('sitemap.xml', sitemap, {'sitemaps': {'pages': StaticSitemap, 'posts': PostSitemap}}, name='sitemap'),
     path('robots.txt', robots_txt, name='robots_txt'),
+    path('og/<str:kind>/<str:key>.png', og_card, name='og_card'),
     path('', include('main.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),

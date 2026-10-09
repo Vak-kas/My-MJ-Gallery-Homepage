@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from main import seo
+from main import og_cards, seo
 
 from . import relay_client
 from .permissions import ADMIN_LIVE_LIMITS, MEMBER_LIVE_LIMITS, can_create_streams, can_manage_streams
@@ -124,7 +124,7 @@ def live_room(request, room_id):
 	ws_base = settings.RELAY_WS_URL or f"{'wss' if request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https' else 'ws'}://{request.get_host()}"
 	public = {k: v for k, v in room.items() if k not in ("token", "viewer_token")}
 	context = {
-		"meta": seo.build(f"📺 {room.get('title') or '라이브 방송'}", f"{room.get('owner') or '서민재 갤러리'} 님의 라이브 방송 — 링크를 열면 로그인 없이 바로 볼 수 있어요.", path=request.path),
+		"meta": seo.build(f"📺 {room.get('title') or '라이브 방송'}", f"{room.get('owner') or '서민재 갤러리'} 님의 라이브 방송 — 링크를 열면 로그인 없이 바로 볼 수 있어요.", og_cards.image_url("tool", "live"), path=request.path),
 		"room": public,
 		"role": role,
 		"ws_url": f"{ws_base.rstrip('/')}/relay/ws/live/{room_id}?token={token}",
