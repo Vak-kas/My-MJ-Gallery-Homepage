@@ -15,6 +15,23 @@ class Tag(models.Model):
 		return self.name
 
 
+class Series(models.Model):
+	"""글 묶음 (예: HackRF 입문 1~5편)."""
+
+	name = models.CharField(max_length=80)
+	slug = models.SlugField(max_length=100, unique=True, allow_unicode=True)
+	description = models.CharField(max_length=200, blank=True)
+	author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="blog_series")
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["-created_at"]
+		constraints = [models.UniqueConstraint(fields=["author", "name"], name="unique_series_name_per_author")]
+
+	def __str__(self):
+		return self.name
+
+
 class Post(models.Model):
 	VISIBILITY_PUBLIC = "public"
 	VISIBILITY_PRIVATE = "private"
@@ -66,6 +83,8 @@ class Post(models.Model):
 	updated_at = models.DateTimeField(auto_now=True)
 	author_ip = models.GenericIPAddressField("작성 IP", null=True, blank=True)  # 부정 이용 방지, 90일 뒤 비움
 	author_agent = models.CharField("작성 브라우저", max_length=300, blank=True)
+	series = models.ForeignKey(Series, on_delete=models.SET_NULL, null=True, blank=True, related_name="posts")
+	series_order = models.PositiveIntegerField(null=True, blank=True)
 
 	class Meta:
 		ordering = ["-published_at", "-id"]

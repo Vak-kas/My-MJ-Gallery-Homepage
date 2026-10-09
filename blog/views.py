@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
+from django.db import models
 from django.db.models import Count, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -22,7 +23,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode
 
-from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
+from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Series, Tag
 from security.utils import client_ip, user_agent
 from main.seo import post_meta
 
@@ -208,6 +209,8 @@ def _serialize_post_form_data(post: Post):
 		"cover_image": post.cover_image.url if post.cover_image else "",
 		"tags": ", ".join(tag.name for tag in post.tags.all()),
 		"is_published": "1" if post.is_published else "0",
+		"series_name": post.series.name if post.series_id else "",
+		"series_order": post.series_order or "",
 	}
 
 
@@ -223,12 +226,66 @@ def _apply_post_tags(post: Post, tags_raw: str):
 			post.tags.add(tag)
 
 
+def _apply_series(post: Post, user, name: str, order_raw: str):
+	"""글쓰기 화면의 시리즈 이름·순서를 반영. 이름을 비우면 시리즈에서 뺌."""
+	name = " ".join((name or "").split())[:80]
+	if not name:
+		if post.series_id:
+			post.series, post.series_order = None, None
+			post.save(update_fields=["series", "series_order"])
+		return
+	series = Series.objects.filter(author=user, name=name).first()
+	if not series:
+		base = slugify(name, allow_unicode=True)[:90] or "series"
+		slug, n = base, 2
+		while Series.objects.filter(slug=slug).exists():
+			slug, n = f"{base}-{n}", n + 1
+		series = Series.objects.create(author=user, name=name, slug=slug)
+	order = int(order_raw) if (order_raw or "").strip().isdigit() else None
+	if order is None:
+		if post.series_id == series.id and post.series_order:
+			order = post.series_order
+		else:
+			last = series.posts.exclude(pk=post.pk).aggregate(m=models.Max("series_order"))["m"] or 0
+			order = last + 1
+	post.series, post.series_order = series, order
+	post.save(update_fields=["series", "series_order"])
+
+
+def _series_context(request, post: Post):
+	"""글 상세의 시리즈 상자: 같은 시리즈 글 목록(보이는 것만)과 이전·다음 편."""
+	if not post.series_id:
+		return {}
+	parts = list(_single_post_qs(request).filter(series_id=post.series_id).order_by("series_order", "published_at", "id"))
+	if post not in parts:
+		parts.append(post)
+	index = parts.index(post)
+	return {
+		"series": post.series,
+		"series_parts": parts,
+		"series_index": index + 1,
+		"series_prev": parts[index - 1] if index > 0 else None,
+		"series_next": parts[index + 1] if index + 1 < len(parts) else None,
+	}
+
+
+def series_detail(request, slug: str):
+	series = get_object_or_404(Series, slug=slug)
+	parts = list(_single_post_qs(request).filter(series=series).order_by("series_order", "published_at", "id"))
+	if not parts:
+		raise Http404("Not found")
+	context = {"series": series, "series_parts": parts}
+	context.update(_sidebar_context(request))
+	return render(request, "blog/series.html", context)
+
+
 def _write_page_context(request, form_data=None, selected_draft=None, editing_post=None):
 	draft_posts_qs = Post.objects.filter(author=request.user, is_published=False)
 	if editing_post:
 		draft_posts_qs = draft_posts_qs.exclude(id=editing_post.id)
 
 	return {
+		"my_series": list(Series.objects.filter(author=request.user).values_list("name", flat=True)[:50]),
 		"categories": Post.CATEGORY_CHOICES,
 		"form_data": form_data or {},
 		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
@@ -776,6 +833,7 @@ def post_detail(request, slug: str):
 
 	context = {
 		"meta": post_meta(post, locked=is_locked_post),
+		**_series_context(request, post),
 		"post": post,
 		"is_locked_post": is_locked_post,
 		"visible_comments": visible_comments,
@@ -889,6 +947,7 @@ def post_create(request):
 			)
 
 		_apply_post_tags(post, tags_raw)
+		_apply_series(post, request.user, request.POST.get("series_name", ""), request.POST.get("series_order", ""))
 
 		if submit_action == "draft" or not is_published:
 			messages.success(request, f'"{post.title}" 글이 임시저장되었습니다.')
@@ -959,6 +1018,7 @@ def post_edit(request, slug: str):
 		# 발행 취소해도 처음 발행일은 유지 (다시 발행하면 원래 날짜로 돌아옴)
 		post.save()
 		_apply_post_tags(post, tags_raw)
+		_apply_series(post, request.user, request.POST.get("series_name", ""), request.POST.get("series_order", ""))
 
 		if submit_action == "draft" or not is_published:
 			messages.success(request, f'"{post.title}" 글이 임시저장되었습니다.')

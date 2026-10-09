@@ -305,6 +305,23 @@
         </section>
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
+            <div class="flex flex-wrap items-end gap-3">
+                <div class="min-w-[220px] flex-1">
+                    <label for="series_name" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">📚 시리즈 <span class="font-normal text-[#8e8e93]">(선택 — 예: HackRF 입문)</span></label>
+                    <input id="series_name" name="series_name" list="my-series" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 이름을 적으면 시리즈가 만들어져요"
+                        class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" autocomplete="off" />
+                    <datalist id="my-series">{% for name in my_series %}<option value="{{ name }}">{% endfor %}</datalist>
+                </div>
+                <div class="w-[120px]">
+                    <label for="series_order" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">몇 편</label>
+                    <input id="series_order" name="series_order" type="number" min="1" max="999" value="{{ form_data.series_order|default:'' }}" placeholder="자동"
+                        class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" />
+                </div>
+            </div>
+            <p class="mt-2 text-[12px] text-[#8e8e93]">같은 시리즈 이름을 쓴 글끼리 묶여서, 글 아래에 목차와 이전·다음 편 버튼이 생겨요. "몇 편"을 비우면 마지막 편 다음 번호가 붙어요.</p>
+        </section>
+
+        <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
             <label for="tags" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]"># 태그</label>
             <input id="tags" name="tags" value="{{ form_data.tags|default:'' }}" placeholder="#Django, #Python, #개발일지 또는 쉼표로 구분"
                 class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" />
@@ -403,6 +420,8 @@ window.addEventListener('DOMContentLoaded', () => {
         summary: document.getElementById('summary')?.value || '',
         category: document.querySelector('select[name="category"]')?.value || '',
         tags: document.getElementById('tags')?.value || '',
+        series_name: document.getElementById('series_name')?.value || '',
+        series_order: document.getElementById('series_order')?.value || '',
         content: mj.getContent(),
         savedAt: Date.now(),
     });
@@ -422,7 +441,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const snapshot = JSON.parse(raw);
             if (!snapshot || !snapshot.content) return;
             if (!window.confirm('이전 편집 내용이 있습니다. 복구할까요?')) return;
-            const fields = { title: 'title', summary: 'summary', tags: 'tags' };
+            const fields = { title: 'title', summary: 'summary', tags: 'tags', series_name: 'series_name', series_order: 'series_order' };
             Object.entries(fields).forEach(([key, id]) => {
                 const el = document.getElementById(id);
                 if (el && typeof snapshot[key] === 'string') el.value = snapshot[key];
