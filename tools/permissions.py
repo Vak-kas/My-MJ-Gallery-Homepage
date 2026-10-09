@@ -35,18 +35,18 @@ def owns_room(user, room):
 
 
 # ── 회원 등급 ─────────────────────────────
-# 비로그인 < 일반 회원 < ⭐ 친한 사람(Studio → Users 에서 지정, Django 그룹) < 관리자
-FRIEND_GROUP = "friends"
-TIER_LABELS = {"anon": "비로그인", "member": "일반 회원", "friend": "⭐ 친한 사람", "admin": "관리자"}
+# 비로그인 < 일반 회원 < ⭐ VIP 회원(Studio → Users 에서 지정, Django 그룹) < 관리자
+VIP_GROUP = "vip"
+TIER_LABELS = {"anon": "비로그인", "member": "일반 회원", "vip": "⭐ VIP 회원", "admin": "관리자"}
 
 
-def is_friend(user):
+def is_vip(user):
 	if not (user and user.is_authenticated and user.is_active):
 		return False
-	cached = getattr(user, "_mj_is_friend", None)
+	cached = getattr(user, "_mj_is_vip", None)
 	if cached is None:
-		cached = user.groups.filter(name=FRIEND_GROUP).exists()
-		user._mj_is_friend = cached
+		cached = user.groups.filter(name=VIP_GROUP).exists()
+		user._mj_is_vip = cached
 	return cached
 
 
@@ -55,42 +55,42 @@ def tier(user):
 		return "anon"
 	if user.is_superuser:
 		return "admin"
-	return "friend" if is_friend(user) else "member"
+	return "vip" if is_vip(user) else "member"
 
 
-def set_friend(user, on):
+def set_vip(user, on):
 	from django.contrib.auth.models import Group
 
-	group, _ = Group.objects.get_or_create(name=FRIEND_GROUP)
+	group, _ = Group.objects.get_or_create(name=VIP_GROUP)
 	if on:
 		user.groups.add(group)
 	else:
 		user.groups.remove(group)
-	user._mj_is_friend = bool(on)
+	user._mj_is_vip = bool(on)
 
 
-# 친한 사람은 회원보다 넉넉하게
-FRIEND_STREAM_LIMITS = {"max_open_rooms": 3, "rooms_per_day": 10, "ttl_minutes": 180, "rate_mb": 20, "total_gb": 10}
-FRIEND_LIVE_LIMITS = {"max_open_rooms": 2, "rooms_per_day": 10, "ttl_minutes": 240, "max_viewers": 15}
-FRIEND_QUOTA_MULTIPLIER = 3  # 속도 측정·포트 체크 한도 배수
+# VIP 회원은 회원보다 넉넉하게
+VIP_STREAM_LIMITS = {"max_open_rooms": 3, "rooms_per_day": 10, "ttl_minutes": 180, "rate_mb": 20, "total_gb": 10}
+VIP_LIVE_LIMITS = {"max_open_rooms": 2, "rooms_per_day": 10, "ttl_minutes": 240, "max_viewers": 15}
+VIP_QUOTA_MULTIPLIER = 3  # 속도 측정·포트 체크 한도 배수
 
 
 def stream_limits(user):
-	return FRIEND_STREAM_LIMITS if is_friend(user) else MEMBER_STREAM_LIMITS
+	return VIP_STREAM_LIMITS if is_vip(user) else MEMBER_STREAM_LIMITS
 
 
 def live_limits(user):
-	return FRIEND_LIVE_LIMITS if is_friend(user) else MEMBER_LIVE_LIMITS
+	return VIP_LIVE_LIMITS if is_vip(user) else MEMBER_LIVE_LIMITS
 
 
 def quota_multiplier(user):
-	return FRIEND_QUOTA_MULTIPLIER if is_friend(user) else 1
+	return VIP_QUOTA_MULTIPLIER if is_vip(user) else 1
 
 
 # AI 기능 (QR 스타일 추천·정규식 만들기·글 비교 요약·네트워크 결과 풀이 모두 합쳐서)
 # per_day: 하루 횟수 (None = 제한 없음), max_chars: 한 번에 보낼 수 있는 글자 수
 AI_LIMITS = {
 	"member": {"per_day": 20, "max_chars": 4_000},
-	"friend": {"per_day": 100, "max_chars": 15_000},
+	"vip": {"per_day": 100, "max_chars": 15_000},
 	"admin": {"per_day": None, "max_chars": 40_000},
 }

@@ -51,7 +51,7 @@ def _consume_quota(request, kind, amount):
 
 	now = time.time()
 	buckets = []
-	mult = quota_multiplier(user)  # 친한 사람은 몇 배
+	mult = quota_multiplier(user)  # VIP 회원은 몇 배
 	for window, quota in QUOTAS[kind]:
 		quota *= mult
 		key = f"speedtest:{kind}:{window}:u{user.id}"

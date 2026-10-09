@@ -12,7 +12,7 @@ from django.utils import timezone
 
 from . import ai
 from .models import AIUsage
-from .permissions import AI_LIMITS, FRIEND_STREAM_LIMITS, MEMBER_STREAM_LIMITS, is_friend, set_friend, stream_limits, tier
+from .permissions import AI_LIMITS, VIP_STREAM_LIMITS, MEMBER_STREAM_LIMITS, is_vip, set_vip, stream_limits, tier
 
 
 def fake_reply(payload, inp=1000, out=500):
@@ -25,8 +25,8 @@ class AITests(TestCase):
 		cache.clear()
 		User = get_user_model()
 		self.member = User.objects.create_user("member", "m@example.com", "pw-for-tests-only")
-		self.friend = User.objects.create_user("friend", "f@example.com", "pw-for-tests-only")
-		set_friend(self.friend, True)
+		self.vip = User.objects.create_user("vip", "f@example.com", "pw-for-tests-only")
+		set_vip(self.vip, True)
 		self.admin = User.objects.create_superuser("admin", "a@example.com", "pw-for-tests-only")
 
 	def fresh(self, user):
@@ -34,11 +34,11 @@ class AITests(TestCase):
 
 	def test_tiers(self):
 		from django.contrib.auth.models import AnonymousUser
-		self.assertEqual([tier(AnonymousUser()), tier(self.member), tier(self.fresh(self.friend)), tier(self.admin)], ["anon", "member", "friend", "admin"])
-		self.assertEqual(stream_limits(self.fresh(self.friend)), FRIEND_STREAM_LIMITS)
+		self.assertEqual([tier(AnonymousUser()), tier(self.member), tier(self.fresh(self.vip)), tier(self.admin)], ["anon", "member", "vip", "admin"])
+		self.assertEqual(stream_limits(self.fresh(self.vip)), VIP_STREAM_LIMITS)
 		self.assertEqual(stream_limits(self.member), MEMBER_STREAM_LIMITS)
-		set_friend(self.friend, False)
-		self.assertFalse(is_friend(self.fresh(self.friend)))
+		set_vip(self.vip, False)
+		self.assertFalse(is_vip(self.fresh(self.vip)))
 
 	def test_check_limits_by_tier(self):
 		from django.contrib.auth.models import AnonymousUser
@@ -48,7 +48,7 @@ class AITests(TestCase):
 		with self.assertRaises(ai.AIError) as e:
 			ai.check(self.member, AI_LIMITS["member"]["max_chars"] + 1)
 		self.assertEqual(e.exception.status, 400)
-		ai.check(self.fresh(self.friend), AI_LIMITS["member"]["max_chars"] + 1)  # 친한 사람은 더 길게
+		ai.check(self.fresh(self.vip), AI_LIMITS["member"]["max_chars"] + 1)  # VIP 회원은 더 길게
 		AIUsage.objects.bulk_create([AIUsage(user=self.member, feature="regex") for _ in range(AI_LIMITS["member"]["per_day"])])
 		AIUsage.objects.create(user=self.member, feature="regex", ok=False)  # 실패는 안 셈
 		with self.assertRaises(ai.AIError) as e:
@@ -60,7 +60,7 @@ class AITests(TestCase):
 
 	def test_site_budget_stops_everyone_but_admin(self):
 		AIUsage.objects.create(user=self.admin, feature="diff", cost_usd=Decimal("1.0"))
-		for user in (self.member, self.fresh(self.friend)):
+		for user in (self.member, self.fresh(self.vip)):
 			with self.assertRaises(ai.AIError) as e:
 				ai.check(user)
 			self.assertEqual(e.exception.status, 503)
@@ -92,14 +92,14 @@ class AITests(TestCase):
 		self.assertIn("010-1234-5678", post.call_args.args[0]["messages"][0]["content"])
 
 	def test_diff_ai(self):
-		self.client.force_login(self.fresh(self.friend))
+		self.client.force_login(self.fresh(self.vip))
 		self.assertEqual(self.post("diff_ai", {"a": "같음", "b": "같음"}).status_code, 400)
 		raw = {"summary": "금액이 바뀜", "changes": [{"kind": "수정", "what": "100만원 → 120만원"}, {"kind": "엉뚱", "what": "x"}, {"what": ""}], "watch": ["금액"]}
 		with mock.patch("tools.ai._post", return_value=fake_reply(raw)):
 			data = self.post("diff_ai", {"a": "100만원", "b": "120만원"}).json()
 		self.assertEqual([c["kind"] for c in data["changes"]], ["수정", "수정"])
 		self.assertEqual(data["watch"], ["금액"])
-		self.assertEqual(data["quota"]["tier"], "friend")
+		self.assertEqual(data["quota"]["tier"], "vip")
 
 	def test_netcheck_ai(self):
 		self.client.force_login(self.member)
@@ -120,11 +120,30 @@ class AITests(TestCase):
 		self.client.force_login(self.member)
 		self.assertEqual(self.client.get(reverse("studio:ai")).status_code, 302)
 
-	def test_studio_users_friend_toggle(self):
+	def test_studio_users_vip_toggle(self):
 		self.client.force_login(self.admin)
-		self.client.post(reverse("studio:users"), {"action": "friend_on", "ids": [self.member.id]})
-		self.assertTrue(is_friend(self.fresh(self.member)))
-		res = self.client.get(reverse("studio:users"), {"state": "friend"})
-		self.assertEqual({u.username for u in res.context["users"]}, {"member", "friend"})
-		self.client.post(reverse("studio:users"), {"action": "friend_off", "ids": [self.member.id]})
-		self.assertFalse(is_friend(self.fresh(self.member)))
+		self.client.post(reverse("studio:users"), {"action": "vip_on", "ids": [self.member.id]})
+		self.assertTrue(is_vip(self.fresh(self.member)))
+		res = self.client.get(reverse("studio:users"), {"state": "vip"})
+		self.assertEqual({u.username for u in res.context["users"]}, {"member", "vip"})
+		self.client.post(reverse("studio:users"), {"action": "vip_off", "ids": [self.member.id]})
+		self.assertFalse(is_vip(self.fresh(self.member)))
+
+	def test_ocr(self):
+		import base64
+		img0 = base64.b64encode(b"x").decode()
+		self.assertEqual(self.post("ocr_run", {"image": img0, "type": "image/jpeg"}).status_code, 401)  # AI 읽기는 회원만
+		self.client.force_login(self.member)
+		img = base64.b64encode(b"\xff\xd8fake-jpeg").decode()
+		self.assertEqual(self.post("ocr_run", {"image": img, "type": "image/gif"}).status_code, 400)
+		self.assertEqual(self.post("ocr_run", {"image": "@@not-base64@@", "type": "image/jpeg"}).status_code, 400)
+		with mock.patch("tools.ai_views.OCR_MAX_BYTES", 5):
+			self.assertEqual(self.post("ocr_run", {"image": img, "type": "image/jpeg"}).status_code, 400)  # 너무 큼
+		raw = {"text": "회의 안건\n1. 일정", "kind": "손글씨", "unclear": ""}
+		with mock.patch("tools.ai._post", return_value=fake_reply(raw)) as post:
+			data = self.post("ocr_run", {"image": img, "type": "image/jpeg", "mode": "table"}).json()
+		self.assertEqual(data["text"], "회의 안건\n1. 일정")
+		content = post.call_args.args[0]["messages"][0]["content"]
+		self.assertEqual(content[0]["source"], {"type": "base64", "media_type": "image/jpeg", "data": img})
+		self.assertIn("마크다운 표", content[1]["text"])
+		self.assertEqual(AIUsage.objects.get().feature, "ocr")

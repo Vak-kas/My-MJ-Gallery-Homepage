@@ -49,8 +49,8 @@
                             <option value="">작업 선택</option>
                             <option value="activate">활성화 · 가입 승인</option>
                             <option value="reject">가입 거절</option>
-                            <option value="friend_on">⭐ 친한 사람으로 지정 (한도 넉넉하게)</option>
-                            <option value="friend_off">친한 사람 해제</option>
+                            <option value="vip_on">⭐ VIP 회원으로 지정 (한도 넉넉하게)</option>
+                            <option value="vip_off">VIP 회원 해제</option>
                             <option value="suspend">정지 (로그인 차단)</option>
                             <option value="purge">정지 + 작성한 글·댓글·방명록 전부 삭제</option>
                             <option value="delete">계정 삭제 + 작성한 것 전부 삭제</option>
@@ -97,9 +97,9 @@
                                 <td class="px-2 py-3">
                                     {% if u.is_superuser %}<span class="rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[12px] text-[#0066cc]">관리자</span>
                                     {% elif u.is_active %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
-                                    {% if u.is_friend %}<span class="ml-1 rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ 친한 사람</span>{% endif %}
+                                    {% if u.is_vip %}<span class="ml-1 rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
                                     {% if u.id != request.user.id %}
-                                    <form method="post" action="{% url 'studio:users' %}" class="mt-1.5">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="{% if u.is_friend %}friend_off{% else %}friend_on{% endif %}"><input type="hidden" name="ids" value="{{ u.id }}"><button class="text-[11px] text-[#8e8e93] hover:text-[#0066cc]">{% if u.is_friend %}⭐ 해제{% else %}⭐ 친한 사람으로{% endif %}</button></form>
+                                    <form method="post" action="{% url 'studio:users' %}" class="mt-1.5">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="{% if u.is_vip %}vip_off{% else %}vip_on{% endif %}"><input type="hidden" name="ids" value="{{ u.id }}"><button class="text-[11px] text-[#8e8e93] hover:text-[#0066cc]">{% if u.is_vip %}⭐ 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
                                     {% endif %}
                                     {% elif u.signup_request.status == 'pending' %}
                                     <span class="rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[12px] text-[#b26a00]">승인 대기</span>
