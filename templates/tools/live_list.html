@@ -41,7 +41,7 @@
         <label class="mt-3 flex items-center gap-2 text-[14px]"><input type="checkbox" name="chat" checked class="h-4 w-4"> 채팅 켜기</label>
         <div class="mt-4 flex flex-wrap items-center gap-3">
             <button class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white">방송 열기</button>
-            {% if not is_admin %}<span class="text-[12px] text-[#8e8e93]">{% if user_tier == "friend" %}⭐ 친한 사람{% else %}회원{% endif %} 한도: 동시에 {{ member_limits.max_open_rooms }}개 · 하루 {{ member_limits.rooms_per_day }}번 · 최대 {{ member_limits.ttl_minutes }}분 · 시청자 {{ member_limits.max_viewers }}명</span>{% endif %}
+            {% if not is_admin %}<span class="text-[12px] text-[#8e8e93]">{% if user_tier == "vip" %}⭐ VIP 회원{% else %}회원{% endif %} 한도: 동시에 {{ member_limits.max_open_rooms }}개 · 하루 {{ member_limits.rooms_per_day }}번 · 최대 {{ member_limits.ttl_minutes }}분 · 시청자 {{ member_limits.max_viewers }}명</span>{% endif %}
         </div>
         <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">화면 소리 공유는 Chrome·Edge 에서 돼요 (탭 공유 시 "탭 오디오 공유" 체크). 시청자가 늘수록 내 업로드가 늘어나니 5명 안팎을 권장해요.</p>
     </form>

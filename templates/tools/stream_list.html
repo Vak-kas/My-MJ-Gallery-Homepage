@@ -31,7 +31,7 @@
         </p>
         {% if limits %}
         <p class="mt-3 inline-block rounded-xl bg-[#f0f7ff] px-4 py-2 text-[13px] text-[#0066cc]">
-            {% if user_tier == "friend" %}⭐ 친한 사람{% else %}회원{% endif %} 한도: 동시에 방 {{ limits.max_open_rooms }}개 · 하루 {{ limits.rooms_per_day }}개 · 유효 시간 최대 {{ limits.ttl_minutes }}분 · 속도 최대 {{ limits.rate_mb }}MB/s · 방당 총량 최대 {{ limits.total_gb }}GB
+            {% if user_tier == "vip" %}⭐ VIP 회원{% else %}회원{% endif %} 한도: 동시에 방 {{ limits.max_open_rooms }}개 · 하루 {{ limits.rooms_per_day }}개 · 유효 시간 최대 {{ limits.ttl_minutes }}분 · 속도 최대 {{ limits.rate_mb }}MB/s · 방당 총량 최대 {{ limits.total_gb }}GB
         </p>
         {% endif %}
     </div>
