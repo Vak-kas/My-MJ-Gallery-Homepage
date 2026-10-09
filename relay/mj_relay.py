@@ -35,8 +35,10 @@ from aiohttp import WSMsgType, web
 from zmq.utils.monitor import parse_monitor_message
 
 try:
-	from mj_live import LiveHub, add_live_routes  # systemd 에서 relay/ 폴더 기준으로 실행
+	from mj_game import GameHub, add_game_routes  # systemd 에서 relay/ 폴더 기준으로 실행
+	from mj_live import LiveHub, add_live_routes
 except ImportError:  # 테스트 등에서 패키지로 불러올 때
+	from relay.mj_game import GameHub, add_game_routes
 	from relay.mj_live import LiveHub, add_live_routes
 
 log = logging.getLogger("mj-relay")
@@ -548,11 +550,13 @@ def _safe_json(raw):
 
 # ── HTTP: 제어 API + WebSocket ─────────────────────
 
-def build_app(relay: Relay, live_hub=None):
+def build_app(relay: Relay, live_hub=None, game_hub=None):
 	app = web.Application(middlewares=[_api_key_middleware(relay.config.api_key)])
 	app["relay"] = relay
 	if live_hub is not None:
 		add_live_routes(app, live_hub)  # 라이브 방송 시그널링 (relay/mj_live.py)
+	if game_hub is not None:
+		add_game_routes(app, game_hub)  # 실시간 게임 방 (relay/mj_game.py)
 
 	async def create(request):
 		try:
@@ -682,7 +686,8 @@ def build_app(relay: Relay, live_hub=None):
 		return ws
 
 	async def health(request):
-		return web.json_response({"ok": True, "rooms": len(relay.rooms), "live": len(live_hub.rooms) if live_hub else 0})
+		return web.json_response({"ok": True, "rooms": len(relay.rooms), "live": len(live_hub.rooms) if live_hub else 0,
+								  "games": len(game_hub.rooms) if game_hub else 0})
 
 	app.router.add_post("/rooms", create)
 	app.router.add_get("/rooms", listing)
@@ -715,7 +720,9 @@ async def _main(config):
 	await relay.start()
 	live_hub = LiveHub()
 	await live_hub.start()
-	app = build_app(relay, live_hub)
+	game_hub = GameHub()
+	await game_hub.start()
+	app = build_app(relay, live_hub, game_hub)
 	runner = web.AppRunner(app)
 	await runner.setup()
 	site = web.TCPSite(runner, config.api_host, config.api_port)
@@ -725,6 +732,7 @@ async def _main(config):
 		await asyncio.Event().wait()
 	finally:
 		await runner.cleanup()
+		await game_hub.stop()
 		await live_hub.stop()
 		await relay.stop()
 

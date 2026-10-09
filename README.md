@@ -95,7 +95,7 @@
 | 🧮 인코딩 · 해시 | Base64·URL·Hex·HTML·유니코드 변환, MD5·SHA·HMAC·파일 해시, JWT 보기 (브라우저 안에서만) | 누구나 |
 | 🔑 키 생성기 | 길이·문자 종류·형식(Hex, Base64, UUID, PIN, API 키) 비밀번호/키 생성, RSA·ECDSA·Ed25519 키 쌍 PEM·OpenSSH 내보내기. 모두 브라우저 안에서만 생성 | 누구나 |
 
-- 데이터 전송 중계 데몬 `relay/mj_relay.py` (asyncio + pyzmq + aiohttp, systemd 서비스 `mj-relay`) — 자세한 내용은 [relay/README.md](relay/README.md)
+- 데이터 전송 중계 데몬 `relay/mj_relay.py` (asyncio + pyzmq + aiohttp, systemd 서비스 `mj-relay`) — 라이브 방송(`mj_live.py`)·실시간 게임 방(`mj_game.py`)도 같이 돎, 자세한 내용은 [relay/README.md](relay/README.md)
 - 맡겨두기·클립보드 파일은 nginx 가 서빙하지 않는 `private_media/` 에 저장하고, Django 가 권한 확인 후에만 내려줌
 
 ### 1.6.1 Game (`/games/`)
@@ -108,7 +108,8 @@
 | 🔢 2048 | 방향키·WASD·밀기, 부드러운 이동·합치기 애니메이션, **서버가 준 seed 로 움직임(U·D·L·R)을 처음부터 다시 둬서 점수 계산**(`games/engine2048.py`, JS 와 같은 난수 mulberry32) → 점수 조작 불가, 한 판은 한 번만 등록 |
 | ⌨️ 한글 타자 연습 | 한글(속담·생활 문장)·영어·코딩 문장 10개, 타수는 한컴타자처럼 자모 단위(겹모음·겹받침 2타), 틀린 글자 빨강·조합 중인 글자는 봐줌, 붙여넣기 막음. **문장은 서버가 고르고 채점·시간도 서버 기준**, 정확도 90% 이상·1,500타 이하만 랭킹 |
 | 🏆 랭킹 | 로그인 회원만 저장(`games.Score`), 사람마다 최고 기록 하나로 TOP 10 + 내 순위 |
-| 준비 중 | ⚫ 오목 · 🎨 그림 맞추기(실시간) → 🖍 그림 ↔ 글 이어하기 |
+| ⚫ 오목 | 실시간 대국(15×15 자유룰). 회원이 방을 만들고(공개하면 '대기 중인 방' 목록에) 링크를 보내면 받은 사람은 로그인 없이 닉네임만으로 참여, 먼저 앉은 두 명이 흑·백·나머지는 구경. 무르기 부탁(상대 동의)·기권·흑백 바꿔 다시·승수·채팅·돌 소리·마지막 수 표시. 판과 규칙은 mj-relay 의 `relay/mj_game.py` 가 판단, 잠깐 끊겨도 자리 유지 |
+| 준비 중 | 🎨 그림 맞추기(실시간) → 🖍 그림 ↔ 글 이어하기 (같은 게임 방 위에) |
 
 ### 1.7 회원 · 가입 승인
 - 회원가입: 아이디, **이름(실명)**, 이메일, 비밀번호, 가입 인사(선택) + **개인정보 수집·이용 동의(필수)**
@@ -306,7 +307,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `2048/`, `typing/`, `scores/<랭킹>/`) |
+| `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `2048/`, `typing/`, `omok/`, `scores/<랭킹>/`) |
 | `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |

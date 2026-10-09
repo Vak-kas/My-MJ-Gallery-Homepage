@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 22px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1100px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">VERSUS · OMOK</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">오목.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">방을 만들고 링크를 보내면 실시간으로 같이 둬요. 받은 사람은 로그인 없이 닉네임만 넣으면 돼요. 15×15, 흑 먼저, 다섯 개 이상 이으면 승리(자유룰).</p>
+    </div>
+
+    {% if messages %}<div class="mt-6 space-y-2">{% for m in messages %}<p class="rounded-2xl px-4 py-3 text-[14px] {% if m.tags == 'error' %}bg-[#fff1f0] text-[#c4271d]{% else %}bg-[#e8f8ee] text-[#1e7a35]{% endif %}">{{ m }}</p>{% endfor %}</div>{% endif %}
+    {% if relay_error %}<p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>{% endif %}
+
+    <div class="mt-8 grid gap-6 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <section class="gm-card">
+            <h2 class="text-[16px] font-semibold">새 방 만들기</h2>
+            {% if user.is_authenticated %}
+            <form method="post" action="{% url 'games:omok_create' %}" class="mt-3 space-y-3">
+                {% csrf_token %}
+                <input name="title" maxlength="40" class="gm-in" placeholder="방 이름 (예: 점심 내기 한 판)">
+                <label class="flex items-center gap-2 text-[13px]"><input type="checkbox" name="public" class="h-4 w-4"> 아래 '대기 중인 방'에 공개 (아무나 들어와서 둘 수 있어요)</label>
+                <button class="w-full rounded-full bg-[#10b981] py-3 text-[15px] font-semibold text-white hover:bg-[#0f9f6e]">⚫ 방 만들기</button>
+            </form>
+            {% else %}
+            <p class="mt-3 text-[14px] text-[#6e6e73]">방은 회원이 만들 수 있어요. 받은 링크로는 로그인 없이 들어갈 수 있어요.</p>
+            <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="mt-3 inline-block rounded-full bg-[#10b981] px-5 py-2.5 text-[14px] font-semibold text-white">로그인하고 방 만들기</a>
+            {% endif %}
+
+            {% if mine %}
+            <h3 class="mt-6 text-[14px] font-semibold">내 방</h3>
+            <ul class="mt-2 divide-y divide-black/[0.06]">
+                {% for r in mine %}
+                <li class="flex items-center gap-2 py-2.5 text-[14px]">
+                    <a href="{{ r.url }}" class="min-w-0 flex-1 truncate font-semibold hover:text-[#0f9f6e]">{{ r.title }}</a>
+                    <span class="text-[12px] text-[#8e8e93]">{{ r.peers }}명 · {% if r.status == 'playing' %}대국 중{% elif r.status == 'over' %}끝남{% else %}기다리는 중{% endif %}{% if r.public %} · 공개{% endif %}</span>
+                    <form method="post" action="{% url 'games:omok_close' r.id %}">{% csrf_token %}<button class="gm-btn" title="방 닫기">닫기</button></form>
+                </li>
+                {% endfor %}
+            </ul>
+            <p class="mt-2 text-[12px] text-[#8e8e93]">아무도 없이 30분이 지나면 자동으로 닫혀요. 한 사람이 {{ max_rooms }}개까지.</p>
+            {% endif %}
+        </section>
+
+        <section class="gm-card">
+            <div class="flex items-center"><h2 class="text-[16px] font-semibold">대기 중인 방</h2><a href="{% url 'games:omok' %}" class="gm-btn ml-auto">↻</a></div>
+            <ul class="mt-3 space-y-2">
+                {% for r in open_rooms %}
+                <li><a href="{{ r.url }}" class="flex items-center gap-3 rounded-2xl border border-black/[0.08] px-4 py-3 hover:border-[#10b981]/50">
+                    <span class="text-[22px]">⚫</span>
+                    <span class="min-w-0 flex-1"><b class="block truncate text-[14px]">{{ r.title }}</b><span class="text-[12px] text-[#8e8e93]">{{ r.owner }} · {{ r.peers }}명 접속</span></span>
+                    <span class="rounded-full px-3 py-1 text-[12px] {% if r.seats_open %}bg-[#ecfdf5] text-[#0f9f6e]{% else %}bg-[#f5f5f7] text-[#6e6e73]{% endif %}">{% if r.seats_open %}빈 자리 {{ r.seats_open }}{% else %}구경하기{% endif %}</span>
+                </a></li>
+                {% empty %}
+                <li class="py-6 text-center text-[14px] text-[#8e8e93]">공개된 방이 없어요. 하나 만들어 보세요!</li>
+                {% endfor %}
+            </ul>
+        </section>
+    </div>
+</main>
+{% endblock %}

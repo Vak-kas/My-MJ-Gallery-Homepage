@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .om-board-wrap { position: relative; width: min(100%, 620px); aspect-ratio: 1; margin: 0 auto; }
+    #om-board { width: 100%; height: 100%; display: block; border-radius: 14px; box-shadow: 0 10px 30px rgba(120, 80, 20, 0.25); cursor: pointer; touch-action: manipulation; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 10px 12px; }
+    .seat.turn { border-color: #10b981; background: #ecfdf5; }
+    .stone { display: inline-block; width: 18px; height: 18px; border-radius: 999px; vertical-align: -3px; }
+    .stone.b { background: radial-gradient(circle at 35% 30%, #666, #000); }
+    .stone.w { background: radial-gradient(circle at 35% 30%, #fff, #cfcfcf); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.2); }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; }
+    #om-chat { height: 220px; overflow-y: auto; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .seat { background: #111318; }
+    html.theme-dark .seat.turn { background: #14432d; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:omok' %}" class="text-[13px] text-[#0f9f6e]">← 오목 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">⚫ {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 15×15 자유룰</p>
+        </div>
+        <button type="button" class="gm-btn" id="om-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:omok_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <!-- 닉네임 -->
+    <section id="om-name-box" class="gm-card mt-5 hidden">
+        <form id="om-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="om-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#10b981] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <p id="om-status" class="mb-3 text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="om-board-wrap"><canvas id="om-board" width="1240" height="1240"></canvas></div>
+            <div class="mt-4 flex flex-wrap justify-center gap-2">
+                <button type="button" class="gm-btn" id="om-undo">↶ 무르기 부탁</button>
+                <button type="button" class="gm-btn" id="om-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="om-rematch">🔁 흑·백 바꿔 다시</button>
+                <button type="button" class="gm-btn" id="om-stand">자리에서 일어나기</button>
+                <label class="ml-2 flex items-center gap-1.5 text-[13px]"><input id="om-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+            <div id="om-undo-ask" class="mt-3 hidden rounded-2xl bg-[#fff8e6] px-4 py-3 text-center text-[14px] text-[#8a5300] dark:bg-[#3b2a10] dark:text-[#f6c86b]">
+                상대가 한 수 무르기를 부탁했어요. <button type="button" class="gm-btn ml-2" id="om-undo-ok">들어주기</button> <button type="button" class="gm-btn" id="om-undo-no">거절</button>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2">
+                <div class="seat" id="seat-black"></div>
+                <div class="seat" id="seat-white"></div>
+                <p id="om-spec" class="pt-1 text-[12px] text-[#8e8e93]"></p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="om-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="om-chat-form" class="mt-2 flex gap-2"><input id="om-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+
+    // 이 방에서의 내 열쇠 — 새로고침·잠깐 끊겨도 자리를 돌려받음
+    let pid = store.get(`mj-omok-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-omok-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, hover = null;
+    const canvas = $('om-board'), ctx = canvas.getContext('2d');
+
+    // ── 판 그리기 ──
+    function geom() { const W = canvas.width, n = S ? S.size : 15, pad = W * 0.055; return { W, n, pad, cell: (W - pad * 2) / (n - 1) }; }
+    function draw() {
+        const { W, n, pad, cell } = geom();
+        const g = ctx.createLinearGradient(0, 0, W, W);
+        g.addColorStop(0, '#e9c48a'); g.addColorStop(1, '#d6a865');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, W);
+        ctx.strokeStyle = 'rgba(70,45,10,0.75)'; ctx.lineWidth = 2;
+        for (let i = 0; i < n; i++) {
+            ctx.beginPath(); ctx.moveTo(pad, pad + i * cell); ctx.lineTo(W - pad, pad + i * cell); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(pad + i * cell, pad); ctx.lineTo(pad + i * cell, W - pad); ctx.stroke();
+        }
+        ctx.fillStyle = 'rgba(70,45,10,0.85)';
+        [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]].forEach(([x, y]) => { ctx.beginPath(); ctx.arc(pad + x * cell, pad + y * cell, cell * 0.11, 0, Math.PI * 2); ctx.fill(); });
+        if (!S) return;
+        const r = cell * 0.46;
+        const stone = (x, y, c, alpha = 1) => {
+            const cx = pad + x * cell, cy = pad + y * cell;
+            ctx.globalAlpha = alpha;
+            ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = cell * 0.12; ctx.shadowOffsetY = cell * 0.05;
+            const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+            if (c === 'b') { grad.addColorStop(0, '#666'); grad.addColorStop(1, '#050505'); } else { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#cfcfcf'); }
+            ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+            ctx.shadowColor = 'transparent'; ctx.globalAlpha = 1;
+        };
+        for (let i = 0; i < S.board.length; i++) if (S.board[i] !== '.') stone(i % n, Math.floor(i / n), S.board[i]);
+        if (S.last) { const [x, y] = S.last; ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(pad + x * cell, pad + y * cell, cell * 0.12, 0, Math.PI * 2); ctx.fill(); }
+        if (S.win_line?.length) {
+            ctx.strokeStyle = 'rgba(16,185,129,0.9)'; ctx.lineWidth = cell * 0.16; ctx.lineCap = 'round';
+            const [a, b] = [S.win_line[0], S.win_line[S.win_line.length - 1]];
+            ctx.beginPath(); ctx.moveTo(pad + a[0] * cell, pad + a[1] * cell); ctx.lineTo(pad + b[0] * cell, pad + b[1] * cell); ctx.stroke();
+        }
+        if (hover && myTurn() && S.board[hover[1] * n + hover[0]] === '.') stone(hover[0], hover[1], mySeat[0], 0.45);
+    }
+    function cellAt(e) {
+        const rect = canvas.getBoundingClientRect(), { n, pad, cell, W } = geom();
+        const x = Math.round(((e.clientX - rect.left) * (W / rect.width) - pad) / cell), y = Math.round(((e.clientY - rect.top) * (W / rect.height) - pad) / cell);
+        return x >= 0 && y >= 0 && x < n && y < n ? [x, y] : null;
+    }
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat;
+    canvas.addEventListener('pointermove', (e) => { const c = cellAt(e); if (String(c) !== String(hover)) { hover = c; draw(); } });
+    canvas.addEventListener('pointerleave', () => { hover = null; draw(); });
+    canvas.addEventListener('click', (e) => {
+        const c = cellAt(e);
+        if (!c || !S) return;
+        if (!mySeat && S.status !== 'over') { toast(Object.values(S.seats).some((s) => !s) ? '먼저 오른쪽에서 자리에 앉으세요.' : '구경 중이에요.'); return; }
+        if (myTurn()) send({ type: 'move', x: c[0], y: c[1] });
+    });
+
+    // ── 자리·상태 ──
+    function seatHTML(seat) {
+        const s = S?.seats?.[seat], label = seat === 'black' ? '흑' : '백', stoneCls = seat === 'black' ? 'b' : 'w';
+        const wins = S?.wins?.[seat] || 0;
+        if (!s) return `<div class="flex items-center gap-2"><span class="stone ${stoneCls}"></span><b class="text-[14px]">${label}</b><span class="text-[13px] text-[#8e8e93]">빈 자리</span>${mySeat ? '' : `<button type="button" class="gm-btn ml-auto" data-sit="${seat}">여기 앉기</button>`}</div>`;
+        return `<div class="flex items-center gap-2"><span class="stone ${stoneCls}"></span><b class="truncate text-[14px]">${esc(s.name)}${mySeat === seat ? ' (나)' : ''}</b><span class="dot" style="background:${s.online ? '#10b981' : '#c7c7cc'}" title="${s.online ? '접속 중' : '잠깐 나감'}"></span><span class="ml-auto text-[12px] text-[#6e6e73]">${wins}승</span></div>`;
+    }
+    function render() {
+        $('seat-black').innerHTML = seatHTML('black');
+        $('seat-white').innerHTML = seatHTML('white');
+        $('seat-black').classList.toggle('turn', S?.status === 'playing' && S.turn === 'black');
+        $('seat-white').classList.toggle('turn', S?.status === 'playing' && S.turn === 'white');
+        let status = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'waiting') status = mySeat ? '상대를 기다리는 중… 초대 링크를 보내 보세요' : '빈 자리에 앉으면 시작해요';
+        else if (S.status === 'playing') status = myTurn() ? '🟢 내 차례예요!' : `${S.turn === 'black' ? '⚫ 흑' : '⚪ 백'} 차례 (${S.move_count + 1}수)`;
+        else status = `🏁 ${S.reason}`;
+        $('om-status').textContent = status;
+        $('om-undo').disabled = !(S && S.status === 'playing' && mySeat && S.move_count && S.turn !== mySeat && !S.undo_from);
+        $('om-resign').disabled = !(S && S.status === 'playing' && mySeat);
+        $('om-rematch').disabled = !(S && S.status === 'over' && mySeat);
+        $('om-stand').disabled = !(mySeat && !(S.status === 'playing' && S.move_count));
+        $('om-undo-ask').classList.toggle('hidden', !(S && S.undo_from && mySeat && S.undo_from !== mySeat));
+        document.title = myTurn() ? `🟢 내 차례 · ${'{{ room.title|escapejs }}'}` : `⚫ {{ room.title|escapejs }} · 오목`;
+        draw();
+    }
+    document.querySelector('aside').addEventListener('click', (e) => { const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit }); });
+    $('om-undo').addEventListener('click', () => send({ type: 'undo-req' }));
+    $('om-undo-ok').addEventListener('click', () => send({ type: 'undo-ok' }));
+    $('om-undo-no').addEventListener('click', () => send({ type: 'undo-no' }));
+    $('om-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('om-rematch').addEventListener('click', () => send({ type: 'rematch' }));
+    $('om-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('om-chat');
+        const div = document.createElement('div');
+        if (m.system) div.innerHTML = `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>`;
+        else div.innerHTML = `${m.seat ? `<span class="stone ${m.seat === 'black' ? 'b' : 'w'}" style="width:10px;height:10px;vertical-align:0"></span> ` : ''}<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+    $('om-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('om-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('om-chat-in').value = ''; } });
+
+    function toast(text) { chatLine({ system: true, text }); }
+
+    // 돌 놓는 소리
+    let audio = null, lastCount = -1;
+    function clack() {
+        if (!$('om-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), gn = audio.createGain();
+            o.type = 'square'; o.frequency.value = 220;
+            gn.gain.setValueAtTime(0.18, audio.currentTime); gn.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.06);
+            o.connect(gn).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.07);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('om-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+            else if (m.type === 'state') {
+                const before = S?.move_count;
+                S = m.state;
+                mySeat = m.you || null;  // 서버가 알려 주는 내 자리
+                const spect = m.peers.filter((p) => !p.seat).map((p) => p.name);
+                $('om-spec').textContent = spect.length ? `구경 ${spect.length}명: ${spect.join(', ')}` : '';
+                if (before !== undefined && S.move_count > before) clack();
+                render();
+            } else if (m.type === 'chat') chatLine(m);
+            else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+            else if (m.type === 'end') { ended = true; $('om-status').textContent = `🚪 ${m.reason}`; }
+        };
+        ws.onclose = () => {
+            if (ended) return;
+            $('om-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) {
+        store.set('mj-game-name', name);
+        $('om-name-box').classList.add('hidden');
+        connect(name);
+    }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved);
+    else { $('om-name-box').classList.remove('hidden'); $('om-name').focus(); }
+    $('om-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('om-name').value.trim()); });
+
+    $('om-copy').addEventListener('click', async () => {
+        const url = $('om-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('om-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('om-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    render();
+    window.__omok = { state: () => S, seat: () => mySeat, send };
+})();
+</script>
+{% endif %}
+{% endblock %}

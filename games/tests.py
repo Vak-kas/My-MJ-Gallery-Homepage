@@ -148,3 +148,72 @@ class ScoreApiTests(TestCase):
 			r = self.post("typing_submit", {"token": s["token"], "typed": s["texts"], "seconds": 2})
 		self.assertGreater(r["cpm"], 1500)
 		self.assertEqual((r["saved"], r["reason"]), (False, "speed"))
+
+
+class OmokViewTests(TestCase):
+	ROOM = {"id": "ab12cd34", "kind": "omok", "token": "tok-123", "title": "점심 내기", "owner_id": None, "owner": "alice", "public": True, "peers": 1, "status": "waiting", "seats_open": 1}
+
+	def setUp(self):
+		cache.clear()
+		self.alice = get_user_model().objects.create_user("alice", "a@example.com", "pw-for-tests-only")
+		self.room = {**self.ROOM, "owner_id": self.alice.id}
+
+	def tearDown(self):
+		cache.clear()
+
+	def test_lobby_lists_public_rooms_with_link(self):
+		from unittest import mock
+
+		with mock.patch("tools.relay_client.list_games", return_value=[self.room, {**self.room, "id": "zz", "public": False}]):
+			res = self.client.get(reverse("games:omok"))
+		self.assertContains(res, "점심 내기")
+		self.assertContains(res, "/games/omok/ab12cd34/?t=tok-123")
+		self.assertNotContains(res, "/games/omok/zz/")  # 비공개 방은 안 보임
+
+	def test_create_requires_login_and_limit(self):
+		from unittest import mock
+
+		self.assertEqual(self.client.post(reverse("games:omok_create")).status_code, 302)
+		self.client.force_login(self.alice)
+		with mock.patch("tools.relay_client.list_games", return_value=[]), \
+				mock.patch("tools.relay_client.create_game", return_value=self.room) as create:
+			res = self.client.post(reverse("games:omok_create"), {"title": "한 판", "public": "on"})
+		self.assertRedirects(res, "/games/omok/ab12cd34/?t=tok-123", fetch_redirect_response=False)
+		self.assertEqual(create.call_args.args[0]["owner"], "alice")
+		self.assertTrue(create.call_args.args[0]["public"])
+		with mock.patch("tools.relay_client.list_games", return_value=[self.room] * 3), \
+				mock.patch("tools.relay_client.create_game") as create:
+			self.client.post(reverse("games:omok_create"))
+		create.assert_not_called()
+
+	def test_room_needs_token_and_open_when_menu_members_only(self):
+		from unittest import mock
+
+		from studio import site_settings
+
+		with mock.patch("tools.relay_client.get_game", return_value=self.room):
+			self.assertEqual(self.client.get("/games/omok/ab12cd34/").status_code, 404)
+			self.assertEqual(self.client.get("/games/omok/ab12cd34/?t=nope").status_code, 404)
+			res = self.client.get("/games/omok/ab12cd34/?t=tok-123")
+			self.assertContains(res, "/relay/ws/game/ab12cd34")  # JS 문자열이라 ?, = 는 이스케이프돼서 경로만 확인
+			self.assertContains(res, 'name="robots" content="noindex')
+			# Game 메뉴를 회원 전용으로 해도 초대 링크는 비로그인도 열림
+			admin = get_user_model().objects.create_superuser("admin", "x@example.com", "pw-for-tests-only")
+			self.client.force_login(admin)
+			nav = ["home", "blog", "tool", "photo", "game"]
+			self.client.post(reverse("studio:settings"), {"nav_order": nav, "nav_state_game": "members", "home_order": [s["key"] for s in site_settings.HOME_SECTION_DEFAULTS]})
+			self.client.logout()
+			self.assertEqual(self.client.get("/games/omok/ab12cd34/?t=tok-123").status_code, 200)
+			self.assertEqual(self.client.get("/games/omok/").status_code, 302)
+
+	def test_only_owner_closes(self):
+		from unittest import mock
+
+		bob = get_user_model().objects.create_user("bob", "b@example.com", "pw-for-tests-only")
+		self.client.force_login(bob)
+		with mock.patch("tools.relay_client.get_game", return_value=self.room), mock.patch("tools.relay_client.close_game") as close:
+			self.client.post(reverse("games:omok_close", args=["ab12cd34"]))
+			close.assert_not_called()
+			self.client.force_login(self.alice)
+			self.client.post(reverse("games:omok_close", args=["ab12cd34"]))
+			close.assert_called_once_with("ab12cd34")

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import scores, views
+from . import live_views, scores, views
 
 app_name = "games"
 
@@ -15,4 +15,8 @@ urlpatterns = [
 	path("typing/start/", scores.typing_start, name="typing_start"),
 	path("typing/submit/", scores.typing_submit, name="typing_submit"),
 	path("scores/<str:board>/", scores.board_view, name="scores"),
+	path("omok/", live_views.omok_lobby, name="omok"),
+	path("omok/new/", live_views.omok_create, name="omok_create"),
+	path("omok/<str:room_id>/", live_views.omok_room, name="omok_room"),
+	path("omok/<str:room_id>/close/", live_views.omok_close, name="omok_close"),
 ]

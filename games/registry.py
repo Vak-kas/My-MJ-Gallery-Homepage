@@ -47,7 +47,15 @@ GAMES = [
 		"tags": ["타자", "랭킹"],
 		"category": "solo",
 	},
-	{"slug": "omok", "url_name": None, "icon": "⚫", "title": "오목", "description": "링크를 보내 친구와 실시간 오목.", "tags": ["1:1"], "category": "versus"},
+	{
+		"slug": "omok",
+		"url_name": "games:omok",
+		"icon": "⚫",
+		"title": "오목",
+		"description": "방을 만들어 링크를 보내면 친구와 실시간 대국. 받은 사람은 로그인 없이 닉네임만. 구경·채팅·무르기·흑백 바꿔 다시 하기.",
+		"tags": ["1:1", "실시간"],
+		"category": "versus",
+	},
 	{"slug": "catchmind", "url_name": None, "icon": "🎨", "title": "그림 맞추기", "description": "한 명이 그리고 나머지가 맞혀요.", "tags": ["여럿이"], "category": "versus"},
 	{"slug": "relay", "url_name": None, "icon": "🖍", "title": "그림 ↔ 글 이어하기", "description": "그림을 보고 글로, 글을 보고 그림으로. 끝에 처음과 비교하면 웃음 폭발.", "tags": ["여럿이"], "category": "versus"},
 ]
