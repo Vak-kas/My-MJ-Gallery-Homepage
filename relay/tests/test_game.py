@@ -18,7 +18,9 @@ API_KEY = "test-key"
 HEAD = {"X-Relay-Key": API_KEY}
 
 
-class GameTestCase(unittest.IsolatedAsyncioTestCase):
+class _GameBase(unittest.IsolatedAsyncioTestCase):
+	"""실시간 게임 방 테스트 공통 (서버 띄우기·접속·메시지 기다리기)."""
+
 	async def asyncSetUp(self):
 		self.relay = mj_relay.Relay(mj_relay.Config(api_key=API_KEY, bind_host="127.0.0.1", port_min=5680, port_max=5689))
 		await self.relay.start()
@@ -51,6 +53,7 @@ class GameTestCase(unittest.IsolatedAsyncioTestCase):
 	async def state(self, ws):
 		return (await self.recv(ws, "state"))["state"]
 
+class GameTestCase(_GameBase):
 	async def test_api_key_and_token(self):
 		self.assertEqual((await self.client.post("/games", json={"kind": "omok"})).status, 401)
 		self.assertEqual((await self.client.post("/games", json={"kind": "chess"}, headers=HEAD)).status, 400)
@@ -143,3 +146,112 @@ class GameTestCase(unittest.IsolatedAsyncioTestCase):
 		self.assertIn("구경", (await self.recv(c, "error"))["text"])
 		for ws in (a, b, c):
 			await ws.close()
+
+
+class CatchTestCase(_GameBase):
+	async def create_catch(self):
+		resp = await self.client.post("/games", json={"kind": "catchmind", "title": "그림", "owner": "seo"}, headers=HEAD)
+		self.assertEqual(resp.status, 201)
+		return await resp.json()
+
+	async def latest_state(self, ws, pred, tries=30):
+		for _ in range(tries):
+			msg = await self.recv(ws, "state")
+			if pred(msg["state"]):
+				return msg["state"]
+		self.fail("원하는 상태가 오지 않음")
+
+	async def test_full_turn(self):
+		room = await self.create_catch()
+		logic = self.hub.rooms[room["id"]].logic
+		logic.words = ["고양이"]  # 제시어 고정
+		a, b, c = await self.join(room, "a", "가"), await self.join(room, "b", "나"), await self.join(room, "c", "다")
+		await b.send_json({"type": "start"})
+		self.assertIn("방장", (await self.recv(b, "error"))["text"])  # 방장은 처음 들어온 a
+		await a.send_json({"type": "start"})
+		st_a = await self.latest_state(a, lambda s: s["status"] == "choosing")
+		self.assertTrue(st_a["is_drawer"])
+		self.assertEqual(st_a["options"], ["고양이"])
+		st_b = await self.latest_state(b, lambda s: s["status"] == "choosing")
+		self.assertIsNone(st_b["options"])  # 다른 사람에겐 제시어 안 보임
+		await a.send_json({"type": "choose", "i": 0})
+		st_b = await self.latest_state(b, lambda s: s["status"] == "drawing")
+		self.assertEqual((st_b["word"], st_b["mask"]), (None, "○○○"))
+		# 그림 → 다른 사람에게 바로 전달
+		await a.send_json({"type": "draw", "id": 1, "c": "#111111", "w": 7, "p": [[10, 10], [20, 20]]})
+		draw = await self.recv(c, "draw")
+		self.assertEqual(draw["p"], [[10, 10], [20, 20]])
+		await a.send_json({"type": "draw", "id": 2, "c": "#abcdef", "w": 7, "p": [[1, 1]]})  # 없는 색은 무시
+		# 늦게 온 사람도 지금까지 그림을 받음
+		d = await self.client.ws_connect(f"/relay/ws/game/{room['id']}?token={room['token']}&pid={'d' * 16}&name=라")
+		sync = await self.recv(d, "sync")
+		self.assertEqual(len(sync["strokes"]), 1)
+		# 거의 맞음 → 나에게만, 정답 → '정답!' 알림 (답 자체는 채팅에 안 나감)
+		await b.send_json({"type": "chat", "text": "고양"})
+		self.assertIn("거의", (await self.recv(b, "close"))["text"])
+		await asyncio.sleep(0.7)
+		await b.send_json({"type": "chat", "text": "고 양 이"})
+		note = await self.recv(c, "chat")
+		while "정답" not in note["text"]:
+			note = await self.recv(c, "chat")
+		self.assertNotIn("고양이", note["text"])
+		# 맞힌 사람·그린 사람은 답이 들어간 말을 못 보냄
+		await asyncio.sleep(0.7)
+		await b.send_json({"type": "chat", "text": "고양이 쉽네"})
+		self.assertIn("보낼 수 없어요", (await self.recv(b, "error"))["text"])
+		# 나머지도 맞히면 정답 공개
+		await c.send_json({"type": "chat", "text": "고양이"})
+		await d.send_json({"type": "chat", "text": "고양이"})
+		st = await self.latest_state(c, lambda s: s["status"] == "reveal")
+		self.assertEqual(st["word"], "고양이")
+		scores = {p["name"]: p["score"] for p in st["players"]}
+		self.assertGreater(scores["나"], scores["다"])  # 먼저 맞힐수록 점수 큼
+		self.assertEqual(scores["가"], 60)  # 그린 사람: 맞힌 사람마다 +20
+		for ws in (a, b, c, d):
+			await ws.close()
+
+	async def test_timer_hint_and_game_end(self):
+		import time as _t
+
+		room = await self.create_catch()
+		r = self.hub.rooms[room["id"]]
+		logic = r.logic
+		logic.words = ["바나나우유"]
+		a, b = await self.join(room, "a", "가"), await self.join(room, "b", "나")
+		await a.send_json({"type": "settings", "rounds": 1, "turn_time": 40})
+		await a.send_json({"type": "start"})
+		await self.latest_state(b, lambda s: s["status"] == "choosing")
+		now = _t.time()
+		await self.hub.tick(now + 13)  # 고르지 않으면 자동으로
+		st = await self.latest_state(b, lambda s: s["status"] == "drawing")
+		self.assertEqual(st["mask"], "○○○○○")
+		await self.hub.tick(logic.started + 21)  # 절반 → 글자 하나 공개
+		st = await self.latest_state(b, lambda s: s["mask"] and s["mask"].count("○") == 4)
+		await self.hub.tick(logic.started + 41)  # 시간 끝 → 정답 공개
+		await self.latest_state(b, lambda s: s["status"] == "reveal")
+		await self.hub.tick(logic.deadline + 0.1)  # 다음 사람(나) 차례
+		st = await self.latest_state(b, lambda s: s["status"] == "choosing")
+		self.assertTrue(st["is_drawer"])
+		await b.send_json({"type": "pass"})
+		await self.latest_state(b, lambda s: s["status"] == "reveal")
+		await self.hub.tick(logic.deadline + 0.1)  # 1바퀴 끝
+		await self.latest_state(a, lambda s: s["status"] == "end")
+		await a.close()
+		await b.close()
+
+	async def test_drawer_leaving_moves_on(self):
+		room = await self.create_catch()
+		logic = self.hub.rooms[room["id"]].logic
+		a, b, c = await self.join(room, "a", "가"), await self.join(room, "b", "나"), await self.join(room, "c", "다")
+		await a.send_json({"type": "start"})
+		await self.latest_state(b, lambda s: s["status"] == "choosing")
+		await a.send_json({"type": "choose", "i": 0})
+		await self.latest_state(b, lambda s: s["status"] == "drawing")
+		await a.close()
+		await asyncio.sleep(0.3)
+		await self.hub.reap()  # 그리던 사람이 안 돌아옴 → 정답 공개, 방장은 다음 사람
+		st = await self.latest_state(b, lambda s: s["status"] == "reveal")
+		self.assertTrue(st["is_host"])
+		self.assertEqual([p["name"] for p in st["players"]], ["나", "다"])
+		await b.close()
+		await c.close()

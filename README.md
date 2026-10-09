@@ -115,7 +115,8 @@
 | ⌨️ 한글 타자 연습 | 한글(속담·생활 문장)·영어·코딩 문장 10개, 타수는 한컴타자처럼 자모 단위(겹모음·겹받침 2타), 틀린 글자 빨강·조합 중인 글자는 봐줌, 붙여넣기 막음. **문장은 서버가 고르고 채점·시간도 서버 기준**, 정확도 90% 이상·1,500타 이하만 랭킹 |
 | 🏆 랭킹 | 로그인 회원만 저장(`games.Score`), 사람마다 최고 기록 하나로 TOP 10 + 내 순위 |
 | ⚫ 오목 | 실시간 대국(15×15 자유룰). 회원이 방을 만들고(공개하면 '대기 중인 방' 목록에) 링크를 보내면 받은 사람은 로그인 없이 닉네임만으로 참여, 먼저 앉은 두 명이 흑·백·나머지는 구경. 무르기 부탁(상대 동의)·기권·흑백 바꿔 다시·승수·채팅·돌 소리·마지막 수 표시. 판과 규칙은 mj-relay 의 `relay/mj_game.py` 가 판단, 잠깐 끊겨도 자리 유지 |
-| 준비 중 | 🎨 그림 맞추기 · 🖍 그림 ↔ 글 이어하기 (오목과 같은 게임 방 위에) |
+| 🎨 그림 맞추기 | 실시간(2~10명). 링크로 모이면 방장이 바퀴·시간을 정해 시작, 차례대로 한 명이 제시어 3개 중 하나를 골라 그리고(색 11·굵기 4·되돌리기·다 지우기·넘기기) 나머지는 채팅으로 맞힘. 정답은 채팅에 안 나가고 '정답!' 알림, 빨리 맞힐수록 높은 점수·그린 사람도 점수, 한 글자 차이면 나에게만 '거의 맞았어요', 시간이 지나면 글자 힌트, 중간에 들어와도 지금까지 그림이 보임. 제시어는 직접 만든 320개(`relay/catch_words.py`) |
+| 준비 중 | 🖍 그림 ↔ 글 이어하기 (같은 게임 방 위에) |
 
 ### 1.7 회원 · 가입 승인
 - 회원가입: 아이디, **이름(실명)**, 이메일, 비밀번호, 가입 인사(선택) + **개인정보 수집·이용 동의(필수)**
@@ -320,7 +321,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `seconds/`, `reaction/`, `bomb/`, `updown/`, `cards/`, `2048/`, `typing/`, `omok/`, `scores/<랭킹>/`) |
+| `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `seconds/`, `reaction/`, `bomb/`, `updown/`, `cards/`, `2048/`, `typing/`, `omok/`, `catchmind/`, `scores/<랭킹>/`) |
 | `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |

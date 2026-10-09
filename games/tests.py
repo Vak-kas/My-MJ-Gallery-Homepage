@@ -217,3 +217,19 @@ class OmokViewTests(TestCase):
 			self.client.force_login(self.alice)
 			self.client.post(reverse("games:omok_close", args=["ab12cd34"]))
 			close.assert_called_once_with("ab12cd34")
+
+
+class CatchmindViewTests(TestCase):
+	ROOM = {"id": "cm123456", "kind": "catchmind", "token": "tok-cm", "title": "금요일 그림", "owner_id": None, "owner": "alice", "public": True, "peers": 2, "status": "lobby", "seats_open": 0}
+
+	def test_lobby_room_and_kind_check(self):
+		from unittest import mock
+
+		with mock.patch("tools.relay_client.list_games", return_value=[self.ROOM, {**OmokViewTests.ROOM}]):
+			res = self.client.get(reverse("games:catchmind"))
+		self.assertContains(res, "그림 맞추기.")
+		self.assertContains(res, "/games/catchmind/cm123456/?t=tok-cm")
+		self.assertNotContains(res, "/games/catchmind/ab12cd34/")  # 오목 방은 안 보임
+		with mock.patch("tools.relay_client.get_game", return_value=self.ROOM):
+			self.assertContains(self.client.get("/games/catchmind/cm123456/?t=tok-cm"), "/relay/ws/game/cm123456")
+			self.assertEqual(self.client.get("/games/omok/cm123456/?t=tok-cm").status_code, 404)  # 종류가 다르면 404

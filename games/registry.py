@@ -101,6 +101,14 @@ GAMES = [
 		"tags": ["1:1", "실시간"],
 		"category": "versus",
 	},
-	{"slug": "catchmind", "url_name": None, "icon": "🎨", "title": "그림 맞추기", "description": "한 명이 그리고 나머지가 맞혀요.", "tags": ["여럿이"], "category": "versus"},
+	{
+		"slug": "catchmind",
+		"url_name": "games:catchmind",
+		"icon": "🎨",
+		"title": "그림 맞추기",
+		"description": "링크로 모여서 차례대로 한 명이 제시어를 그리고 나머지는 채팅으로 맞혀요. 빨리 맞힐수록 높은 점수, 글자 힌트, 2~10명. 로그인 없이 닉네임만.",
+		"tags": ["여럿이", "실시간"],
+		"category": "versus",
+	},
 	{"slug": "relay", "url_name": None, "icon": "🖍", "title": "그림 ↔ 글 이어하기", "description": "그림을 보고 글로, 글을 보고 그림으로. 끝에 처음과 비교하면 웃음 폭발.", "tags": ["여럿이"], "category": "versus"},
 ]

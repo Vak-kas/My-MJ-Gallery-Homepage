@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 16px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .gm-go { border-radius: 999px; padding: 11px 26px; font-size: 16px; font-weight: 700; color: #fff; background: #10b981; }
+    .gm-go:hover { background: #0f9f6e; }
+    .cm-stage { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 18px; overflow: hidden; background: #fff; box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.08); }
+    #cm-canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+    #cm-canvas.can-draw { cursor: crosshair; }
+    .cm-over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; text-align: center; background: rgba(255, 255, 255, 0.92); z-index: 2; }
+    .cm-mask { font-size: clamp(22px, 3.4vw, 32px); font-weight: 800; letter-spacing: 0.25em; font-variant-numeric: tabular-nums; }
+    .cm-color { width: 28px; height: 28px; border-radius: 999px; border: 2px solid rgba(0, 0, 0, 0.15); }
+    .cm-color.is-on { box-shadow: 0 0 0 3px #10b981; }
+    .cm-width { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; }
+    .cm-width.is-on { border-color: #10b981; box-shadow: 0 0 0 2px #10b981; }
+    #cm-chat { height: 260px; overflow-y: auto; }
+    .cm-timer { font-variant-numeric: tabular-nums; font-weight: 800; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .cm-over { background: rgba(23, 26, 32, 0.94); color: #f3f4f6; }
+    html.theme-dark .cm-width { background: #2a2a2e; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:catchmind' %}" class="text-[13px] text-[#0f9f6e]">← 그림 맞추기 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🎨 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 2~10명</p>
+        </div>
+        <button type="button" class="gm-btn" id="cm-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="cm-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:catchmind_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="cm-name-box" class="gm-card mt-5 hidden">
+        <form id="cm-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="cm-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#10b981] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <div class="mb-3 flex flex-wrap items-center gap-3">
+                <span class="text-[13px] text-[#8e8e93]" id="cm-round"></span>
+                <span class="cm-mask flex-1 text-center" id="cm-word"></span>
+                <span class="cm-timer text-[22px]" id="cm-timer"></span>
+            </div>
+            <div class="cm-stage">
+                <canvas id="cm-canvas" width="1000" height="750"></canvas>
+                <div class="cm-over" id="cm-over"><p class="text-[15px] text-[#8e8e93]">연결하는 중…</p></div>
+            </div>
+            <div id="cm-tools" class="mt-3 hidden flex-wrap items-center gap-2">
+                <div class="flex flex-wrap gap-1.5" id="cm-colors"></div>
+                <div class="ml-1 flex gap-1.5" id="cm-widths"></div>
+                <div class="ml-auto flex gap-1.5">
+                    <button type="button" class="gm-btn" id="cm-undo">↶ 되돌리기</button>
+                    <button type="button" class="gm-btn" id="cm-clear">🗑 다 지우기</button>
+                    <button type="button" class="gm-btn" id="cm-pass">🏳 넘기기</button>
+                </div>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">점수</h2>
+                <ol id="cm-players" class="mt-2 space-y-1 text-[14px]"></ol>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅 · 정답</h2>
+                <div id="cm-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="cm-chat-form" class="mt-2 flex gap-2"><input id="cm-chat-in" class="gm-in" maxlength="200" placeholder="정답이나 말을 입력하세요" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+{% include "components/share.html" %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const COLORS = ['#111111', '#ffffff', '#ef4444', '#f97316', '#facc15', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#8b5a2b', '#9ca3af'];
+    const WIDTHS = [3, 7, 14, 28];
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+
+    let pid = store.get(`mj-cm-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-cm-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, ended = false, retry = 0;
+    let strokes = [];      // [{id, c, w, p:[[x,y]...]}]
+    let color = COLORS[0], width = WIDTHS[1], drawing = null, pending = [], strokeSeq = Date.now() % 100000;
+    let left = 0, lastStatus = '';
+    const canvas = $('cm-canvas'), ctx = canvas.getContext('2d');
+
+    // ── 그리기 ──
+    function line(c, w, pts, from = 0) {
+        if (!pts.length) return;
+        ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        if (pts.length === 1 || (from === 0 && pts.length === 1)) { ctx.beginPath(); ctx.arc(pts[0][0], pts[0][1], w / 2, 0, Math.PI * 2); ctx.fill(); return; }
+        ctx.beginPath();
+        const start = Math.max(0, from - 1);
+        ctx.moveTo(pts[start][0], pts[start][1]);
+        for (let i = start + 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+        ctx.stroke();
+    }
+    function redraw() {
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+        strokes.forEach((s) => line(s.c, s.w, s.p));
+    }
+    function addPoints(id, c, w, pts) {
+        let s = strokes[strokes.length - 1];
+        if (!s || s.id !== id) { s = { id, c, w, p: [] }; strokes.push(s); }
+        const from = s.p.length;
+        s.p.push(...pts);
+        line(c, w, s.p, from);
+    }
+    const canDraw = () => S && S.status === 'drawing' && S.is_drawer;
+    function point(e) {
+        const r = canvas.getBoundingClientRect();
+        return [Math.round(Math.max(0, Math.min(1000, (e.clientX - r.left) * (1000 / r.width)))), Math.round(Math.max(0, Math.min(750, (e.clientY - r.top) * (750 / r.height))))];
+    }
+    canvas.addEventListener('pointerdown', (e) => {
+        if (!canDraw()) return;
+        canvas.setPointerCapture(e.pointerId);
+        drawing = { id: ++strokeSeq };
+        const p = point(e);
+        addPoints(drawing.id, color, width, [p]);
+        pending.push(p);
+        e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+        if (!drawing) return;
+        const p = point(e);
+        const last = strokes[strokes.length - 1]?.p.slice(-1)[0];
+        if (last && Math.abs(last[0] - p[0]) + Math.abs(last[1] - p[1]) < 2) return;  // 너무 촘촘한 점은 생략
+        addPoints(drawing.id, color, width, [p]);
+        pending.push(p);
+    });
+    const endStroke = () => { if (drawing) { flushDraw(); drawing = null; } };
+    canvas.addEventListener('pointerup', endStroke);
+    canvas.addEventListener('pointercancel', endStroke);
+    // 40ms 마다 모아서 보냄 (한 번에 최대 200점)
+    function flushDraw() {
+        while (pending.length && drawing) {
+            send({ type: 'draw', id: drawing.id, c: color, w: width, p: pending.splice(0, 200) });
+        }
+    }
+    setInterval(flushDraw, 40);
+
+    $('cm-colors').innerHTML = COLORS.map((c) => `<button type="button" class="cm-color" data-c="${c}" style="background:${c}" title="${c === '#ffffff' ? '지우개(흰색)' : c}"></button>`).join('');
+    $('cm-widths').innerHTML = WIDTHS.map((w) => `<button type="button" class="cm-width" data-w="${w}"><span style="display:block;width:${Math.min(22, w)}px;height:${Math.min(22, w)}px;border-radius:999px;background:currentColor"></span></button>`).join('');
+    function markTools() {
+        document.querySelectorAll('[data-c]').forEach((b) => b.classList.toggle('is-on', b.dataset.c === color));
+        document.querySelectorAll('[data-w]').forEach((b) => b.classList.toggle('is-on', +b.dataset.w === width));
+    }
+    $('cm-colors').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (b) { color = b.dataset.c; markTools(); } });
+    $('cm-widths').addEventListener('click', (e) => { const b = e.target.closest('[data-w]'); if (b) { width = +b.dataset.w; markTools(); } });
+    $('cm-undo').addEventListener('click', () => { if (!canDraw()) return; strokes.pop(); redraw(); send({ type: 'undo' }); });
+    $('cm-clear').addEventListener('click', () => { if (!canDraw() || !confirm('다 지울까요?')) return; strokes = []; redraw(); send({ type: 'clear' }); });
+    $('cm-pass').addEventListener('click', () => { if (confirm('이번 제시어를 넘길까요?')) send({ type: 'pass' }); });
+    markTools();
+
+    // ── 화면 ──
+    function overlay(html) {
+        const o = $('cm-over');
+        o.classList.toggle('hidden', !html);
+        o.style.display = html ? '' : 'none';
+        if (html) o.innerHTML = html;
+    }
+    function render() {
+        if (!S) return;
+        canvas.classList.toggle('can-draw', canDraw());
+        $('cm-tools').classList.toggle('hidden', !canDraw());
+        $('cm-tools').classList.toggle('flex', canDraw());
+        $('cm-round').textContent = S.round && S.status !== 'lobby' ? `${Math.min(S.round, S.rounds)} / ${S.rounds} 바퀴` : '';
+        $('cm-word').textContent = S.word ? S.word : (S.mask || '');
+        $('cm-chat-in').placeholder = S.is_drawer && S.status === 'drawing' ? '그리는 중엔 정답을 말할 수 없어요' : '정답이나 말을 입력하세요';
+        // 점수판
+        const ranked = [...S.players];
+        $('cm-players').innerHTML = ranked.map((p) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1.5 ${p.me ? 'bg-[#ecfdf5] dark:bg-[#14432d]' : ''}">
+            <span class="w-5 text-center">${p.drawer ? '✏️' : p.guessed ? '✅' : p.host ? '👑' : ''}</span>
+            <span class="min-w-0 flex-1 truncate ${p.online ? '' : 'text-[#8e8e93] line-through'}">${esc(p.name)}${p.me ? ' (나)' : ''}</span>
+            ${p.gained && S.status !== 'lobby' ? `<span class="text-[12px] text-[#0f9f6e]">+${p.gained}</span>` : ''}
+            <b class="tabular-nums">${p.score}</b></li>`).join('');
+        // 판 위 안내
+        const host = S.is_host;
+        if (S.status === 'lobby' || S.status === 'end') {
+            const result = S.status === 'end' ? `<p class="text-[26px] font-extrabold">🏆 게임 끝!</p><ol class="text-[15px]">${[...S.players].sort((a, b) => b.score - a.score).slice(0, 5).map((p, i) => `<li>${['🥇', '🥈', '🥉'][i] || i + 1} ${esc(p.name)} <b>${p.score}점</b></li>`).join('')}</ol>` : '<p class="text-[22px] font-bold">🎨 모이면 시작해요</p>';
+            const settings = host ? `<div class="flex flex-wrap justify-center gap-2 text-[13px]">
+                <label>바퀴 <select id="cm-set-rounds" class="gm-in !inline-block !w-auto !py-1">${[1, 2, 3, 4, 5].map((n) => `<option ${n === S.rounds ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+                <label>시간 <select id="cm-set-time" class="gm-in !inline-block !w-auto !py-1">${[40, 60, 80, 100, 120].map((n) => `<option value="${n}" ${n === S.turn_time ? 'selected' : ''}>${n}초</option>`).join('')}</select></label></div>
+                <button type="button" class="gm-go" id="cm-start" ${S.players.length < 2 ? 'disabled style="opacity:.5"' : ''}>${S.status === 'end' ? '🔁 다시 하기' : '▶ 시작'}</button>
+                ${S.players.length < 2 ? '<p class="text-[13px] text-[#8e8e93]">두 명 이상 모이면 시작할 수 있어요. 초대 링크를 보내 보세요!</p>' : ''}` : `<p class="text-[14px] text-[#8e8e93]">방장이 시작하기를 기다리는 중…</p>`;
+            overlay(`${result}<p class="text-[14px] text-[#6e6e73]">참가 ${S.players.length}명</p>${settings}`);
+            $('cm-start')?.addEventListener('click', () => send({ type: 'start' }));
+            $('cm-set-rounds')?.addEventListener('change', (e) => send({ type: 'settings', rounds: +e.target.value }));
+            $('cm-set-time')?.addEventListener('change', (e) => send({ type: 'settings', turn_time: +e.target.value }));
+        } else if (S.status === 'choosing') {
+            if (S.is_drawer && S.options) {
+                overlay(`<p class="text-[18px] font-bold">✏️ 내 차례! 그릴 제시어를 고르세요</p><div class="flex flex-wrap justify-center gap-2">${S.options.map((w, i) => `<button type="button" class="gm-go" data-opt="${i}">${esc(w)}</button>`).join('')}</div><p class="text-[13px] text-[#8e8e93]">안 고르면 자동으로 정해져요</p>`);
+                document.querySelectorAll('[data-opt]').forEach((b) => b.addEventListener('click', () => send({ type: 'choose', i: +b.dataset.opt })));
+            } else overlay(`<p class="text-[18px] font-bold">✏️ ${esc(S.drawer)} 님이 제시어를 고르는 중…</p>`);
+        } else if (S.status === 'reveal') {
+            overlay(`<p class="text-[15px] text-[#8e8e93]">정답</p><p class="text-[40px] font-extrabold">${esc(S.word || '')}</p>`);
+        } else overlay('');
+        if (S.status !== lastStatus) {
+            if (S.status === 'choosing' && S.is_drawer) ding(880);
+            lastStatus = S.status;
+        }
+        left = S.left ?? 0;
+        tickTimer();
+    }
+    function tickTimer() { $('cm-timer').textContent = S && ['choosing', 'drawing'].includes(S.status) ? `⏱ ${left}` : ''; $('cm-timer').style.color = left <= 10 ? '#ef4444' : ''; }
+    setInterval(() => { if (left > 0) { left--; tickTimer(); } }, 1000);
+
+    // ── 채팅 ──
+    function chatLine(m, cls = '') {
+        const box = $('cm-chat'), div = document.createElement('div');
+        if (m.system) div.innerHTML = `<span class="${/정답!/.test(m.text) ? 'font-semibold text-[#0f9f6e]' : 'text-[#8e8e93]'}">· ${esc(m.text)}</span>`;
+        else div.innerHTML = `<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        if (cls) div.className = cls;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+        if (m.system && /정답!/.test(m.text)) ding(1320);
+    }
+    $('cm-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('cm-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('cm-chat-in').value = ''; } });
+
+    let audio = null;
+    function ding(f) {
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain();
+            o.frequency.value = f; g.gain.setValueAtTime(0.12, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.25);
+            o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.26);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'hello') { retry = 0; $('cm-chat').innerHTML = ''; (m.chat || []).forEach((c) => chatLine(c)); }
+            else if (m.type === 'state') { S = m.state; render(); }
+            else if (m.type === 'sync') { strokes = m.strokes || []; redraw(); }
+            else if (m.type === 'draw') addPoints(m.id, m.c, m.w, m.p);
+            else if (m.type === 'undo') { strokes.pop(); redraw(); }
+            else if (m.type === 'clear') { strokes = []; redraw(); }
+            else if (m.type === 'chat') chatLine(m);
+            else if (m.type === 'close') chatLine({ system: true, text: `💡 ${m.text}` }, 'font-semibold text-[#b26a00]');
+            else if (m.type === 'error') chatLine({ system: true, text: `⚠️ ${m.text}` });
+            else if (m.type === 'end') { ended = true; overlay(`<p class="text-[18px] font-bold">🚪 ${esc(m.reason)}</p>`); }
+        };
+        ws.onclose = () => {
+            if (ended) return;
+            overlay('<p class="text-[15px] text-[#8e8e93]">연결이 끊겼어요. 다시 연결하는 중…</p>');
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) { store.set('mj-game-name', name); $('cm-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved);
+    else { $('cm-name-box').classList.remove('hidden'); $('cm-name').focus(); }
+    $('cm-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('cm-name').value.trim()); });
+
+    $('cm-copy').addEventListener('click', async () => {
+        const url = $('cm-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('cm-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('cm-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('cm-kakao').addEventListener('click', () => mjShare({ title: `🎨 그림 맞추기 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('cm-copy').dataset.url, button: '그림 맞추러 가기' }));
+    redraw();
+    window.__cm = { state: () => S, send, strokes: () => strokes };
+})();
+</script>
+{% endif %}
+{% endblock %}
