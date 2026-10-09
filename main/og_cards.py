@@ -24,7 +24,7 @@ def tool_spec(slug):
     from tools.registry import TOOLS
 
     if slug == "index":
-        return {"title": "Tool", "subtitle": "QR 코드 · 네트워크 진단 · 암호화 키 · JSON·정규식 · 라이브 방송까지, 직접 만든 웹 도구 모음", "pill": f"{len(TOOLS)} TOOLS",
+        return {"title": "Tool", "subtitle": "살면서 ‘이런 게 있었으면’ 싶었던 것들을 하나씩 직접 만들어 모아두었습니다", "pill": f"{len(TOOLS)} TOOLS",
                 "accent": PURPLE, "eyebrow": "SMJ GALLERY", "footer": "로그인 없이 바로 쓰는 도구도 많아요"}
     tool = next((t for t in TOOLS if t["slug"] == slug), None)
     if not tool:
