@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .rx-pad { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 440px; border-radius: 28px; color: #fff; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; background: #334155; text-align: center; padding: 20px; }
+    .rx-pad.wait { background: #dc2626; }
+    .rx-pad.go { background: #16a34a; }
+    .rx-pad.foul { background: #f59e0b; }
+    .rx-pad.result { background: #1e3a8a; }
+    .rx-big { font-size: clamp(56px, 12vw, 112px); font-weight: 800; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+    .rx-sub { margin-top: 14px; font-size: 17px; opacity: 0.9; }
+    .rx-who { position: absolute; top: 18px; left: 0; right: 0; font-size: 15px; font-weight: 600; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · REFLEX</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">반응속도 대결.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">빨간 화면에서 기다리다가 <b class="text-[#16a34a]">초록색</b>이 되는 순간 누르세요. 초록이 되기 전에 누르면 반칙! (스페이스바도 돼요)</p>
+    </div>
+
+    <div class="mt-6 flex gap-1.5" id="rx-mode">
+        <button type="button" class="gm-btn is-on" data-mode="solo">🙋 혼자 (5번 평균)</button>
+        <button type="button" class="gm-btn" data-mode="party">🍺 내기 (여럿이)</button>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div id="rx-pad" class="rx-pad" role="button" tabindex="0">
+            <p class="rx-who" id="rx-who"></p>
+            <p class="rx-big" id="rx-big">⚡</p>
+            <p class="rx-sub" id="rx-sub">눌러서 시작</p>
+        </div>
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card" id="rx-solo-box">
+                <h2 class="text-[15px] font-semibold">이번 도전 <span class="text-[13px] font-normal text-[#8e8e93]" id="rx-solo-n"></span></h2>
+                <ol class="mt-2 space-y-1 text-[14px] tabular-nums" id="rx-solo-list"></ol>
+                <p class="mt-2 text-[13px] text-[#6e6e73]" id="rx-best"></p>
+            </section>
+            <section class="gm-card hidden space-y-3" id="rx-party-box">
+                <div class="flex items-center"><h2 class="text-[15px] font-semibold">참가자</h2><button type="button" class="gm-btn ml-auto !px-2.5 !py-1 !text-[12px]" id="rx-reset">처음부터</button></div>
+                <textarea id="rx-names" class="gm-in" rows="4">민재
+지수
+하늘</textarea>
+                <div id="rx-table" class="text-[14px]"></div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" class="gm-btn" id="rx-next" disabled>다음 판 ▶</button>
+                    <button type="button" class="gm-btn" id="rx-share">💬 결과 공유</button>
+                </div>
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <p>보통 사람은 200~300ms(0.2~0.3초). 200ms 아래면 아주 빠른 편이에요.</p>
+            </section>
+        </aside>
+    </div>
+</main>
+{% include "components/share.html" %}
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const SOLO_TRIES = 5;
+    let mode = 'solo', phase = 'idle', timer = 0, goAt = 0, lock = 0;
+    let solo = [];
+    let party = { players: [], turn: 0, round: 1, results: [] };
+
+    function setPad(cls, big, sub, who = '') {
+        $('rx-pad').className = `rx-pad ${cls}`;
+        $('rx-big').textContent = big; $('rx-sub').textContent = sub; $('rx-who').textContent = who;
+    }
+    const whoNow = () => (mode === 'party' && party.players.length ? `🙋 ${party.players[party.turn]} 차례` : '');
+
+    function arm() {
+        phase = 'wait';
+        setPad('wait', '기다려…', '초록색이 되면 누르세요', whoNow());
+        timer = setTimeout(() => { phase = 'go'; goAt = performance.now(); setPad('go', '지금!', '누르세요!', whoNow()); }, 1500 + Math.random() * 3500);
+    }
+
+    function press(e) {
+        if (e) e.preventDefault();
+        const now = performance.now();
+        if (now < lock) return;
+        if (phase === 'idle' || phase === 'shown') {
+            if (mode === 'party' && !ensurePlayers()) return;
+            if (mode === 'party' && party.turn >= party.players.length) { $('rx-next').click(); return; }
+            if (mode === 'solo' && solo.length >= SOLO_TRIES) { solo = []; renderSolo(); }
+            arm();
+        } else if (phase === 'wait') {
+            clearTimeout(timer);
+            phase = 'shown'; lock = now + 700;
+            setPad('foul', '반칙! 🙅', mode === 'party' ? '초록 되기 전에 눌렀어요 (실격)' : '너무 빨랐어요. 다시 해 볼까요?', whoNow());
+            record(null);
+        } else if (phase === 'go') {
+            const ms = Math.round(now - goAt);
+            phase = 'shown'; lock = now + 700;
+            setPad('result', `${ms}ms`, ms < 200 ? '⚡ 번개!' : ms < 260 ? '👍 빨라요' : ms < 350 ? '🙂 보통' : '🐢 조금 느려요', whoNow());
+            record(ms);
+        }
+    }
+
+    function record(ms) {
+        if (mode === 'solo') {
+            if (ms !== null) solo.push(ms);
+            renderSolo();
+            $('rx-sub').textContent += solo.length >= SOLO_TRIES ? ' · 5번 끝! 누르면 새로' : ' · 누르면 다음';
+            return;
+        }
+        party.results.push({ name: party.players[party.turn], ms });
+        party.turn++;
+        const over = party.turn >= party.players.length;
+        $('rx-sub').textContent += over ? ' · 판 끝! 오른쪽 순위' : ` · 다음: ${party.players[party.turn]}`;
+        renderParty(over);
+    }
+
+    function renderSolo() {
+        $('rx-solo-n').textContent = `${solo.length}/${SOLO_TRIES}`;
+        $('rx-solo-list').innerHTML = solo.map((m, i) => `<li class="flex"><span class="w-6 text-[#8e8e93]">${i + 1}</span><span>${m}ms</span></li>`).join('');
+        let best = store.get('mj-reaction-best', null);
+        if (solo.length >= SOLO_TRIES) {
+            const avg = Math.round(solo.reduce((a, b) => a + b, 0) / solo.length);
+            if (!best || avg < best) { best = avg; store.set('mj-reaction-best', best); }
+            $('rx-solo-list').innerHTML += `<li class="mt-1 border-t border-black/[0.06] pt-1 font-semibold">평균 ${avg}ms</li>`;
+        }
+        $('rx-best').textContent = best ? `내 최고 평균 ${best}ms` : '';
+    }
+
+    const readNames = () => [...new Set($('rx-names').value.split('\n').map((s) => s.trim()).filter(Boolean))].slice(0, 10);
+    function ensurePlayers() {
+        if (party.players.length) return true;
+        const names = readNames();
+        if (names.length < 2) { alert('두 명 이상 적어 주세요.'); return false; }
+        party = { players: names, turn: 0, round: 1, results: [] };
+        $('rx-names').disabled = true;
+        return true;
+    }
+    // 반칙은 맨 뒤, 나머지는 빠른 순
+    const ranked = () => [...party.results].sort((a, b) => (a.ms === null) - (b.ms === null) || a.ms - b.ms);
+    function renderParty(over) {
+        const rows = ranked();
+        const loser = over && rows.length > 1 ? rows[rows.length - 1] : null;
+        let html = rows.length ? `<p class="text-[12px] text-[#8e8e93]">${party.round}판</p><ol class="mt-1 space-y-1">${rows.map((r, i) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1 ${over && i === 0 ? 'bg-[#ecfdf5] font-semibold dark:bg-[#14432d]' : ''} ${r === loser ? 'bg-[#fff1f0] dark:bg-[#3b1717]' : ''}"><span class="w-5 text-center">${over && i === 0 ? '👑' : r === loser ? '😱' : i + 1}</span><span class="flex-1 truncate">${esc(r.name)}</span><span class="tabular-nums">${r.ms === null ? '반칙' : `${r.ms}ms`}</span></li>`).join('')}</ol>` : '';
+        if (loser) html += `<p class="mt-2 rounded-xl bg-[#fff1f0] px-3 py-2 font-semibold text-[#c4271d] dark:bg-[#3b1717]">😱 벌칙 당첨: ${esc(loser.name)}</p>`;
+        $('rx-table').innerHTML = html;
+        $('rx-next').disabled = !over;
+    }
+    $('rx-next').addEventListener('click', () => { party.turn = 0; party.round++; party.results = []; phase = 'idle'; setPad('', '⚡', '눌러서 시작', whoNow()); renderParty(false); });
+    $('rx-reset').addEventListener('click', () => { clearTimeout(timer); party = { players: [], turn: 0, round: 1, results: [] }; $('rx-names').disabled = false; phase = 'idle'; setPad('', '⚡', '눌러서 시작'); renderParty(false); });
+    $('rx-share').addEventListener('click', () => {
+        const rows = ranked();
+        const text = rows.length ? [`⚡ 반응속도 대결 ${party.round}판`, ...rows.map((r, i) => `${i + 1}. ${r.name} ${r.ms === null ? '반칙' : `${r.ms}ms`}`), party.turn >= party.players.length && rows.length > 1 ? `😱 벌칙: ${rows[rows.length - 1].name}` : ''].filter(Boolean).join('\n') : '⚡ 반응속도 대결 한 판 할래?';
+        mjShare({ title: '⚡ 반응속도 대결', text, url: location.origin + location.pathname, button: '나도 해 보기' });
+    });
+    document.querySelectorAll('#rx-mode [data-mode]').forEach((b) => b.addEventListener('click', () => {
+        clearTimeout(timer);
+        mode = b.dataset.mode; phase = 'idle';
+        document.querySelectorAll('#rx-mode [data-mode]').forEach((x) => x.classList.toggle('is-on', x === b));
+        $('rx-solo-box').classList.toggle('hidden', mode !== 'solo');
+        $('rx-party-box').classList.toggle('hidden', mode !== 'party');
+        setPad('', '⚡', '눌러서 시작', whoNow());
+    }));
+
+    $('rx-pad').addEventListener('pointerdown', press);
+    document.addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && !e.target.closest('textarea, input')) press(e); });
+    renderSolo();
+    window.__rx = { press, state: () => ({ phase, party, solo }) };
+})();
+</script>
+{% endblock %}

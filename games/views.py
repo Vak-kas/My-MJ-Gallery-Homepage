@@ -28,6 +28,22 @@ def seconds(request):
 	return render(request, "games/seconds.html")
 
 
+def reaction(request):
+	return render(request, "games/reaction.html")
+
+
+def bomb(request):
+	return render(request, "games/bomb.html")
+
+
+def updown(request):
+	return render(request, "games/updown.html")
+
+
+def cards(request):
+	return render(request, "games/cards.html")
+
+
 @ensure_csrf_cookie
 def g2048(request):
 	return render(request, "games/2048.html", {"board": leaderboard("2048", request.user)})

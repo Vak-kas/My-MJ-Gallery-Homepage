@@ -54,7 +54,7 @@
                 <div class="flex flex-wrap gap-1.5" id="rl-presets"></div>
                 <label class="flex items-center gap-2 text-[13px]"><input id="rl-remove" type="checkbox" class="h-4 w-4"> 당첨된 항목은 빼고 다음 판</label>
                 <label class="flex items-center gap-2 text-[13px]"><input id="rl-sound" type="checkbox" class="h-4 w-4" checked> 🔊 딸깍 소리</label>
-                <button type="button" class="gm-btn w-full" id="rl-share">🔗 이 돌림판 링크 복사</button>
+                <div class="grid grid-cols-2 gap-2"><button type="button" class="gm-btn" id="rl-share">🔗 링크 복사</button><button type="button" class="gm-btn" id="rl-kakao">💬 공유</button></div>
             </section>
             <section class="gm-card">
                 <div class="flex items-center"><h2 class="text-[15px] font-semibold">기록</h2><button type="button" class="ml-auto text-[12px] text-[#8e8e93] hover:text-[#c4271d]" id="rl-clear">지우기</button></div>
@@ -249,7 +249,13 @@
     const dec = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
     $('rl-share').addEventListener('click', async (e) => {
         const url = `${location.origin}${location.pathname}#${enc($('rl-items').value)}`;
-        try { await navigator.clipboard.writeText(url); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '🔗 이 돌림판 링크 복사'; }, 1400); } catch (err) { prompt('링크를 복사하세요', url); }
+        try { await navigator.clipboard.writeText(url); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '🔗 링크 복사'; }, 1400); } catch (err) { prompt('링크를 복사하세요', url); }
+    });
+
+    $('rl-kakao').addEventListener('click', () => {
+        const url = `${location.origin}${location.pathname}#${enc($('rl-items').value)}`;
+        const text = history.length ? `🎉 결과: ${history[0]}\n(${items.map((i) => i.label).join(', ')})` : `돌림판: ${items.map((i) => i.label).join(', ')}`;
+        mjShare({ title: '🎡 돌림판', text, url, button: '돌려 보기' });
     });
 
     let text = PRESETS['🍱 점심 메뉴'];
@@ -265,4 +271,5 @@
     window.__roulette = { items: () => items, pointed, spin, angle: () => angle };
 })();
 </script>
+{% include "components/share.html" %}
 {% endblock %}

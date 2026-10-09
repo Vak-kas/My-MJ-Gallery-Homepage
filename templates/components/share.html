@@ -1,0 +1,49 @@
+{# 공유하기: window.mjShare({title, text, url, image, button}) — 카카오톡 카드 → 휴대폰 공유창 → 복사 순서로 #}
+<script>
+window.mjShare = (() => {
+    const KEY = '{{ kakao_js_key|escapejs }}';
+    const SDK = 'https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js';
+    const SRI = 'sha384-DKYJZ8NLiK8MN4/C5P2dtSmLQ4KwPaoqAfyA/DfmEc1VDxu4yyC7wy6K1Hs90nka';
+    let loading = null;
+    const loadKakao = () => loading || (loading = new Promise((ok, bad) => {
+        if (window.Kakao) { ok(window.Kakao); return; }
+        const s = document.createElement('script');
+        s.src = SDK; s.integrity = SRI; s.crossOrigin = 'anonymous';
+        s.onload = () => ok(window.Kakao); s.onerror = () => bad(new Error('kakao sdk'));
+        document.head.appendChild(s);
+    }));
+    const ogImage = () => document.querySelector('meta[property="og:image"]')?.content || '';
+
+    function toast(text) {
+        const t = document.createElement('div');
+        t.textContent = text;
+        t.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:90;background:#1d1d1f;color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25)';
+        document.body.appendChild(t);
+        setTimeout(() => t.remove(), 1800);
+    }
+    async function copy(text) {
+        try { await navigator.clipboard.writeText(text); toast('복사했어요. 카톡에 붙여넣으세요!'); } catch (e) { prompt('복사하세요', text); }
+    }
+
+    async function share({ title, text = '', url = location.href, image = '', button = '열어 보기' } = {}) {
+        if (KEY) {
+            try {
+                const Kakao = await loadKakao();
+                if (!Kakao.isInitialized()) Kakao.init(KEY);
+                Kakao.Share.sendDefault({
+                    objectType: 'feed',
+                    content: { title: title || document.title, description: text.slice(0, 200), imageUrl: image || ogImage(), link: { mobileWebUrl: url, webUrl: url } },
+                    buttons: [{ title: button, link: { mobileWebUrl: url, webUrl: url } }],
+                });
+                return 'kakao';
+            } catch (e) { /* 키·도메인 설정이 안 맞으면 아래로 */ }
+        }
+        if (navigator.share) {
+            try { await navigator.share({ title, text, url }); return 'native'; } catch (e) { if (e.name === 'AbortError') return 'cancel'; }
+        }
+        await copy([text, url].filter(Boolean).join('\n'));
+        return 'copy';
+    }
+    return share;
+})();
+</script>

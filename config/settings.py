@@ -110,6 +110,7 @@ TEMPLATES = [
                 'studio.context_processors.site_nav',
                 'main.context_processors.seo_meta',
                 'tools.context_processors.user_tier',
+                'main.context_processors.share',
             ],
         },
     },
@@ -129,6 +130,8 @@ SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
 # 관리자 알림 카카오톡 '나에게 보내기' (선택)
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")
+# 카카오톡 공유하기 (JavaScript 키, 카카오 개발자 콘솔 > 앱 > 플랫폼 > Web 에 사이트 도메인 등록 필요). 비우면 휴대폰 공유창/링크 복사
+KAKAO_JS_KEY = os.getenv("KAKAO_JS_KEY", "")
 
 
 # Database

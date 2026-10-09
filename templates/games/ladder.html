@@ -77,6 +77,7 @@
                     <button type="button" class="gm-btn" id="ld-all">▶ 모두 내려가기</button>
                     <button type="button" class="gm-btn" id="ld-reshuffle">🔀 다시 섞기</button>
                     <button type="button" class="gm-btn" id="ld-share">🔗 링크 복사</button>
+                    <button type="button" class="gm-btn" id="ld-kakao">💬 공유</button>
                 </div>
             </div>
             <div class="mt-4 overflow-x-auto"><svg id="ld-svg"></svg></div>
@@ -268,6 +269,11 @@
         saveHash();
         try { await navigator.clipboard.writeText(location.href); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '🔗 링크 복사'; }, 1400); } catch (err) { prompt('링크를 복사하세요', location.href); }
     });
+    $('ld-kakao').addEventListener('click', () => {
+        saveHash();
+        const done = [...revealed].sort((a, b) => a - b).map((i) => `${state.names[i] || `${i + 1}번`} → ${state.results[walk(i).end] || '-'}`);
+        mjShare({ title: '🪜 사다리타기', text: done.length ? done.join('\n') : `${state.names.filter(Boolean).join(', ')} 사다리 탔어요! 결과는 링크에서 확인`, url: location.href, button: '사다리 보기' });
+    });
     try {
         if (location.hash.length > 1) {
             const o = dec(location.hash.slice(1));
@@ -281,4 +287,5 @@
     window.__ladder = { walk, state: () => state, ladder: () => ladder, go };
 })();
 </script>
+{% include "components/share.html" %}
 {% endblock %}
