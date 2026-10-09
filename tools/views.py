@@ -4,6 +4,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
@@ -73,8 +74,8 @@ def image_tool(request):
 	return render(request, "tools/image.html")
 
 
-@login_required  # AI 비용이 드는 도구라 회원만
-def ocr(request):
+@ensure_csrf_cookie  # 비로그인도 무료 읽기 요청을 보낼 수 있게
+def ocr(request):  # 무료 읽기는 누구나, ✨AI 읽기는 회원
 	return render(request, "tools/ocr.html")
 
 
@@ -114,7 +115,7 @@ def _daily_room_key(user):
 
 
 def _apply_member_limits(payload, lim):
-	"""회원이 만드는 방은 유효 시간·속도·총량을 한도 안으로 줄임 (친한 사람은 더 넉넉한 한도)."""
+	"""회원이 만드는 방은 유효 시간·속도·총량을 한도 안으로 줄임 (VIP 회원은 더 넉넉한 한도)."""
 	caps = {"ttl": lim["ttl_minutes"] * 60, "rate_limit": int(lim["rate_mb"] * MB), "total_limit": int(lim["total_gb"] * GB)}
 	for key, cap in caps.items():
 		payload[key] = min(payload.get(key, cap), cap)

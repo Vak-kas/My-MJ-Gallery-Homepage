@@ -68,10 +68,10 @@ TOOLS = [
 		"url_name": "tools:ocr",
 		"icon": "📷",
 		"title": "사진 글자 추출",
-		"description": "사진·캡처·칠판·손글씨·영수증 속 글자를 뽑아 바로 복사해요. 여러 장 한꺼번에, ⌘V 붙여넣기, 표는 표 모양 그대로. ✨AI(이미지 인식)라 한글도 정확해요.",
-		"tags": ["AI", "OCR"],
+		"description": "사진·캡처·문서 속 글자를 뽑아 바로 복사해요. 기본은 무료로 읽고, 손글씨·칠판·표는 ✨AI 로 다시 읽으면 훨씬 정확해요(회원). 여러 장, ⌘V 붙여넣기.",
+		"tags": ["OCR", "AI"],
 		"category": "docs",
-		"access": "member",
+		"access": "public",  # 무료 읽기는 누구나, AI 읽기는 회원
 	},
 	{
 		"slug": "gpa",

@@ -30,17 +30,22 @@
 <main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
     <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
     <div class="mt-4">
-        <p class="text-[12px] uppercase tracking-[0.24em] text-[#6e56cf]">AI · OCR</p>
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#6e56cf]">OCR</p>
         <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">사진 글자 추출.</h1>
-        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">사진·캡처·칠판·손글씨·영수증 속 글자를 뽑아서 바로 고치고 복사해요. 사진은 글자를 읽는 데만 쓰고 저장하지 않아요.</p>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">사진·캡처·문서 속 글자를 뽑아서 바로 고치고 복사해요. 기본은 무료로 읽고, 손글씨·칠판·표처럼 어려운 사진은 ✨AI 로 읽으면 훨씬 정확해요. 사진은 저장하지 않아요.</p>
     </div>
 
     <div class="mt-8 flex flex-wrap items-center gap-3">
-        <span class="text-[13px] text-[#6e6e73]">뽑는 모양</span>
+        <span class="text-[13px] text-[#6e6e73]">읽는 방법</span>
+        <div class="oc-seg" id="oc-engine">
+            <button type="button" data-v="free" class="is-on" title="서버에서 무료로 읽어요. 깔끔한 인쇄물·캡처에 알맞아요">무료</button>
+            <button type="button" data-v="ai" title="손글씨·칠판·표·비스듬한 사진도 정확해요 (회원, 하루 횟수 안에서)">✨ AI (회원)</button>
+        </div>
+        <span class="ml-2 text-[13px] text-[#6e6e73]">뽑는 모양</span>
         <div class="oc-seg" id="oc-mode">
             <button type="button" data-v="lines" class="is-on" title="사진에 보이는 줄바꿈 그대로">줄 그대로</button>
             <button type="button" data-v="para" title="화면 폭 때문에 끊긴 줄을 이어서 문단으로">문단으로 이어서</button>
-            <button type="button" data-v="table" title="표는 마크다운 표로">표는 표로</button>
+            <button type="button" data-v="table" title="표는 마크다운 표로 (✨AI 만)">표는 표로 ✨</button>
         </div>
         <span class="ai-quota ml-auto" data-ai-quota></span>
     </div>
@@ -48,7 +53,7 @@
     <label id="oc-drop" class="oc-drop mt-4 flex cursor-pointer flex-col items-center justify-center px-6 py-10 text-center">
         <span class="text-[34px]">📷</span>
         <span class="mt-2 text-[15px] font-semibold text-[#1d1d1f]">사진을 끌어놓거나, 눌러서 고르거나, ⌘V 로 붙여넣으세요</span>
-        <span class="mt-1 text-[13px] text-[#8e8e93]">JPG · PNG · WebP · HEIC, 한 번에 5장까지 · 사진 한 장 = AI 1번</span>
+        <span class="mt-1 text-[13px] text-[#8e8e93]">JPG · PNG · WebP · HEIC, 한 번에 5장까지 · ✨AI 는 사진 한 장 = 1번</span>
         <input id="oc-file" type="file" accept="image/*,.heic,.heif" multiple class="hidden">
     </label>
 
@@ -64,13 +69,14 @@
 <script>
 (() => {
     const HEIC_SRC = "{% static 'vendor/heic2any/heic2any-0.0.4.min.js' %}";
-    const RUN_URL = "{% url 'tools:ocr_run' %}";
+    const URLS = { ai: "{% url 'tools:ocr_run' %}", free: "{% url 'tools:ocr_free' %}" };
     const MAX_FILES = 5;
-    const LONG_SIDE = 1568;  // AI 가 읽기 좋은 크기 — 이보다 크면 줄여서 보냄 (비용도 줄어듦)
+    const SIDE = { ai: 1568, free: 2400 };  // AI 는 이 크기면 충분(비용도 줄어듦), 무료는 클수록 잘 읽음
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-    const items = [];  // { id, name, thumb, status: 'wait'|'run'|'done'|'error', text, kind, unclear, error }
-    let seq = 0, mode = 'lines', busy = false;
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const items = [];  // { id, name, file, thumb, engine, status: 'wait'|'run'|'done'|'error', text, conf, kind, unclear, error }
+    let seq = 0, mode = 'lines', engine = 'free', busy = false;
 
     let heicLoading = null;
     const loadHeic = () => heicLoading || (heicLoading = new Promise((ok, bad) => {
@@ -87,10 +93,10 @@
             return createImageBitmap(Array.isArray(png) ? png[0] : png);
         }
     }
-    // 긴 쪽을 LONG_SIDE 이하로 줄인 JPEG (base64)
-    async function prepare(file) {
+    // 긴 쪽을 side 이하로 줄인 JPEG data URL
+    async function toJpeg(file, side) {
         const bmp = await decode(file);
-        const s = Math.min(1, LONG_SIDE / Math.max(bmp.width, bmp.height));
+        const s = Math.min(1, side / Math.max(bmp.width, bmp.height));
         const c = document.createElement('canvas');
         c.width = Math.max(1, Math.round(bmp.width * s)); c.height = Math.max(1, Math.round(bmp.height * s));
         const g = c.getContext('2d');
@@ -98,37 +104,42 @@
         g.imageSmoothingQuality = 'high';
         g.drawImage(bmp, 0, 0, c.width, c.height);
         bmp.close?.();
-        const url = c.toDataURL('image/jpeg', 0.9);
-        return { thumb: url, data: url.split(',')[1] };
+        return c.toDataURL('image/jpeg', 0.92);
     }
 
     async function addFiles(files) {
-        if (!mjAI.guard()) return;
+        if (engine === 'ai' && !mjAI.guard()) return;
         const list = [...files].filter((f) => f.type.startsWith('image/') || isHeic(f));
-        const room = MAX_FILES - items.filter((i) => i.status !== 'done' && i.status !== 'error').length;
+        const room = MAX_FILES - items.filter((i) => i.status === 'wait' || i.status === 'run').length;
         if (list.length > room) alert(`한 번에 ${MAX_FILES}장까지 넣을 수 있어요. 앞의 ${Math.max(0, room)}장만 넣을게요.`);
         for (const file of list.slice(0, Math.max(0, room))) {
-            const it = { id: ++seq, name: file.name || `붙여넣은 사진 ${seq}`, status: 'wait' };
+            const it = { id: ++seq, name: file.name || `붙여넣은 사진 ${seq}`, file, engine, status: 'wait' };
             items.unshift(it);
-            render();
-            try { Object.assign(it, await prepare(file)); }
-            catch (e) { it.status = 'error'; it.error = e.message; }
+            try { it.thumb = await toJpeg(file, 520); } catch (e) { it.status = 'error'; it.error = e.message; it.file = null; }
             render();
         }
         pump();
     }
 
-    // 한 장씩 차례로 보냄
+    // 한 장씩 차례로
     async function pump() {
         if (busy) return;
-        const it = [...items].reverse().find((i) => i.status === 'wait' && i.data);
+        const it = [...items].reverse().find((i) => i.status === 'wait');
         if (!it) return;
         busy = true;
         it.status = 'run'; render();
         try {
-            const d = await mjAI.post(RUN_URL, { image: it.data, type: 'image/jpeg', mode });
-            Object.assign(it, { status: 'done', text: d.text, kind: d.kind, unclear: d.unclear });
-            it.data = null;  // 다 쓴 사진 데이터는 버림
+            const url = await toJpeg(it.file, SIDE[it.engine]);
+            const body = { image: url.split(',')[1], type: 'image/jpeg', mode: it.engine === 'free' && mode === 'table' ? 'lines' : mode };
+            let d;
+            if (it.engine === 'ai') {
+                d = await mjAI.post(URLS.ai, body);
+            } else {
+                const r = await fetch(URLS.free, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body) });
+                d = await r.json().catch(() => ({ error: '글자를 읽지 못했어요.' }));
+                if (!r.ok) throw new Error(d.error || '글자를 읽지 못했어요.');
+            }
+            Object.assign(it, { status: 'done', text: d.text, conf: d.conf ?? null, kind: d.kind || '', unclear: d.unclear || '' });
         } catch (e) {
             it.status = 'error'; it.error = e.message;
         }
@@ -137,29 +148,42 @@
         pump();
     }
 
+    function engineBadge(it) {
+        if (it.engine === 'ai') return '<span class="ai-tag" style="background:#f1edff;color:#6e56cf">✨ AI</span>';
+        const c = it.conf ?? 0;
+        const tone = c >= 85 ? 'background:#e8f8ee;color:#1e7a35' : c >= 70 ? 'background:#fff8e6;color:#8a5300' : 'background:#fff1f0;color:#c4271d';
+        return `<span class="ai-tag" style="background:#f5f5f7;color:#6e6e73">무료</span> <span class="ai-tag" style="${tone}" title="글자 인식 신뢰도">신뢰도 ${c}%</span>`;
+    }
+
     function render() {
         // 고치던 칸의 커서·스크롤을 다시 그린 뒤에도 그대로
-        const act = document.activeElement?.dataset?.text ? { id: document.activeElement.dataset.text, s: document.activeElement.selectionStart, e: document.activeElement.selectionEnd, top: document.activeElement.scrollTop } : null;
+        const a = document.activeElement;
+        const act = a?.dataset?.text ? { id: a.dataset.text, s: a.selectionStart, e: a.selectionEnd, top: a.scrollTop } : null;
         const done = items.filter((i) => i.status === 'done');
         $('oc-bar').classList.toggle('hidden', !items.length);
         $('oc-bar').classList.toggle('flex', !!items.length);
         $('oc-count').textContent = items.length ? `${items.length}장 · 완료 ${done.length}` : '';
         $('oc-copy-all').disabled = $('oc-save').disabled = !done.length;
         $('oc-list').innerHTML = items.map((it) => {
+            const aiAgain = it.file && it.engine === 'free' ? `<button type="button" class="ai-btn !px-3 !py-1 !text-[12px]" data-ai="${it.id}">✨ AI 로 다시 읽기</button>` : '';
             let body;
             if (it.status === 'done') {
-                body = `<textarea class="oc-text" data-text="${it.id}" spellcheck="false">${esc(it.text)}</textarea>
-                    <div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#8e8e93]">
-                        <span>${esc(it.kind)} · ${it.text.length.toLocaleString()}자</span>
+                const weak = it.engine === 'free' && ((it.conf ?? 0) < 75 || mode === 'table' || !it.text);
+                body = (it.text ? `<textarea class="oc-text" data-text="${it.id}" spellcheck="false">${esc(it.text)}</textarea>`
+                        : '<p class="rounded-xl bg-[#f5f5f7] px-4 py-6 text-center text-[14px] text-[#8e8e93]">글자를 찾지 못했어요.</p>')
+                    + `<div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#8e8e93]">
+                        ${engineBadge(it)}
+                        <span>${esc(it.kind ? it.kind + ' · ' : '')}${(it.text || '').length.toLocaleString()}자</span>
                         ${it.unclear ? `<span class="text-[#b26a00]">⚠️ ${esc(it.unclear)}</span>` : ''}
-                        <button type="button" class="oc-btn ml-auto" data-copy="${it.id}">복사</button>
-                    </div>`;
-                if (!it.text) body = '<p class="rounded-xl bg-[#f5f5f7] px-4 py-6 text-center text-[14px] text-[#8e8e93]">글자를 찾지 못했어요.</p>';
+                        <span class="ml-auto flex gap-2">${aiAgain}${it.text ? `<button type="button" class="oc-btn" data-copy="${it.id}">복사</button>` : ''}</span>
+                    </div>`
+                    + (weak ? `<p class="mt-2 text-[12px] text-[#6e56cf]">${mode === 'table' ? '표는 무료로는 칸이 뭉개져요.' : '글자가 많이 틀렸을 수 있어요.'} 손글씨·칠판·표는 ✨AI 가 훨씬 정확해요.</p>` : '');
             } else if (it.status === 'error') {
                 body = `<p class="rounded-xl bg-[#fff1f0] px-4 py-3 text-[14px] text-[#c4271d]">${esc(it.error)}</p>
-                    ${it.data ? `<button type="button" class="oc-btn mt-2" data-retry="${it.id}">다시 시도</button>` : ''}`;
+                    <div class="mt-2 flex gap-2">${it.file ? `<button type="button" class="oc-btn" data-retry="${it.id}">다시 시도</button>` : ''}${aiAgain}</div>`;
             } else {
-                body = `<p class="flex items-center gap-2 rounded-xl bg-[#f5f2ff] px-4 py-6 text-[14px] text-[#6e56cf] dark:bg-[#221c3a]">${it.status === 'run' ? '<span class="ai-spin" style="border-color:rgba(110,86,207,.3);border-top-color:#6e56cf"></span> 글자를 읽고 있어요…' : '차례를 기다리는 중…'}</p>`;
+                const label = it.engine === 'ai' ? '✨ AI 가 글자를 읽고 있어요…' : '글자를 읽고 있어요…';
+                body = `<p class="flex items-center gap-2 rounded-xl bg-[#f5f2ff] px-4 py-6 text-[14px] text-[#6e56cf] dark:bg-[#221c3a]">${it.status === 'run' ? `<span class="ai-spin" style="border-color:rgba(110,86,207,.3);border-top-color:#6e56cf"></span> ${label}` : '차례를 기다리는 중…'}</p>`;
             }
             return `<li class="oc-card grid gap-4 md:grid-cols-[260px_minmax(0,1fr)]" data-id="${it.id}">
                 <div><img class="oc-thumb" src="${it.thumb || ''}" alt=""><p class="mt-1 truncate text-[12px] text-[#8e8e93]" title="${esc(it.name)}">${esc(it.name)}</p></div>
@@ -184,6 +208,13 @@
         }
         const r = e.target.closest('[data-retry]');
         if (r) { const it = items.find((i) => i.id === +r.dataset.retry); it.status = 'wait'; it.error = null; render(); pump(); }
+        const ai = e.target.closest('[data-ai]');
+        if (ai) {
+            if (!mjAI.guard()) return;
+            const it = items.find((i) => i.id === +ai.dataset.ai);
+            Object.assign(it, { engine: 'ai', status: 'wait', error: null, conf: null });
+            render(); pump();
+        }
     });
     const joined = () => items.filter((i) => i.status === 'done' && i.text).reverse().map((i) => i.text).join('\n\n');
     $('oc-copy-all').addEventListener('click', async (e) => {
@@ -197,10 +228,19 @@
         setTimeout(() => URL.revokeObjectURL(a.href), 3000);
     });
     $('oc-clear').addEventListener('click', () => { if (busy) return; items.splice(0); render(); });
-    document.querySelectorAll('#oc-mode button').forEach((b) => b.addEventListener('click', () => {
-        mode = b.dataset.v;
-        document.querySelectorAll('#oc-mode button').forEach((x) => x.classList.toggle('is-on', x === b));
+    const seg = (id, set) => document.querySelectorAll(`#${id} button`).forEach((b) => b.addEventListener('click', () => {
+        if (set(b.dataset.v) === false) return;
+        document.querySelectorAll(`#${id} button`).forEach((x) => x.classList.toggle('is-on', x === b));
     }));
+    seg('oc-engine', (v) => {
+        if (v === 'ai' && !mjAI.guard()) return false;
+        engine = v;
+    });
+    seg('oc-mode', (v) => {
+        mode = v;
+        // 표는 AI 만 제대로 읽어서, 무료일 때 고르면 AI 로 바꿔 줌
+        if (v === 'table' && engine === 'free' && mjAI.authed) document.querySelector('#oc-engine [data-v=ai]').click();
+    });
 
     const drop = $('oc-drop');
     $('oc-file').addEventListener('change', (e) => { addFiles(e.target.files); e.target.value = ''; });
@@ -212,7 +252,7 @@
         const files = [...(e.clipboardData?.files || [])];
         if (files.length) { e.preventDefault(); addFiles(files); }
     });
-    window.__ocr = { items, addFiles };
+    window.__ocr = { items, addFiles, setEngine: (v) => { engine = v; } };
 })();
 </script>
 {% include "tools/_ai_assist.html" %}
