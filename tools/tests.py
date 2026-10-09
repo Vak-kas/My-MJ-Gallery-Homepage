@@ -944,3 +944,82 @@ class ToolRegistryTests(TestCase):
 			self.assertIn(tool.get("access"), {"public", "member", "admin"}, tool["slug"])
 		slugs = [t["slug"] for t in TOOLS]
 		self.assertEqual(len(slugs), len(set(slugs)))
+
+
+class CiteTests(TestCase):
+	CROSSREF = {"message": {
+		"DOI": "10.1109/CVPR.2016.90", "type": "proceedings-article", "title": ["Deep Residual Learning for Image Recognition"],
+		"author": [{"given": "Kaiming", "family": "He"}, {"given": "Xiangyu", "family": "Zhang"}],
+		"issued": {"date-parts": [[2016, 6]]}, "container-title": ["2016 IEEE Conference on Computer Vision and Pattern Recognition (CVPR)"],
+		"page": "770-778", "publisher": "IEEE",
+	}}
+	ARXIV = b"""<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom" xmlns:arxiv="http://arxiv.org/schemas/atom">
+	<entry><id>http://arxiv.org/abs/1706.03762v7</id><published>2017-06-12T17:57:34Z</published><title>Attention Is All
+	You Need</title><author><name>Ashish Vaswani</name></author><author><name>Noam Shazeer</name></author>
+	<arxiv:primary_category term="cs.CL"/></entry></feed>"""
+	GPP = (b"<html><body><span>Specification #: 38.321</span> Title: <b>NR; Medium Access Control (MAC) protocol specification</b> Status: Under change control "
+		b"Type: Technical specification (TS) <table><tr><td>RAN#113</td><td>19.4.0</td><td>2026-09-25</td></tr>"
+		b"<tr><td>18.10.0</td><td>2026-06-29</td></tr><tr><td>18.9.0</td><td>2026-03-20</td></tr><tr><td>17.0.0</td><td>2022-04-14</td></tr></table></body></html>")
+
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def fake(self, url, accept="application/json"):
+		import json
+		if "crossref.org/works/" in url:
+			return json.dumps(self.CROSSREF).encode()
+		if "crossref.org/works?" in url:
+			return json.dumps({"message": {"items": [self.CROSSREF["message"]]}}).encode()
+		if "arxiv.org" in url:
+			return self.ARXIV
+		if "3gpp.org" in url:
+			return self.GPP
+		raise AssertionError(url)
+
+	def get(self, q):
+		from unittest import mock
+		with mock.patch("tools.cite._get", side_effect=self.fake) as m:
+			res = self.client.get(reverse("tools:cite_lookup"), {"q": q})
+		return res, m
+
+	def test_classify(self):
+		from . import cite
+		self.assertEqual(cite.classify("https://doi.org/10.1109/CVPR.2016.90."), ("doi", "10.1109/cvpr.2016.90"))
+		self.assertEqual(cite.classify("https://arxiv.org/abs/1706.03762v7"), ("arxiv", "1706.03762"))
+		self.assertEqual(cite.classify("TR 38.901 v17.0.0"), ("3gpp", "38.901@17.0.0"))
+		self.assertEqual(cite.classify("38321"), ("3gpp", "38.321"))
+		self.assertEqual(cite.classify("Attention is all you need")[0], "search")
+
+	def test_doi_and_cache(self):
+		res, m = self.get("10.1109/CVPR.2016.90")
+		item = res.json()["items"][0]
+		self.assertEqual((item["type"], item["year"], item["pages"], item["doi"]), ("inproceedings", 2016, "770-778", "10.1109/CVPR.2016.90"))
+		self.assertEqual(item["authors"][0], {"family": "He", "given": "Kaiming"})
+		res, m = self.get("doi:10.1109/cvpr.2016.90")
+		self.assertFalse(m.called)  # 두 번째는 캐시
+
+	def test_arxiv_and_search(self):
+		item = self.get("arXiv:1706.03762")[0].json()["items"][0]
+		self.assertEqual((item["title"], item["arxiv"], item["primary_class"]), ("Attention Is All You Need", "1706.03762", "cs.CL"))
+		items = self.get("Attention is all you need")[0].json()["items"]
+		self.assertEqual(items[0]["source"], "arxiv")  # 제목이 같은 게 먼저
+
+	def test_3gpp_latest_and_version(self):
+		item = self.get("TS 38.321")[0].json()["items"][0]
+		self.assertEqual((item["number"], item["version"], item["year"], item["month"], item["report_type"]), ("TS 38.321", "19.4.0", 2026, 9, "Technical Specification (TS)"))
+		self.assertEqual([r["version"] for r in item["releases"]], ["19.4.0", "18.10.0", "17.0.0"])  # 릴리스마다 최신 하나
+		item = self.get("38.321 v18.9.0")[0].json()["items"][0]
+		self.assertEqual((item["version"], item["release"]), ("18.9.0", 18))
+		self.assertEqual(self.get("38.321 v9.9.9")[0].status_code, 404)
+
+	def test_rate_limit_counts_only_upstream_calls(self):
+		from unittest import mock
+		with mock.patch.dict("tools.cite.LIMITS", {"anon": 2}):
+			self.assertEqual(self.get("10.1109/a")[0].status_code, 200)
+			self.assertEqual(self.get("10.1109/a")[0].status_code, 200)  # 캐시라 안 셈
+			self.assertEqual(self.get("10.1109/b")[0].status_code, 200)
+			self.assertEqual(self.get("10.1109/c")[0].status_code, 429)
+
+	def test_page(self):
+		self.assertContains(self.client.get(reverse("tools:cite")), "논문 인용 만들기")

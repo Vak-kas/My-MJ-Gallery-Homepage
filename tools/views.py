@@ -70,6 +70,10 @@ def gpa(request):
 	return render(request, "tools/gpa.html")
 
 
+def cite_page(request):
+	return render(request, "tools/cite.html")
+
+
 def image_tool(request):
 	return render(request, "tools/image.html")
 

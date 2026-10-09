@@ -74,6 +74,16 @@ TOOLS = [
 		"access": "public",  # 무료 읽기는 누구나, AI 읽기는 회원
 	},
 	{
+		"slug": "cite",
+		"url_name": "tools:cite",
+		"icon": "📚",
+		"title": "논문 인용 만들기",
+		"description": "DOI·arXiv 번호·논문 제목·3GPP 규격 번호(TS 38.321)를 넣으면 BibTeX·APA·IEEE·MLA·Chicago 인용을 바로. 갖고 있는 BibTeX 변환, 참고문헌 목록·.bib 저장.",
+		"tags": ["논문", "BibTeX"],
+		"category": "docs",
+		"access": "public",
+	},
+	{
 		"slug": "gpa",
 		"url_name": "tools:gpa",
 		"icon": "🎓",
