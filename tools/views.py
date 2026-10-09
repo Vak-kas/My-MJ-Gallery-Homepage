@@ -41,6 +41,10 @@ def duplex(request):
 	return render(request, "tools/duplex.html")
 
 
+def units_tool(request):
+	return render(request, "tools/units.html")
+
+
 def time_tool(request):
 	return render(request, "tools/time.html")
 

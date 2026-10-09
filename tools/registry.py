@@ -234,6 +234,16 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "units",
+		"url_name": "tools:units",
+		"icon": "🧮",
+		"title": "단위 · 진법 변환기",
+		"description": "2·8·10·16진법(큰 수·2의 보수·비트 켜고 끄기·IEEE 754), 데이터 크기·전송 속도, 평↔m², dBm↔mW, 주파수↔파장, 온도·길이·무게 등 한 번에 변환.",
+		"tags": ["진법", "단위"],
+		"category": "dev",
+		"access": "public",
+	},
+	{
 		"slug": "regex",
 		"url_name": "tools:regex",
 		"icon": ".*",

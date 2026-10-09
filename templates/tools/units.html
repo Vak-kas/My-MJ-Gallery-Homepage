@@ -1,0 +1,354 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .un-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .un-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 11px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .un-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .un-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .un-pill { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 6px 12px; font-size: 13px; color: #1d1d1f; white-space: nowrap; }
+    .un-pill:hover { background: #f5f5f7; }
+    .un-pill.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .un-row { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0, 0, 0, 0.05); font-size: 13px; }
+    .un-row:first-child { border-top: 0; }
+    .un-row dt { color: #8e8e93; }
+    .un-row dd { min-width: 0; word-break: break-all; }
+    .un-copy { cursor: pointer; border-radius: 6px; padding: 0 3px; margin: 0 -3px; }
+    .un-copy:hover { background: #e8f1fb; }
+    .un-field label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 3px; }
+    .un-bits { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 3px 10px; }
+    .un-byte { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; }
+    .un-bit { height: 30px; border-radius: 6px; background: #f5f5f7; font: 600 13px ui-monospace, Menlo, monospace; color: #8e8e93; }
+    .un-bit.on { background: #0066cc; color: #fff; }
+    .un-bit.sign { box-shadow: inset 0 0 0 2px #f97316; }
+    .un-err { color: #c4271d; font-size: 13px; }
+    html.theme-dark .un-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .un-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .un-pill { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .un-pill.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .un-row { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .un-bit { background: #111318; }
+    html.theme-dark .un-bit.on { background: #0a84ff; color: #fff; }
+    html.theme-dark .un-copy:hover { background: #1c2a3a; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">UNIT · RADIX</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">단위 · 진법 변환기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">아무 칸에나 값을 넣으면 나머지가 한꺼번에 바뀌어요. 이 브라우저에서 바로 계산하고, 결과 값을 누르면 복사돼요.</p>
+    </div>
+
+    <div class="mt-6 flex gap-1.5">
+        <button type="button" class="un-pill is-on" data-tab="radix">🔢 진법</button>
+        <button type="button" class="un-pill" data-tab="unit">📏 단위</button>
+    </div>
+
+    <!-- 진법 -->
+    <section id="tab-radix" class="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <div class="un-card min-w-0">
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_150px]">
+                <input id="rx-in" class="un-in un-mono text-[16px]" value="0xFF" autocomplete="off" spellcheck="false" placeholder="255 · 0xFF · 0b1111_1111 · -42">
+                <select id="rx-base" class="un-in">
+                    <option value="auto">자동 (0x·0b·0o)</option><option value="10">10진수</option><option value="16">16진수</option><option value="2">2진수</option><option value="8">8진수</option><option value="custom">직접 (2~36)</option>
+                </select>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
+                <span class="text-[#6e6e73]">비트 폭</span>
+                <div class="flex gap-1" id="rx-width">
+                    <button type="button" class="un-pill is-on" data-w="0">자동</button>
+                    <button type="button" class="un-pill" data-w="8">8</button>
+                    <button type="button" class="un-pill" data-w="16">16</button>
+                    <button type="button" class="un-pill" data-w="32">32</button>
+                    <button type="button" class="un-pill" data-w="64">64</button>
+                </div>
+                <label class="ml-2 flex items-center gap-1.5"><span class="text-[#6e6e73]">직접 진법</span><input id="rx-custom" type="number" min="2" max="36" value="36" class="un-in w-[72px]"></label>
+            </div>
+            <dl class="mt-3" id="rx-out"></dl>
+        </div>
+        <aside class="space-y-4">
+            <div class="un-card">
+                <div class="flex items-center gap-2"><h2 class="text-[15px] font-semibold">비트</h2><span class="text-[12px] text-[#8e8e93]" id="rx-bitinfo"></span></div>
+                <p class="mt-1 text-[12px] text-[#8e8e93]">눌러서 켜고 끌 수 있어요. 주황 테두리는 부호 비트.</p>
+                <div class="un-bits mt-3" id="rx-bits"></div>
+            </div>
+            <div class="un-card">
+                <h2 class="text-[15px] font-semibold">실수 ↔ IEEE 754</h2>
+                <input id="fl-in" class="un-in un-mono mt-3" value="3.14" autocomplete="off" placeholder="3.14 · -0.1 · 1e-7 · NaN">
+                <dl class="mt-2" id="fl-out"></dl>
+            </div>
+        </aside>
+    </section>
+
+    <!-- 단위 -->
+    <section id="tab-unit" class="mt-4 hidden">
+        <div class="flex flex-wrap gap-1.5" id="un-cats"></div>
+        <div class="un-card mt-4">
+            <p class="text-[13px] text-[#6e6e73]" id="un-note"></p>
+            <div class="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4" id="un-fields"></div>
+            <div class="mt-4 hidden rounded-2xl bg-[#f5f5f7] p-4 text-[13px] dark:bg-[#111318]" id="un-extra"></div>
+        </div>
+    </section>
+</main>
+
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    // raw: 복사할 값 (보여 주는 값과 다를 때, 예: 4자리씩 띄운 2진수)
+    const row = (k, v, copy = true, raw) => `<div class="un-row"><dt>${esc(k)}</dt><dd>${copy ? `<span class="un-copy un-mono" title="눌러서 복사" data-copy="${esc(raw ?? v)}">${esc(v)}</span>` : v}</dd></div>`;
+    const group = (s, n, sep = ' ') => { const out = []; for (let i = s.length; i > 0; i -= n) out.unshift(s.slice(Math.max(0, i - n), i)); return out.join(sep); };
+
+    // ── 탭 ──
+    let tab = store.get('mj.units.tab', 'radix');
+    function showTab(t) {
+        tab = t; store.set('mj.units.tab', t);
+        document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === t));
+        $('tab-radix').classList.toggle('hidden', t !== 'radix');
+        $('tab-unit').classList.toggle('hidden', t !== 'unit');
+    }
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+    // ── 진법 (BigInt) ──
+    const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+    let width = 0;
+    function parseBig(raw, base) {
+        let s = raw.trim().toLowerCase().replace(/[\s_,']/g, '');
+        let neg = false;
+        if (s.startsWith('-')) { neg = true; s = s.slice(1); } else if (s.startsWith('+')) s = s.slice(1);
+        if (base === 'auto') {
+            if (/^0x/.test(s)) { base = 16; s = s.slice(2); }
+            else if (/^0b/.test(s)) { base = 2; s = s.slice(2); }
+            else if (/^0o/.test(s)) { base = 8; s = s.slice(2); }
+            else base = 10;
+        } else if (base === 16) s = s.replace(/^0x/, '');
+        else if (base === 2) s = s.replace(/^0b/, '');
+        else if (base === 8) s = s.replace(/^0o/, '');
+        if (!s) throw new Error('숫자를 넣어 주세요');
+        let v = 0n;
+        const B = BigInt(base);
+        for (const ch of s) {
+            const d = DIGITS.indexOf(ch);
+            if (d < 0 || d >= base) throw new Error(`'${ch}' 는 ${base}진수에 없는 글자예요`);
+            v = v * B + BigInt(d);
+        }
+        return { v: neg ? -v : v, base };
+    }
+    const toBase = (v, b) => (v < 0n ? '-' + (-v).toString(b) : v.toString(b));
+    function pickWidth(v) {
+        if (width) return width;
+        for (const w of [8, 16, 32, 64]) { if (v >= -(1n << BigInt(w - 1)) && v < (1n << BigInt(w))) return w; }
+        return 0;  // 64비트보다 큼
+    }
+    let current = { v: 255n, w: 8 };
+    function renderRadix() {
+        let parsed;
+        const baseSel = $('rx-base').value;
+        const base = baseSel === 'auto' ? 'auto' : baseSel === 'custom' ? Math.min(36, Math.max(2, +$('rx-custom').value || 36)) : +baseSel;
+        try { parsed = parseBig($('rx-in').value, base); }
+        catch (err) { $('rx-out').innerHTML = `<p class="un-err">${esc(err.message)}</p>`; $('rx-bits').innerHTML = ''; return; }
+        const v = parsed.v, w = pickWidth(v);
+        let html = '';
+        if (w) {
+            const W = BigInt(w), mask = (1n << W) - 1n;
+            if (v >= (1n << W) || v < -(1n << (W - 1n))) {
+                html += `<p class="un-err mb-2">${w}비트에 안 들어가는 값이에요. 아래는 넘친 부분을 잘라낸 결과예요.</p>`;
+            }
+            const u = ((v % (1n << W)) + (1n << W)) & mask;  // 부호 없는 해석(2의 보수)
+            const signed = u >= (1n << (W - 1n)) ? u - (1n << W) : u;
+            current = { v: u, w };
+            const customBase = Math.min(36, Math.max(2, +$('rx-custom').value || 36));
+            html += row('2진수', group(u.toString(2).padStart(w, '0'), 4), true, u.toString(2).padStart(w, '0'))
+                + row('8진수', u.toString(8))
+                + row('10진수 (부호 없음)', u.toString())
+                + row(`10진수 (부호 있음, ${w}비트)`, signed.toString())
+                + row('16진수', group(u.toString(16).toUpperCase().padStart(w / 4, '0'), 2), true, u.toString(16).toUpperCase().padStart(w / 4, '0'))
+                + row(`${customBase}진수`, toBase(v, customBase));
+            const bytes = []; for (let i = w - 8; i >= 0; i -= 8) bytes.push(Number((u >> BigInt(i)) & 255n));
+            const ascii = bytes.map((b) => (b >= 32 && b < 127 ? String.fromCharCode(b) : '·')).join('');
+            html += row('바이트 (빅 엔디언)', bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' '))
+                + row('바이트 (리틀 엔디언)', [...bytes].reverse().map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' '))
+                + row('ASCII', ascii);
+            if (w === 32 || w === 64) {
+                const dv = new DataView(new ArrayBuffer(8));
+                if (w === 32) { dv.setUint32(0, Number(u)); html += row('float32 로 읽으면', String(dv.getFloat32(0))); }
+                else { dv.setBigUint64(0, u); html += row('float64 로 읽으면', String(dv.getFloat64(0))); }
+            }
+            html += row('켜진 비트 수', String(u.toString(2).split('').filter((c) => c === '1').length), false);
+        } else {
+            current = { v, w: 0 };
+            const customBase = Math.min(36, Math.max(2, +$('rx-custom').value || 36));
+            html += row('2진수', group(toBase(v, 2), 4), true, toBase(v, 2)) + row('8진수', toBase(v, 8)) + row('10진수', v.toString()) + row('16진수', toBase(v, 16).toUpperCase())
+                + row(`${customBase}진수`, toBase(v, customBase))
+                + row('자릿수', `10진 ${v.toString().replace('-', '').length}자리 · 2진 ${toBase(v < 0n ? -v : v, 2).length}비트`, false);
+        }
+        $('rx-out').innerHTML = html;
+        renderBits();
+    }
+    function renderBits() {
+        const { v, w } = current;
+        if (!w) { $('rx-bits').innerHTML = '<p class="col-span-8 text-[12px] text-[#8e8e93]">64비트보다 큰 수는 비트를 보여주지 않아요.</p>'; $('rx-bitinfo').textContent = ''; return; }
+        $('rx-bitinfo').textContent = `${w}비트`;
+        const cells = [];
+        for (let byte = w / 8 - 1; byte >= 0; byte--) {
+            let inner = '';
+            for (let b = 7; b >= 0; b--) {
+                const i = byte * 8 + b, on = (v >> BigInt(i)) & 1n;
+                inner += `<button type="button" class="un-bit ${on ? 'on' : ''} ${i === w - 1 ? 'sign' : ''}" data-bit="${i}" title="비트 ${i}">${on}</button>`;
+            }
+            cells.push(`<div class="col-span-4 sm:col-span-4"><p class="mb-0.5 text-[10px] text-[#8e8e93]">${byte * 8 + 7}…${byte * 8}</p><div class="un-byte">${inner}</div></div>`);
+        }
+        $('rx-bits').innerHTML = cells.join('');
+    }
+    $('rx-bits').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-bit]'); if (!b) return;
+        const nv = current.v ^ (1n << BigInt(b.dataset.bit));
+        $('rx-base').value = '16';
+        $('rx-in').value = '0x' + nv.toString(16).toUpperCase().padStart(current.w / 4, '0');
+        renderRadix();
+    });
+    $('rx-width').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-w]'); if (!b) return;
+        width = +b.dataset.w;
+        document.querySelectorAll('#rx-width [data-w]').forEach((x) => x.classList.toggle('is-on', x === b));
+        renderRadix();
+    });
+    ['rx-in', 'rx-base', 'rx-custom'].forEach((id) => $(id).addEventListener('input', renderRadix));
+
+    function renderFloat() {
+        const raw = $('fl-in').value.trim();
+        if (!raw) { $('fl-out').innerHTML = ''; return; }
+        let x;
+        if (/^0x[0-9a-f]{8}$/i.test(raw)) { const dv = new DataView(new ArrayBuffer(4)); dv.setUint32(0, parseInt(raw, 16)); x = dv.getFloat32(0); }
+        else if (/^0x[0-9a-f]{16}$/i.test(raw)) { const dv = new DataView(new ArrayBuffer(8)); dv.setBigUint64(0, BigInt(raw)); x = dv.getFloat64(0); }
+        else x = Number(raw.replace(/inf(inity)?/i, 'Infinity'));
+        if (Number.isNaN(x) && !/^nan$/i.test(raw) && !/^0x/i.test(raw)) { $('fl-out').innerHTML = '<p class="un-err">숫자나 0x 로 시작하는 8·16자리 16진수를 넣어 주세요.</p>'; return; }
+        const dv = new DataView(new ArrayBuffer(8));
+        dv.setFloat32(0, x); const f32 = dv.getUint32(0); const back32 = dv.getFloat32(0);
+        dv.setFloat64(0, x); const f64 = dv.getBigUint64(0);
+        const b32 = f32.toString(2).padStart(32, '0');
+        $('fl-out').innerHTML = row('float32 (16진)', '0x' + f32.toString(16).toUpperCase().padStart(8, '0'))
+            + row('float32 (2진)', `${b32[0]} ${b32.slice(1, 9)} ${b32.slice(9)}`)
+            + row('float32 실제 값', String(back32))
+            + row('float64 (16진)', '0x' + f64.toString(16).toUpperCase().padStart(16, '0'))
+            + row('float64 실제 값', x.toPrecision(17).replace(/\.?0+$/, '').replace(/\.?0+e/, 'e'));
+    }
+    $('fl-in').addEventListener('input', renderFloat);
+
+    // ── 단위 ──
+    // f: 기준 단위로 바꾸는 배수, 또는 to/from 함수
+    const C = 299792458;
+    const lin = (id, label, f) => ({ id, label, to: (x) => x * f, from: (b) => b / f });
+    const CATS = [
+        { id: 'data', name: '💾 데이터 크기', note: 'KB·MB 는 1000 배(10진), KiB·MiB 는 1024 배(2진)예요. 윈도우 탐색기의 "MB"는 사실 MiB.', units: [
+            lin('bit', 'bit', 1 / 8), lin('B', 'B (바이트)', 1), lin('KB', 'KB', 1e3), lin('MB', 'MB', 1e6), lin('GB', 'GB', 1e9), lin('TB', 'TB', 1e12),
+            lin('KiB', 'KiB', 1024), lin('MiB', 'MiB', 1024 ** 2), lin('GiB', 'GiB', 1024 ** 3), lin('TiB', 'TiB', 1024 ** 4)], start: ['GB', 1] },
+        { id: 'rate', name: '📶 전송 속도', note: '인터넷 속도(Mbps)는 비트, 다운로드 표시(MB/s)는 바이트예요. 8배 차이.', units: [
+            lin('bps', 'bps', 1), lin('kbps', 'kbps', 1e3), lin('Mbps', 'Mbps', 1e6), lin('Gbps', 'Gbps', 1e9),
+            lin('Bps', 'B/s', 8), lin('KBps', 'KB/s', 8e3), lin('MBps', 'MB/s', 8e6), lin('GBps', 'GB/s', 8e9), lin('MiBps', 'MiB/s', 8 * 1024 ** 2)], start: ['Mbps', 500], extra: 'rate' },
+        { id: 'length', name: '📏 길이', units: [
+            lin('mm', 'mm', 1e-3), lin('cm', 'cm', 1e-2), lin('m', 'm', 1), lin('km', 'km', 1e3), lin('in', 'inch (인치)', 0.0254), lin('ft', 'ft (피트)', 0.3048),
+            lin('yd', 'yd (야드)', 0.9144), lin('mi', 'mile (마일)', 1609.344), lin('nmi', '해리', 1852), lin('ja', '자 (尺)', 10 / 33), lin('um', 'µm', 1e-6), lin('nm', 'nm', 1e-9)], start: ['in', 27] },
+        { id: 'area', name: '🏠 넓이', note: '1평 = 400/121 m² ≈ 3.3058 m²', units: [
+            lin('m2', 'm²', 1), lin('pyeong', '평', 400 / 121), lin('cm2', 'cm²', 1e-4), lin('km2', 'km²', 1e6), lin('a', 'a (아르)', 100), lin('ha', 'ha (헥타르)', 1e4),
+            lin('ft2', 'ft²', 0.09290304), lin('acre', 'acre', 4046.8564224)], start: ['pyeong', 25] },
+        { id: 'mass', name: '⚖️ 무게', note: '고기 1근 = 600 g, 금 1돈 = 3.75 g', units: [
+            lin('mg', 'mg', 1e-6), lin('g', 'g', 1e-3), lin('kg', 'kg', 1), lin('t', 't (톤)', 1e3), lin('oz', 'oz (온스)', 0.028349523125), lin('lb', 'lb (파운드)', 0.45359237),
+            lin('geun', '근', 0.6), lin('don', '돈', 0.00375), lin('nyang', '냥', 0.0375), lin('ct', '캐럿', 0.0002)], start: ['geun', 1] },
+        { id: 'volume', name: '🧴 부피', units: [
+            lin('mL', 'mL (cc)', 1e-3), lin('L', 'L', 1), lin('m3', 'm³', 1e3), lin('cup', '컵 (200 mL)', 0.2), lin('galUS', 'gal (미국)', 3.785411784), lin('galUK', 'gal (영국)', 4.54609),
+            lin('flozUS', 'fl oz (미국)', 0.0295735295625), lin('bbl', '배럴 (석유)', 158.987294928)], start: ['L', 1] },
+        { id: 'temp', name: '🌡 온도', units: [
+            { id: 'C', label: '°C (섭씨)', to: (x) => x, from: (b) => b },
+            { id: 'F', label: '°F (화씨)', to: (x) => (x - 32) * 5 / 9, from: (b) => b * 9 / 5 + 32 },
+            { id: 'K', label: 'K (켈빈)', to: (x) => x - 273.15, from: (b) => b + 273.15 }], start: ['F', 100] },
+        { id: 'speed', name: '🚀 속도', note: '마하는 15°C 해수면 기준 소리 속도(340.3 m/s)', units: [
+            lin('mps', 'm/s', 1), lin('kmh', 'km/h', 1 / 3.6), lin('mph', 'mph', 0.44704), lin('kn', 'knot (노트)', 1852 / 3600), lin('mach', '마하', 340.3), lin('c', '광속 비율', C)], start: ['kmh', 100] },
+        { id: 'pressure', name: '🎈 압력', units: [
+            lin('Pa', 'Pa', 1), lin('hPa', 'hPa', 100), lin('kPa', 'kPa', 1e3), lin('MPa', 'MPa', 1e6), lin('bar', 'bar', 1e5), lin('atm', 'atm (기압)', 101325),
+            lin('psi', 'psi', 6894.757293168), lin('mmHg', 'mmHg', 133.322387415)], start: ['psi', 32] },
+        { id: 'energy', name: '⚡ 에너지', units: [
+            lin('J', 'J', 1), lin('kJ', 'kJ', 1e3), lin('cal', 'cal', 4.184), lin('kcal', 'kcal', 4184), lin('Wh', 'Wh', 3600), lin('kWh', 'kWh', 3.6e6),
+            lin('mAh', 'mAh @3.7V', 3.7 * 3.6), lin('eV', 'eV', 1.602176634e-19), lin('BTU', 'BTU', 1055.05585262)], start: ['kcal', 500] },
+        { id: 'power', name: '📡 전력 · dBm', note: 'dBm = 10·log10(mW). 0 dBm = 1 mW, +3 dB 는 약 2배, +10 dB 는 10배.', units: [
+            lin('pW', 'pW', 1e-12), lin('nW', 'nW', 1e-9), lin('uW', 'µW', 1e-6), lin('mW', 'mW', 1e-3), lin('W', 'W', 1), lin('kW', 'kW', 1e3),
+            { id: 'dBm', label: 'dBm', to: (x) => 10 ** ((x - 30) / 10), from: (b) => 10 * Math.log10(b) + 30 },
+            { id: 'dBW', label: 'dBW', to: (x) => 10 ** (x / 10), from: (b) => 10 * Math.log10(b) },
+            lin('hp', '마력 (PS)', 735.49875)], start: ['dBm', 23] },
+        { id: 'db', name: '🔊 dB ↔ 배수', note: '전력 비는 10·log10, 전압·진폭 비는 20·log10 이에요.', units: [
+            { id: 'dB', label: 'dB', to: (x) => x, from: (b) => b },
+            { id: 'pow', label: '전력 배수', to: (x) => 10 * Math.log10(x), from: (b) => 10 ** (b / 10) },
+            { id: 'amp', label: '전압·진폭 배수', to: (x) => 20 * Math.log10(x), from: (b) => 10 ** (b / 20) },
+            { id: 'pct', label: '전력 %', to: (x) => 10 * Math.log10(x / 100), from: (b) => 100 * 10 ** (b / 10) }], start: ['dB', 3] },
+        { id: 'freq', name: '〰️ 주파수 · 파장', note: '진공에서 파장 λ = c / f (c = 299,792,458 m/s)', units: [
+            lin('Hz', 'Hz', 1), lin('kHz', 'kHz', 1e3), lin('MHz', 'MHz', 1e6), lin('GHz', 'GHz', 1e9), lin('THz', 'THz', 1e12),
+            { id: 'lm', label: '파장 (m)', to: (x) => C / x, from: (b) => C / b },
+            { id: 'lcm', label: '파장 (cm)', to: (x) => C / (x / 100), from: (b) => C / b * 100 },
+            { id: 'lmm', label: '파장 (mm)', to: (x) => C / (x / 1000), from: (b) => C / b * 1000 },
+            { id: 'lnm', label: '파장 (nm)', to: (x) => C / (x / 1e9), from: (b) => C / b * 1e9 },
+            { id: 'period', label: '주기 (ns)', to: (x) => 1e9 / x, from: (b) => 1e9 / b }], start: ['GHz', 3.5] },
+        { id: 'angle', name: '📐 각도', units: [
+            lin('deg', '도 (°)', Math.PI / 180), lin('rad', '라디안', 1), lin('grad', '그라드', Math.PI / 200), lin('arcmin', '분 (′)', Math.PI / 10800), lin('arcsec', '초 (″)', Math.PI / 648000), lin('turn', '바퀴', 2 * Math.PI)], start: ['deg', 90] },
+    ];
+    let cat = CATS.find((c) => c.id === store.get('mj.units.cat', 'data')) || CATS[0];
+    let base = null;  // 기준 단위 값
+    function fmt(x) {
+        if (!Number.isFinite(x)) return Number.isNaN(x) ? '' : x > 0 ? '∞' : '-∞';
+        if (x === 0) return '0';
+        const a = Math.abs(x);
+        if (a >= 1e15 || a < 1e-6) return x.toExponential(6).replace(/\.?0+e/, 'e');
+        return String(Number(x.toPrecision(12)));
+    }
+    function renderCats() {
+        $('un-cats').innerHTML = CATS.map((c) => `<button type="button" class="un-pill ${c === cat ? 'is-on' : ''}" data-cat="${c.id}">${esc(c.name)}</button>`).join('');
+    }
+    function renderFields() {
+        $('un-note').textContent = cat.note || '';
+        $('un-fields').innerHTML = cat.units.map((u) => `<div class="un-field"><label for="u-${u.id}">${esc(u.label)}</label><input id="u-${u.id}" class="un-in un-mono" data-u="${u.id}" inputmode="decimal" autocomplete="off"></div>`).join('');
+        const [uid, val] = cat.start;
+        base = cat.units.find((u) => u.id === uid).to(val);
+        fill(null);
+    }
+    function fill(except) {
+        for (const u of cat.units) {
+            if (u.id === except) continue;
+            $(`u-${u.id}`).value = base === null ? '' : fmt(u.from(base));
+        }
+        renderExtra();
+    }
+    function renderExtra() {
+        const box = $('un-extra');
+        if (cat.extra !== 'rate' || base === null || !(base > 0)) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        const bytesPerSec = base / 8;
+        const t = (bytes) => { let s = bytes / bytesPerSec; if (s < 60) return `${s.toFixed(1)}초`; if (s < 3600) return `${Math.floor(s / 60)}분 ${Math.round(s % 60)}초`; return `${Math.floor(s / 3600)}시간 ${Math.round(s % 3600 / 60)}분`; };
+        box.innerHTML = `<p class="font-semibold">이 속도로 받으면 걸리는 시간</p><div class="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 sm:grid-cols-5">${[['사진 5MB', 5e6], ['노래 10MB', 1e7], ['앱 1GB', 1e9], ['영화 4GB', 4e9], ['게임 100GB', 1e11]].map(([k, b]) => `<span>${k} <b class="tabular-nums">${t(b)}</b></span>`).join('')}</div>`;
+    }
+    $('un-cats').addEventListener('click', (e) => { const b = e.target.closest('[data-cat]'); if (!b) return; cat = CATS.find((c) => c.id === b.dataset.cat); store.set('mj.units.cat', cat.id); renderCats(); renderFields(); });
+    $('un-fields').addEventListener('input', (e) => {
+        const inp = e.target.closest('[data-u]'); if (!inp) return;
+        const u = cat.units.find((x) => x.id === inp.dataset.u);
+        const raw = inp.value.trim().replace(/,/g, '');
+        const x = raw === '' ? NaN : Number(raw);
+        if (!Number.isFinite(x)) { if (raw === '') { base = null; fill(u.id); } return; }
+        base = u.to(x);
+        fill(u.id);
+    });
+
+    // 결과 복사
+    document.addEventListener('click', async (e) => {
+        const c = e.target.closest('.un-copy'); if (!c) return;
+        try { await navigator.clipboard.writeText(c.dataset.copy ?? c.textContent); const o = c.style.background; c.style.background = '#d1fae5'; setTimeout(() => { c.style.background = o; }, 400); } catch (err) { /* 무시 */ }
+    });
+
+    showTab(tab); renderRadix(); renderFloat(); renderCats(); renderFields();
+    window.__units = { parseBig, CATS, fmt, setCat: (id) => { cat = CATS.find((c) => c.id === id); renderCats(); renderFields(); } };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}
