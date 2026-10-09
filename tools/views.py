@@ -49,6 +49,10 @@ def time_tool(request):
 	return render(request, "tools/time.html")
 
 
+def linkbudget(request):
+	return render(request, "tools/linkbudget.html")
+
+
 def subnet(request):
 	return render(request, "tools/subnet.html")
 

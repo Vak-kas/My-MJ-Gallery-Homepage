@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .lb-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .lb-in { width: 100%; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 6px 9px; font-size: 14px; color: #1d1d1f; outline: none; font-variant-numeric: tabular-nums; }
+    .lb-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .lb-f label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 3px; }
+    .lb-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .lb-seg button { border-radius: 999px; padding: 4px 11px; font-size: 13px; color: #6e6e73; }
+    .lb-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .lb-h { font-size: 13px; font-weight: 700; color: #1d1d1f; margin: 4px 0 8px; }
+    .lb-big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .lb-tbl { width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .lb-tbl td { padding: 5px 4px; border-top: 1px solid rgba(0, 0, 0, 0.05); }
+    .lb-tbl td:last-child { text-align: right; white-space: nowrap; }
+    .lb-tbl tr.sum td { font-weight: 700; border-top: 2px solid rgba(0, 0, 0, 0.15); }
+    .lb-tbl .sign { width: 18px; color: #8e8e93; }
+    .lb-stat { border-radius: 14px; background: #f5f5f7; padding: 10px 12px; }
+    .lb-stat p:first-child { font-size: 11px; color: #8e8e93; }
+    .lb-stat p:last-child { margin-top: 2px; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .lb-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 4px 11px; font-size: 12px; color: #1d1d1f; }
+    .lb-btn:hover { background: #f5f5f7; }
+    #lb-chart { width: 100%; height: 260px; display: block; }
+    html.theme-dark .lb-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .lb-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .lb-seg, html.theme-dark .lb-stat { background: #111318; }
+    html.theme-dark .lb-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .lb-h { color: #e8e8ea; }
+    html.theme-dark .lb-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .lb-tbl td { border-color: rgba(255, 255, 255, 0.08); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">LINK BUDGET · NTN</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">링크 버짓 계산기.</h1>
+        <p class="mt-3 max-w-[820px] text-[15px] leading-relaxed text-[#6e6e73]">보낸 신호가 받는 쪽에 얼마나 세게 도착하는지(SNR)를 dB 로 더하고 빼서 계산해요. 위성은 궤도·앙각으로 거리를 구하고, 도플러·지연도 같이 보여 줘요. <b>3GPP TR 38.821</b> 표준 시나리오를 누르면 표준 표와 같은 값이 나와요.</p>
+    </div>
+
+    <!-- 프리셋 -->
+    <section class="lb-card mt-6">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span class="text-[13px] font-semibold">📚 TR 38.821 프리셋</span>
+            <span class="lb-seg" id="p-set"><button type="button" class="is-on" data-v="1">Set-1</button><button type="button" data-v="2">Set-2</button></span>
+            <span class="lb-seg" id="p-orbit"><button type="button" data-v="GEO">GEO</button><button type="button" data-v="LEO-1200">LEO-1200</button><button type="button" class="is-on" data-v="LEO-600">LEO-600</button></span>
+            <span class="lb-seg" id="p-ue"><button type="button" class="is-on" data-v="S">S 대역 · 휴대폰</button><button type="button" data-v="Ka">Ka 대역 · VSAT</button></span>
+            <span class="lb-seg" id="p-dir"><button type="button" class="is-on" data-v="DL">하향 (위성→단말)</button><button type="button" data-v="UL">상향 (단말→위성)</button></span>
+            <button type="button" class="lb-btn" id="p-apply">적용</button>
+        </div>
+        <p class="mt-2 text-[12px] text-[#8e8e93]" id="p-note"></p>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <!-- 입력 -->
+        <section class="lb-card min-w-0 space-y-5">
+            <div>
+                <div class="flex flex-wrap items-center gap-2"><p class="lb-h">🛰 거리</p><span class="lb-seg ml-auto" id="m-geo"><button type="button" class="is-on" data-v="sat">위성 (궤도·앙각)</button><button type="button" data-v="direct">거리 직접 (지상 링크 등)</button></span></div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4" id="geo-sat">
+                    <div class="lb-f"><label>궤도 고도 (km)</label><input class="lb-in" id="h" type="number" step="any"></div>
+                    <div class="lb-f"><label>앙각 (°)</label><input class="lb-in" id="el" type="number" step="any" min="0" max="90"></div>
+                    <div class="lb-f"><label>최소 앙각 (°) <span title="이 앙각 위에 있을 때만 통신한다고 보고 '보이는 시간'을 계산">ⓘ</span></label><input class="lb-in" id="elmin" type="number" step="any" value="10"></div>
+                    <div class="lb-f"><label>지구 반지름 (km)</label><input class="lb-in" id="re" type="number" step="any" value="6371"></div>
+                </div>
+                <div class="hidden grid-cols-2 gap-3 sm:grid-cols-4" id="geo-direct">
+                    <div class="lb-f"><label>거리 (km)</label><input class="lb-in" id="dkm" type="number" step="any" value="1"></div>
+                    <div class="lb-f"><label>경로 손실 모델</label><select class="lb-in" id="plm"><option value="fs">자유공간 (FSPL)</option><option value="ld">거리 지수 n (log-distance)</option></select></div>
+                    <div class="lb-f"><label>거리 지수 n</label><input class="lb-in" id="pln" type="number" step="any" value="3"></div>
+                    <div class="lb-f"><label>기준 거리 d₀ (m)</label><input class="lb-in" id="pld0" type="number" step="any" value="1"></div>
+                </div>
+            </div>
+            <div>
+                <p class="lb-h">〰️ 주파수 · 대역폭</p>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="lb-f"><label>주파수 (GHz)</label><input class="lb-in" id="f" type="number" step="any"></div>
+                    <div class="lb-f"><label>대역폭 (MHz)</label><input class="lb-in" id="bw" type="number" step="any"></div>
+                    <div class="lb-f"><label>목표 SNR (dB)</label><input class="lb-in" id="target" type="number" step="any" value="0"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex flex-wrap items-center gap-2"><p class="lb-h">📤 송신</p><span class="lb-seg ml-auto" id="m-tx"><button type="button" class="is-on" data-v="density">EIRP 밀도 (dBW/MHz)</button><button type="button" data-v="power">송신 전력 + 안테나 이득</button></span></div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="lb-f" data-tx="density"><label>EIRP 밀도 (dBW/MHz)</label><input class="lb-in" id="eirpd" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-tx="power"><label>송신 전력 (dBm)</label><input class="lb-in" id="ptx" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-tx="power"><label>송신 안테나 이득 (dBi)</label><input class="lb-in" id="gtx" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-tx="power"><label>급전 손실 (dB)</label><input class="lb-in" id="ltx" type="number" step="any" value="0"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex flex-wrap items-center gap-2"><p class="lb-h">📥 수신</p><span class="lb-seg ml-auto" id="m-rx"><button type="button" class="is-on" data-v="gt">G/T (dB/K)</button><button type="button" data-v="nf">안테나 이득 + 잡음 지수</button></span></div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="lb-f" data-rx="gt"><label>G/T (dB/K)</label><input class="lb-in" id="gt" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-rx="nf"><label>수신 안테나 이득 (dBi)</label><input class="lb-in" id="grx" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-rx="nf"><label>잡음 지수 NF (dB)</label><input class="lb-in" id="nf" type="number" step="any"></div>
+                    <div class="lb-f hidden" data-rx="nf"><label>안테나 잡음 온도 (K)</label><input class="lb-in" id="tant" type="number" step="any"></div>
+                </div>
+            </div>
+            <div>
+                <p class="lb-h">🌧 손실 · 여유</p>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    <div class="lb-f"><label>대기 흡수 (dB)</label><input class="lb-in" id="latm" type="number" step="any"></div>
+                    <div class="lb-f"><label>그림자 여유 (dB)</label><input class="lb-in" id="lsh" type="number" step="any"></div>
+                    <div class="lb-f"><label>섬광 (dB)</label><input class="lb-in" id="lsc" type="number" step="any"></div>
+                    <div class="lb-f"><label>편파 손실 (dB)</label><input class="lb-in" id="lpol" type="number" step="any"></div>
+                    <div class="lb-f"><label>기타 (비·건물 등, dB)</label><input class="lb-in" id="ladd" type="number" step="any" value="0"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 결과 -->
+        <aside class="space-y-4 xl:sticky xl:top-6 xl:self-start">
+            <section class="lb-card">
+                <div class="flex items-end gap-4">
+                    <div><p class="text-[12px] text-[#8e8e93]">SNR (CNR)</p><p class="lb-big" id="o-snr">–</p></div>
+                    <div class="pb-1.5"><p class="text-[12px] text-[#8e8e93]">목표 대비 여유</p><p class="text-[18px] font-semibold tabular-nums" id="o-margin">–</p></div>
+                </div>
+                <p class="mt-1 text-[12px] text-[#6e6e73]" id="o-verdict"></p>
+                <div class="mt-3 grid grid-cols-2 gap-2" id="o-stats"></div>
+            </section>
+            <section class="lb-card">
+                <div class="flex items-center gap-2"><p class="lb-h !m-0">📋 버짓 표</p><button type="button" class="lb-btn ml-auto" id="copy-md">마크다운 복사</button><button type="button" class="lb-btn" id="copy-csv">CSV</button></div>
+                <table class="lb-tbl mt-2" id="o-table"></table>
+                <p class="mt-2 text-[11px] text-[#8e8e93]">C/N₀ = EIRP + G/T − 손실 − 볼츠만 상수(−228.6 dBW/K/Hz), SNR = C/N₀ − 10·log₁₀(대역폭)</p>
+            </section>
+        </aside>
+    </div>
+
+    <!-- 그래프 -->
+    <section class="lb-card mt-5" id="chart-box">
+        <div class="flex flex-wrap items-center gap-2">
+            <p class="lb-h !m-0">📈 앙각에 따라</p>
+            <span class="lb-seg" id="m-y"><button type="button" class="is-on" data-v="snr">SNR</button><button type="button" data-v="fspl">경로 손실</button><button type="button" data-v="dist">거리</button><button type="button" data-v="doppler">도플러</button><button type="button" data-v="delay">지연</button></span>
+            <span class="ml-auto text-[12px] text-[#8e8e93]">빨간 점 = 지금 앙각 · 손실 항목은 앙각과 상관없이 그대로 둠</span>
+        </div>
+        <canvas id="lb-chart" class="mt-3"></canvas>
+    </section>
+    <p class="mt-4 text-[12px] leading-5 text-[#8e8e93]">· 위성 속도는 원궤도, 도플러는 위성이 머리 위로 지나가는 경우(지구 자전 무시)의 근사예요. · 대기·섬광·그림자 값은 앙각·날씨에 따라 달라서 직접 넣는 값이에요(프리셋은 TR 38.821 표 6.1.3.3-1 값 — 앙각은 표의 경로 손실에 맞춰 LEO 30°, GEO Set-1 12.5°·Set-2 20°). · 출처: 3GPP TR 38.821 표 6.1.1.1-1·2·3, 6.1.3.3-1.</p>
+</main>
+
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const C = 299792458, K_DB = -228.6, MU = 398600.4418;  // km³/s²
+    const num = (id) => { const v = parseFloat($(id).value); return Number.isFinite(v) ? v : 0; };
+    const log10 = Math.log10, dB = (x) => 10 * log10(x), fx = (x, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : '–');
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const mode = { geo: 'sat', tx: 'density', rx: 'gt', y: 'snr' };
+
+    // ── TR 38.821 값 ──
+    const ALT = { GEO: 35786, 'LEO-1200': 1200, 'LEO-600': 600 };
+    const SAT = {  // [Set][orbit][band] = { eirpd(DL dBW/MHz), gt(UL dB/K) }
+        1: { GEO: { S: [59, 19], Ka: [40, 28] }, 'LEO-1200': { S: [40, 1.1], Ka: [10, 13] }, 'LEO-600': { S: [34, 1.1], Ka: [4, 13] } },
+        2: { GEO: { S: [53.5, 14], Ka: [32, 20] }, 'LEO-1200': { S: [34, -4.9], Ka: [2, 5] }, 'LEO-600': { S: [28, -4.9], Ka: [-4, 5] } },
+    };
+    // 표 6.1.3.3-1 의 대기·섬광·그림자 (앙각 30°)
+    const LOSS = { S: { GEO: [0.2, 3, 2.2], LEO: [0.1, 3, 2.2] }, Ka: { GEO: [1.2, 0, 1.1], LEO: [0.5, 0, 0.3], GEO2: [0.8, 0, 0.5] } };
+    const UE = { S: { ptx: 23, gtx: 0, grx: 0, nf: 7, tant: 290 }, Ka: { ptx: 33, gtx: 43.2, grx: 39.7, nf: 1.2, tant: 150 } };
+    const p = { set: '1', orbit: 'LEO-600', ue: 'S', dir: 'DL' };
+
+    function seg(id, key, obj, after) {
+        $(id).addEventListener('click', (e) => {
+            const b = e.target.closest('[data-v]'); if (!b) return;
+            obj[key] = b.dataset.v;
+            $(id).querySelectorAll('[data-v]').forEach((x) => x.classList.toggle('is-on', x === b));
+            after?.();
+        });
+    }
+    const setSeg = (id, v) => $(id).querySelectorAll('[data-v]').forEach((x) => x.classList.toggle('is-on', x.dataset.v === v));
+    function showModes() {
+        $('geo-sat').classList.toggle('hidden', mode.geo !== 'sat'); $('geo-sat').classList.toggle('grid', mode.geo === 'sat');
+        $('geo-direct').classList.toggle('hidden', mode.geo !== 'direct'); $('geo-direct').classList.toggle('grid', mode.geo === 'direct');
+        document.querySelectorAll('[data-tx]').forEach((el) => el.classList.toggle('hidden', el.dataset.tx !== mode.tx));
+        document.querySelectorAll('[data-rx]').forEach((el) => el.classList.toggle('hidden', el.dataset.rx !== mode.rx));
+        $('chart-box').classList.toggle('hidden', mode.geo !== 'sat');
+        setSeg('m-geo', mode.geo); setSeg('m-tx', mode.tx); setSeg('m-rx', mode.rx);
+    }
+    const setVal = (id, v) => { $(id).value = Number.isFinite(v) ? +v.toFixed(3) : v; };
+
+    function applyPreset() {
+        const sat = SAT[p.set][p.orbit][p.ue], ue = UE[p.ue];
+        const ka = p.ue === 'Ka', geo = p.orbit === 'GEO';
+        mode.geo = 'sat';
+        // 표 6.1.3.3-1 의 경로 손실에서 거꾸로 구한 앙각: LEO 30°, GEO 는 Set-1 12.5° · Set-2 20°
+        const el = geo ? (p.set === '2' ? 20 : 12.5) : 30;
+        setVal('h', ALT[p.orbit]); setVal('el', el);
+        setVal('f', ka ? (p.dir === 'DL' ? 20 : 30) : 2);
+        setVal('bw', ka ? 400 : (p.dir === 'DL' ? 30 : 0.36));
+        if (p.dir === 'DL') {
+            mode.tx = 'density'; setVal('eirpd', sat[0]);
+            mode.rx = 'nf'; setVal('grx', ue.grx); setVal('nf', ue.nf); setVal('tant', ue.tant);
+        } else {
+            mode.tx = 'power'; setVal('ptx', ue.ptx); setVal('gtx', ue.gtx); setVal('ltx', 0);
+            mode.rx = 'gt'; setVal('gt', sat[1]);
+        }
+        const l = ka ? (geo ? (p.set === '2' ? LOSS.Ka.GEO2 : LOSS.Ka.GEO) : LOSS.Ka.LEO) : (geo && p.set === '1' ? LOSS.S.GEO : LOSS.S.LEO);
+        const atm = ka && p.dir === 'UL' && geo ? (p.set === '2' ? 0.7 : 1.1) : l[0];
+        setVal('latm', atm); setVal('lsh', l[1]); setVal('lsc', l[2]); setVal('lpol', 0); setVal('ladd', 0);
+        $('p-note').textContent = `${p.orbit} ${p.ue === 'S' ? 'S 대역(2 GHz) 휴대폰' : 'Ka 대역 VSAT(60 cm)'} ${p.dir === 'DL' ? '하향' : '상향'} · Set-${p.set} · 앙각 ${el}° — ` +
+            (p.dir === 'DL' ? `위성 EIRP 밀도 ${sat[0]} dBW/MHz, 단말 이득 ${ue.grx} dBi·NF ${ue.nf} dB·안테나 ${ue.tant} K` : `단말 ${ue.ptx} dBm·이득 ${ue.gtx} dBi, 위성 G/T ${sat[1]} dB/K`) + (p.ue === 'S' && p.dir === 'UL' ? ' · 대역폭 360 kHz(30 kHz SCS 1 RB)' : '');
+        showModes(); calc();
+    }
+    seg('p-set', 'set', p); seg('p-orbit', 'orbit', p); seg('p-ue', 'ue', p); seg('p-dir', 'dir', p);
+    $('p-apply').addEventListener('click', applyPreset);
+    ['p-set', 'p-orbit', 'p-ue', 'p-dir'].forEach((id) => $(id).addEventListener('click', (e) => { if (e.target.closest('[data-v]')) applyPreset(); }));
+    seg('m-geo', 'geo', mode, () => { showModes(); calc(); });
+    seg('m-tx', 'tx', mode, () => { showModes(); calc(); });
+    seg('m-rx', 'rx', mode, () => { showModes(); calc(); });
+    seg('m-y', 'y', mode, () => drawChart());
+
+    // ── 계산 ──
+    function slant(h, el, re) { const s = Math.sin(el * Math.PI / 180); return Math.sqrt(re * re * s * s + h * h + 2 * re * h) - re * s; }
+    function orbitOf(h, el, re, fHz) {
+        const r = re + h, v = Math.sqrt(MU / r), w = v / r;  // km/s, rad/s
+        const vr = w * re * Math.cos(el * Math.PI / 180);  // 머리 위로 지나갈 때 거리 변화 속도 (km/s)
+        const elmin = num('elmin') * Math.PI / 180;
+        const lam = Math.acos(re * Math.cos(elmin) / r) - elmin;  // 보이는 중심각 (반쪽)
+        return { v, period: 2 * Math.PI / w, doppler: fHz * vr * 1000 / C, vr, visible: 2 * lam / w, coverR: re * lam };
+    }
+    function budget(override) {
+        const fGHz = num('f'), fHz = fGHz * 1e9, bwMHz = num('bw');
+        let d = 0, fspl;
+        if (mode.geo === 'sat') { d = slant(num('h'), override?.el ?? num('el'), num('re') || 6371); fspl = 20 * log10(d * 1000) + 20 * log10(fHz) - 147.55; }
+        else {
+            d = num('dkm');
+            const d0 = Math.max(1e-3, num('pld0')) / 1000;
+            fspl = $('plm').value === 'ld' ? (20 * log10(d0 * 1000) + 20 * log10(fHz) - 147.55) + 10 * num('pln') * log10(Math.max(d, d0) / d0) : 20 * log10(d * 1000) + 20 * log10(fHz) - 147.55;
+        }
+        const eirp = mode.tx === 'density' ? num('eirpd') + dB(Math.max(bwMHz, 1e-9)) : num('ptx') - 30 + num('gtx') - num('ltx');  // dBW
+        let gt, gr = null, tsys = null;
+        if (mode.rx === 'gt') gt = num('gt');
+        else { gr = num('grx'); tsys = num('tant') + 290 * (10 ** (num('nf') / 10) - 1); gt = gr - dB(tsys); }
+        const losses = num('latm') + num('lsh') + num('lsc') + num('lpol') + num('ladd');
+        const cn0 = eirp + gt - fspl - losses - K_DB;
+        const snr = cn0 - dB(bwMHz * 1e6);
+        const pr = gr !== null ? eirp + gr - fspl - losses : null;  // dBW
+        const noise = tsys !== null ? K_DB + dB(tsys) + dB(bwMHz * 1e6) : null;
+        return { d, fspl, eirp, gt, gr, tsys, losses, cn0, snr, pr, noise, bwMHz, fHz };
+    }
+    let last = null;
+    function calc() {
+        const b = budget();
+        last = b;
+        const target = num('target');
+        $('o-snr').textContent = `${fx(b.snr)} dB`;
+        $('o-snr').style.color = b.snr >= target ? '#0f9f6e' : '#c4271d';
+        const m = b.snr - target;
+        $('o-margin').textContent = `${m >= 0 ? '+' : ''}${fx(m)} dB`;
+        const se = Math.log2(1 + 10 ** (b.snr / 10));
+        $('o-verdict').textContent = b.snr >= target ? `목표(${target} dB)보다 ${fx(m)} dB 여유가 있어요.` : `목표(${target} dB)보다 ${fx(-m)} dB 모자라요. 안테나 이득·전력을 올리거나 대역폭을 줄여 보세요.`;
+        const stats = [
+            ['거리', `${b.d >= 1000 ? fx(b.d, 0) : fx(b.d, 1)} km`],
+            ['경로 손실', `${fx(b.fspl)} dB`],
+            ['C/N₀', `${fx(b.cn0)} dBHz`],
+            ['섀넌 용량', `${fmtRate(b.bwMHz * 1e6 * se)} (${fx(se, 2)} b/s/Hz)`],
+        ];
+        if (b.pr !== null) stats.push(['수신 전력', `${fx(b.pr + 30)} dBm`]);
+        if (b.noise !== null) stats.push(['잡음 전력', `${fx(b.noise + 30)} dBm (T ${fx(b.tsys, 0)} K)`]);
+        if (mode.geo === 'sat') {
+            const o = orbitOf(num('h'), num('el'), num('re') || 6371, b.fHz);
+            const oneway = b.d / (C / 1000) * 1000;
+            stats.push(['편도 지연', `${fx(oneway, 2)} ms`], ['왕복 (단말↔위성)', `${fx(oneway * 2, 2)} ms`],
+                ['도플러 (이 앙각)', `±${fmtHz(o.doppler)}`], ['위성 속도', `${fx(o.v, 2)} km/s · 한 바퀴 ${fx(o.period / 60, 1)}분`],
+                [`보이는 시간 (${num('elmin')}° 위)`, num('h') > 30000 ? '계속 (정지궤도)' : `약 ${fx(o.visible / 60, 1)}분 · 반경 ${fx(o.coverR, 0)} km`]);
+        }
+        $('o-stats').innerHTML = stats.map(([k, v]) => `<div class="lb-stat"><p>${k}</p><p>${v}</p></div>`).join('');
+        const rows = budgetRows(b);
+        $('o-table').innerHTML = rows.map((r) => `<tr class="${r.sum ? 'sum' : ''}"><td class="sign">${r.sign || ''}</td><td>${r.k}</td><td>${r.v}</td></tr>`).join('');
+        store.set('mj.linkbudget', snapshot());
+        drawChart();
+    }
+    function budgetRows(b) {
+        const rows = [
+            { sign: '', k: mode.tx === 'density' ? `송신 EIRP (${num('eirpd')} dBW/MHz × ${b.bwMHz} MHz)` : `송신 EIRP (${num('ptx')} dBm + ${num('gtx')} dBi${num('ltx') ? ` − ${num('ltx')} dB` : ''})`, v: `${fx(b.eirp, 2)} dBW` },
+            { sign: '−', k: `경로 손실 (${fx(b.d, 1)} km, ${num('f')} GHz)`, v: `${fx(b.fspl, 2)} dB` },
+            { sign: '−', k: '대기 흡수', v: `${fx(num('latm'), 2)} dB` },
+            { sign: '−', k: '그림자 여유', v: `${fx(num('lsh'), 2)} dB` },
+            { sign: '−', k: '섬광', v: `${fx(num('lsc'), 2)} dB` },
+            { sign: '−', k: '편파 손실', v: `${fx(num('lpol'), 2)} dB` },
+            { sign: '−', k: '기타 손실', v: `${fx(num('ladd'), 2)} dB` },
+            { sign: '+', k: b.gr !== null ? `수신 G/T (${b.gr} dBi − 10log₁₀ ${fx(b.tsys, 0)} K)` : '수신 G/T', v: `${fx(b.gt, 2)} dB/K` },
+            { sign: '−', k: '볼츠만 상수 k', v: '−228.60 dBW/K/Hz' },
+            { sum: true, k: 'C/N₀', v: `${fx(b.cn0, 2)} dBHz` },
+            { sign: '−', k: `대역폭 10log₁₀(${b.bwMHz} MHz)`, v: `${fx(dB(b.bwMHz * 1e6), 2)} dBHz` },
+            { sum: true, k: 'SNR (CNR)', v: `${fx(b.snr, 2)} dB` },
+        ];
+        return rows;
+    }
+    const fmtHz = (hz) => (Math.abs(hz) >= 1e3 ? `${fx(hz / 1e3, 1)} kHz` : `${fx(hz, 0)} Hz`);
+    const fmtRate = (bps) => (bps >= 1e9 ? `${fx(bps / 1e9, 2)} Gbps` : bps >= 1e6 ? `${fx(bps / 1e6, 1)} Mbps` : `${fx(bps / 1e3, 0)} kbps`);
+
+    // ── 그래프 (앙각 5°~90°) ──
+    function drawChart() {
+        if (mode.geo !== 'sat') return;
+        const cv = $('lb-chart'), dpr = window.devicePixelRatio || 1;
+        const W = cv.clientWidth, H = cv.clientHeight;
+        cv.width = W * dpr; cv.height = H * dpr;
+        const ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+        const dark = document.documentElement.classList.contains('theme-dark');
+        const ink = dark ? '#c7c7cc' : '#6e6e73', grid = dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+        const pts = [];
+        for (let el = 5; el <= 90; el += 0.5) {
+            const b = budget({ el });
+            const o = orbitOf(num('h'), el, num('re') || 6371, b.fHz);
+            const y = { snr: b.snr, fspl: b.fspl, dist: b.d, doppler: o.doppler / 1e3, delay: b.d / (C / 1000) * 1000 }[mode.y];
+            pts.push([el, y]);
+        }
+        const unit = { snr: 'dB', fspl: 'dB', dist: 'km', doppler: 'kHz', delay: 'ms (편도)' }[mode.y];
+        let lo = Math.min(...pts.map((q) => q[1])), hi = Math.max(...pts.map((q) => q[1]));
+        if (hi - lo < 1e-6) { hi += 1; lo -= 1; }
+        const pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+        const L = 56, R = 16, T = 12, B = 30;
+        const X = (el) => L + (el - 5) / 85 * (W - L - R), Y = (v) => T + (hi - v) / (hi - lo) * (H - T - B);
+        ctx.font = '11px -apple-system, sans-serif'; ctx.fillStyle = ink; ctx.strokeStyle = grid; ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const v = lo + (hi - lo) * i / 4, y = Y(v);
+            ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(W - R, y); ctx.stroke();
+            ctx.textAlign = 'right'; ctx.fillText(Math.abs(v) >= 1000 ? v.toFixed(0) : v.toFixed(1), L - 6, y + 4);
+        }
+        ctx.textAlign = 'center';
+        for (const el of [10, 20, 30, 40, 50, 60, 70, 80, 90]) ctx.fillText(`${el}°`, X(el), H - 10);
+        ctx.textAlign = 'left'; ctx.fillText(unit, 4, T + 4);
+        ctx.strokeStyle = '#0066cc'; ctx.lineWidth = 2; ctx.beginPath();
+        pts.forEach(([el, v], i) => (i ? ctx.lineTo(X(el), Y(v)) : ctx.moveTo(X(el), Y(v)))); ctx.stroke();
+        if (mode.y === 'snr') {  // 목표선
+            const t = num('target');
+            if (t > lo && t < hi) { ctx.setLineDash([4, 4]); ctx.strokeStyle = '#f97316'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(L, Y(t)); ctx.lineTo(W - R, Y(t)); ctx.stroke(); ctx.setLineDash([]); }
+        }
+        const cur = Math.min(90, Math.max(5, num('el')));
+        const cv2 = pts.reduce((a, q) => (Math.abs(q[0] - cur) < Math.abs(a[0] - cur) ? q : a));
+        ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(X(cur), Y(cv2[1]), 4.5, 0, Math.PI * 2); ctx.fill();
+    }
+    window.addEventListener('resize', drawChart);
+
+    // ── 복사 ──
+    function tableText(sep) {
+        const rows = budgetRows(last);
+        if (sep === 'md') return '| 항목 | 값 |\n|---|---:|\n' + rows.map((r) => `| ${r.sign ? r.sign + ' ' : ''}${r.sum ? '**' + r.k + '**' : r.k} | ${r.sum ? '**' + r.v + '**' : r.v} |`).join('\n');
+        return '항목,값\n' + rows.map((r) => `"${(r.sign ? r.sign + ' ' : '') + r.k}","${r.v}"`).join('\n');
+    }
+    async function copy(btn, text) { try { await navigator.clipboard.writeText(text); const o = btn.textContent; btn.textContent = '✓ 복사됨'; setTimeout(() => { btn.textContent = o; }, 1200); } catch (e) { prompt('복사하세요', text); } }
+    $('copy-md').addEventListener('click', (e) => copy(e.target, tableText('md')));
+    $('copy-csv').addEventListener('click', (e) => copy(e.target, tableText('csv')));
+
+    // ── 저장·불러오기 ──
+    const IDS = ['h', 'el', 'elmin', 're', 'dkm', 'plm', 'pln', 'pld0', 'f', 'bw', 'target', 'eirpd', 'ptx', 'gtx', 'ltx', 'gt', 'grx', 'nf', 'tant', 'latm', 'lsh', 'lsc', 'lpol', 'ladd'];
+    function snapshot() { const o = { mode: { ...mode } }; IDS.forEach((id) => { o[id] = $(id).value; }); return o; }
+    document.querySelector('main').addEventListener('input', (e) => { if (IDS.includes(e.target.id)) calc(); });
+    const saved = store.get('mj.linkbudget', null);
+    if (saved) { Object.assign(mode, saved.mode || {}); IDS.forEach((id) => { if (saved[id] !== undefined) $(id).value = saved[id]; }); showModes(); setSeg('m-y', mode.y); calc(); }
+    else applyPreset();
+    window.__lb = { budget, orbitOf, slant, applyPreset, p, mode };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

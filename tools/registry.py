@@ -204,6 +204,16 @@ TOOLS = [
 		"access": "member",
 	},
 	{
+		"slug": "linkbudget",
+		"url_name": "tools:linkbudget",
+		"icon": "📡",
+		"title": "링크 버짓 계산기 (위성·NTN)",
+		"description": "궤도·앙각·주파수로 거리·경로 손실·C/N0·SNR·용량·도플러·지연을 계산. 3GPP TR 38.821 Set-1/2 (GEO·LEO-1200·LEO-600, S 대역 휴대폰·Ka VSAT) 프리셋, 앙각별 그래프, 버짓 표 복사.",
+		"tags": ["NTN", "계산기"],
+		"category": "network",
+		"access": "public",
+	},
+	{
 		"slug": "subnet",
 		"url_name": "tools:subnet",
 		"icon": "⌗",
