@@ -59,6 +59,16 @@ def share(request):
 
 	return {
 		"kakao_js_key": settings.KAKAO_JS_KEY,
-		"google_site_verification": settings.GOOGLE_SITE_VERIFICATION,
-		"naver_site_verification": settings.NAVER_SITE_VERIFICATION,
+		"google_site_verification": _verification_value(settings.GOOGLE_SITE_VERIFICATION),
+		"naver_site_verification": _verification_value(settings.NAVER_SITE_VERIFICATION),
 	}
+
+
+def _verification_value(raw):
+	"""content 값만 넣어도, <meta ... content="값" /> 태그를 통째로 넣어도 값만 꺼냄."""
+	import re
+
+	raw = (raw or "").strip()
+	m = re.search(r'content\s*=\s*["\']([^"\']+)["\']', raw)
+	value = m.group(1) if m else raw
+	return value if re.fullmatch(r"[A-Za-z0-9_\-]{8,128}", value) else ""

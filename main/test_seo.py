@@ -64,10 +64,15 @@ class LinkPreviewTests(TestCase):
 		from django.test import override_settings
 
 		self.assertNotIn("naver-site-verification", self.client.get("/").content.decode())
-		with override_settings(NAVER_SITE_VERIFICATION="abc123", GOOGLE_SITE_VERIFICATION="g-xyz"):
+		with override_settings(NAVER_SITE_VERIFICATION="abc12345", GOOGLE_SITE_VERIFICATION="g-xyz-1234"):
 			html = self.client.get("/").content.decode()
-		self.assertIn('<meta name="naver-site-verification" content="abc123">', html)
-		self.assertIn('<meta name="google-site-verification" content="g-xyz">', html)
+		self.assertIn('<meta name="naver-site-verification" content="abc12345">', html)
+		self.assertIn('<meta name="google-site-verification" content="g-xyz-1234">', html)
+		tag = '<meta name="naver-site-verification" content="ad0edbba19bbbb2e42abaca0171acc7ca918fef8" />'
+		with override_settings(NAVER_SITE_VERIFICATION=tag, GOOGLE_SITE_VERIFICATION='"><script>x</script>'):
+			html = self.client.get("/").content.decode()
+		self.assertIn('<meta name="naver-site-verification" content="ad0edbba19bbbb2e42abaca0171acc7ca918fef8">', html)  # 태그째 넣어도 값만
+		self.assertNotIn("google-site-verification", html)  # 이상한 값은 안 넣음
 		feed = self.client.get("/blog/feed/").content.decode()
 		self.assertIn("<title>HackRF 입문</title>", feed)
 		self.assertNotIn("비밀 글", feed)
