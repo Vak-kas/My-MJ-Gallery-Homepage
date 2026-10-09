@@ -1,0 +1,394 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .pp-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px 20px; }
+    .pp-in { width: 100%; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 14px; font-size: 15px; color: #1d1d1f; outline: none; }
+    .pp-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .pp-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .pp-seg button { border-radius: 999px; padding: 5px 12px; font-size: 13px; color: #6e6e73; }
+    .pp-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .pp-chip { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 3px 10px; font-size: 12px; color: #424245; white-space: nowrap; }
+    .pp-chip.is-on { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .pp-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 4px 11px; font-size: 12px; color: #1d1d1f; white-space: nowrap; }
+    .pp-btn:hover { background: #f5f5f7; }
+    .pp-btn:disabled { opacity: 0.45; }
+    .pp-btn.on { background: #fff8e6; border-color: #f5c46b; color: #8a5300; }
+    .pp-badge { border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 600; }
+    .pp-abs { font-size: 13.5px; line-height: 1.6; color: #424245; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; }
+    .pp-abs.open { -webkit-line-clamp: unset; display: block; }
+    .pp-res mark { background: #fff3b0; color: inherit; border-radius: 2px; padding: 0 1px; }
+    .pp-label { font-size: 12px; color: #8e8e93; margin-right: 4px; }
+    .pp-tog { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #424245; }
+    html.theme-dark .pp-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .pp-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .pp-seg { background: #111318; }
+    html.theme-dark .pp-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .pp-chip, html.theme-dark .pp-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .pp-chip.is-on { background: #0a84ff; border-color: #0a84ff; }
+    html.theme-dark .pp-abs, html.theme-dark .pp-tog { color: #c7c7cc; }
+    html.theme-dark .pp-res mark { background: #5c4a00; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">PAPER · SEARCH</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">논문 찾기.</h1>
+        <p class="mt-3 max-w-[800px] text-[15px] leading-relaxed text-[#6e6e73]">키워드로 논문을 찾아요. <b>NTN·RIS·UAV 같은 통신 약어는 풀어 쓴 말까지 같이</b> 찾고, 인용 많은 순·최신순·저널/학회로 거를 수 있어요. 마음에 드는 논문에서 참고문헌·인용한 논문으로 꼬리를 물고, 바로 인용하거나 내 논문함에 담아 두세요.</p>
+    </div>
+
+    <div class="mt-6 flex gap-1.5">
+        <button type="button" class="pp-chip is-on !px-4 !py-1.5 !text-[13px]" data-tab="search">🔎 찾기</button>
+        <button type="button" class="pp-chip !px-4 !py-1.5 !text-[13px]" data-tab="shelf">📌 내 논문함 <span id="pp-shelf-n"></span></button>
+    </div>
+
+    <!-- 찾기 -->
+    <section id="tab-search" class="mt-4">
+        <div class="pp-card">
+            <form id="pp-form" class="flex gap-2">
+                <input id="pp-q" class="pp-in" placeholder="예) NTN jamming · RIS ISAC · physical layer security UAV · 위성 재밍" autocomplete="off">
+                <button class="shrink-0 whitespace-nowrap rounded-full bg-[#0066cc] px-6 text-[15px] font-semibold text-white">찾기</button>
+            </form>
+            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <span><span class="pp-label">어디서</span><span class="pp-seg" id="pp-source"><button type="button" class="is-on" data-v="openalex">전체 논문 DB</button><button type="button" data-v="arxiv">arXiv 최신</button></span></span>
+                <span><span class="pp-label">기간</span><span class="pp-seg" id="pp-period"><button type="button" class="is-on" data-v="">전체</button><button type="button" data-v="1">1년</button><button type="button" data-v="3">3년</button><button type="button" data-v="5">5년</button><button type="button" data-v="custom">직접</button></span></span>
+                <span id="pp-years" class="hidden items-center gap-1 text-[13px]"><input id="pp-from" type="number" min="1950" max="2100" class="pp-in !w-[84px] !px-2 !py-1 !text-[13px]" placeholder="부터"> ~ <input id="pp-to" type="number" min="1950" max="2100" class="pp-in !w-[84px] !px-2 !py-1 !text-[13px]" placeholder="까지"></span>
+                <span id="pp-sort-box"><span class="pp-label">정렬</span><span class="pp-seg" id="pp-sort"><button type="button" class="is-on" data-v="relevance">관련도</button><button type="button" data-v="cited">인용 많은</button><button type="button" data-v="recent">최신</button></span></span>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+                <label class="pp-tog" title="컴퓨터 네트워크·통신 / 전기전자 / 항공우주 분야 논문만 (GPS·의학 등 다른 분야 빼기)"><input type="checkbox" id="pp-field" checked> 통신·전자 분야만</label>
+                <label class="pp-tog" title="NTN → non-terrestrial, satellite communication … 처럼 같은 뜻의 말도 같이 찾기"><input type="checkbox" id="pp-expand" checked> 약어·동의어 넓히기</label>
+                <label class="pp-tog"><input type="checkbox" id="pp-oa"> 원문 공개된 것만</label>
+                <label class="pp-tog" title="제목·초록이 아니라 본문 어딘가에 나오는 것도 찾기 (결과가 훨씬 많고 덜 정확해요)"><input type="checkbox" id="pp-body"> 본문까지 찾기</label>
+            </div>
+            <div class="mt-3 flex flex-wrap items-center gap-1.5" id="pp-venues">
+                <span class="pp-label">저널·학회</span>
+            </div>
+            <p class="mt-3 hidden text-[12px] leading-5 text-[#6e6e73]" id="pp-explain"></p>
+        </div>
+
+        <div class="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-[#6e6e73]" id="pp-head"></div>
+        <div class="pp-res mt-3 space-y-3" id="pp-results">
+            <div class="pp-card text-[14px] leading-7 text-[#6e6e73]">
+                <p>💡 <b>이렇게 써 보세요</b></p>
+                <p>· 영어 키워드가 잘 나와요. 한국어 몇 개(위성·재밍·드론·빔포밍·강화학습 …)는 영어로 바꿔서 찾아요.</p>
+                <p>· 띄어 쓴 말은 모두 들어간 논문만 찾아요. 직접 <code>(LEO OR GEO) AND jamming NOT GNSS</code> 처럼 써도 돼요.</p>
+                <p>· <b>인용 많은 순</b>은 관련도 상위 100편 안에서 다시 줄 세워요. 그 분야 핵심 논문부터 볼 때 좋아요.</p>
+                <p>· 좋은 논문을 찾으면 <b>참고문헌 →</b> / <b>인용한 논문 →</b> 으로 꼬리를 물어 보세요.</p>
+            </div>
+        </div>
+        <div class="mt-4 text-center"><button type="button" class="pp-btn hidden !px-6 !py-2 !text-[14px]" id="pp-more">더 보기</button></div>
+    </section>
+
+    <!-- 내 논문함 -->
+    <section id="tab-shelf" class="mt-4 hidden">
+        {% if user.is_authenticated %}
+        <div class="flex flex-wrap items-center gap-2">
+            <span class="pp-seg" id="sh-filter"><button type="button" class="is-on" data-v="">전체</button><button type="button" data-v="star">⭐ 중요</button><button type="button" data-v="todo">읽을 것</button><button type="button" data-v="reading">읽는 중</button><button type="button" data-v="done">다 읽음</button></span>
+            <input id="sh-q" class="pp-in !w-[220px] !py-1.5 !text-[13px]" placeholder="논문함에서 찾기">
+            <span class="ml-auto flex gap-1.5">
+                <button type="button" class="pp-btn" id="sh-bib">.bib 저장</button>
+                <button type="button" class="pp-btn" id="sh-cite">📚 모두 내 참고문헌으로</button>
+            </span>
+        </div>
+        <div class="pp-res mt-3 space-y-3" id="sh-list"></div>
+        {% else %}
+        <div class="pp-card text-center text-[14px] text-[#6e6e73]">내 논문함은 회원 전용이에요. <a class="font-semibold text-[#0066cc]" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">로그인</a>하면 담아 둔 논문을 어느 기기에서나 볼 수 있어요.</div>
+        {% endif %}
+    </section>
+</main>
+
+<script>window.PAPERS = { search: '{% url "tools:papers_search" %}', shelf: '{% url "tools:papers_shelf" %}', save: '{% url "tools:papers_shelf_save" %}', update: '{% url "tools:papers_shelf" %}', cite: '{% url "tools:cite" %}', login: {{ user.is_authenticated|yesno:"true,false" }}, loginUrl: '{% url "accounts:login" %}?next={{ request.path|urlencode }}' };</script>
+<script src="{% static 'js/mj-cite.js' %}?v=1"></script>
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const P = window.PAPERS;
+    const { F, bibtex, plain, sameItem, esc } = window.MjCite;
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const fmtN = (n) => (n ?? 0).toLocaleString('ko-KR');
+    const VENUE_ORDER = ['twc', 'jsac', 'tcom', 'tvt', 'wcl', 'coml', 'iotj', 'tifs', 'taes', 'comst', 'tmc', 'wcm', 'net', 'ojcoms', 'access', 'globecom', 'icc', 'wcnc', 'vtc', 'infocom', 'arxiv'];
+    const VENUE_LABEL = { twc: 'TWC', jsac: 'JSAC', tcom: 'TCOM', tvt: 'TVT', wcl: 'WCL', coml: 'Comm. Letters', iotj: 'IoT-J', tifs: 'TIFS', taes: 'TAES', comst: 'COMST', tmc: 'TMC', wcm: 'Wireless Comm. Mag.', net: 'Network Mag.', ojcoms: 'OJ-COMS', access: 'Access', globecom: 'GLOBECOM', icc: 'ICC', wcnc: 'WCNC', vtc: 'VTC', infocom: 'INFOCOM', arxiv: 'arXiv' };
+
+    // ── 상태 ──
+    const saved = store.get('mj.papers.opts', {});
+    const st = { source: 'openalex', period: '', sort: 'relevance', venues: [], ...saved, rel: null, page: 1 };
+    let items = [], shown = 20, last = null, terms = [];
+    let shelf = [];
+
+    // ── 필터 화면 ──
+    $('pp-venues').insertAdjacentHTML('beforeend', VENUE_ORDER.map((k) => `<button type="button" class="pp-chip" data-venue="${k}">${VENUE_LABEL[k]}</button>`).join('') + '<button type="button" class="pp-chip !border-dashed" id="pp-venue-clear">모두 끄기</button>');
+    function syncControls() {
+        const seg = (id, v) => document.querySelectorAll(`#${id} [data-v]`).forEach((b) => b.classList.toggle('is-on', b.dataset.v === v));
+        seg('pp-source', st.source); seg('pp-period', st.period); seg('pp-sort', st.sort);
+        document.querySelectorAll('[data-venue]').forEach((b) => b.classList.toggle('is-on', st.venues.includes(b.dataset.venue)));
+        $('pp-years').classList.toggle('hidden', st.period !== 'custom'); $('pp-years').classList.toggle('flex', st.period === 'custom');
+        $('pp-sort-box').style.opacity = st.source === 'arxiv' ? 0.4 : 1;
+        $('pp-venues').style.opacity = st.source === 'arxiv' ? 0.4 : 1;
+        ['pp-oa', 'pp-body'].forEach((id) => { $(id).disabled = st.source === 'arxiv'; });
+        if (st.field !== undefined) $('pp-field').checked = st.field;
+        if (st.expand !== undefined) $('pp-expand').checked = st.expand;
+    }
+    function remember() { store.set('mj.papers.opts', { source: st.source, period: st.period, sort: st.sort, venues: st.venues, field: $('pp-field').checked, expand: $('pp-expand').checked }); }
+    const bindSeg = (id, key, rerun = true) => $(id).addEventListener('click', (e) => {
+        const b = e.target.closest('[data-v]'); if (!b) return;
+        st[key] = b.dataset.v; syncControls(); remember();
+        if (key === 'sort' && items.length && st.source === 'openalex' && !st.rel) { run(false, true); return; }
+        if (rerun && $('pp-q').value.trim() && !(key === 'period' && st.period === 'custom')) run();
+    });
+    bindSeg('pp-source', 'source'); bindSeg('pp-period', 'period'); bindSeg('pp-sort', 'sort');
+    $('pp-venues').addEventListener('click', (e) => {
+        if (e.target.id === 'pp-venue-clear') st.venues = [];
+        else { const b = e.target.closest('[data-venue]'); if (!b) return; const v = b.dataset.venue; st.venues = st.venues.includes(v) ? st.venues.filter((x) => x !== v) : [...st.venues, v]; }
+        syncControls(); remember(); if ($('pp-q').value.trim()) run();
+    });
+    ['pp-field', 'pp-expand', 'pp-oa', 'pp-body'].forEach((id) => $(id).addEventListener('change', () => { remember(); if ($('pp-q').value.trim()) run(); }));
+    ['pp-from', 'pp-to'].forEach((id) => $(id).addEventListener('change', () => { if ($('pp-q').value.trim()) run(); }));
+
+    function params(page) {
+        const y = new Date().getFullYear();
+        let from = '', to = '';
+        if (st.period === 'custom') { from = $('pp-from').value; to = $('pp-to').value; }
+        else if (st.period) from = String(y - Number(st.period) + 1);
+        const p = new URLSearchParams({ q: $('pp-q').value.trim(), source: st.source, sort: st.sort, page, field: $('pp-field').checked ? 1 : 0, expand: $('pp-expand').checked ? 1 : 0, oa: $('pp-oa').checked ? 1 : 0, body: $('pp-body').checked ? 1 : 0 });
+        if (from) p.set('from', from); if (to) p.set('to', to);
+        if (st.venues.length && st.source === 'openalex') p.set('venues', st.venues.join(','));
+        return p;
+    }
+
+    // ── 검색 ──
+    async function fetchJSON(url, opts) {
+        const res = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin', ...opts });
+        const data = await res.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!res.ok) throw new Error(data.error || '실패했어요.');
+        return data;
+    }
+    async function run(append = false, resortOnly = false) {
+        if (resortOnly) {  // 인용순·최신순은 서버가 캐시한 100편을 다시 정렬만
+            st.page = 1;
+        }
+        const q = $('pp-q').value.trim();
+        if (!q) return;
+        st.rel = null;
+        if (!append) { st.page = 1; shown = 20; $('pp-results').innerHTML = '<div class="pp-card text-[14px] text-[#8e8e93]">⏳ 찾는 중…</div>'; $('pp-more').classList.add('hidden'); }
+        const p = params(st.page);
+        history.replaceState(null, '', '?' + new URLSearchParams({ q }).toString());
+        try {
+            const data = await fetchJSON(`${P.search}?${p}`);
+            last = data;
+            items = append ? items.concat(data.items) : data.items;
+            terms = data.groups.flatMap(([t, syn]) => [t, ...syn]).filter((t) => t.length > 1);
+            if (!terms.length) terms = (data.query.match(/"[^"]+"|[^\s()]+/g) || []).map((t) => t.replace(/"/g, '')).filter((t) => !/^(AND|OR|NOT|ANDNOT)$/.test(t) && !t.includes(':'));
+            renderExplain(data);
+            renderResults();
+        } catch (err) {
+            $('pp-results').innerHTML = `<div class="pp-card text-[14px] text-[#c4271d]">${esc(err.message)}</div>`;
+            $('pp-head').innerHTML = '';
+        }
+    }
+    async function openRel(p, kind) {
+        st.rel = { p, kind };
+        shown = 20;
+        $('pp-results').innerHTML = '<div class="pp-card text-[14px] text-[#8e8e93]">⏳ 불러오는 중…</div>';
+        window.scrollTo({ top: $('pp-head').offsetTop - 80, behavior: 'smooth' });
+        try {
+            const data = await fetchJSON(`${P.search}?rel=${kind}:${encodeURIComponent(p.id)}`);
+            items = data.items; last = data;
+            renderResults();
+        } catch (err) { $('pp-results').innerHTML = `<div class="pp-card text-[14px] text-[#c4271d]">${esc(err.message)}</div>`; }
+    }
+    function renderExplain(data) {
+        const box = $('pp-explain');
+        const wide = data.groups.filter(([, syn]) => syn.length);
+        const hangul = /[가-힣]/.test($('pp-q').value) && data.groups.some(([t, syn]) => /[가-힣]/.test(t) && !syn.length);
+        if (!wide.length && !hangul) { box.classList.add('hidden'); return; }
+        box.classList.remove('hidden');
+        box.innerHTML = (wide.length ? '🔁 같이 찾은 말: ' + wide.map(([t, syn]) => `<b>${esc(t)}</b> → ${syn.map(esc).join(' · ')}`).join(' &nbsp;|&nbsp; ') : '')
+            + (hangul ? `<br><span class="text-[#b26a00]">⚠️ 영어로 못 바꾼 한국어가 있어요. 논문 DB 는 영어라서 영어 키워드가 잘 나와요.</span>` : '');
+    }
+
+    // ── 결과 ──
+    const hl = (text) => {
+        let out = esc(text);
+        const ts = [...new Set(terms)].sort((a, b) => b.length - a.length).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        if (!ts.length) return out;
+        return out.replace(new RegExp(`\\b(${ts.join('|')})`, 'gi'), '<mark>$1</mark>');
+    };
+    function toCite(p) {
+        const type = p.venue_type === 'conference' ? 'inproceedings' : (p.venue === 'arXiv' || p.type === 'preprint') && !p.doi ? 'preprint' : 'article';
+        const authors = (p.authors || []).map((n) => {
+            if (/[가-힣]/.test(n)) return { family: n.replace(/\s+/g, ''), given: '', literal: true };
+            const parts = n.split(/\s+/);
+            return parts.length === 1 ? { family: n, given: '', literal: true } : { family: parts.pop(), given: parts.join(' ') };
+        });
+        return { type, title: p.title, authors, editors: [], year: p.year, month: p.date ? Number(p.date.slice(5, 7)) || null : null, container: type === 'preprint' ? 'arXiv' : p.venue,
+            volume: p.volume || '', issue: p.issue || '', pages: p.pages || '', article_number: '', publisher: p.publisher || '', doi: p.doi || '', arxiv: p.arxiv || '', url: p.url || '', isbn: '', source: p.doi ? 'crossref' : p.arxiv ? 'arxiv' : 'crossref', primary_class: p.category || '' };
+    }
+    const shelfKey = (p) => (p.doi || '').toLowerCase() || (p.arxiv ? `arxiv:${p.arxiv}` : '') || p.id || (p.title || '').toLowerCase().slice(0, 200);
+    const inShelf = (p) => shelf.find((s) => s.key === shelfKey(p));
+    function badges(p) {
+        const b = [];
+        if (p.venue === 'arXiv' || p.venue_type === 'repository') b.push(['arXiv', '#fdecec', '#b31b1b']);
+        else if (p.venue_type === 'conference') b.push(['학회', '#f3e8ff', '#7e22ce']);
+        else if (p.venue) b.push(['저널', '#e8f1fb', '#0066cc']);
+        if (p.arxiv && p.venue !== 'arXiv') b.push(['arXiv 원문', '#fdecec', '#b31b1b']);
+        if (p.is_oa && !p.arxiv) b.push(['🔓 공개', '#ecfdf5', '#0f9f6e']);
+        if (p.type === 'review') b.push(['리뷰·서베이', '#fff8e6', '#8a5300']);
+        return b.map(([t, bg, fg]) => `<span class="pp-badge" style="background:${bg};color:${fg}">${t}</span>`).join(' ');
+    }
+    function card(p, idx, where) {
+        const au = (p.authors || []).slice(0, 4).join(', ') + (p.author_count > 4 ? ` 외 ${p.author_count - 4}명` : '');
+        const s = inShelf(p);
+        const citeList = store.get('mj.cite.list', []);
+        const cited = citeList.some((x) => sameItem(x, toCite(p)));
+        return `<article class="pp-card" data-i="${idx}" data-where="${where}">
+            <div class="flex flex-wrap items-center gap-1.5">${badges(p)}<span class="ml-auto text-[12px] text-[#8e8e93]">${p.cited_by !== null && p.cited_by !== undefined ? `인용 <b class="text-[#1d1d1f]">${fmtN(p.cited_by)}</b>` : ''}</span></div>
+            <h3 class="mt-1.5 text-[16px] font-semibold leading-snug"><a href="${esc(p.url)}" target="_blank" rel="noopener" class="hover:underline">${hl(p.title)}</a></h3>
+            <p class="mt-1 text-[12.5px] text-[#6e6e73]">${esc(au)}${p.venue ? ` · <span class="text-[#1d1d1f]">${esc(p.venue)}</span>` : ''}${p.year ? ` · ${p.year}` : ''}</p>
+            ${p.abstract ? `<p class="pp-abs mt-2" title="눌러서 펼치기">${hl(p.abstract)}</p>` : '<p class="mt-2 text-[12px] text-[#8e8e93]">초록이 없어요.</p>'}
+            <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                <button type="button" class="pp-btn ${s ? 'on' : ''}" data-act="shelf">${s ? '📌 담김' : '📌 담기'}</button>
+                <button type="button" class="pp-btn" data-act="bib">BibTeX 복사</button>
+                <button type="button" class="pp-btn" data-act="ieee">IEEE 복사</button>
+                <button type="button" class="pp-btn" data-act="cite" ${cited ? 'disabled' : ''}>${cited ? '✓ 참고문헌에 있음' : '＋ 내 참고문헌'}</button>
+                ${p.pdf ? `<a class="pp-btn" href="${esc(p.pdf)}" target="_blank" rel="noopener">📄 PDF</a>` : ''}
+                ${p.id ? `<span class="ml-auto flex gap-1.5">
+                    <button type="button" class="pp-btn" data-act="refs" ${p.refs ? '' : 'disabled'}>참고문헌 ${fmtN(p.refs)} →</button>
+                    <button type="button" class="pp-btn" data-act="citedby" ${p.cited_by ? '' : 'disabled'}>인용한 논문 ${fmtN(p.cited_by)} →</button></span>` : ''}
+            </div></article>`;
+    }
+    function renderResults() {
+        const list = items.slice(0, shown);
+        let head = '';
+        if (st.rel) {
+            head = `<button type="button" class="pp-btn" id="pp-back">← 검색 결과로</button> <span>“${esc(st.rel.p.title.slice(0, 80))}${st.rel.p.title.length > 80 ? '…' : ''}” ${st.rel.kind === 'refs' ? '이(가) 인용한 논문' : '을(를) 인용한 논문'} <b class="text-[#1d1d1f]">${fmtN(last.total)}</b>편${last.total > items.length ? ` (인용 많은 ${items.length}편)` : ''} · 인용 많은 순</span>`;
+        } else if (last) {
+            const sortName = { relevance: '관련도순', cited: '인용 많은 순', recent: '최신순' }[st.sort];
+            head = st.source === 'arxiv' ? `arXiv 에서 <b class="text-[#1d1d1f]">${fmtN(last.total)}</b>편 · 최근 올라온 순` : `약 <b class="text-[#1d1d1f]">${fmtN(last.total)}</b>편 · ${st.sort === 'relevance' ? sortName : `관련도 상위 ${items.length}편을 ${sortName}`}`;
+        }
+        $('pp-head').innerHTML = head;
+        $('pp-results').innerHTML = list.map((p, i) => card(p, i, 'res')).join('') || '<div class="pp-card text-[14px] text-[#8e8e93]">찾은 논문이 없어요. 키워드를 줄이거나, 기간·분야 필터를 풀어 보세요.</div>';
+        const more = shown < items.length || (!st.rel && last && last.has_more);
+        $('pp-more').classList.toggle('hidden', !more);
+        $('pp-back')?.addEventListener('click', () => { st.rel = null; run(); });
+    }
+    $('pp-more').addEventListener('click', () => {
+        if (shown < items.length) { shown += 20; renderResults(); return; }
+        st.page += 1; shown += 20; run(true);
+    });
+    $('pp-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+
+    // ── 카드 버튼 ──
+    async function copyText(text, btn, html) {
+        try {
+            if (html && window.ClipboardItem) await navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) })]);
+            else await navigator.clipboard.writeText(text);
+            const old = btn.textContent; btn.textContent = '✓ 복사됨'; setTimeout(() => { btn.textContent = old; }, 1200);
+        } catch (e) { prompt('복사하세요', text); }
+    }
+    async function toggleShelf(p, btn) {
+        if (!P.login) { if (confirm('내 논문함은 회원 전용이에요. 로그인할까요?')) location.href = P.loginUrl; return; }
+        const s = inShelf(p);
+        btn.disabled = true;
+        try {
+            if (s) { await fetchJSON(`${P.update}${s.id}/`, { method: 'POST', headers: { 'X-CSRFToken': csrf(), 'Content-Type': 'application/json' }, body: JSON.stringify({ delete: true }) }); shelf = shelf.filter((x) => x !== s); }
+            else { const data = await fetchJSON(P.save, { method: 'POST', headers: { 'X-CSRFToken': csrf(), 'Content-Type': 'application/json' }, body: JSON.stringify({ data: p }) }); shelf.unshift(data.item); }
+        } catch (err) { alert(err.message); }
+        btn.disabled = false;
+        renderShelfCount(); rerender();
+    }
+    function rerender() { if (!$('tab-search').classList.contains('hidden')) renderResults(); else renderShelf(); }
+    document.addEventListener('click', (e) => {
+        const abs = e.target.closest('.pp-abs'); if (abs) { abs.classList.toggle('open'); return; }
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        const art = b.closest('[data-i]');
+        const p = art.dataset.where === 'shelf' ? shelfView[+art.dataset.i].data : items[+art.dataset.i];
+        const act = b.dataset.act;
+        if (act === 'bib') copyText(bibtex(toCite(p)), b);
+        else if (act === 'ieee') { const h = F.ieee(toCite(p)); copyText(plain(h), b, h); }
+        else if (act === 'cite') { const list = store.get('mj.cite.list', []); const it = toCite(p); if (!list.some((x) => sameItem(x, it))) { list.push(it); store.set('mj.cite.list', list); } b.textContent = '✓ 참고문헌에 있음'; b.disabled = true; }
+        else if (act === 'shelf') toggleShelf(p, b);
+        else if (act === 'refs' || act === 'citedby') { showTab('search'); openRel(p, act); }
+        else if (act === 'status' || act === 'star' || act === 'remove') shelfAction(art, act, b);
+    });
+
+    // ── 내 논문함 ──
+    let shelfFilter = '', shelfView = [];
+    async function loadShelf() {
+        if (!P.login) return;
+        try { shelf = (await fetchJSON(P.shelf)).items; } catch (e) { shelf = []; }
+        renderShelfCount();
+        if (!$('tab-shelf').classList.contains('hidden')) renderShelf();
+        if (items.length) renderResults();
+    }
+    function renderShelfCount() { $('pp-shelf-n').textContent = shelf.length ? shelf.length : ''; }
+    function renderShelf() {
+        if (!P.login) return;
+        const q = ($('sh-q').value || '').toLowerCase();
+        shelfView = shelf.filter((s) => (!shelfFilter || (shelfFilter === 'star' ? s.starred : s.status === shelfFilter))
+            && (!q || [s.data.title, s.data.venue, (s.data.authors || []).join(' '), s.note].join(' ').toLowerCase().includes(q)));
+        terms = q ? [q] : [];
+        const STATUS = [['todo', '읽을 것'], ['reading', '읽는 중'], ['done', '다 읽음']];
+        $('sh-list').innerHTML = shelfView.map((s, i) => {
+            const base = card(s.data, i, 'shelf');
+            const extra = `<div class="mt-3 flex flex-wrap items-center gap-2 border-t border-black/[0.05] pt-3">
+                <button type="button" class="pp-btn ${s.starred ? 'on' : ''}" data-act="star">${s.starred ? '⭐ 중요' : '☆ 중요'}</button>
+                <span class="pp-seg">${STATUS.map(([v, t]) => `<button type="button" class="${s.status === v ? 'is-on' : ''}" data-act="status" data-v="${v}">${t}</button>`).join('')}</span>
+                <input class="pp-in !py-1 !text-[13px] min-w-[200px] flex-1" data-note placeholder="메모 (예: 시스템 모델 참고, 재밍 모델 비교용)" value="${esc(s.note)}">
+                <span class="text-[11px] text-[#8e8e93]">${s.created.slice(0, 10)} 담음</span></div>`;
+            return base.replace('</article>', extra + '</article>').replace('data-act="shelf">📌 담김', 'data-act="shelf">빼기');
+        }).join('') || `<div class="pp-card text-center text-[14px] text-[#8e8e93]">${shelf.length ? '조건에 맞는 논문이 없어요.' : '아직 담은 논문이 없어요. 찾기에서 📌 담기를 눌러 보세요.'}</div>`;
+    }
+    async function shelfAction(art, act, b) {
+        const s = shelfView[+art.dataset.i];
+        const body = act === 'star' ? { starred: !s.starred } : act === 'status' ? { status: b.dataset.v } : {};
+        try { const data = await fetchJSON(`${P.update}${s.id}/`, { method: 'POST', headers: { 'X-CSRFToken': csrf(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); Object.assign(s, data.item); }
+        catch (err) { alert(err.message); }
+        renderShelf();
+    }
+    if (P.login) {
+        $('sh-filter').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; shelfFilter = b.dataset.v; document.querySelectorAll('#sh-filter [data-v]').forEach((x) => x.classList.toggle('is-on', x === b)); renderShelf(); });
+        $('sh-q').addEventListener('input', renderShelf);
+        $('sh-list').addEventListener('change', async (e) => {
+            const inp = e.target.closest('[data-note]'); if (!inp) return;
+            const s = shelfView[+inp.closest('[data-i]').dataset.i];
+            try { const data = await fetchJSON(`${P.update}${s.id}/`, { method: 'POST', headers: { 'X-CSRFToken': csrf(), 'Content-Type': 'application/json' }, body: JSON.stringify({ note: inp.value }) }); Object.assign(s, data.item); inp.style.borderColor = '#34c759'; setTimeout(() => { inp.style.borderColor = ''; }, 800); }
+            catch (err) { alert(err.message); }
+        });
+        $('sh-bib').addEventListener('click', () => {
+            const list = (shelfView.length ? shelfView : shelf).map((s) => bibtex(toCite(s.data)));
+            if (!list.length) return;
+            const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([list.join('\n\n') + '\n'], { type: 'application/x-bibtex' })); a.download = 'papers.bib'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+        });
+        $('sh-cite').addEventListener('click', (e) => {
+            const list = store.get('mj.cite.list', []); let n = 0;
+            for (const s of (shelfView.length ? shelfView : shelf)) { const it = toCite(s.data); if (!list.some((x) => sameItem(x, it))) { list.push(it); n++; } }
+            store.set('mj.cite.list', list);
+            e.target.innerHTML = `✓ ${n}편 추가 — <u>인용 도구 열기</u>`; e.target.onclick = () => { location.href = P.cite; };
+        });
+    }
+
+    // ── 탭 ──
+    function showTab(t) {
+        document.querySelectorAll('[data-tab]').forEach((b) => b.classList.toggle('is-on', b.dataset.tab === t));
+        $('tab-search').classList.toggle('hidden', t !== 'search');
+        $('tab-shelf').classList.toggle('hidden', t !== 'shelf');
+        if (t === 'shelf') renderShelf(); else { terms = last ? last.groups.flatMap(([a, syn]) => [a, ...syn]) : []; if (items.length) renderResults(); }
+    }
+    document.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+    syncControls();
+    loadShelf();
+    const q0 = new URLSearchParams(location.search).get('q');
+    if (q0) { $('pp-q').value = q0; run(); }
+    window.__papers = { st, items: () => items, shelf: () => shelf, toCite, run };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

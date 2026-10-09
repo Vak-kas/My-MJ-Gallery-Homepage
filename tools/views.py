@@ -78,6 +78,11 @@ def gpa(request):
 	return render(request, "tools/gpa.html")
 
 
+@ensure_csrf_cookie  # 내 논문함 담기(POST)
+def papers_page(request):
+	return render(request, "tools/papers.html")
+
+
 def cite_page(request):
 	return render(request, "tools/cite.html")
 

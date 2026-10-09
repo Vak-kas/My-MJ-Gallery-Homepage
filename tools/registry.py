@@ -74,6 +74,16 @@ TOOLS = [
 		"access": "public",  # 무료 읽기는 누구나, AI 읽기는 회원
 	},
 	{
+		"slug": "papers",
+		"url_name": "tools:papers",
+		"icon": "📑",
+		"title": "논문 찾기",
+		"description": "키워드(NTN jamming 처럼)로 논문 검색 — 통신 약어는 알아서 넓혀 찾고, 인용순·최신순·저널/학회·기간으로 거르기. 참고문헌·인용한 논문 꼬리 물기, 바로 인용, 내 논문함(회원).",
+		"tags": ["논문", "검색"],
+		"category": "docs",
+		"access": "public",
+	},
+	{
 		"slug": "cite",
 		"url_name": "tools:cite",
 		"icon": "📚",
