@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO ANALYTICS</p>
+                <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">방문자 통계</h1>
+                <p class="mt-3 text-[15px] text-[#6e6e73]">외부 추적 없이 이 서버에서만 집계해요. IP 는 저장하지 않고, 봇·링크 미리보기·관리자 본인 방문은 빼고 셉니다. 기록은 90일 보관.</p>
+            </div>
+            <div class="flex gap-1.5 text-[13px]">
+                {% for value, label in ranges %}
+                <a href="?days={{ value }}" class="rounded-full px-4 py-1.5 {% if days == value %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">오늘 방문자</p>
+                <p class="mt-2 text-[34px] font-semibold tracking-[-0.02em]">{{ s.today_visitors }}</p>
+                <p class="text-[12px] text-[#8e8e93]">페이지뷰 {{ s.today_views }}</p>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">{% if days == 1 %}오늘{% else %}{{ days }}일{% endif %} 방문자</p>
+                <p class="mt-2 text-[34px] font-semibold tracking-[-0.02em]">{{ s.visitors_total }}</p>
+                <p class="text-[12px] text-[#8e8e93]">날짜별 순방문자 합</p>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">페이지뷰</p>
+                <p class="mt-2 text-[34px] font-semibold tracking-[-0.02em]">{{ s.views_total }}</p>
+                <p class="text-[12px] text-[#8e8e93]">단축 링크 클릭 {{ s.short_clicks }}</p>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">회원이 본 비율</p>
+                <p class="mt-2 text-[34px] font-semibold tracking-[-0.02em]">{{ s.member_pct }}%</p>
+                <p class="text-[12px] text-[#8e8e93]">나머지는 비로그인 방문</p>
+            </div>
+        </section>
+
+        {% if days > 1 %}
+        <section class="mt-6 rounded-[20px] border border-black/[0.06] bg-white p-5">
+            <div class="flex items-center justify-between">
+                <h2 class="text-[15px] font-semibold">날짜별</h2>
+                <span class="flex items-center gap-3 text-[12px] text-[#8e8e93]"><span class="inline-flex items-center gap-1"><i class="inline-block h-2.5 w-2.5 rounded-sm bg-[#0066cc]/30"></i>페이지뷰</span><span class="inline-flex items-center gap-1"><i class="inline-block h-2.5 w-2.5 rounded-sm bg-[#0066cc]"></i>방문자</span></span>
+            </div>
+            <div class="mt-4 flex h-[180px] items-end gap-[3px]">
+                {% for d in s.series %}
+                <div class="group relative flex h-full flex-1 items-end" title="{{ d.day|date:'m.d' }} — 방문자 {{ d.visitors }} · 페이지뷰 {{ d.views }}">
+                    <div class="absolute bottom-0 w-full rounded-t-[3px] bg-[#0066cc]/25" style="height: {{ d.pct }}%"></div>
+                    <div class="relative w-full rounded-t-[3px] bg-[#0066cc]" style="height: {{ d.vpct }}%"></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-2 flex justify-between text-[11px] text-[#8e8e93]"><span>{{ s.start|date:"m.d" }}</span><span>{{ s.today|date:"m.d" }}</span></div>
+        </section>
+        {% endif %}
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-2">
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">인기 글</h2>
+                <ol class="mt-3 space-y-2 text-[13px]">
+                    {% for p in s.posts %}
+                    <li class="flex items-center gap-3"><span class="w-5 text-right text-[#8e8e93]">{{ forloop.counter }}</span><a href="{{ p.path }}" target="_blank" class="min-w-0 flex-1 truncate hover:underline">{{ p.title }}</a><span class="tabular-nums text-[#6e6e73]">{{ p.n }}</span></li>
+                    {% empty %}
+                    <li class="text-[#8e8e93]">아직 기록이 없어요.</li>
+                    {% endfor %}
+                </ol>
+            </section>
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">인기 Tool</h2>
+                <ol class="mt-3 space-y-2 text-[13px]">
+                    {% for p in s.tools %}
+                    <li class="flex items-center gap-3"><span class="w-5 text-right text-[#8e8e93]">{{ forloop.counter }}</span><a href="{{ p.path }}" target="_blank" class="min-w-0 flex-1 truncate hover:underline">{{ p.title }}</a><span class="tabular-nums text-[#6e6e73]">{{ p.n }}</span></li>
+                    {% empty %}
+                    <li class="text-[#8e8e93]">아직 기록이 없어요.</li>
+                    {% endfor %}
+                </ol>
+            </section>
+
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">유입 경로 <span class="text-[12px] font-normal text-[#8e8e93]">방문자 기준</span></h2>
+                <div class="mt-3 space-y-2.5 text-[13px]">
+                    {% for src in s.sources %}
+                    <div>
+                        <div class="flex justify-between"><span>{{ src.label }}</span><span class="tabular-nums text-[#6e6e73]">{{ src.n }} · {{ src.pct }}%</span></div>
+                        <div class="mt-1 h-2 rounded-full bg-[#f5f5f7]"><div class="h-2 rounded-full {% if src.key == 'kakao' %}bg-[#f5c400]{% elif src.key == 'search' %}bg-[#34c759]{% elif src.key == 'github' %}bg-[#6e5494]{% else %}bg-[#0066cc]{% endif %}" style="width: {{ src.pct }}%"></div></div>
+                    </div>
+                    {% empty %}
+                    <p class="text-[#8e8e93]">아직 기록이 없어요.</p>
+                    {% endfor %}
+                </div>
+                {% if s.referrers %}
+                <h3 class="mt-5 text-[13px] font-semibold text-[#6e6e73]">들어온 사이트</h3>
+                <ul class="mt-2 space-y-1 text-[13px]">
+                    {% for r in s.referrers %}<li class="flex justify-between"><span class="truncate font-mono text-[12px]">{{ r.referrer_host }}</span><span class="tabular-nums text-[#6e6e73]">{{ r.n }}</span></li>{% endfor %}
+                </ul>
+                {% endif %}
+            </section>
+
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">기기</h2>
+                <div class="mt-3 flex h-3 overflow-hidden rounded-full bg-[#f5f5f7]">
+                    {% for d in s.devices %}<div class="{% cycle 'bg-[#0066cc]' 'bg-[#34c759]' 'bg-[#f97316]' %}" style="width: {{ d.pct }}%" title="{{ d.label }} {{ d.pct }}%"></div>{% endfor %}
+                </div>
+                <div class="mt-2 flex flex-wrap gap-4 text-[13px]">
+                    {% for d in s.devices %}<span>{{ d.label }} <b>{{ d.pct }}%</b> <span class="text-[#8e8e93]">({{ d.n }})</span></span>{% empty %}<span class="text-[#8e8e93]">아직 기록이 없어요.</span>{% endfor %}
+                </div>
+                <h2 class="mt-6 text-[15px] font-semibold">시간대</h2>
+                <div class="mt-3 flex h-[90px] items-end gap-[3px]">
+                    {% for h in s.hourly %}<div class="flex-1 rounded-t-[2px] bg-[#0066cc]/70" style="height: {{ h.pct }}%" title="{{ h.h }}시 — {{ h.n }}"></div>{% endfor %}
+                </div>
+                <div class="mt-1 flex justify-between text-[11px] text-[#8e8e93]"><span>0시</span><span>6시</span><span>12시</span><span>18시</span><span>23시</span></div>
+            </section>
+
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5 xl:col-span-2">
+                <h2 class="text-[15px] font-semibold">많이 본 페이지</h2>
+                <ol class="mt-3 grid gap-x-8 gap-y-2 text-[13px] md:grid-cols-2">
+                    {% for p in s.pages %}
+                    <li class="flex items-center gap-3"><span class="w-5 text-right text-[#8e8e93]">{{ forloop.counter }}</span><a href="{{ p.path }}" target="_blank" class="min-w-0 flex-1 truncate hover:underline">{{ p.title }}</a><span class="tabular-nums text-[#6e6e73]">{{ p.n }}</span></li>
+                    {% empty %}
+                    <li class="text-[#8e8e93]">아직 기록이 없어요.</li>
+                    {% endfor %}
+                </ol>
+            </section>
+        </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

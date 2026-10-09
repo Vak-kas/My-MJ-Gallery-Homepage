@@ -94,6 +94,14 @@
         </a>
 
         <p class="px-4 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">운영</p>
+        <a href="{% url 'studio:analytics' %}"
+           class="group relative flex items-center rounded-xl px-4 py-2 text-[14px] transition {% if current_name == 'analytics' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
+            <span>Analytics</span>
+            <span class="studio-tip" hidden>
+                방문자 수, 인기 글·Tool, 유입 경로(검색·카톡·깃허브)
+            </span>
+        </a>
+
         <a href="{% url 'studio:users' %}"
            class="group relative flex items-center rounded-xl px-4 py-2 text-[14px] transition {% if current_name == 'users' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Users</span>

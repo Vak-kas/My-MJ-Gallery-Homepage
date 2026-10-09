@@ -75,6 +75,7 @@ INSTALLED_APPS = [
     'tools',
     'notifications',
     'security',
+    'analytics',
 ]
 
 MIDDLEWARE = [
@@ -86,6 +87,7 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'security.middleware.IPBlockMiddleware',
     'studio.middleware.SectionAccessMiddleware',
+    'analytics.tracking.PageViewMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
