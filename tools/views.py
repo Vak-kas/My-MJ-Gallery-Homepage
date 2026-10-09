@@ -14,20 +14,26 @@ from django.views.decorators.http import require_POST
 
 from . import relay_client
 from .permissions import MEMBER_STREAM_LIMITS, can_create_streams, can_manage_streams, owns_room
-from .registry import SECTIONS, TOOLS
+from .registry import CATEGORIES, TOOLS
 from .speedtest import _client_ip
 
 
 def index(request):
 	user = request.user
+	tools = [{**t, "url": reverse(t["url_name"])} for t in TOOLS]
 	sections = []
-	for key, title, note in SECTIONS:
-		if key == "admin" and not user.is_superuser:
-			continue
-		tools = [{**t, "url": reverse(t["url_name"])} for t in TOOLS if t.get("access", "public") == key]
-		if tools:  # 도구가 없는 칸은 숨김
-			sections.append({"key": key, "title": title, "note": note, "tools": tools})
-	return render(request, "tools/index.html", {"sections": sections})
+	for key, icon, title, note in CATEGORIES:
+		items = [t for t in tools if t.get("category") == key and t.get("access", "public") != "admin"]
+		if items:  # 도구가 없는 칸은 숨김
+			sections.append({"key": key, "icon": icon, "title": title, "note": note, "tools": items})
+	admin_tools = [t for t in tools if t.get("access") == "admin"]
+	if admin_tools and user.is_superuser:
+		sections.append({"key": "admin", "icon": "🛡", "title": "관리자 전용", "note": "사이트 관리자만 보이는 도구", "tools": admin_tools})
+	return render(request, "tools/index.html", {
+		"sections": sections,
+		"tool_count": sum(len(s["tools"]) for s in sections),
+		"has_member_tools": any(t.get("access") == "member" for s in sections for t in s["tools"]),
+	})
 
 
 def duplex(request):
