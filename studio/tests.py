@@ -187,7 +187,7 @@ class SiteSettingsTests(TestCase):
         cache.clear()  # 설정 캐시가 다른 테스트로 새지 않게
 
     def save(self, nav=None, home=None, **extra):
-        nav = nav or ["home", "blog", "tool", "photo"]
+        nav = nav or ["home", "blog", "tool", "photo", "game"]
         home = home or ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]
         data = {"nav_order": nav, "home_order": home, **{f"home_on_{k}": "on" for k in home}}
         data.update(extra)
@@ -198,19 +198,19 @@ class SiteSettingsTests(TestCase):
         return [i["label"] for i in self.client.get(path).context["site_nav"]]
 
     def test_defaults_and_member_cannot_open(self):
-        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery"])
+        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery", "Game"])
         self.client.force_login(self.member)
         self.assertEqual(self.client.get(reverse("studio:settings")).status_code, 302)
 
     def test_reorder_and_rename(self):
-        self.save(nav=["home", "photo", "tool", "blog"], nav_label_photo="사진")
+        self.save(nav=["home", "game", "photo", "tool", "blog"], nav_label_photo="사진")
         self.client.logout()
-        self.assertEqual(self.nav_labels("/tools/"), ["Home", "사진", "Tool", "Blog"])
+        self.assertEqual(self.nav_labels("/tools/"), ["Home", "Game", "사진", "Tool", "Blog"])
 
     def test_hidden_section_blocks_page_but_not_share_links(self):
         self.save(nav_state_tool="admin", nav_state_photo="members")
         self.client.logout()
-        self.assertEqual(self.nav_labels(), ["Home", "Blog"])
+        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Game"])
         self.assertEqual(self.client.get("/tools/").status_code, 404)
         self.assertEqual(self.client.get("/tools/keygen/").status_code, 404)
         self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 404)  # 숨김이면 공유 링크도 막힘
@@ -234,7 +234,7 @@ class SiteSettingsTests(TestCase):
 
     def test_admin_sees_hidden_home_sections(self):
         order = ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]
-        data = {"nav_order": ["home", "blog", "tool", "photo"], "home_order": order, "nav_state_blog": "admin",
+        data = {"nav_order": ["home", "blog", "tool", "photo", "game"], "home_order": order, "nav_state_blog": "admin",
                 **{f"home_on_{k}": "on" for k in order if k != "award"}}
         self.client.force_login(self.admin)
         self.client.post(reverse("studio:settings"), data)
@@ -256,7 +256,7 @@ class SiteSettingsTests(TestCase):
 
     def test_home_sections_order_and_toggle(self):
         order = ["project", "profile", "skill", "career", "activity", "award", "publication", "blog_links"]
-        data = {"nav_order": ["home", "blog", "tool", "photo"], "home_order": order,
+        data = {"nav_order": ["home", "blog", "tool", "photo", "game"], "home_order": order,
                 **{f"home_on_{k}": "on" for k in order if k not in ("award", "publication")}}
         self.client.force_login(self.admin)
         self.client.post(reverse("studio:settings"), data)
@@ -273,4 +273,4 @@ class SiteSettingsTests(TestCase):
 
     def test_tampered_post_rejected(self):
         self.save(nav=["home", "blog"])  # 항목 누락
-        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery"])
+        self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery", "Game"])

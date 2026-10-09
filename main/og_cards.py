@@ -17,6 +17,7 @@ PAGES = {
     "board": {"title": "자유게시판", "subtitle": "공지 · 소통 · 자유 글", "pill": "BOARD", "accent": ORANGE, "eyebrow": "SMJ GALLERY · BLOG"},
     "life": {"title": "Life", "subtitle": "일상 메모 · 생각 기록 · 회고", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
     "gallery": {"title": "Gallery", "subtitle": "사진으로 남긴 순간들", "pill": "PHOTO", "accent": GOLD, "eyebrow": "SMJ GALLERY"},
+    "games": {"title": "Game", "subtitle": "사다리타기 · 돌림판, 그리고 추억의 게임들", "pill": "GAME", "accent": GREEN, "eyebrow": "SMJ GALLERY"},
 }
 
 
@@ -48,6 +49,16 @@ def series_spec(slug):
             "eyebrow": "SMJ GALLERY · SERIES", "footer": author}
 
 
+def game_spec(slug):
+    from games.registry import GAMES
+
+    game = next((g for g in GAMES if g["slug"] == slug and g["url_name"]), None)
+    if not game:
+        return None
+    return {"title": game["title"], "subtitle": game["description"], "pill": "GAME", "accent": GREEN,
+            "eyebrow": "SMJ GALLERY · GAME", "footer": " · ".join(game.get("tags", []))}
+
+
 def spec(kind, key):
     if kind == "page":
         return PAGES.get(key)
@@ -55,6 +66,8 @@ def spec(kind, key):
         return tool_spec(key)
     if kind == "series":
         return series_spec(key)
+    if kind == "game":
+        return game_spec(key)
     return None
 
 

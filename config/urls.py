@@ -30,6 +30,7 @@ urlpatterns = [
     path('blog/feed/', LatestPostsFeed(), name='blog_feed'),
     path('blog/', include(('blog.urls', 'blog'), namespace='blog')),
     path('tools/', include(('tools.urls', 'tools'), namespace='tools')),
+    path('games/', include(('games.urls', 'games'), namespace='games')),
     path('s/<str:code>', short_redirect, name='short_redirect'),
     path('sitemap.xml', sitemap, {'sitemaps': {'pages': StaticSitemap, 'posts': PostSitemap}}, name='sitemap'),
     path('robots.txt', robots_txt, name='robots_txt'),

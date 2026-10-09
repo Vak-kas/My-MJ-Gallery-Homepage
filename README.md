@@ -1,7 +1,7 @@
 # MjGallery (서민재 갤러리)
 
 개인 포트폴리오 · 블로그 · 갤러리 · 웹 도구를 하나로 묶은 Django 웹 애플리케이션입니다.
-누구나 보는 퍼블릭 페이지(`main`, `blog`, `gallery`, `tools`)와 관리자 전용 관리 공간(`studio`)으로 구성됩니다.
+누구나 보는 퍼블릭 페이지(`main`, `blog`, `gallery`, `tools`, `games`)와 관리자 전용 관리 공간(`studio`)으로 구성됩니다.
 
 > 🌐 **서비스 URL: https://smjgallery.kr**
 
@@ -98,6 +98,15 @@
 - 데이터 전송 중계 데몬 `relay/mj_relay.py` (asyncio + pyzmq + aiohttp, systemd 서비스 `mj-relay`) — 자세한 내용은 [relay/README.md](relay/README.md)
 - 맡겨두기·클립보드 파일은 nginx 가 서빙하지 않는 `private_media/` 에 저장하고, Django 가 권한 확인 후에만 내려줌
 
+### 1.6.1 Game (`/games/`)
+상단 메뉴 **Game** (Studio → Settings 에서 다른 메뉴처럼 켜기·끄기·순서·회원 전용). 게임 목록은 `games/registry.py` — `url_name` 이 없으면 '준비 중' 카드.
+
+| 게임 | 설명 |
+|---|---|
+| 🪜 사다리타기 | 2~12명, 결과 프리셋(당첨 1명·커피 쏘기·순서·청소 당번), 가로줄 양 조절, 결과는 내려가기 전까지 가림, 이름을 누르면 길을 따라 그려 내려감 / 모두 내려가기, 같은 사다리를 링크(#)로 공유 (seed 로 똑같이 다시 만듦) |
+| 🎡 돌림판 | 한 줄에 하나 (`치킨 *3` 처럼 비율), 프리셋(점심 메뉴·1~10·벌칙·예/아니오·발표 순서), 딸깍 소리·꽃가루, 당첨 항목 빼고 다음 판, 기록, 링크 공유, 스페이스바로 돌리기 |
+| 준비 중 | 🔢 2048 · ⌨️ 한글 타자 연습(랭킹) → ⚫ 오목 · 🎨 그림 맞추기(실시간) → 🖍 그림 ↔ 글 이어하기 → 💣 물풍선 대전 · 📼 플래시 게임관(Ruffle, 올려도 되는 게임만) |
+
 ### 1.7 회원 · 가입 승인
 - 회원가입: 아이디, **이름(실명)**, 이메일, 비밀번호, 가입 인사(선택) + **개인정보 수집·이용 동의(필수)**
 - 가입 신청 시 계정은 **승인 대기(비활성)** → 관리자가 승인해야 로그인 가능
@@ -172,6 +181,7 @@ MjGallery/
 ├─ analytics/         # 방문 기록 미들웨어, 통계 집계
 ├─ monitor/           # 서버 상태·트래픽·업타임 모니터, S3 백업, 예약 작업(run_scheduled)
 ├─ security/          # 로그인 기록·잠금, IP 차단 미들웨어, 작성 IP 보관 기간 정리
+├─ games/             # Game 메뉴 (사다리타기·돌림판, registry.py 에 게임 목록)
 ├─ tools/             # Tool 메뉴 (QR·JSON·정규식·키 생성기·네트워크 진단·단축 URL·비밀 메모·클립보드·라이브 방송·데이터 전송 등)
 ├─ relay/             # 중계 데몬(mj_relay.py: 데이터 전송, mj_live.py: 라이브 방송 시그널링), CLI(mj_stream.py), 설치 스크립트(TURN 포함)
 ├─ scripts/           # gen_dark_css.py (다크 모드 CSS 생성)
@@ -293,6 +303,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
+| `/games/` | Game 메뉴 (`ladder/`, `roulette/`) |
 | `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
