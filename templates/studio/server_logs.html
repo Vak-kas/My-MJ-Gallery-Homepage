@@ -75,6 +75,7 @@
     const descs = { {% for key, name, desc in sources %}"{{ key }}": "{{ desc|escapejs }}",{% endfor %} };
     let state = { source: '{{ data.source|escapejs }}', level: '{{ level|escapejs }}', lines: {{ lines }}, q: $('lg-q').value };
     let data = JSON.parse($('lg-data').textContent);
+    const IP_URL = '{% url "studio:security" %}ip/';
     let timer = null, busy = false;
     try { $('lg-wrap').checked = localStorage.getItem('mj.logs.wrap') === '1'; } catch (e) {}
 
@@ -95,7 +96,7 @@
             <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">상태 코드 (보이는 ${s.total}건)</p>
                 <div class="mt-2 flex gap-4">${s.status.map(([k, n]) => `<div><p class="text-[20px] font-semibold tabular-nums" style="color:${colors[k]}">${n}</p><p class="text-[11px] text-[#8e8e93]">${k}</p></div>`).join('')}</div></div>
             <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">많이 요청된 주소</p><ul class="mt-2 space-y-0.5 text-[12px]">${list(s.paths)}</ul></div>
-            <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">많이 요청한 IP</p><ul class="mt-2 space-y-0.5 text-[12px]">${list(s.ips)}</ul></div>`;
+            <div class="rounded-[18px] border border-black/[0.06] bg-white p-4"><p class="text-[12px] text-[#8e8e93]">많이 요청한 IP <span class="text-[11px]">(눌러서 조회)</span></p><ul class="mt-2 space-y-0.5 text-[12px]">${s.ips.map(([k, n]) => `<li class="flex justify-between gap-3"><a class="truncate font-mono text-[#0066cc] hover:underline" href="${IP_URL}${encodeURIComponent(k)}/">${esc(k)}</a><span class="tabular-nums text-[#6e6e73]">${n}</span></li>`).join('')}</ul></div>`;
     }
     function render(keepScroll) {
         const box = $('lg-box');

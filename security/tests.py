@@ -140,3 +140,81 @@ class ContentIPTests(TestCase):
         self.assertEqual((c.author_ip, c.author_agent), (None, ""))
         self.assertFalse(LoginEvent.objects.filter(pk=e.pk).exists())
         self.assertEqual(result["login_events"], 1)
+
+
+class IPLookupTests(TestCase):
+    EXT = {
+        "rdap": {"network": "CENSY", "range": "167.94.145.0 – 167.94.146.255", "cidr": "", "country": "", "orgs": ["Censys, Inc."], "abuse": ["scan-abuse@censys.io"], "registry": "ARIN", "registered": ""},
+        "ipinfo": {"hostname": "53.146.94.167.censys-scanner.com", "city": "Frankfurt am Main", "region": "Hesse", "country": "DE", "asn": "AS398705", "isp": "Censys, Inc.", "loc": ""},
+        "internetdb": {"ports": [], "tags": [], "vulns": [], "hostnames": [], "cpes": []},
+        "tor": False, "abuseipdb": None, "rdns": ("53.146.94.167.censys-scanner.com", True),
+    }
+
+    def setUp(self):
+        import tempfile
+        from pathlib import Path
+        from unittest import mock
+
+        from django.contrib.auth import get_user_model
+        from django.core.cache import cache
+
+        cache.clear()
+        self.admin = get_user_model().objects.create_superuser("admin", "a@example.com", "pw")
+        self.tmp = tempfile.TemporaryDirectory()
+        root = Path(self.tmp.name)
+        (root / "nginx").mkdir()
+        (root / "nginx" / "access.log").write_text(
+            '167.94.146.53 - - [10/Oct/2026:01:00:00 +0900] "GET /.env HTTP/1.1" 404 10 "-" "Mozilla/5.0 (compatible; CensysInspect/1.1)"\n'
+            '1.2.3.4 - - [10/Oct/2026:01:00:01 +0900] "GET / HTTP/1.1" 200 10 "-" "x"\n'
+            '167.94.146.53 - - [10/Oct/2026:01:00:02 +0900] "GET /relay/ws/x?token=SECRET HTTP/1.1" 400 10 "-" "Mozilla/5.0 (compatible; CensysInspect/1.1)"\n')
+        (root / "auth.log").write_text("Oct 10 sshd[1]: Invalid user admin from 167.94.146.53 port 1\nOct 10 sshd[1]: Failed password for invalid user admin from 167.94.146.53 port 1 ssh2\n")
+        self.patches = [mock.patch("monitor.logs.LOG_ROOT", root)]
+        for name in ("rdap", "ipinfo", "internetdb", "abuseipdb", "reverse_dns"):
+            key = "rdns" if name == "reverse_dns" else name
+            self.patches.append(mock.patch(f"security.iplookup.{name}", return_value=self.EXT[key]))
+        self.patches.append(mock.patch("security.iplookup.tor_exits", return_value=set()))
+        for p in self.patches:
+            p.start()
+        LoginEvent.objects.create(username="root", ip="167.94.146.53", result=LoginEvent.RESULT_FAILED)
+        self.client.force_login(self.admin)
+
+    def tearDown(self):
+        for p in self.patches:
+            p.stop()
+        self.tmp.cleanup()
+
+    def test_report_page(self):
+        from django.urls import reverse
+
+        res = self.client.get(reverse("studio:security_ip", args=["167.94.146.53"]))
+        self.assertContains(res, "Censys (인터넷 전체 스캔 연구 회사)")
+        self.assertContains(res, "scan-abuse@censys.io")
+        self.assertContains(res, "<b>2번</b>", html=False)  # nginx 접속 2줄
+        self.assertContains(res, "/.env")
+        self.assertNotContains(res, "SECRET")  # 토큰 가림
+        self.assertContains(res, "admin<span")  # SSH 로 시도한 아이디
+        self.assertContains(res, "root<span")  # 사이트 로그인 시도 아이디
+        self.assertContains(res, "We observed unwanted/abusive traffic from 167.94.146.53")
+
+    def test_verdicts(self):
+        from security import iplookup
+
+        cloud = {**self.EXT, "rdns": ("", False), "ipinfo": {**self.EXT["ipinfo"], "hostname": "", "isp": "DigitalOcean, LLC"}, "rdap": {**self.EXT["rdap"], "orgs": ["DigitalOcean, LLC"], "network": "DO"}}
+        self.assertEqual(iplookup.verdict(cloud)["kind"], "cloud")
+        kt = {**cloud, "ipinfo": {**cloud["ipinfo"], "isp": "Korea Telecom", "country": "KR"}, "rdap": {**cloud["rdap"], "orgs": [], "network": "KORNET-KR"}}
+        self.assertEqual(iplookup.verdict(kt)["kind"], "isp")
+        self.assertEqual(iplookup.verdict({**kt, "tor": True})["kind"], "tor")
+
+    def test_private_ip_and_bad_input(self):
+        from django.urls import reverse
+
+        res = self.client.get(reverse("studio:security_ip", args=["10.0.0.1"]))
+        self.assertContains(res, "사설·내부 IP")
+        self.assertEqual(self.client.get("/studio/security/ip/not-an-ip/").status_code, 404)
+
+    def test_admin_only(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        self.client.force_login(get_user_model().objects.create_user("u", "u@example.com", "pw"))
+        self.assertNotEqual(self.client.get(reverse("studio:security_ip", args=["167.94.146.53"])).status_code, 200)

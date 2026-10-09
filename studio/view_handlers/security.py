@@ -6,11 +6,13 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Count, Q
 from django.http import HttpResponse
+from django.http import Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
 from blog.models import Comment, GuestbookEntry, Post
+from security import iplookup
 from security.models import IPBlock, LoginEvent
 from security.utils import RETENTION_DAYS, cleanup_old_records, clear_block_cache, client_ip
 
@@ -155,3 +157,23 @@ def security(request):
         blocks = list(IPBlock.objects.select_related("created_by"))
         context.update({"blocks": blocks})
     return render(request, "studio/security.html", context)
+
+
+@admin_view
+def security_ip(request, ip):
+    """IP 하나에 대한 공개 정보 + 우리 서버 기록."""
+    addr = iplookup.parse(ip)
+    if not addr:
+        raise Http404
+    public = addr.is_global
+    if request.GET.get("refresh") and public:
+        from django.core.cache import cache
+        cache.delete(f"sec:ip:{addr}")
+    ext = iplookup.external(addr) if public else None
+    loc = iplookup.local(addr)
+    suggest = str(ipaddress.ip_network(f"{addr}/{24 if addr.version == 4 else 64}", strict=False))
+    return render(request, "studio/security_ip.html", {
+        "ip": str(addr), "version": addr.version, "public": public, "ext": ext, "loc": loc,
+        "is_me": str(addr) == client_ip(request), "report": iplookup.report_text(addr, ext or {}, loc),
+        "suggest_net": suggest, "durations": [(k, label) for k, label, _ in DURATIONS], "tabs": TABS,
+    })

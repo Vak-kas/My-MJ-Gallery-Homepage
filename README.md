@@ -158,6 +158,7 @@
 - **AI**: 오늘 쓴 돈 / 하루 예산 막대, 오늘·7·30일 호출·토큰·어림 비용(달러·원), 30일 하루 비용 그래프, 기능별·회원별, 최근 호출, 등급별 한도
 - **Analytics**: 방문자 통계 (오늘·7·30·90일) — 방문자·페이지뷰, 날짜별 그래프, 인기 글·Tool, 유입 경로(검색·카카오톡·GitHub·SNS)와 들어온 사이트, 기기·시간대
   - IP 미저장(날짜별로 바뀌는 해시로 순방문자만), 봇·링크 미리보기·관리자 본인 방문 제외, 90일 보관
+- **Security → 🔎 IP 조회** (`/studio/security/ip/<IP>/`): 보안·로그 화면의 IP 옆 🔎 또는 검색칸. 공개 정보만 — 등록 정보(RDAP: 소유 기관·대역·신고 연락처), ASN·통신사·대략 도시(ipinfo), 열린 포트·태그·알려진 취약점(Shodan InternetDB), Tor 출구, (선택 `ABUSEIPDB_API_KEY`) 신고 점수 — 와 우리 서버 기록(사이트 로그인·시도한 아이디·SSH 실패·nginx 접속 요약·작성 기록·차단). 스캐너·검색 로봇·클라우드·Tor·국내 회선 한 줄 판단, 바로 차단(IP·/24), abuse 신고 메일 초안(로그 포함)·KISA 링크. 상대 IP 로 직접 접속·스캔하지 않음, 결과 하루 캐시
 - **Server**: CPU·메모리·디스크, 이번 달 트래픽(재부팅 보정), 서비스(gunicorn·nginx·mj-relay·coturn)·중계 방·예약 작업 상태, 저장 공간
   - 📜 **로그** (`/studio/server/logs/`): 웹 앱(gunicorn·Django 500 traceback)·중계 데몬(mj-relay)·nginx 접속/오류·로그인·SSH(auth.log)·시스템 경고를 읽기 전용으로. 검색(강조)·경고/오류만·최근 200~2000줄·5초 자동 새로고침, nginx 접속은 상태 코드·많이 요청된 주소·IP 요약. 주소의 토큰·초대 코드는 `•••` 로 가림. 서버 계정(ubuntu)이 `adm` 그룹이라 sudo 없이 읽음
   - ⏱ **업타임 모니터**: 웹 주소(HTTP)·포트(TCP)를 1·5·10·30분마다 확인, 2번 연속 실패 시 🔔·카톡 장애 알림, 복구 알림, 24시간·7일 가동률
@@ -274,6 +275,8 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 
 # 선택: 논문 인용 도구가 Crossref 에 알려 줄 연락처 (넣으면 더 안정적인 polite pool)
 # CROSSREF_MAILTO=you@example.com
+# 선택: Studio 보안 IP 조회에 AbuseIPDB 신고 점수 (abuseipdb.com 무료 키)
+# ABUSEIPDB_API_KEY=...
 
 # 선택: 검색엔진 소유 확인 (HTML 태그 방식의 content 값만)
 # GOOGLE_SITE_VERIFICATION=...

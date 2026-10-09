@@ -137,6 +137,8 @@ GOOGLE_SITE_VERIFICATION = os.getenv("GOOGLE_SITE_VERIFICATION", "")
 NAVER_SITE_VERIFICATION = os.getenv("NAVER_SITE_VERIFICATION", "")
 # 논문 인용 도구가 Crossref API 를 부를 때 알려 주는 연락처 (선택, 넣으면 더 안정적인 'polite pool' 사용)
 CROSSREF_MAILTO = os.getenv("CROSSREF_MAILTO", "")
+# Studio 보안 IP 조회에서 AbuseIPDB 신고 점수도 보기 (선택, abuseipdb.com 무료 키)
+ABUSEIPDB_API_KEY = os.getenv("ABUSEIPDB_API_KEY", "")
 
 
 # Database
