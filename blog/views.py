@@ -24,6 +24,7 @@ from urllib.parse import urlencode
 
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Tag
 from security.utils import client_ip, user_agent
+from main.seo import post_meta
 
 
 UNLOCK_MAX_ATTEMPTS = 5
@@ -774,6 +775,7 @@ def post_detail(request, slug: str):
 		c.can_manage = _can_manage_comment(request, c)
 
 	context = {
+		"meta": post_meta(post, locked=is_locked_post),
 		"post": post,
 		"is_locked_post": is_locked_post,
 		"visible_comments": visible_comments,

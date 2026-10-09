@@ -17,14 +17,22 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+from django.contrib.sitemaps.views import sitemap
+
+from blog.feeds import LatestPostsFeed
+from main.sitemaps import PostSitemap, StaticSitemap
+from main.views import robots_txt
 from tools.link_views import short_redirect
 from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    path('blog/feed/', LatestPostsFeed(), name='blog_feed'),
     path('blog/', include(('blog.urls', 'blog'), namespace='blog')),
     path('tools/', include(('tools.urls', 'tools'), namespace='tools')),
     path('s/<str:code>', short_redirect, name='short_redirect'),
+    path('sitemap.xml', sitemap, {'sitemaps': {'pages': StaticSitemap, 'posts': PostSitemap}}, name='sitemap'),
+    path('robots.txt', robots_txt, name='robots_txt'),
     path('', include('main.urls')),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),

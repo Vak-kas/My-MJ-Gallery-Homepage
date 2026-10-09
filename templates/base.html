@@ -2,8 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>서민재 갤러리</title>
+    {% with m=meta|default:default_meta %}
+    <title>{% block title %}{{ m.title|default:"서민재 갤러리" }}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if m %}
+    <meta name="description" content="{{ m.description }}">
+    {% if m.noindex %}<meta name="robots" content="noindex, nofollow">{% else %}<link rel="canonical" href="{{ m.url }}">{% endif %}
+    <meta property="og:site_name" content="서민재 갤러리">
+    <meta property="og:locale" content="ko_KR">
+    <meta property="og:type" content="{{ m.type }}">
+    <meta property="og:title" content="{{ m.og_title }}">
+    <meta property="og:description" content="{{ m.description }}">
+    <meta property="og:url" content="{{ m.url }}">
+    <meta property="og:image" content="{{ m.image }}">
+    <meta property="og:image:alt" content="{{ m.og_title }}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{{ m.og_title }}">
+    <meta name="twitter:description" content="{{ m.description }}">
+    <meta name="twitter:image" content="{{ m.image }}">
+    {% if m.published %}<meta property="article:published_time" content="{{ m.published }}">{% endif %}
+    {% if m.author %}<meta property="article:author" content="{{ m.author }}">{% endif %}
+    {% for tag in m.tags %}<meta property="article:tag" content="{{ tag }}">{% endfor %}
+    {% endif %}
+    {% endwith %}
+    <link rel="alternate" type="application/rss+xml" title="서민재 갤러리 블로그" href="/blog/feed/">
 
     {% load static %}
     <link rel="icon" type="image/svg+xml" href="{% static 'images/mj-logo.svg' %}?v=2">
