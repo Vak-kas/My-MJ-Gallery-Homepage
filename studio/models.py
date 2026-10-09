@@ -121,7 +121,7 @@ class Education(models.Model):
     start_date = models.DateField(blank=True, null=True)  # 입학일
     end_date = models.DateField(blank=True, null=True)    # 졸업일
     
-    gpa = models.CharField(max_length=10, blank=True)      # 학점
+    gpa = models.CharField(max_length=20, blank=True)      # 학점 ("4.098 / 4.5" 처럼 11자 넘는 값도 있음)
     description = models.TextField(blank=True)
 
     is_visible = models.BooleanField(default=True)

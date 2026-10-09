@@ -12,9 +12,14 @@ def _by_admin(user):
     return bool(user and user.is_superuser)
 
 
+def _skip(created, kwargs):
+    # loaddata(raw=True) 로 옛 데이터를 옮길 때 알림·카톡이 다시 나가지 않게
+    return not created or kwargs.get("raw")
+
+
 @receiver(post_save, sender=Comment)
 def comment_created(sender, instance, created, **kwargs):
-    if not created or _by_admin(instance.author):
+    if _skip(created, kwargs) or _by_admin(instance.author):
         return
     post = instance.post
     notify(
@@ -27,7 +32,7 @@ def comment_created(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=GuestbookEntry)
 def guestbook_created(sender, instance, created, **kwargs):
-    if not created or _by_admin(instance.author):
+    if _skip(created, kwargs) or _by_admin(instance.author):
         return
     notify(
         Notification.KIND_GUESTBOOK,
@@ -40,7 +45,7 @@ def guestbook_created(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Post)
 def post_published(sender, instance, created, **kwargs):
     # 다른 회원이 글을 발행했을 때만 (내 글·임시저장은 알리지 않음)
-    if not created or not instance.is_published or _by_admin(instance.author):
+    if _skip(created, kwargs) or not instance.is_published or _by_admin(instance.author):
         return
     notify(
         Notification.KIND_POST,

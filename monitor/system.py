@@ -108,6 +108,15 @@ def snapshot():
     db = settings.DATABASES["default"]
     if db["ENGINE"].endswith("sqlite3") and os.path.exists(db["NAME"]):
         storage.append({"label": "데이터베이스 (SQLite)", "bytes": os.path.getsize(db["NAME"])})
+    elif "postgresql" in db["ENGINE"]:
+        try:
+            from django.db import connection
+
+            with connection.cursor() as cur:
+                cur.execute("SELECT pg_database_size(current_database())")
+                storage.append({"label": "데이터베이스 (PostgreSQL)", "bytes": cur.fetchone()[0]})
+        except Exception:
+            pass
     up = uptime_seconds()
     up_text = ""
     if up:
