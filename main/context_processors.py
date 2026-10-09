@@ -54,7 +54,11 @@ def seo_meta(request):
 
 
 def share(request):
-	"""카카오톡 공유하기 JavaScript 키 (components/share.html)."""
+	"""카카오톡 공유하기 JavaScript 키 (components/share.html), 검색엔진 소유 확인 값 (base.html)."""
 	from django.conf import settings
 
-	return {"kakao_js_key": settings.KAKAO_JS_KEY}
+	return {
+		"kakao_js_key": settings.KAKAO_JS_KEY,
+		"google_site_verification": settings.GOOGLE_SITE_VERIFICATION,
+		"naver_site_verification": settings.NAVER_SITE_VERIFICATION,
+	}

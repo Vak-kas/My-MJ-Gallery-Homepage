@@ -57,6 +57,17 @@ class LinkPreviewTests(TestCase):
 		robots = self.client.get("/robots.txt").content.decode()
 		self.assertIn("Disallow: /studio/", robots)
 		self.assertIn("Sitemap: https://smjgallery.kr/sitemap.xml", robots)
+		self.assertIn("Disallow: /games/omok/*?t=", robots)  # 오목 방 초대 링크만 (로비는 허용)
+		self.assertNotIn("Disallow: /games/omok/\n", robots)
+
+	def test_search_verification_meta(self):
+		from django.test import override_settings
+
+		self.assertNotIn("naver-site-verification", self.client.get("/").content.decode())
+		with override_settings(NAVER_SITE_VERIFICATION="abc123", GOOGLE_SITE_VERIFICATION="g-xyz"):
+			html = self.client.get("/").content.decode()
+		self.assertIn('<meta name="naver-site-verification" content="abc123">', html)
+		self.assertIn('<meta name="google-site-verification" content="g-xyz">', html)
 		feed = self.client.get("/blog/feed/").content.decode()
 		self.assertIn("<title>HackRF 입문</title>", feed)
 		self.assertNotIn("비밀 글", feed)

@@ -266,6 +266,10 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # AI_PRICE_INPUT_PER_MTOK=1        # 어림 비용 계산용 단가 (100만 토큰당 달러)
 # AI_PRICE_OUTPUT_PER_MTOK=5
 
+# 선택: 검색엔진 소유 확인 (HTML 태그 방식의 content 값만)
+# GOOGLE_SITE_VERIFICATION=...
+# NAVER_SITE_VERIFICATION=...
+
 # 선택: 카카오톡 공유하기 — 카카오 개발자 콘솔 > 앱 > 앱 키 > JavaScript 키, 플랫폼 > Web 에 https://smjgallery.kr 등록
 # KAKAO_JS_KEY=...
 

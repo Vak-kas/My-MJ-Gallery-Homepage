@@ -5,6 +5,8 @@
     {% with m=meta|default:default_meta %}
     <title>{% block title %}{{ m.title|default:"서민재 갤러리" }}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% if google_site_verification %}<meta name="google-site-verification" content="{{ google_site_verification }}">{% endif %}
+    {% if naver_site_verification %}<meta name="naver-site-verification" content="{{ naver_site_verification }}">{% endif %}
     {% if m %}
     <meta name="description" content="{{ m.description }}">
     {% if m.noindex %}<meta name="robots" content="noindex, nofollow">{% else %}<link rel="canonical" href="{{ m.url }}">{% endif %}
