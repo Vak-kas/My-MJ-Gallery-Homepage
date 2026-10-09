@@ -89,7 +89,7 @@
                 <div id="sc-table" class="text-[14px]"></div>
                 <div class="flex flex-wrap gap-1.5">
                     <button type="button" class="gm-btn" id="sc-next-round">다음 판 ▶</button>
-                    <button type="button" class="gm-btn" id="sc-copy">결과 복사 (카톡용)</button>
+                    <button type="button" class="gm-btn" id="sc-copy">💬 결과 공유</button>
                 </div>
                 <p class="text-[12px] leading-5 text-[#8e8e93]">한 판 = 모두 한 번씩. 같은 판에서는 목표가 같아요(랜덤이어도). 누적은 오차를 더한 값이라 작을수록 1등.</p>
             </section>
@@ -244,12 +244,11 @@
         target = pickTarget(); phase = 'ready';
         renderParty(); paint();
     });
-    $('sc-copy').addEventListener('click', async (e) => {
+    $('sc-copy').addEventListener('click', () => {
         const rows = sortedRound();
-        if (!rows.length) return;
-        const text = [`⏱ 초 맞추기 ${party.round}판 (목표 ${target}초)`, ...rows.map((r, i) => `${i + 1}. ${r.name} ${fmt(r.s)}초 (${sign(r.d)})`),
-            rows.length > 1 && party.turn >= party.players.length ? `😱 벌칙: ${rows[rows.length - 1].name}` : '', location.origin + location.pathname].filter(Boolean).join('\n');
-        try { await navigator.clipboard.writeText(text); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '결과 복사 (카톡용)'; }, 1400); } catch (err) { prompt('복사하세요', text); }
+        const text = rows.length ? [`⏱ 초 맞추기 ${party.round}판 (목표 ${target}초)`, ...rows.map((r, i) => `${i + 1}. ${r.name} ${fmt(r.s)}초 (${sign(r.d)})`),
+            rows.length > 1 && party.turn >= party.players.length ? `😱 벌칙: ${rows[rows.length - 1].name}` : ''].filter(Boolean).join('\n') : '⏱ 3초 맞추기 한 판 할래?';
+        mjShare({ title: '⏱ 초 맞추기', text, url: location.origin + location.pathname, button: '나도 해 보기' });
     });
 
     // ── 설정 ──
@@ -295,4 +294,5 @@
     window.__sec = { state: () => ({ phase, target, party, mode }), press };
 })();
 </script>
+{% include "components/share.html" %}
 {% endblock %}

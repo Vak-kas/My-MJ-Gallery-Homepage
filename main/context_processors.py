@@ -51,3 +51,10 @@ def seo_meta(request):
 	meta["url"] = seo.absolute(request.path)
 	meta["noindex"] = request.path.startswith(seo.NOINDEX_PREFIXES)
 	return {"default_meta": meta}
+
+
+def share(request):
+	"""카카오톡 공유하기 JavaScript 키 (components/share.html)."""
+	from django.conf import settings
+
+	return {"kakao_js_key": settings.KAKAO_JS_KEY}

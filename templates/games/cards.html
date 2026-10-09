@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: 10px; }
+    .cd { perspective: 700px; aspect-ratio: 3 / 4; cursor: pointer; }
+    .cd-in { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.55s cubic-bezier(.3, 1.3, .5, 1); }
+    .cd.open .cd-in { transform: rotateY(180deg); }
+    .cd-face { position: absolute; inset: 0; border-radius: 14px; backface-visibility: hidden; -webkit-backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 6px; text-align: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12); }
+    .cd-back { background: repeating-linear-gradient(45deg, #6366f1, #6366f1 10px, #818cf8 10px, #818cf8 20px); color: #fff; font-size: 28px; font-weight: 800; }
+    .cd-front { transform: rotateY(180deg); background: #fff; border: 2px solid #e5e7eb; font-weight: 800; font-size: 15px; color: #1d1d1f; word-break: keep-all; }
+    .cd-front.bad { background: #fee2e2; border-color: #ef4444; color: #b91c1c; }
+    .cd-front.good { background: #dcfce7; border-color: #22c55e; color: #15803d; }
+    .cd-front small { display: block; margin-top: 4px; font-size: 11px; font-weight: 600; opacity: 0.8; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .cd-front { background: #1f2937; border-color: #374151; color: #f3f4f6; }
+    html.theme-dark .cd-front.bad { background: #450a0a; color: #fca5a5; }
+    html.theme-dark .cd-front.good { background: #052e16; color: #86efac; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · CARDS</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">꽝 뽑기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">카드를 섞어서 뒤집어 두었어요. 한 명씩 한 장 골라 뒤집으세요. 꽝이 나오면 벌칙!</p>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="gm-card min-w-0">
+            <p class="mb-4 text-center text-[16px] font-semibold" id="cd-status"></p>
+            <div class="cd-grid" id="cd-grid"></div>
+        </section>
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card space-y-3">
+                <h2 class="text-[15px] font-semibold">카드 만들기</h2>
+                <div class="grid grid-cols-2 gap-2">
+                    <label class="text-[12px] text-[#6e6e73]">카드 수<input id="cd-n" type="number" min="2" max="40" value="8" class="gm-in mt-1"></label>
+                    <label class="text-[12px] text-[#6e6e73]">꽝 개수<input id="cd-bad" type="number" min="0" max="39" value="1" class="gm-in mt-1"></label>
+                </div>
+                <label class="block text-[12px] text-[#6e6e73]">꽝 카드 글자
+                    <input id="cd-bad-label" class="gm-in mt-1" maxlength="20" value="💥 꽝!">
+                </label>
+                <label class="block text-[12px] text-[#6e6e73]">나머지 카드 글자
+                    <input id="cd-good-label" class="gm-in mt-1" maxlength="20" value="😌 통과">
+                </label>
+                <details class="text-[13px]">
+                    <summary class="cursor-pointer text-[#6e6e73]">카드마다 직접 적기 (벌칙 목록 등)</summary>
+                    <textarea id="cd-custom" class="gm-in mt-2" rows="5" placeholder="한 줄에 한 장. 적으면 위 설정 대신 이걸로 만들어요.&#10;예) 노래 한 곡&#10;커피 쏘기&#10;통과"></textarea>
+                    <p class="mt-1 text-[11px] text-[#8e8e93]">'꽝'·'벌칙'·'쏘기' 가 들어간 줄은 빨간 카드로 보여요.</p>
+                </details>
+                <div class="flex flex-wrap gap-1.5" id="cd-presets"></div>
+                <label class="block text-[12px] text-[#6e6e73]">참가자 (선택 — 적으면 누가 뭘 뽑았는지 기록)
+                    <textarea id="cd-names" class="gm-in mt-1" rows="3" placeholder="한 줄에 한 명"></textarea>
+                </label>
+                <button type="button" class="w-full rounded-full bg-[#6366f1] py-3 text-[15px] font-semibold text-white hover:bg-[#4f46e5]" id="cd-shuffle">🔀 섞어서 깔기</button>
+            </section>
+            <section class="gm-card">
+                <div class="flex items-center"><h2 class="text-[15px] font-semibold">뽑은 기록</h2><button type="button" class="gm-btn ml-auto !px-2.5 !py-1 !text-[12px]" id="cd-open-all">모두 뒤집기</button></div>
+                <ol id="cd-log" class="mt-2 space-y-1 text-[14px]"></ol>
+                <button type="button" class="gm-btn mt-3" id="cd-share">💬 결과 공유</button>
+            </section>
+        </aside>
+    </div>
+</main>
+{% include "components/share.html" %}
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const PRESETS = {
+        '꽝 1장': { n: 6, bad: 1 },
+        '당첨 1장': { custom: '🎉 당첨!\n꽝\n꽝\n꽝\n꽝\n꽝' },
+        '벌칙 카드': { custom: '🎤 노래 한 곡\n☕ 커피 쏘기\n💃 춤 10초\n😌 통과\n😌 통과\n🍀 한 번 더 뽑기\n🙈 비밀 하나 말하기\n😌 통과' },
+        '순서 정하기': { custom: '1번\n2번\n3번\n4번\n5번' },
+    };
+    const BAD_WORDS = /꽝|벌칙|쏘기/;
+    let cards = [], picks = [];
+
+    const names = () => $('cd-names').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 40);
+    function deck() {
+        const custom = $('cd-custom').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 40);
+        if (custom.length >= 2) return custom.map((label) => ({ label, bad: BAD_WORDS.test(label) && !/당첨|통과/.test(label), good: /당첨|🎉/.test(label) }));
+        const n = Math.max(2, Math.min(40, parseInt($('cd-n').value, 10) || 8));
+        const bad = Math.max(0, Math.min(n - 1, parseInt($('cd-bad').value, 10) || 0));
+        return Array.from({ length: n }, (_, i) => (i < bad ? { label: $('cd-bad-label').value || '💥 꽝!', bad: true } : { label: $('cd-good-label').value || '😌 통과', bad: false }));
+    }
+    function shuffle() {
+        cards = deck();
+        for (let i = cards.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [cards[i], cards[j]] = [cards[j], cards[i]]; }  // 피셔-예이츠
+        cards.forEach((c) => { c.open = false; c.by = null; });
+        picks = [];
+        render();
+    }
+    function status() {
+        const left = cards.filter((c) => !c.open);
+        const badLeft = left.filter((c) => c.bad).length;
+        const n = names();
+        const next = n.length ? `🙋 ${n[picks.length % n.length]} 차례 · ` : '';
+        if (!left.length) return '모두 뒤집었어요!';
+        return `${next}남은 카드 ${left.length}장${cards.some((c) => c.bad) ? ` · 남은 꽝 ${badLeft}장` : ''}`;
+    }
+    function render() {
+        $('cd-grid').innerHTML = cards.map((c, i) => `<div class="cd ${c.open ? 'open' : ''}" data-i="${i}"><div class="cd-in">
+            <div class="cd-face cd-back">${i + 1}</div>
+            <div class="cd-face cd-front ${c.bad ? 'bad' : c.good ? 'good' : ''}">${esc(c.label)}${c.by ? `<small>${esc(c.by)}</small>` : ''}</div></div></div>`).join('');
+        $('cd-status').textContent = status();
+        $('cd-log').innerHTML = picks.map((p, k) => `<li class="flex gap-2"><span class="w-5 text-[#8e8e93]">${k + 1}</span><span class="flex-1 truncate">${esc(p.by || `${p.i + 1}번 카드`)}</span><span class="${cards[p.i].bad ? 'font-bold text-[#dc2626]' : ''}">${esc(cards[p.i].label)}</span></li>`).join('') || '<li class="text-[#8e8e93]">아직 아무도 안 뽑았어요</li>';
+    }
+    $('cd-grid').addEventListener('click', (e) => {
+        const el = e.target.closest('.cd');
+        if (!el) return;
+        const c = cards[+el.dataset.i];
+        if (c.open) return;
+        const n = names();
+        c.open = true;
+        c.by = n.length ? n[picks.length % n.length] : null;
+        picks.push({ i: +el.dataset.i, by: c.by });
+        el.classList.add('open');  // 뒤집기 애니메이션 먼저
+        if (c.bad) navigator.vibrate?.([200, 60, 200]);
+        setTimeout(render, 600);
+    });
+    $('cd-open-all').addEventListener('click', () => { cards.forEach((c) => { c.open = true; }); render(); });
+    $('cd-shuffle').addEventListener('click', shuffle);
+    $('cd-presets').innerHTML = Object.keys(PRESETS).map((k) => `<button type="button" class="gm-btn !px-2.5 !py-1 !text-[12px]" data-p="${k}">${k}</button>`).join('');
+    $('cd-presets').addEventListener('click', (e) => {
+        const p = PRESETS[e.target.dataset.p]; if (!p) return;
+        $('cd-custom').value = p.custom || '';
+        if (p.n) { $('cd-n').value = p.n; $('cd-bad').value = p.bad; }
+        if (p.custom) $('cd-custom').closest('details').open = true;
+        shuffle();
+    });
+    $('cd-share').addEventListener('click', () => {
+        const text = picks.length ? ['🃏 꽝 뽑기 결과', ...picks.map((p, k) => `${k + 1}. ${p.by || `${p.i + 1}번 카드`} → ${cards[p.i].label}`)].join('\n') : '🃏 꽝 뽑기 한 판 할래?';
+        mjShare({ title: '🃏 꽝 뽑기', text, url: location.origin + location.pathname, button: '나도 뽑기' });
+    });
+    shuffle();
+    window.__cards = { state: () => ({ cards, picks }), shuffle };
+})();
+</script>
+{% endblock %}

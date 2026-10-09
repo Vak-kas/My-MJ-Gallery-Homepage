@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .bm-pad { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 460px; border-radius: 28px; background: #1f2937; color: #fff; text-align: center; padding: 24px; user-select: none; -webkit-user-select: none; touch-action: manipulation; overflow: hidden; }
+    .bm-bomb { font-size: clamp(90px, 18vw, 150px); line-height: 1; filter: drop-shadow(0 8px 20px rgba(0, 0, 0, 0.4)); }
+    .bm-pad.ticking .bm-bomb { animation: bm-shake var(--beat, 0.6s) ease-in-out infinite; }
+    @keyframes bm-shake { 0%, 100% { transform: rotate(-6deg) scale(1); } 50% { transform: rotate(6deg) scale(1.08); } }
+    .bm-pad.boom { animation: bm-flash 0.6s ease-out; background: #b91c1c; }
+    @keyframes bm-flash { 0% { background: #fff; } 100% { background: #b91c1c; } }
+    .bm-topic { margin-top: 16px; font-size: clamp(20px, 3vw, 26px); font-weight: 700; }
+    .bm-holder { margin-top: 10px; font-size: 18px; opacity: 0.9; }
+    .bm-pass { margin-top: 22px; border-radius: 999px; background: #fff; color: #111; padding: 14px 34px; font-size: 18px; font-weight: 800; }
+    .bm-pass:active { transform: scale(0.96); }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · BOMB</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">폭탄 돌리기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">시작하면 폭탄이 째깍째깍. 주제에 맞는 단어를 하나 말하고 '넘기기'를 누른 뒤 옆 사람에게 폰을 넘기세요. 언제 터질지는 아무도 몰라요! 💥</p>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div id="bm-pad" class="bm-pad">
+            <p class="bm-bomb" id="bm-bomb">💣</p>
+            <p class="bm-topic" id="bm-topic">준비됐나요?</p>
+            <p class="bm-holder" id="bm-holder"></p>
+            <button type="button" class="bm-pass" id="bm-main">▶ 시작</button>
+        </div>
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card space-y-3">
+                <h2 class="text-[15px] font-semibold">설정</h2>
+                <div>
+                    <p class="text-[12px] text-[#6e6e73]">터지는 시간 (랜덤)</p>
+                    <div class="mt-1 flex flex-wrap gap-1.5" id="bm-len">
+                        <button type="button" class="gm-btn" data-len="5,15">짧게 5~15초</button>
+                        <button type="button" class="gm-btn is-on" data-len="10,35">보통 10~35초</button>
+                        <button type="button" class="gm-btn" data-len="25,70">길게 25~70초</button>
+                    </div>
+                </div>
+                <div>
+                    <p class="text-[12px] text-[#6e6e73]">주제</p>
+                    <div class="mt-1 flex flex-wrap gap-1.5" id="bm-topics"></div>
+                </div>
+                <label class="block text-[12px] text-[#6e6e73]">참가자 (선택 — 적으면 누가 들고 있는지 보여줘요)
+                    <textarea id="bm-names" class="gm-in mt-1" rows="3" placeholder="한 줄에 한 명"></textarea>
+                </label>
+                <label class="flex items-center gap-2 text-[13px]"><input id="bm-sound" type="checkbox" class="h-4 w-4" checked> 🔊 째깍 소리 · 📳 진동</label>
+            </section>
+            <section class="gm-card">
+                <div class="flex items-center"><h2 class="text-[15px] font-semibold">💥 벌칙 기록</h2><button type="button" class="ml-auto text-[12px] text-[#8e8e93] hover:text-[#c4271d]" id="bm-clear">지우기</button></div>
+                <ol id="bm-log" class="mt-2 space-y-1 text-[14px]"></ol>
+                <button type="button" class="gm-btn mt-3" id="bm-share">💬 공유</button>
+            </section>
+        </aside>
+    </div>
+</main>
+{% include "components/share.html" %}
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const TOPICS = {
+        '🎲 아무거나': null,
+        '🍎 과일': '과일 이름', '🐶 동물': '동물 이름', '🍜 음식': '음식 이름', '🏙 나라·도시': '나라나 도시 이름',
+        '🎬 영화·드라마': '영화나 드라마 제목', '🎵 가수': '가수 이름', '🚗 브랜드': '브랜드 이름', '📚 과목·전공': '과목이나 전공',
+        '🔤 끝말잇기': '끝말잇기 (앞 사람 단어의 끝 글자로)', '🔢 3·6·9': '숫자 세기 (3·6·9 는 박수)',
+    };
+    let topicKey = '🎲 아무거나', range = [10, 35];
+    let running = false, endAt = 0, startAt = 0, holder = 0, passes = 0, tickTimer = 0, log = [];
+
+    $('bm-topics').innerHTML = Object.keys(TOPICS).map((k) => `<button type="button" class="gm-btn ${k === topicKey ? 'is-on' : ''}" data-topic="${k}">${k}</button>`).join('');
+    const names = () => $('bm-names').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 20);
+    const topicText = () => {
+        if (TOPICS[topicKey]) return TOPICS[topicKey];
+        const pool = Object.values(TOPICS).filter(Boolean);
+        return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    let audio = null;
+    function beep(freq, len = 0.05, vol = 0.12) {
+        if (!$('bm-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain();
+            o.frequency.value = freq; o.type = 'square';
+            g.gain.setValueAtTime(vol, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + len);
+            o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + len + 0.02);
+        } catch (e) { /* 소리 없이 */ }
+    }
+    function boomSound() {
+        if (!$('bm-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const len = 1.2, buf = audio.createBuffer(1, audio.sampleRate * len, audio.sampleRate), data = buf.getChannelData(0);
+            for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2.5);
+            const src = audio.createBufferSource(), f = audio.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 700;
+            src.buffer = buf; src.connect(f).connect(audio.destination); src.start();
+        } catch (e) { /* 소리 없이 */ }
+        navigator.vibrate?.([300, 80, 500]);
+    }
+
+    // 남은 시간이 줄수록 째깍이 빨라짐 (남은 시간 자체는 안 보여 줌)
+    function tick() {
+        if (!running) return;
+        const now = performance.now();
+        if (now >= endAt) { explode(); return; }
+        const left = (endAt - now) / (endAt - startAt);
+        const beat = Math.max(0.12, 0.25 + left * 0.55);
+        $('bm-pad').style.setProperty('--beat', `${beat}s`);
+        beep(left < 0.25 ? 1400 : 900);
+        tickTimer = setTimeout(tick, beat * 1000);
+    }
+
+    function showHolder() {
+        const list = names();
+        $('bm-holder').textContent = list.length ? `💣 지금 ${list[holder % list.length]} 님이 들고 있어요` : `넘긴 횟수 ${passes}`;
+    }
+
+    function start() {
+        running = true; passes = 0; holder = 0;
+        startAt = performance.now();
+        endAt = startAt + (range[0] + Math.random() * (range[1] - range[0])) * 1000;
+        $('bm-pad').className = 'bm-pad ticking';
+        $('bm-bomb').textContent = '💣';
+        $('bm-topic').textContent = `주제: ${topicText()}`;
+        $('bm-main').textContent = '말하고 넘기기 →';
+        showHolder();
+        tick();
+    }
+    function pass() {
+        passes++; holder++;
+        navigator.vibrate?.(30);
+        if (topicKey === '🎲 아무거나') $('bm-topic').textContent = `주제: ${topicText()}`;
+        showHolder();
+    }
+    function explode() {
+        running = false;
+        clearTimeout(tickTimer);
+        boomSound();
+        $('bm-pad').className = 'bm-pad boom';
+        $('bm-bomb').textContent = '💥';
+        const list = names();
+        const who = list.length ? list[holder % list.length] : '지금 들고 있는 사람';
+        $('bm-topic').textContent = `펑! ${who} 벌칙!`;
+        $('bm-holder').textContent = `${passes}번 넘겼어요 · ${((endAt - startAt) / 1000).toFixed(1)}초 버팀`;
+        $('bm-main').textContent = '🔁 한 판 더';
+        log.unshift({ who, passes, sec: (endAt - startAt) / 1000 });
+        log = log.slice(0, 20);
+        renderLog();
+    }
+    function renderLog() {
+        $('bm-log').innerHTML = log.map((l, i) => `<li class="flex gap-2"><span class="w-5 text-[#8e8e93]">${log.length - i}</span><span class="flex-1 font-semibold">${esc(l.who)}</span><span class="text-[12px] text-[#8e8e93]">${l.passes}번 · ${l.sec.toFixed(1)}초</span></li>`).join('') || '<li class="text-[#8e8e93]">아직 아무도 안 터졌어요</li>';
+    }
+
+    $('bm-main').addEventListener('pointerdown', (e) => { e.preventDefault(); if (running) pass(); else start(); });
+    $('bm-topics').addEventListener('click', (e) => { const b = e.target.closest('[data-topic]'); if (!b) return; topicKey = b.dataset.topic; document.querySelectorAll('#bm-topics [data-topic]').forEach((x) => x.classList.toggle('is-on', x === b)); });
+    $('bm-len').addEventListener('click', (e) => { const b = e.target.closest('[data-len]'); if (!b || running) return; range = b.dataset.len.split(',').map(Number); document.querySelectorAll('#bm-len [data-len]').forEach((x) => x.classList.toggle('is-on', x === b)); });
+    $('bm-clear').addEventListener('click', () => { log = []; renderLog(); });
+    $('bm-share').addEventListener('click', () => {
+        const text = log.length ? ['💣 폭탄 돌리기 벌칙 기록', ...log.slice(0, 10).map((l, i) => `${i + 1}. ${l.who} (${l.passes}번 넘김)`)].join('\n') : '💣 폭탄 돌리기 한 판 할래?';
+        mjShare({ title: '💣 폭탄 돌리기', text, url: location.origin + location.pathname, button: '같이 하기' });
+    });
+    renderLog();
+    window.__bomb = { start, pass, explode, state: () => ({ running, passes, holder, endAt, startAt, log }) };
+})();
+</script>
+{% endblock %}

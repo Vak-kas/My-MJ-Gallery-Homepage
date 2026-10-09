@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .ud-pad { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 440px; border-radius: 28px; background: linear-gradient(160deg, #0c4a6e, #075985); color: #fff; text-align: center; padding: 24px; }
+    .ud-pad.hit { background: linear-gradient(160deg, #9f1239, #e11d48); }
+    .ud-range { font-size: clamp(40px, 8vw, 72px); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .ud-hint { margin-top: 8px; font-size: 26px; font-weight: 800; min-height: 36px; animation: ud-pop 0.3s cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes ud-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .ud-input { width: 180px; border-radius: 16px; border: 0; padding: 14px; font-size: 32px; font-weight: 700; text-align: center; color: #111; font-variant-numeric: tabular-nums; }
+    .ud-go { border-radius: 999px; background: #fff; color: #075985; padding: 14px 26px; font-size: 18px; font-weight: 800; }
+    .ud-keys { display: grid; grid-template-columns: repeat(3, 64px); gap: 8px; margin-top: 14px; }
+    .ud-keys button { height: 52px; border-radius: 14px; background: rgba(255, 255, 255, 0.16); font-size: 22px; font-weight: 700; }
+    .ud-keys button:active { background: rgba(255, 255, 255, 0.3); }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · UP DOWN</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">업다운.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">숨은 숫자를 돌아가며 불러요. UP·DOWN 힌트로 범위가 좁아지고, <b>숫자를 맞히는 사람이 벌칙</b>! (당첨으로 바꿀 수도 있어요)</p>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div class="ud-pad" id="ud-pad">
+            <p class="text-[15px] opacity-80" id="ud-who"></p>
+            <p class="ud-range" id="ud-range">1 ~ 100</p>
+            <p class="ud-hint" id="ud-hint"></p>
+            <form id="ud-form" class="mt-4 flex items-center gap-2">
+                <input id="ud-input" class="ud-input" inputmode="numeric" autocomplete="off" maxlength="4">
+                <button class="ud-go">확인</button>
+            </form>
+            <div class="ud-keys" id="ud-keys"></div>
+        </div>
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card space-y-3">
+                <h2 class="text-[15px] font-semibold">설정</h2>
+                <div class="flex flex-wrap gap-1.5" id="ud-max">
+                    <button type="button" class="gm-btn" data-max="50">1~50</button>
+                    <button type="button" class="gm-btn is-on" data-max="100">1~100</button>
+                    <button type="button" class="gm-btn" data-max="300">1~300</button>
+                    <button type="button" class="gm-btn" data-max="1000">1~1000</button>
+                </div>
+                <div class="flex flex-wrap gap-1.5" id="ud-rule">
+                    <button type="button" class="gm-btn is-on" data-rule="penalty">😱 맞히면 벌칙</button>
+                    <button type="button" class="gm-btn" data-rule="win">🎉 맞히면 당첨</button>
+                </div>
+                <label class="block text-[12px] text-[#6e6e73]">참가자 (선택)
+                    <textarea id="ud-names" class="gm-in mt-1" rows="3" placeholder="한 줄에 한 명"></textarea>
+                </label>
+                <button type="button" class="gm-btn w-full" id="ud-new">🔁 새 숫자</button>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">부른 숫자</h2>
+                <ol id="ud-log" class="mt-2 space-y-1 text-[14px] tabular-nums"></ol>
+                <button type="button" class="gm-btn mt-3" id="ud-share">💬 공유</button>
+            </section>
+        </aside>
+    </div>
+</main>
+{% include "components/share.html" %}
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    let max = 100, rule = 'penalty', secret = 0, lo = 1, hi = 100, turn = 0, log = [], done = false;
+    const names = () => $('ud-names').value.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 20);
+    const whoAt = (i) => { const n = names(); return n.length ? n[i % n.length] : `${i + 1}번째`; };
+
+    function newGame() {
+        secret = 1 + Math.floor(Math.random() * max);
+        lo = 1; hi = max; turn = 0; log = []; done = false;
+        $('ud-pad').classList.remove('hit');
+        $('ud-hint').textContent = '';
+        $('ud-input').value = '';
+        $('ud-form').classList.remove('hidden'); $('ud-keys').classList.remove('hidden');
+        render();
+    }
+    function render() {
+        $('ud-range').textContent = `${lo} ~ ${hi}`;
+        $('ud-who').textContent = done ? '' : (names().length ? `🙋 ${whoAt(turn)} 차례` : `${turn + 1}번째 시도`);
+        $('ud-log').innerHTML = log.map((l) => `<li class="flex gap-2"><span class="flex-1 truncate">${esc(l.who)}</span><b>${l.n}</b><span class="w-16 text-right ${l.r === 'hit' ? 'font-bold text-[#e11d48]' : 'text-[#6e6e73]'}">${l.r === 'up' ? '⬆ UP' : l.r === 'down' ? '⬇ DOWN' : '🎯 정답'}</span></li>`).join('') || '<li class="text-[#8e8e93]">아직 없어요</li>';
+    }
+    function guess(n) {
+        if (done) return;
+        if (!Number.isInteger(n) || n < lo || n > hi) { $('ud-hint').textContent = `${lo}~${hi} 사이로!`; return; }
+        const who = whoAt(turn);
+        let r;
+        if (n === secret) {
+            r = 'hit'; done = true;
+            $('ud-pad').classList.add('hit');
+            $('ud-hint').textContent = rule === 'penalty' ? `💥 ${who} 벌칙! 정답 ${secret}` : `🎉 ${who} 당첨! 정답 ${secret}`;
+            $('ud-form').classList.add('hidden'); $('ud-keys').classList.add('hidden');
+            navigator.vibrate?.([200, 60, 200]);
+        } else if (n < secret) { r = 'up'; lo = n + 1; $('ud-hint').textContent = `⬆ UP`; }
+        else { r = 'down'; hi = n - 1; $('ud-hint').textContent = `⬇ DOWN`; }
+        // 힌트 애니메이션 다시
+        const h = $('ud-hint'); h.style.animation = 'none'; h.offsetWidth; h.style.animation = '';
+        log.push({ who, n, r });
+        turn++;
+        $('ud-input').value = '';
+        render();
+    }
+    $('ud-form').addEventListener('submit', (e) => { e.preventDefault(); guess(parseInt($('ud-input').value, 10)); });
+    // 휴대폰용 숫자 키패드
+    $('ud-keys').innerHTML = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'].map((k) => `<button type="button" data-k="${k}">${k}</button>`).join('');
+    $('ud-keys').addEventListener('click', (e) => {
+        const k = e.target.dataset.k; if (!k) return;
+        const inp = $('ud-input');
+        if (k === '⌫') inp.value = inp.value.slice(0, -1);
+        else if (k === '✓') guess(parseInt(inp.value, 10));
+        else if (inp.value.length < 4) inp.value += k;
+    });
+    $('ud-max').addEventListener('click', (e) => { const b = e.target.closest('[data-max]'); if (!b) return; max = +b.dataset.max; document.querySelectorAll('#ud-max [data-max]').forEach((x) => x.classList.toggle('is-on', x === b)); newGame(); });
+    $('ud-rule').addEventListener('click', (e) => { const b = e.target.closest('[data-rule]'); if (!b) return; rule = b.dataset.rule; document.querySelectorAll('#ud-rule [data-rule]').forEach((x) => x.classList.toggle('is-on', x === b)); });
+    $('ud-names').addEventListener('input', render);
+    $('ud-new').addEventListener('click', newGame);
+    $('ud-share').addEventListener('click', () => {
+        const last = log[log.length - 1];
+        const text = done ? `🔢 업다운 (1~${max}) — 정답 ${secret}\n${log.length}번 만에 ${last.who} ${rule === 'penalty' ? '벌칙 😱' : '당첨 🎉'}` : '🔢 업다운 한 판 할래?';
+        mjShare({ title: '🔢 업다운', text, url: location.origin + location.pathname, button: '같이 하기' });
+    });
+    newGame();
+    window.__ud = { guess, state: () => ({ secret, lo, hi, turn, log, done }) };
+})();
+</script>
+{% endblock %}

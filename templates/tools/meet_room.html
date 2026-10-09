@@ -52,7 +52,7 @@
         </div>
         <div class="flex flex-wrap gap-2">
             <button type="button" class="mr-btn" id="mr-copy" data-url="{{ share_url }}">🔗 링크 복사</button>
-            <button type="button" class="mr-btn hidden" id="mr-share">공유하기</button>
+            <button type="button" class="mr-btn" id="mr-share">💬 공유</button>
             {% if is_owner %}
             <form method="post" action="{% url 'tools:meet_delete' meeting.meet_id %}" onsubmit="return confirm('이 일정을 지울까요? 참여한 사람들의 응답도 같이 지워져요.')">
                 {% csrf_token %}<button class="mr-btn">🗑 일정 지우기</button>
@@ -392,10 +392,7 @@
         const url = $('mr-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('mr-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('mr-copy').textContent = '🔗 링크 복사'; }, 1500); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    if (navigator.share) {
-        $('mr-share').classList.remove('hidden');
-        $('mr-share').addEventListener('click', () => navigator.share({ title: document.querySelector('h1').textContent.trim(), text: '되는 시간을 칠해 주세요', url: $('mr-copy').dataset.url }).catch(() => {}));
-    }
+    $('mr-share').addEventListener('click', () => mjShare({ title: `📅 ${document.querySelector('h1').textContent.trim()}`, text: '되는 시간을 칠해 주세요! 로그인 없이 이름만 넣으면 돼요.', url: $('mr-copy').dataset.url, button: '시간 칠하러 가기' }));
     function tab(name) {
         document.querySelectorAll('[data-pane]').forEach((p) => p.classList.toggle('max-lg:hidden', p.dataset.pane !== name));
         document.querySelectorAll('[data-tab]').forEach((b) => { b.style.background = b.dataset.tab === name ? '#1d1d1f' : ''; b.style.color = b.dataset.tab === name ? '#fff' : ''; });
@@ -417,4 +414,5 @@
     window.__meet = { state: () => S, me: () => me, mine: () => mine, refresh, people };
 })();
 </script>
+{% include "components/share.html" %}
 {% endblock %}

@@ -37,6 +37,7 @@
             <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 15×15 자유룰</p>
         </div>
         <button type="button" class="gm-btn" id="om-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="om-kakao">💬 카톡으로 초대</button>
         {% if is_owner %}<form method="post" action="{% url 'games:omok_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
     </div>
 
@@ -246,9 +247,11 @@
         const url = $('om-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('om-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('om-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
+    $('om-kakao').addEventListener('click', () => mjShare({ title: `⚫ 오목 한 판 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.', url: $('om-copy').dataset.url, button: '오목 두러 가기' }));
     render();
     window.__omok = { state: () => S, seat: () => mySeat, send };
 })();
 </script>
 {% endif %}
+{% include "components/share.html" %}
 {% endblock %}
