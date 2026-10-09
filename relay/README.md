@@ -91,3 +91,13 @@ venv/bin/python manage.py test tools
    - coturn 설치, `.env` 에 `TURN_SECRET` 생성, `/etc/turnserver.conf` 작성(사설망 중계 차단·속도 제한), gunicorn 재시작
 2. **Lightsail 콘솔 → 네트워킹 → IPv4 방화벽**: 사용자 지정 `UDP 3478`, `TCP 3478`, `UDP 49160-49200` 추가
 3. 확인: `systemctl status coturn`, 방송 화면의 시청자 목록에서 "서버 중계" 표시
+
+## 실시간 게임 방 (`relay/mj_game.py`)
+
+mj-relay 안에서 함께 도는 게임 방. 판은 서버가 들고 규칙(차례·빈 칸·승패)도 서버가 판단하고, 브라우저는 보여 주기만 한다.
+
+- 제어 API (Django 가 호출): `POST /games` {kind, title, owner_id, owner, public} · `GET /games` · `GET /games/{id}` · `DELETE /games/{id}`
+- WebSocket: `/relay/ws/game/{id}?token=<방 토큰>&pid=<브라우저 열쇠>&name=<닉네임>` (nginx 의 `/relay/ws/` 프록시 그대로)
+- `pid` 가 같으면 새로고침·잠깐 끊겨도 자리를 돌려받음, 90초 안 돌아오면 자리 비움(대국 중이면 상대 승)
+- 아무도 없이 30분 → 방 닫음, 방 최대 6시간·30개, 방마다 30명
+- 게임 종류 = 규칙 클래스 하나 (`OmokLogic`: 15×15 자유룰, 무르기 부탁·기권·흑백 바꿔 다시). 새 게임은 `LOGICS` 에 추가

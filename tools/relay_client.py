@@ -72,3 +72,19 @@ def create_live(payload):
 
 def close_live(room_id):
 	return _call("DELETE", f"/live/{room_id}")
+
+
+def list_games():
+	return (_call("GET", "/games") or {}).get("rooms", [])
+
+
+def get_game(room_id):
+	return _call("GET", f"/games/{room_id}")
+
+
+def create_game(payload):
+	return _call("POST", "/games", payload)
+
+
+def close_game(room_id):
+	return _call("DELETE", f"/games/{room_id}")
