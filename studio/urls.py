@@ -51,6 +51,7 @@ urlpatterns = [
     path('security/', views.security, name='security'),
     path('analytics/', views.analytics, name='analytics'),
     path('server/', views.server, name='server'),
+    path('server/logs/', views.server_logs, name='server_logs'),
     path('ai/', views.ai_usage, name='ai'),
     path('settings/', views.site_settings_view, name='settings'),
     path('posts/<int:id>/visibility/', views.post_visibility_update, name='post_visibility_update'),
