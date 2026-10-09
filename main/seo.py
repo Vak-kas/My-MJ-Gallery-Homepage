@@ -11,7 +11,7 @@ SITE_NAME = "서민재 갤러리"
 DEFAULT_DESCRIPTION = "네트워크·보안을 공부하는 서민재의 포트폴리오와 기술 블로그, 그리고 직접 만든 웹 도구 모음."
 NOINDEX_PREFIXES = (
 	"/studio/", "/accounts/", "/notifications/", "/admin/", "/s/",
-	"/tools/share/", "/tools/secret/", "/tools/live/", "/tools/stream/", "/tools/clipboard/",
+	"/tools/share/", "/tools/secret/", "/tools/live/", "/tools/stream/", "/tools/clipboard/", "/tools/meet/",
 )
 
 

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, link_views, live_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import clipboard_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -20,6 +20,13 @@ urlpatterns = [
     path("diff/", views.textdiff, name="textdiff"),
     path("gpa/", views.gpa, name="gpa"),
     path("image/", views.image_tool, name="image"),
+    path("meet/", meet_views.meet, name="meet"),
+    path("meet/<str:meet_id>/", meet_views.meet_room, name="meet_room"),
+    path("meet/<str:meet_id>/state/", meet_views.meet_state, name="meet_state"),
+    path("meet/<str:meet_id>/join/", meet_views.meet_join, name="meet_join"),
+    path("meet/<str:meet_id>/save/", meet_views.meet_save, name="meet_save"),
+    path("meet/<str:meet_id>/remove/", meet_views.meet_remove, name="meet_remove"),
+    path("meet/<str:meet_id>/delete/", meet_views.meet_delete, name="meet_delete"),
     path("regex/", views.regex, name="regex"),
     path("qrcode/ai-style/", qr_ai.qr_ai_style, name="qrcode_ai"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),

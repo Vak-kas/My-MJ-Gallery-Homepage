@@ -128,3 +128,60 @@ class SecretNote(models.Model):
 
 	def __str__(self):
 		return f"secret:{self.note_id}"
+
+
+def _meet_id():
+	return secrets.token_urlsafe(9)
+
+
+class Meeting(models.Model):
+	"""팀플 일정 맞추기. 날짜 × 시간 칸 중 각자 되는 칸을 칠함.
+	칸 번호 = 날짜 순번 × 하루 칸 수 + 그날 안에서 칸 순번."""
+
+	meet_id = models.CharField(max_length=24, unique=True, default=_meet_id)
+	owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="meetings")
+	title = models.CharField(max_length=80)
+	note = models.CharField(max_length=300, blank=True)
+	dates = models.JSONField()  # ["2026-10-12", ...] 정렬됨
+	start_min = models.PositiveSmallIntegerField()  # 00:00 부터 몇 분
+	end_min = models.PositiveSmallIntegerField()  # 이 시각 전까지
+	slot_min = models.PositiveSmallIntegerField(default=30)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)  # 응답이 바뀌어도 갱신 → 화면 자동 새로고침 기준
+	expires_at = models.DateTimeField(db_index=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"meet:{self.meet_id} {self.title}"
+
+	def get_absolute_url(self):
+		from django.urls import reverse
+
+		return reverse("tools:meet_room", args=[self.meet_id])
+
+	@property
+	def slots_per_day(self):
+		return (self.end_min - self.start_min) // self.slot_min
+
+	@property
+	def slot_count(self):
+		return self.slots_per_day * len(self.dates)
+
+
+class MeetingResponse(models.Model):
+	meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="responses")
+	name = models.CharField(max_length=30)
+	key_hash = models.CharField(max_length=64)  # 이 기기에서 고칠 때 쓰는 열쇠(sha256)
+	pin_hash = models.CharField(max_length=128, blank=True)  # 다른 기기에서 다시 들어올 때 비밀번호 (선택)
+	slots = models.JSONField(default=list)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["created_at", "id"]
+		constraints = [models.UniqueConstraint(fields=["meeting", "name"], name="uniq_meeting_response_name")]
+
+	def __str__(self):
+		return f"{self.meeting_id}:{self.name}"

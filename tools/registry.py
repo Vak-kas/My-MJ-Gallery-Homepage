@@ -84,6 +84,16 @@ TOOLS = [
 		"access": "member",  # 방 만들기는 회원(한도 있음), 받는 쪽은 링크만 있으면 누구나 — tools/permissions.py
 	},
 	{
+		"slug": "meet",
+		"url_name": "tools:meet",
+		"icon": "📅",
+		"title": "팀플 일정 맞추기",
+		"description": "날짜와 시간대를 정해 링크를 돌리면, 각자 되는 시간을 드래그로 칠해요. 겹치는 시간이 진하게 보이고 '모두 되는 시간'을 바로 찾아줘요. 참여는 로그인 없이.",
+		"tags": ["팀플", "약속"],
+		"category": "share",
+		"access": "member",  # 만들기는 회원, 링크로 참여는 누구나
+	},
+	{
 		"slug": "clipboard",
 		"url_name": "tools:clipboard",
 		"icon": "📋",

@@ -229,6 +229,8 @@ class SiteSettingsTests(TestCase):
         self.client.logout()
         self.assertEqual(self.client.get("/tools/").status_code, 302)
         self.assertEqual(self.client.get("/tools/secret/abc/").status_code, 200)
+        self.assertEqual(self.client.get("/tools/meet/nope/").status_code, 404)  # 로그인으로 보내지 않고 일정 링크까지 통과
+        self.assertEqual(self.client.get("/tools/meet/").status_code, 302)
 
     def test_admin_sees_hidden_home_sections(self):
         order = ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]

@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .mt-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 22px; }
+    .mt-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .mt-in:focus { border-color: #0066cc; }
+    .mt-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .mt-btn:hover { background: #f5f5f7; }
+    .cal-day { height: 40px; border-radius: 10px; font-size: 14px; font-variant-numeric: tabular-nums; color: #1d1d1f; transition: background 0.1s; touch-action: none; user-select: none; }
+    .cal-day:hover:not(:disabled) { background: #f0f7ff; }
+    .cal-day.is-on { background: #0066cc; color: #fff; font-weight: 600; }
+    .cal-day.is-today { box-shadow: inset 0 0 0 1px #0066cc; }
+    .cal-day:disabled { color: #c7c7cc; cursor: default; }
+    .cal-day.is-sun { color: #c4271d; }
+    .cal-day.is-sat { color: #0066cc; }
+    .cal-day.is-on.is-sun, .cal-day.is-on.is-sat { color: #fff; }
+    html.theme-dark .mt-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .mt-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .mt-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .cal-day { color: #e8e8ea; }
+    html.theme-dark .cal-day:hover:not(:disabled) { background: #142e43; }
+    html.theme-dark .cal-day:disabled { color: #4b4f58; }
+    html.theme-dark .cal-day.is-sun { color: #ff6b61; }
+    html.theme-dark .cal-day.is-sat { color: #4da3ff; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MEETING · PLANNER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">팀플 일정 맞추기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">날짜와 시간대를 정해서 링크를 돌리면, 각자 되는 시간을 칠해요. 받은 사람은 로그인 없이 이름만 넣고 참여해요.</p>
+    </div>
+
+    {% if messages %}
+    <div class="mt-6 space-y-2">
+        {% for m in messages %}
+        <p class="rounded-2xl px-4 py-3 text-[14px] {% if m.tags == 'error' %}bg-[#fff1f0] text-[#c4271d]{% else %}bg-[#e8f8ee] text-[#1e7a35]{% endif %}">{{ m }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]">
+        <form method="post" id="mt-form" class="mt-card space-y-5">
+            {% csrf_token %}
+            <input type="hidden" name="dates" id="mt-dates">
+            <label class="block text-[13px] text-[#6e6e73]">일정 이름
+                <input name="title" maxlength="80" required class="mt-in mt-1" placeholder="예: 캡스톤 2차 회의">
+            </label>
+
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[13px] text-[#6e6e73]">날짜 고르기 <span class="text-[#8e8e93]">(누르거나 끌어서 여러 날)</span></span>
+                    <span id="mt-picked" class="text-[13px] font-semibold text-[#0066cc]"></span>
+                    <div class="ml-auto flex gap-1.5">
+                        <button type="button" class="mt-btn" data-quick="week">이번 주 평일</button>
+                        <button type="button" class="mt-btn" data-quick="next7">오늘부터 7일</button>
+                        <button type="button" class="mt-btn" data-quick="clear">비우기</button>
+                    </div>
+                </div>
+                <div class="mt-3 grid gap-6 md:grid-cols-2" id="mt-cals"></div>
+                <div class="mt-2 flex justify-between">
+                    <button type="button" class="mt-btn" id="cal-prev">← 이전 달</button>
+                    <button type="button" class="mt-btn" id="cal-next">다음 달 →</button>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-3">
+                <label class="text-[13px] text-[#6e6e73]">몇 시부터<select name="start" id="mt-start" class="mt-in mt-1"></select></label>
+                <label class="text-[13px] text-[#6e6e73]">몇 시까지<select name="end" id="mt-end" class="mt-in mt-1"></select></label>
+                <label class="text-[13px] text-[#6e6e73]">칸 단위
+                    <select name="slot" id="mt-slot" class="mt-in mt-1">
+                        {% for s in slot_choices %}<option value="{{ s }}" {% if s == 30 %}selected{% endif %}>{{ s }}분</option>{% endfor %}
+                    </select>
+                </label>
+            </div>
+            <label class="block text-[13px] text-[#6e6e73]">메모 (선택)
+                <input name="note" maxlength="300" class="mt-in mt-1" placeholder="예: 2시간 정도, 학교 근처 카페">
+            </label>
+            <button class="w-full rounded-full bg-[#0066cc] py-3 text-[15px] font-semibold text-white hover:bg-[#0058b0]">링크 만들기 →</button>
+        </form>
+
+        <aside class="space-y-4">
+            <section class="mt-card">
+                <h2 class="text-[15px] font-semibold">내가 만든 일정</h2>
+                {% if rows %}
+                <ul class="mt-3 divide-y divide-black/[0.06]">
+                    {% for r in rows %}
+                    <li class="flex items-center gap-3 py-3">
+                        <div class="min-w-0 flex-1">
+                            <a href="{{ r.obj.get_absolute_url }}" class="block truncate text-[14px] font-semibold text-[#1d1d1f] hover:text-[#0066cc]">{{ r.obj.title }}</a>
+                            <p class="text-[12px] text-[#8e8e93]">{{ r.obj.dates|first }}{% if r.obj.dates|length > 1 %} ~ {{ r.obj.dates|last }}{% endif %} · {{ r.count }}명 참여</p>
+                        </div>
+                        <button type="button" class="mt-btn" data-copy="{{ r.url }}">링크 복사</button>
+                        <form method="post" action="{% url 'tools:meet_delete' r.obj.meet_id %}" onsubmit="return confirm('이 일정을 지울까요? 참여한 사람들의 응답도 같이 지워져요.')">
+                            {% csrf_token %}<button class="mt-btn" title="지우기">🗑</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="mt-3 text-[13px] text-[#8e8e93]">아직 없어요. 왼쪽에서 만들어 보세요.</p>
+                {% endif %}
+                <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">마지막 날짜에서 2주가 지나면 자동으로 지워져요.</p>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const MAX = {{ max_dates }};
+    const pad = (n) => String(n).padStart(2, '0');
+    const iso = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const picked = new Set();
+    let base = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    function month(first) {
+        const y = first.getFullYear(), m = first.getMonth();
+        const days = new Date(y, m + 1, 0).getDate();
+        const cells = Array(first.getDay()).fill('<span></span>');
+        for (let d = 1; d <= days; d++) {
+            const dt = new Date(y, m, d), key = iso(dt), dow = dt.getDay();
+            const past = dt < today;
+            cells.push(`<button type="button" class="cal-day ${picked.has(key) ? 'is-on' : ''} ${+dt === +today ? 'is-today' : ''} ${dow === 0 ? 'is-sun' : dow === 6 ? 'is-sat' : ''}" data-d="${key}" ${past ? 'disabled' : ''}>${d}</button>`);
+        }
+        return `<div><p class="mb-2 text-center text-[14px] font-semibold text-[#1d1d1f]">${y}년 ${m + 1}월</p>
+            <div class="grid grid-cols-7 gap-1 text-center text-[11px] text-[#8e8e93]">${'일월화수목금토'.split('').map((w) => `<span>${w}</span>`).join('')}</div>
+            <div class="mt-1 grid grid-cols-7 gap-1">${cells.join('')}</div></div>`;
+    }
+    function render() {
+        const next = new Date(base.getFullYear(), base.getMonth() + 1, 1);
+        document.getElementById('mt-cals').innerHTML = month(base) + month(next);
+        document.getElementById('cal-prev').disabled = base <= new Date(today.getFullYear(), today.getMonth(), 1);
+        const list = [...picked].sort();
+        document.getElementById('mt-dates').value = list.join(',');
+        document.getElementById('mt-picked').textContent = list.length ? `${list.length}일 골랐어요` : '';
+    }
+
+    // 누르거나 끌어서 여러 날 고르기: 처음 누른 날부터 지금 날까지 사이를 모두 켜거나 끔 (빨리 끌어도 빠지는 날 없음)
+    let drag = null;
+    const cals = document.getElementById('mt-cals');
+    const toDate = (key) => new Date(`${key}T00:00:00`);
+    function applyRange(toKey) {
+        const a = toDate(drag.from), b = toDate(toKey);
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        const next = new Set(drag.before);
+        for (const d = new Date(lo); d <= hi; d.setDate(d.getDate() + 1)) {
+            if (d < today) continue;
+            if (drag.on) { if (next.size < MAX) next.add(iso(d)); } else next.delete(iso(d));
+        }
+        picked.clear();
+        next.forEach((k) => picked.add(k));
+        cals.querySelectorAll('.cal-day[data-d]').forEach((el) => el.classList.toggle('is-on', picked.has(el.dataset.d)));
+    }
+    cals.addEventListener('pointerdown', (e) => {
+        const el = e.target.closest('.cal-day');
+        if (!el || el.disabled) return;
+        drag = { from: el.dataset.d, on: !picked.has(el.dataset.d), before: new Set(picked) };
+        applyRange(el.dataset.d);
+        e.preventDefault();
+    });
+    window.addEventListener('pointermove', (e) => {
+        if (!drag) return;
+        const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.cal-day');
+        if (el && el.dataset.d && !el.disabled) applyRange(el.dataset.d);
+    });
+    window.addEventListener('pointerup', () => { if (drag) { drag = null; render(); } });
+    document.getElementById('cal-prev').addEventListener('click', () => { base = new Date(base.getFullYear(), base.getMonth() - 1, 1); render(); });
+    document.getElementById('cal-next').addEventListener('click', () => { base = new Date(base.getFullYear(), base.getMonth() + 1, 1); render(); });
+    document.querySelectorAll('[data-quick]').forEach((b) => b.addEventListener('click', () => {
+        const q = b.dataset.quick;
+        if (q === 'clear') picked.clear();
+        if (q === 'next7') for (let i = 0; i < 7; i++) picked.add(iso(new Date(today.getFullYear(), today.getMonth(), today.getDate() + i)));
+        if (q === 'week') {  // 이번 주(주말이면 다음 주) 월~금 중 오늘 이후
+            const start = new Date(today);
+            if (today.getDay() === 6) start.setDate(today.getDate() + 2);
+            if (today.getDay() === 0) start.setDate(today.getDate() + 1);
+            const mon = new Date(start); mon.setDate(start.getDate() - (start.getDay() - 1));
+            for (let i = 0; i < 5; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); if (d >= today) picked.add(iso(d)); }
+        }
+        render();
+    }));
+
+    // 시간 고르기
+    const label = (m) => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+    function times() {
+        const slot = +document.getElementById('mt-slot').value;
+        const s = document.getElementById('mt-start'), e = document.getElementById('mt-end');
+        const sv = +(s.value || 540), ev = +(e.value || 1320);
+        const opts = [];
+        for (let m = 0; m <= 1440; m += slot) opts.push(m);
+        s.innerHTML = opts.filter((m) => m < 1440).map((m) => `<option value="${m}">${label(m)}</option>`).join('');
+        e.innerHTML = opts.filter((m) => m > 0).map((m) => `<option value="${m}">${m === 1440 ? '24:00' : label(m)}</option>`).join('');
+        s.value = String(Math.floor(sv / slot) * slot); e.value = String(Math.ceil(ev / slot) * slot);
+    }
+    document.getElementById('mt-slot').addEventListener('change', times);
+    document.getElementById('mt-form').addEventListener('submit', (e) => {
+        if (!picked.size) { e.preventDefault(); alert('날짜를 하루 이상 골라 주세요.'); return; }
+        if (+document.getElementById('mt-start').value >= +document.getElementById('mt-end').value) { e.preventDefault(); alert('끝나는 시간이 시작보다 늦어야 해요.'); }
+    });
+    document.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+        try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = '복사됨 ✓'; setTimeout(() => { b.textContent = '링크 복사'; }, 1500); } catch (e) { prompt('링크를 복사하세요', b.dataset.copy); }
+    }));
+    times();
+    render();
+})();
+</script>
+{% endblock %}
