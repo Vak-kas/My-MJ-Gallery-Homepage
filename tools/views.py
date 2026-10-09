@@ -51,6 +51,14 @@ def encode(request):
 	return render(request, "tools/encode.html")
 
 
+def charcount(request):
+	return render(request, "tools/charcount.html")
+
+
+def textdiff(request):
+	return render(request, "tools/textdiff.html")
+
+
 def pdf_tool(request):
 	return render(request, "tools/pdf.html")
 
