@@ -63,7 +63,8 @@ class LinkPreviewTests(TestCase):
 	def test_search_verification_meta(self):
 		from django.test import override_settings
 
-		self.assertNotIn("naver-site-verification", self.client.get("/").content.decode())
+		with override_settings(NAVER_SITE_VERIFICATION="", GOOGLE_SITE_VERIFICATION=""):  # .env 값과 상관없이
+			self.assertNotIn("naver-site-verification", self.client.get("/").content.decode())
 		with override_settings(NAVER_SITE_VERIFICATION="abc12345", GOOGLE_SITE_VERIFICATION="g-xyz-1234"):
 			html = self.client.get("/").content.decode()
 		self.assertIn('<meta name="naver-site-verification" content="abc12345">', html)
