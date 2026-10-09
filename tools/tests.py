@@ -1182,3 +1182,54 @@ class PaperSectionsTests(TestCase):
 		self.assertEqual(res.status_code, 404)
 		self.assertTrue(res.json()["need_pdf"])
 		self.assertEqual(self.client.post("/tools/papers/sections/pdf/").status_code, 302)  # PDF 올리기는 회원만
+
+
+class PaperAITests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.user = get_user_model().objects.create_user("u", "u@example.com", "pw")
+
+	def post(self, body):
+		import json
+		return self.client.post("/tools/papers/ai/", json.dumps(body), content_type="application/json")
+
+	def test_summary_trims_and_caches(self):
+		from unittest import mock
+		from . import paper_ai
+		self.assertEqual(self.post({"mode": "summary", "title": "T", "sections": {"abstract": "x"}}).status_code, 401)  # 로그인 필요
+		self.client.force_login(self.user)
+		long = {"abstract": "a" * 3000, "introduction": "i" * 9000, "system": "s" * 9000, "simulation": "r" * 3000}
+		raw = {**{k: f"{label} 값" for k, label in paper_ai.FIELDS}, "keywords": ["LEO jamming", "anti-jamming"]}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=raw) as call:
+			res = self.post({"mode": "summary", "title": "Anti-jamming in LEO", "sections": long})
+			body = res.json()
+			self.assertEqual(res.status_code, 200, body)
+			self.assertEqual(body["fields"][1], {"key": "scenario", "label": "시나리오·네트워크", "value": "시나리오·네트워크 값"})
+			sent = call.call_args.kwargs["content"]
+			self.assertLessEqual(len(sent), 4000)  # 회원 한도(4000자) 안으로 줄여서 보냄
+			self.assertIn("## system", sent)
+			again = self.post({"mode": "summary", "title": "Anti-jamming in LEO", "sections": long}).json()
+		self.assertEqual(call.call_count, 1)  # 같은 논문은 저장된 결과
+		self.assertTrue(again["cached"])
+
+	def test_repair_leaked_fields(self):
+		from . import paper_ai
+		raw = {"threat": 'TDOA.</threat>\n<parameter name="objective">LEP 최대화</objective>\n<parameter name="method">SAA</parameter>', "objective": "언급 없음", "method": "", "metrics": "LEP"}
+		self.assertEqual(paper_ai.repair(raw, {"threat", "objective", "method", "metrics"}), {"threat": "TDOA.", "objective": "LEP 최대화", "method": "SAA", "metrics": "LEP"})
+
+	def test_intro_and_group(self):
+		from unittest import mock
+		self.client.force_login(self.user)
+		raw = {"paragraphs": [{"n": 1, "role": "background", "gist": "배경"}, {"n": 9, "role": "gap", "gist": "없는 문단"}, {"n": 2, "role": "weird", "gist": "기여"}],
+			   "flow": "배경 → 기여", "lessons": ["짧게 시작"], "phrases": ["Motivated by ..., we ..."]}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=raw):
+			body = self.post({"mode": "intro", "title": "T", "paragraphs": ["p1", "p2"]}).json()
+		self.assertEqual([p["n"] for p in body["paragraphs"]], [1, 2])  # 없는 문단 번호는 버림
+		self.assertEqual(body["paragraphs"][1]["role"], "background")  # 이상한 역할은 기본값
+		self.assertEqual(self.post({"mode": "group", "papers": [{"title": "A", "fields": []}]}).status_code, 400)
+		graw = {"groups": [{"name": "DRL", "papers": [1, 2, 7], "common": "c", "differences": "d"}], "gaps": [{"gap": "g", "why": "w"}], "overview": "o"}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=graw):
+			g = self.post({"mode": "group", "papers": [{"title": "A", "fields": [{"key": "method", "value": "DRL"}]}, {"title": "B", "fields": []}]}).json()
+		self.assertEqual(g["groups"][0]["papers"], [1, 2])
