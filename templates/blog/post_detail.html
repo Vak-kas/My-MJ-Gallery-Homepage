@@ -106,12 +106,39 @@
                 </form>
             </div>
             {% else %}
+{% if series %}
+            <section class="mb-8 rounded-[20px] border border-[#0066cc]/20 bg-[#f0f7ff] p-5">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                    <a href="{% url 'blog:series' series.slug %}" class="text-[15px] font-semibold text-[#1d1d1f] hover:underline">📚 {{ series.name }}</a>
+                    <span class="text-[12px] text-[#0066cc]">{{ series_index }} / {{ series_parts|length }}편</span>
+                </div>
+                <details class="mt-2" {% if series_parts|length <= 6 %}open{% endif %}>
+                    <summary class="cursor-pointer text-[12px] text-[#6e6e73]">목차 보기</summary>
+                    <ol class="mt-2 space-y-1 text-[14px]">
+                        {% for part in series_parts %}
+                        <li class="flex gap-2">
+                            <span class="w-6 shrink-0 text-right text-[#8e8e93]">{{ part.series_order|default:forloop.counter }}.</span>
+                            {% if part.id == post.id %}<span class="font-semibold text-[#0066cc]">{{ part.title }} (지금 글)</span>
+                            {% else %}<a href="{% url 'blog:post_detail' part.slug %}" class="text-[#1d1d1f] hover:underline">{{ part.title }}</a>{% endif %}
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </details>
+            </section>
+            {% endif %}
             <div class="prose max-w-none prose-p:leading-[1.9] prose-headings:tracking-[-0.03em] prose-h1:text-[2.1rem] prose-h2:text-[1.65rem] prose-h3:text-[1.3rem] prose-table:w-full prose-img:rounded-2xl">
                 {{ post.content|render_editorjs }}
             </div>
             {% endif %}
         </div>
     </article>
+
+    {% if series and not is_locked_post %}
+    <nav class="mt-8 grid gap-3 sm:grid-cols-2">
+        {% if series_prev %}<a href="{% url 'blog:post_detail' series_prev.slug %}" class="rounded-[18px] border border-black/[0.08] bg-white p-4 hover:border-[#0066cc]/40"><p class="text-[12px] text-[#8e8e93]">← 이전 편</p><p class="mt-1 truncate text-[15px] font-semibold text-[#1d1d1f]">{{ series_prev.title }}</p></a>{% else %}<span></span>{% endif %}
+        {% if series_next %}<a href="{% url 'blog:post_detail' series_next.slug %}" class="rounded-[18px] border border-black/[0.08] bg-white p-4 text-right hover:border-[#0066cc]/40"><p class="text-[12px] text-[#8e8e93]">다음 편 →</p><p class="mt-1 truncate text-[15px] font-semibold text-[#1d1d1f]">{{ series_next.title }}</p></a>{% endif %}
+    </nav>
+    {% endif %}
 
     {% if not is_locked_post %}
     <section id="comments" class="mt-10 space-y-8 scroll-mt-24">

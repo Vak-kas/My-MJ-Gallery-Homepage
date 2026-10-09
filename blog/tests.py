@@ -3,7 +3,7 @@ import json
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
-from blog.models import GuestbookEntry
+from blog.models import GuestbookEntry, Post
 from blog.content import parse_content, render_tiptap_html, tiptap_cover_image, tiptap_plain_text
 from blog.templatetags.blog_extras import editorjs_cover_image, editorjs_excerpt, render_editorjs
 
@@ -251,3 +251,51 @@ class DraftVsPublishedTests(TestCase):
 		published = self.client.get(reverse("studio:posts"), {"status": "published"})
 		self.assertContains(published, "발행글")
 		self.assertNotContains(published, ">쓰는중</a>")
+
+
+class SeriesTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.utils import timezone
+		self.user = get_user_model().objects.create_superuser("seo", "s@example.com", "pw")
+		self.client.force_login(self.user)
+		self.now = timezone.now()
+
+	def write(self, title, series="HackRF 입문", order=""):
+		self.client.post(reverse("blog:post_create"), {
+			"title": title, "category": "tech", "content": '{"format":"tiptap","version":1,"doc":{"type":"doc","content":[]}}',
+			"series_name": series, "series_order": order, "submit_action": "publish", "is_published": "1",
+		})
+		return Post.objects.get(title=title)
+
+	def test_auto_order_and_navigation(self):
+		from blog.models import Series
+		p1 = self.write("1편 준비물")
+		p2 = self.write("2편 설치")
+		p3 = self.write("3편 첫 수신")
+		self.assertEqual([p.series_order for p in (p1, p2, p3)], [1, 2, 3])
+		self.assertEqual(Series.objects.count(), 1)
+		res = self.client.get(reverse("blog:post_detail", args=[p2.slug]))
+		self.assertEqual(res.context["series_index"], 2)
+		self.assertEqual(res.context["series_prev"], p1)
+		self.assertEqual(res.context["series_next"], p3)
+		self.assertContains(res, "📚 HackRF 입문")
+		page = self.client.get(reverse("blog:series", args=[p1.series.slug]))
+		self.assertEqual([p.title for p in page.context["series_parts"]], ["1편 준비물", "2편 설치", "3편 첫 수신"])
+
+	def test_explicit_order_and_remove(self):
+		p = self.write("번외편", order="10")
+		self.assertEqual(p.series_order, 10)
+		self.client.post(reverse("blog:post_edit", args=[p.slug]), {
+			"title": "번외편", "category": "tech", "content": p.content, "series_name": "", "submit_action": "publish", "is_published": "1",
+		})
+		p.refresh_from_db()
+		self.assertIsNone(p.series)
+
+	def test_hidden_parts_not_listed_for_visitors(self):
+		p1 = self.write("공개 편")
+		p2 = self.write("비공개 편")
+		Post.objects.filter(pk=p2.pk).update(visibility=Post.VISIBILITY_PRIVATE)
+		self.client.logout()
+		res = self.client.get(reverse("blog:post_detail", args=[p1.slug]))
+		self.assertEqual([p.title for p in res.context["series_parts"]], ["공개 편"])
