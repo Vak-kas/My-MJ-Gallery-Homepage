@@ -98,6 +98,39 @@
             </section>
         </div>
 
+        <section id="backup" class="mt-6 scroll-mt-24 rounded-[20px] border border-black/[0.06] bg-white p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-[15px] font-semibold">S3 백업</h2>
+                    {% if backup.configured %}
+                    <p class="mt-1 text-[12px] text-[#8e8e93]">버킷 <span class="font-mono">{{ backup.bucket }}</span> · 매일 {{ backup.hour }}시 이후 자동 · DB 는 {{ backup.keep_days }}일 보관 · 사진·파일은 바뀐 것만 올림</p>
+                    {% endif %}
+                </div>
+                {% if backup.configured %}
+                <form method="post">{% csrf_token %}<input type="hidden" name="action" value="backup">
+                    <button class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] hover:bg-[#f5f5f7] disabled:opacity-50" {% if backup.running %}disabled{% endif %}>{% if backup.running %}백업 중…{% else %}지금 백업{% endif %}</button>
+                </form>
+                {% endif %}
+            </div>
+            {% if not backup.configured %}
+            <p class="mt-3 text-[13px] leading-6 text-[#6e6e73]">아직 설정 전이에요. 서버 <code>.env</code> 에 <code>BACKUP_S3_BUCKET</code>, <code>BACKUP_AWS_ACCESS_KEY_ID</code>, <code>BACKUP_AWS_SECRET_ACCESS_KEY</code> 를 넣으면 매일 자동으로 백업해요. (README 의 "S3 백업" 참고)</p>
+            {% elif not backup.at %}
+            <p class="mt-3 text-[13px] text-[#b26a00]">아직 백업한 적이 없어요. "지금 백업"으로 한 번 확인해 보세요.</p>
+            {% else %}
+            <ul class="mt-3 space-y-2 text-[13px]">
+                <li class="flex justify-between"><span>마지막 백업</span>
+                    <span class="{% if not backup.ok %}text-[#c4271d]{% elif backup.stale %}text-[#b26a00]{% else %}text-[#1e7a35]{% endif %}">{% if backup.ok %}●{% else %}✕ 실패{% endif %} {{ backup.at|date:"m.d H:i" }} ({{ backup.at|timesince }} 전, {{ backup.seconds }}초)</span></li>
+                {% if backup.ok %}
+                <li class="flex justify-between"><span>DB</span><span class="font-mono text-[12px] text-[#6e6e73]">{{ backup.db_key }} · {{ backup.db_size|filesizeformat }}</span></li>
+                <li class="flex justify-between"><span>사진·파일</span><span class="text-[#6e6e73]">새로 올림 {{ backup.uploaded }}개({{ backup.bytes|filesizeformat }}) · 그대로 {{ backup.skipped }}개</span></li>
+                {% else %}
+                <li class="break-all rounded-lg bg-[#fff1f0] px-3 py-2 text-[12px] text-[#c4271d]">{{ backup.error }}</li>
+                {% endif %}
+                {% if backup.stale and backup.ok %}<li class="text-[12px] text-[#b26a00]">⚠️ 이틀 넘게 백업이 안 됐어요. 예약 작업(cron)을 확인하세요.</li>{% endif %}
+            </ul>
+            {% endif %}
+        </section>
+
         <section id="uptime" class="mt-8 scroll-mt-24">
             <div class="flex flex-wrap items-end justify-between gap-3">
                 <div>

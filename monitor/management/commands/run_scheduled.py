@@ -1,4 +1,4 @@
-"""1분마다 cron 으로 실행: 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 오래된 기록 정리.
+"""1분마다 cron 으로 실행: 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 오래된 기록 정리·S3 백업.
 
   * * * * * cd /home/ubuntu/projects/smjgallery && venv/bin/python manage.py run_scheduled >/dev/null 2>&1
 """
@@ -7,7 +7,7 @@ from django.core.cache import cache
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from monitor import traffic, uptime
+from monitor import backup, traffic, uptime
 from monitor.models import TrafficSnapshot
 
 HEARTBEAT_KEY = "monitor:scheduler:last_run"
@@ -30,6 +30,9 @@ class Command(BaseCommand):
 
             if cache.add(f"monitor:daily:{timezone.localdate().isoformat()}", 1, 26 * 60 * 60):
                 self.daily_cleanup()
+
+            if backup.due(now):
+                backup.start_in_background()  # 몇 분 걸릴 수 있어 따로 띄움
 
             cache.set(HEARTBEAT_KEY, now.isoformat(), 7 * 24 * 60 * 60)
             if options.get("verbosity", 1) > 1:
