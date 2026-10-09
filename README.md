@@ -60,6 +60,7 @@
 | 📄 PDF 도구 | PDF·사진 여러 개 합치기, 페이지 끌어서 순서 바꾸기·돌리기·빼기, 선택한 페이지만 / 페이지마다 따로 저장, 사진은 A4 맞춤 또는 원래 크기 (pdf.js + pdf-lib, 브라우저 안에서만) | 누구나 |
 | ✍️ 글자 수 세기 | 공백 포함/제외 글자 수, 바이트(한글 2바이트·UTF-8), 단어·문장·문단, 원고지 매수, 읽기·말하기 시간, 목표 글자 진행 막대, 자주 쓴 낱말, 긴 문장 찾기 (브라우저 안에서만) | 누구나 |
 | 🖼 이미지 도구 | 용량 줄이기("N KB/MB 이하로": 화질 자동 탐색 + 크기 줄이기), 크기·형식 변환(JPG·PNG·WebP, HEIC 열기), 돌리기·뒤집기·자르기(1:1·4:3·3:4 증명사진·16:9), 📍 위치·카메라·날짜 정보 표시 후 저장하면 모두 제거, 여러 장 ZIP (브라우저 안에서만, HEIC 는 heic2any) | 누구나 |
+| 📷 사진 글자 추출 | ✨AI(이미지 인식)로 사진·캡처·칠판·손글씨·영수증 속 글자를 뽑아 바로 고치고 복사, 줄 그대로 / 문단으로 이어서 / 표는 마크다운 표, 여러 장(5장)·⌘V·HEIC, 모두 복사·.txt (사진은 긴 쪽 1568px 로 줄여 보내고 저장 안 함, 한 장 = AI 1번) | 로그인 회원 |
 | 🎓 학점 계산기 | 과목별/학기 합계 입력, 4.5·4.3 제, P/NP·F, 전공 평점, 목표 누적 평점까지 필요한 평균, 4.5 ↔ 4.3 ↔ 100점 환산(비례·×20+10·직접 공식). 성적은 브라우저에만 저장 | 누구나 |
 | 🔀 글 비교 | 두 글을 줄·단어·글자 단위로 비교(Myers diff), 한 줄 보기/나란히 보기, 바뀐 줄 안 글자 강조, 공백·대소문자 무시 (브라우저 안에서만), ✨ **AI 바뀐 내용 요약**(무엇이·꼭 확인할 점, 회원) | 누구나 |
 
@@ -108,7 +109,7 @@
   | 일반 회원 | 20번 · 4,000자 | 동시 1 · 하루 3 · 60분 · 8MB/s · 3GB | 동시 1 · 하루 3 · 120분 · 5명 | 기본 한도 |
   | ⭐ 친한 사람 | 100번 · 15,000자 | 동시 3 · 하루 10 · 180분 · 20MB/s · 10GB | 동시 2 · 하루 10 · 240분 · 15명 | 3배 |
   | 관리자 | 제한 없음 | 제한 없음 | 360분 · 20명 | 제한 없음 |
-- **✨ AI 기능**(QR 스타일 추천 · 정규식 만들기 · 글 비교 요약 · 네트워크 결과 풀이)은 `tools/ai.py` 공통 한도
+- **✨ AI 기능**(QR 스타일 추천 · 정규식 만들기 · 글 비교 요약 · 네트워크 결과 풀이 · 사진 글자 추출)은 `tools/ai.py` 공통 한도
   - 회원 등급별 하루 횟수·글자 수 + **사이트 전체 하루 예산**(`AI_DAILY_BUDGET_USD`, 넘으면 그날은 관리자 말고 멈춤)
   - Claude 도구 사용(tool_use)으로 정해진 형식만 받고 서버에서 다시 검사, 입력한 글·결과는 저장하지 않고 토큰 수·어림 비용만 기록
 
@@ -238,7 +239,7 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # 선택: 서버 상태판의 월 데이터 전송 허용량 (GB)
 # SERVER_TRANSFER_ALLOWANCE_GB=3072
 
-# 선택: ✨ AI 기능 (Claude API) — QR 스타일 추천 · 정규식 만들기 · 글 비교 요약 · 네트워크 결과 풀이
+# 선택: ✨ AI 기능 (Claude API) — QR 스타일 추천 · 정규식 만들기 · 글 비교 요약 · 네트워크 결과 풀이 · 사진 글자 추출
 # ANTHROPIC_API_KEY=sk-ant-...
 # ANTHROPIC_MODEL=claude-haiku-5-5
 # AI_DAILY_BUDGET_USD=1            # 사이트 전체 하루 예산 (0 이면 끔)
@@ -292,7 +293,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
+| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |

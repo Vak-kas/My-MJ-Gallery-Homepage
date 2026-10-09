@@ -190,7 +190,7 @@ class MeetingResponse(models.Model):
 class AIUsage(models.Model):
 	"""AI 기능 한 번 부를 때마다 한 줄. 입력한 글·결과는 저장하지 않고 토큰 수·어림 비용만."""
 
-	FEATURES = [("qr", "QR 스타일 추천"), ("regex", "정규식 만들기"), ("diff", "글 비교 요약"), ("netcheck", "네트워크 결과 풀이")]
+	FEATURES = [("qr", "QR 스타일 추천"), ("regex", "정규식 만들기"), ("diff", "글 비교 요약"), ("netcheck", "네트워크 결과 풀이"), ("ocr", "사진 글자 추출")]
 
 	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="ai_usages")
 	feature = models.CharField(max_length=20, choices=FEATURES)

@@ -64,6 +64,16 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "ocr",
+		"url_name": "tools:ocr",
+		"icon": "📷",
+		"title": "사진 글자 추출",
+		"description": "사진·캡처·칠판·손글씨·영수증 속 글자를 뽑아 바로 복사해요. 여러 장 한꺼번에, ⌘V 붙여넣기, 표는 표 모양 그대로. ✨AI(이미지 인식)라 한글도 정확해요.",
+		"tags": ["AI", "OCR"],
+		"category": "docs",
+		"access": "member",
+	},
+	{
 		"slug": "gpa",
 		"url_name": "tools:gpa",
 		"icon": "🎓",

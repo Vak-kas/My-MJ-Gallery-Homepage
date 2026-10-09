@@ -73,6 +73,11 @@ def image_tool(request):
 	return render(request, "tools/image.html")
 
 
+@login_required  # AI 비용이 드는 도구라 회원만
+def ocr(request):
+	return render(request, "tools/ocr.html")
+
+
 def pdf_tool(request):
 	return render(request, "tools/pdf.html")
 

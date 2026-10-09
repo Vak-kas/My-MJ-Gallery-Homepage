@@ -128,3 +128,22 @@ class AITests(TestCase):
 		self.assertEqual({u.username for u in res.context["users"]}, {"member", "friend"})
 		self.client.post(reverse("studio:users"), {"action": "friend_off", "ids": [self.member.id]})
 		self.assertFalse(is_friend(self.fresh(self.member)))
+
+	def test_ocr(self):
+		import base64
+		self.assertEqual(self.client.get(reverse("tools:ocr")).status_code, 302)
+		self.client.force_login(self.member)
+		self.assertEqual(self.client.get(reverse("tools:ocr")).status_code, 200)
+		img = base64.b64encode(b"\xff\xd8fake-jpeg").decode()
+		self.assertEqual(self.post("ocr_run", {"image": img, "type": "image/gif"}).status_code, 400)
+		self.assertEqual(self.post("ocr_run", {"image": "@@not-base64@@", "type": "image/jpeg"}).status_code, 400)
+		with mock.patch("tools.ai_views.OCR_MAX_BYTES", 5):
+			self.assertEqual(self.post("ocr_run", {"image": img, "type": "image/jpeg"}).status_code, 400)  # 너무 큼
+		raw = {"text": "회의 안건\n1. 일정", "kind": "손글씨", "unclear": ""}
+		with mock.patch("tools.ai._post", return_value=fake_reply(raw)) as post:
+			data = self.post("ocr_run", {"image": img, "type": "image/jpeg", "mode": "table"}).json()
+		self.assertEqual(data["text"], "회의 안건\n1. 일정")
+		content = post.call_args.args[0]["messages"][0]["content"]
+		self.assertEqual(content[0]["source"], {"type": "base64", "media_type": "image/jpeg", "data": img})
+		self.assertIn("마크다운 표", content[1]["text"])
+		self.assertEqual(AIUsage.objects.get().feature, "ocr")
