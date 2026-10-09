@@ -53,6 +53,9 @@ def post_meta(post, locked=False):
 	fmt, data = parse_content(post.content)
 	text = post.summary or (tiptap_plain_text(data) if fmt == "tiptap" else "")
 	image = post.cover_image.url if post.cover_image else (tiptap_cover_image(data) if fmt == "tiptap" else "")
+	if not image and post.is_published and post.category != post.CATEGORY_SECRET:
+		from blog.og_image import cache_key
+		image = reverse("blog:post_og", args=[post.slug]) + f"?v={cache_key(post)}"  # 사진 없는 글은 제목 카드 이미지
 	return build(
 		post.title,
 		text[:160] + ("…" if len(text) > 160 else ""),

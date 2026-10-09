@@ -982,3 +982,22 @@ def post_delete(request, slug: str):
 	post.delete()
 	messages.success(request, f'"{title}" 글이 삭제되었습니다.')
 	return redirect("blog:index")
+
+
+def post_og_image(request, slug: str):
+	"""글 링크 미리보기 카드 이미지. 공개·발행된 글만 그리고, 나머지는 기본 이미지로."""
+	from django.http import FileResponse
+	from django.shortcuts import redirect
+	from django.templatetags.static import static
+
+	from .og_image import get_or_create
+
+	post = Post.objects.select_related("author").filter(slug=slug).first()
+	if (not post or not post.is_published or post.visibility != Post.VISIBILITY_PUBLIC
+			or post.category == Post.CATEGORY_SECRET):
+		return redirect(static("images/og-default.png"))
+	from django.core.files.storage import default_storage
+	response = FileResponse(default_storage.open(get_or_create(post), "rb"), content_type="image/png")
+	response["Cache-Control"] = "public, max-age=86400"
+	return response
+

@@ -70,3 +70,46 @@ class LinkPreviewTests(TestCase):
 		self.client.logout()
 		xml = self.client.get("/sitemap.xml").content.decode()
 		self.assertNotIn("/blog/", xml)
+
+
+@override_settings(SITE_URL="https://smjgallery.kr")
+class PostCardImageTests(TestCase):
+	def setUp(self):
+		import tempfile
+		cache.clear()
+		self.tmp = tempfile.mkdtemp()
+		self.override = override_settings(MEDIA_ROOT=self.tmp)
+		self.override.enable()
+		self.author = get_user_model().objects.create_user("seo", "s@example.com", "pw", first_name="서민재")
+		self.post = Post.objects.create(category="life", title="정처기 합격 야미", slug="pass", author=self.author, published_at=timezone.now())
+
+	def tearDown(self):
+		import shutil
+		self.override.disable()
+		shutil.rmtree(self.tmp, ignore_errors=True)
+		cache.clear()
+
+	def test_meta_uses_card_when_no_photo(self):
+		html = self.client.get(reverse("blog:post_detail", args=["pass"])).content.decode()
+		self.assertIn('content="https://smjgallery.kr/blog/post/pass/og.png?v=', html)
+
+	def test_card_png_rendered_and_cached(self):
+		import os
+		res = self.client.get(reverse("blog:post_og", args=["pass"]))
+		self.assertEqual(res["Content-Type"], "image/png")
+		body = b"".join(res.streaming_content)
+		self.assertTrue(body.startswith(b"\x89PNG"))
+		files = os.listdir(os.path.join(self.tmp, "og", "posts"))
+		self.assertEqual(len(files), 1)
+		self.client.get(reverse("blog:post_og", args=["pass"]))
+		self.assertEqual(len(os.listdir(os.path.join(self.tmp, "og", "posts"))), 1)  # 두 번째는 저장된 걸 씀
+		Post.objects.filter(pk=self.post.pk).update(title="새 제목")
+		self.client.get(reverse("blog:post_og", args=["pass"]))
+		self.assertEqual(len(os.listdir(os.path.join(self.tmp, "og", "posts"))), 2)  # 제목이 바뀌면 새로 그림
+
+	def test_protected_or_missing_gets_default(self):
+		Post.objects.filter(pk=self.post.pk).update(visibility=Post.VISIBILITY_PROTECTED)
+		res = self.client.get(reverse("blog:post_og", args=["pass"]))
+		self.assertEqual(res.status_code, 302)
+		self.assertIn("og-default.png", res["Location"])
+		self.assertEqual(self.client.get(reverse("blog:post_og", args=["nope"])).status_code, 302)
