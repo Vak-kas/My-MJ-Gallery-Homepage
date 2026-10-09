@@ -1,22 +1,3 @@
-<style>
-    /* 사이드바 묶음(포트폴리오·콘텐츠·운영)마다 색 띠 + 옅은 배경으로 구분 */
-    #studio-sidebar .sg { --sg: #0071e3; --sg-bg: rgba(0, 113, 227, 0.045); position: relative; border-radius: 16px; background: var(--sg-bg); padding: 10px 6px 8px 8px; }
-    #studio-sidebar .sg-content { --sg: #1f9d55; --sg-bg: rgba(31, 157, 85, 0.05); }
-    #studio-sidebar .sg-ops { --sg: #e8710a; --sg-bg: rgba(232, 113, 10, 0.05); }
-    #studio-sidebar .sg::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--sg); opacity: 0.55; }
-    #studio-sidebar .sg-head { display: flex; align-items: center; gap: 8px; padding: 0 16px 6px; font-size: 11px; font-weight: 700; letter-spacing: 0.18em; color: var(--sg); }
-    #studio-sidebar .sg-dot { width: 7px; height: 7px; border-radius: 999px; background: var(--sg); }
-    #studio-sidebar .sg a + a { margin-top: 2px; }
-    #studio-sidebar .sg a.font-medium { background: #fff; box-shadow: inset 3px 0 0 var(--sg), 0 1px 3px rgba(0, 0, 0, 0.06); }
-    #studio-sidebar .sg a:not(.font-medium):hover { background: rgba(255, 255, 255, 0.7); }
-    html.theme-dark #studio-sidebar .sg { --sg-bg: rgba(77, 163, 255, 0.07); }
-    html.theme-dark #studio-sidebar .sg-portfolio { --sg: #4da3ff; }
-    html.theme-dark #studio-sidebar .sg-content { --sg: #4cc38a; --sg-bg: rgba(76, 195, 138, 0.07); }
-    html.theme-dark #studio-sidebar .sg-ops { --sg: #ff9f45; --sg-bg: rgba(255, 159, 69, 0.07); }
-    html.theme-dark #studio-sidebar .sg a.font-medium { background: rgba(255, 255, 255, 0.09) !important; box-shadow: inset 3px 0 0 var(--sg); }
-    html.theme-dark #studio-sidebar .sg a:not(.font-medium) { background: transparent !important; }
-    html.theme-dark #studio-sidebar .sg a:not(.font-medium):hover { background: rgba(255, 255, 255, 0.05) !important; }
-</style>
 <aside id="studio-sidebar" class="fixed left-0 top-0 z-40 h-screen w-[260px] overflow-y-auto overscroll-contain border-r border-black/[0.06] bg-white px-5 py-7">
 
     <div>
@@ -30,11 +11,10 @@
         </a>
     </div>
 
-    <nav class="mt-6 space-y-3 pb-6">
+    <nav class="mt-6 space-y-0.5 pb-6">
 
         {% with current_name=request.resolver_match.url_name %}
-        <section class="sg sg-portfolio">
-        <p class="sg-head"><span class="sg-dot"></span>포트폴리오</p>
+        <p class="px-4 pb-1 pt-0 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">포트폴리오</p>
         <a href="{% url 'studio:profile' %}"
            class="group relative flex items-center rounded-xl px-4 py-2 text-[14px] transition {% if current_name == 'profile' or current_name == 'profile_basic' or current_name == 'profile_contact' or current_name == 'profile_links' or current_name == 'profile_resume' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Profile</span>
@@ -96,10 +76,7 @@
             </span>
         </a>
 
-        </section>
-
-        <section class="sg sg-content">
-        <p class="sg-head"><span class="sg-dot"></span>콘텐츠</p>
+        <p class="mx-4 mt-3 border-t border-black/[0.1] px-0 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">콘텐츠</p>
         <a href="{% url 'studio:posts' %}"
            class="group relative flex items-center rounded-xl px-4 py-2 text-[14px] transition {% if current_name == 'posts' or current_name == 'post_visibility_update' or current_name == 'post_delete' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Posts</span>
@@ -116,10 +93,7 @@
             </span>
         </a>
 
-        </section>
-
-        <section class="sg sg-ops">
-        <p class="sg-head"><span class="sg-dot"></span>운영</p>
+        <p class="mx-4 mt-3 border-t border-black/[0.1] px-0 pb-1 pt-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">운영</p>
         <a href="{% url 'studio:analytics' %}"
            class="group relative flex items-center rounded-xl px-4 py-2 text-[14px] transition {% if current_name == 'analytics' %}bg-[#f5f5f7] text-[#1d1d1f] font-medium{% else %}text-[#6e6e73] hover:bg-[#f5f5f7] hover:text-[#1d1d1f]{% endif %}">
             <span>Analytics</span>
@@ -159,8 +133,6 @@
                 메뉴 공개·순서, 홈 섹션 켜기/끄기·순서를 정합니다.
             </span>
         </a>
-
-        </section>
 
         {% endwith %}
 
