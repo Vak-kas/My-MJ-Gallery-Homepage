@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.models import SignupRequest
-from monitor import system, traffic, uptime
+from monitor import backup, system, traffic, uptime
 from monitor.management.commands.run_scheduled import HEARTBEAT_KEY
 from monitor.models import UptimeTarget
 
@@ -72,11 +72,35 @@ def _add_target(request):
     messages.success(request, f"'{target.name}' 감시를 시작했어요.")
 
 
+def _backup_status():
+    st = backup.status() or {}
+    at = datetime.fromisoformat(st["at"]) if st.get("at") else None
+    return {
+        **st,
+        "configured": backup.configured(),
+        "running": backup.is_running(),
+        "at": at,
+        "stale": bool(backup.configured() and (not at or (timezone.now() - at).total_seconds() > 2 * 24 * 60 * 60)),
+        "bucket": settings.BACKUP_S3_BUCKET,
+        "keep_days": settings.BACKUP_KEEP_DAYS,
+        "hour": settings.BACKUP_HOUR,
+    }
+
+
 @admin_view
 def server(request):
     if request.method == "POST":
         action = request.POST.get("action")
-        if action == "add":
+        if action == "backup":
+            if not backup.configured():
+                messages.error(request, "백업 설정(.env)이 아직 없어요.")
+            elif backup.is_running():
+                messages.error(request, "이미 백업이 돌고 있어요.")
+            else:
+                backup.start_in_background()
+                messages.success(request, "백업을 시작했어요. 잠시 뒤 새로고침하면 결과가 보여요.")
+            return redirect(reverse("studio:server") + "#backup")
+        elif action == "add":
             _add_target(request)
         elif action in {"delete", "toggle", "check"}:
             target = get_object_or_404(UptimeTarget, pk=request.POST.get("id"))
@@ -110,6 +134,7 @@ def server(request):
         "app": _app_stats(),
         "heartbeat_at": heartbeat_at,
         "scheduler_ok": bool(heartbeat_at and (timezone.now() - heartbeat_at).total_seconds() < 180),
+        "backup": _backup_status(),
         "targets": targets,
         "intervals": UptimeTarget.INTERVALS,
     })

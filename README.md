@@ -103,7 +103,8 @@
   - IP 미저장(날짜별로 바뀌는 해시로 순방문자만), 봇·링크 미리보기·관리자 본인 방문 제외, 90일 보관
 - **Server**: CPU·메모리·디스크, 이번 달 트래픽(재부팅 보정), 서비스(gunicorn·nginx·mj-relay·coturn)·중계 방·예약 작업 상태, 저장 공간
   - ⏱ **업타임 모니터**: 웹 주소(HTTP)·포트(TCP)를 1·5·10·30분마다 확인, 2번 연속 실패 시 🔔·카톡 장애 알림, 복구 알림, 24시간·7일 가동률
-  - 예약 작업 한 줄(cron, 1분마다): `manage.py run_scheduled` — 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 보안·통계·맡겨두기·업타임 기록 정리
+  - 예약 작업 한 줄(cron, 1분마다): `manage.py run_scheduled` — 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 보안·통계·맡겨두기·업타임 기록 정리, S3 백업
+  - 💾 **S3 백업**: 마지막 백업 시각·크기·실패 이유, "지금 백업" 버튼, 이틀 넘게 안 되면 경고
 - **Security**: 보안 기록과 차단 (기록은 90일 뒤 자동 정리, `python manage.py security_cleanup`)
   - 로그인 기록(성공·실패·잠김), 같은 아이디 15분 5회 / 같은 IP 15분 10회 실패 시 15분 잠금
   - **관리자 계정이 처음 보는 IP 에서 로그인하면 🔔 + 카톡 알림**
@@ -136,7 +137,7 @@ MjGallery/
 ├─ studio/            # 관리자 CMS (Posts, Community, Users 포함)
 ├─ notifications/     # 관리자 알림, 카카오톡 푸시
 ├─ analytics/         # 방문 기록 미들웨어, 통계 집계
-├─ monitor/           # 서버 상태·트래픽·업타임 모니터, 예약 작업(run_scheduled)
+├─ monitor/           # 서버 상태·트래픽·업타임 모니터, S3 백업, 예약 작업(run_scheduled)
 ├─ security/          # 로그인 기록·잠금, IP 차단 미들웨어, 작성 IP 보관 기간 정리
 ├─ tools/             # Tool 메뉴 (QR·JSON·정규식·키 생성기·네트워크 진단·단축 URL·비밀 메모·클립보드·라이브 방송·데이터 전송 등)
 ├─ relay/             # 중계 데몬(mj_relay.py: 데이터 전송, mj_live.py: 라이브 방송 시그널링), CLI(mj_stream.py), 설치 스크립트(TURN 포함)
@@ -183,6 +184,14 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # AWS_SECRET_ACCESS_KEY=...
 # AWS_STORAGE_BUCKET_NAME=...
 # AWS_S3_REGION_NAME=ap-northeast-2
+
+# 선택: S3 백업 (USE_S3 와 별개, 버킷에만 권한이 있는 IAM 키)
+# BACKUP_S3_BUCKET=...
+# BACKUP_AWS_ACCESS_KEY_ID=...
+# BACKUP_AWS_SECRET_ACCESS_KEY=...
+# BACKUP_S3_REGION=ap-northeast-2
+# BACKUP_KEEP_DAYS=30
+# BACKUP_HOUR=4
 
 # 선택: 데이터 전송 중계 데몬 (relay/README.md 참고)
 # RELAY_API_KEY=...
@@ -264,7 +273,7 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
   - `git pull` → `pip install` → `migrate` → `collectstatic` → gunicorn 재시작 → `mj-relay` 재시작
 - 데이터 전송 중계 데몬 최초 설치: `sudo bash relay/deploy/install.sh` + 방화벽 TCP `5550-5599` 개방 ([relay/README.md](relay/README.md))
 - 라이브 방송 TURN 서버 최초 설치: `sudo bash relay/deploy/install_turn.sh` + 방화벽 UDP·TCP `3478`, UDP `49160-49200`
-- 예약 작업(cron) 1회 등록 — 1분마다 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 오래된 기록 정리:
+- 예약 작업(cron) 1회 등록 — 1분마다 업타임 확인, 1시간마다 트래픽 기록, 하루 한 번 오래된 기록 정리·S3 백업:
   ```
   (crontab -l 2>/dev/null; echo "* * * * * cd /home/ubuntu/projects/smjgallery && venv/bin/python manage.py run_scheduled >/dev/null 2>&1") | crontab -
   ```
@@ -275,9 +284,14 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 
 - 관리 명령
   - `python manage.py run_scheduled` — 예약 작업 (위 cron), 업타임·트래픽·정리를 한 번에
+  - `python manage.py backup_s3` — 지금 S3 백업 (run_scheduled 가 매일 `BACKUP_HOUR` 시 이후 자동 실행) / `--list` DB 백업 목록 / `--download DIR` 최근 DB + 사진·파일 전부 내려받기
   - `python manage.py security_cleanup` — 90일 지난 로그인 기록·작성 IP 정리 (run_scheduled 가 하루 한 번 실행)
   - `python manage.py cleanup_shared_files` — 만료된 맡겨두기 파일 정리 (업로드·다운로드 때도 자동 정리)
   - `python manage.py clear_guestbook` — 방명록 정리 (평소에는 Studio → Community 사용 권장)
+- S3 백업
+  - 버킷: `db/날짜_시각.sqlite3.gz`(PostgreSQL 이면 `.pgdump`, `BACKUP_KEEP_DAYS` 일 보관) + `media/`·`private_media/`(바뀐 파일만 올리고, 서버에서 지운 파일도 버킷에는 남김)
+  - `.env` 는 비밀키라 백업하지 않음 → 따로 안전하게 보관
+  - 복원: `manage.py backup_s3 --download ~/mj-backup` → SQLite 는 `gunzip` 해서 `db.sqlite3` 로, PostgreSQL 은 `pg_restore -d mjgallery 파일.pgdump`, `media/`·`private_media/` 는 프로젝트 폴더로 복사
 - 새 색을 쓰는 템플릿을 추가하면 `venv/bin/python scripts/gen_dark_css.py` 로 다크 모드 CSS 다시 생성
 - 카카오톡은 링크 미리보기를 저장해 두므로, 예전에 보낸 링크는 [카카오 공유 디버거](https://developers.kakao.com/tool/debugger/sharing)에서 캐시 초기화
 - 업로드 한도는 `config/settings.py` 의 `DATA_UPLOAD_MAX_MEMORY_SIZE`, `FILE_UPLOAD_MAX_MEMORY_SIZE` (nginx `client_max_body_size` 와 함께 조정)

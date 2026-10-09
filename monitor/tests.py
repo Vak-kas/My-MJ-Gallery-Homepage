@@ -111,3 +111,142 @@ class ServerPageTests(TestCase):
 		member = get_user_model().objects.create_user("m", "m@example.com", "pw")
 		self.client.force_login(member)
 		self.assertEqual(self.client.get(reverse("studio:server")).status_code, 302)
+
+
+class FakeS3:
+	"""boto3 S3 클라이언트 중 백업이 쓰는 부분만."""
+
+	def __init__(self):
+		self.objects = {}  # key -> (bytes, LastModified)
+
+	def upload_file(self, path, bucket, key):
+		with open(path, "rb") as f:
+			self.objects[key] = (f.read(), timezone.now())
+
+	def download_file(self, bucket, key, path):
+		with open(path, "wb") as f:
+			f.write(self.objects[key][0])
+
+	def delete_objects(self, Bucket, Delete):
+		for o in Delete["Objects"]:
+			self.objects.pop(o["Key"], None)
+
+	def get_paginator(self, name):
+		outer = self
+
+		class P:
+			def paginate(self, Bucket, Prefix):
+				yield {"Contents": [{"Key": k, "Size": len(b), "LastModified": t} for k, (b, t) in sorted(outer.objects.items()) if k.startswith(Prefix)]}
+
+		return P()
+
+
+class BackupTests(TestCase):
+	def setUp(self):
+		import tempfile
+		from pathlib import Path
+
+		cache.clear()
+		self.tmp = tempfile.TemporaryDirectory()
+		root = Path(self.tmp.name)
+		self.media = root / "media"
+		(self.media / "posts").mkdir(parents=True)
+		(self.media / "posts" / "a.jpg").write_bytes(b"x" * 100)
+		(self.media / "b.txt").write_bytes(b"hello")
+		self.s3 = FakeS3()
+		self.patches = [
+			self.settings(BACKUP_S3_BUCKET="bk", BACKUP_AWS_ACCESS_KEY_ID="id", BACKUP_AWS_SECRET_ACCESS_KEY="sk",
+						  MEDIA_ROOT=self.media, PRIVATE_MEDIA_ROOT=root / "private_media", BACKUP_KEEP_DAYS=30, BACKUP_HOUR=4),
+			mock.patch("monitor.backup.client", return_value=self.s3),
+		]
+		for p in self.patches:
+			p.enable() if hasattr(p, "enable") else p.start()
+
+	def tearDown(self):
+		for p in reversed(self.patches):
+			p.disable() if hasattr(p, "disable") else p.stop()
+		self.tmp.cleanup()
+		cache.clear()
+
+	def test_run_uploads_db_and_only_changed_files(self):
+		import gzip
+		import sqlite3
+		import tempfile
+
+		from . import backup
+
+		r = backup.run()
+		self.assertTrue(r["ok"])
+		self.assertEqual((r["uploaded"], r["skipped"]), (2, 0))
+		self.assertIn("media/posts/a.jpg", self.s3.objects)
+		# 올린 DB 를 풀어서 실제로 열리는 SQLite 인지 확인
+		with tempfile.NamedTemporaryFile(suffix=".sqlite3") as f:
+			f.write(gzip.decompress(self.s3.objects[r["db_key"]][0]))
+			f.flush()
+			tables = sqlite3.connect(f.name).execute("select name from sqlite_master where type='table'").fetchall()
+		self.assertIn(("auth_user",), tables)
+
+		(self.media / "b.txt").write_bytes(b"hello world")
+		r2 = backup.run()
+		self.assertEqual((r2["uploaded"], r2["skipped"]), (1, 1))
+		self.assertEqual(backup.status()["db_key"], r2["db_key"])
+
+	def test_prune_old_db_backups(self):
+		from . import backup
+
+		self.s3.objects["db/old.sqlite3.gz"] = (b"x", timezone.now() - timedelta(days=31))
+		self.s3.objects["db/new.sqlite3.gz"] = (b"x", timezone.now() - timedelta(days=2))
+		self.s3.objects["media/keep.jpg"] = (b"x", timezone.now() - timedelta(days=400))
+		self.assertEqual(backup.prune_db(self.s3, 30), 1)
+		self.assertEqual(sorted(self.s3.objects), ["db/new.sqlite3.gz", "media/keep.jpg"])
+
+	def test_failure_is_recorded(self):
+		from . import backup
+
+		self.s3.upload_file = mock.Mock(side_effect=OSError("AccessDenied"))
+		with self.assertRaises(OSError):
+			backup.run()
+		st = backup.status()
+		self.assertFalse(st["ok"])
+		self.assertIn("AccessDenied", st["error"])
+		self.assertFalse(backup.is_running())
+
+	def test_due_once_a_day_after_hour(self):
+		import datetime as dt
+
+		from . import backup
+
+		tz = timezone.get_current_timezone()
+		self.assertFalse(backup.due(dt.datetime(2026, 10, 9, 3, 59, tzinfo=tz)))
+		self.assertTrue(backup.due(dt.datetime(2026, 10, 9, 4, 0, tzinfo=tz)))
+		self.assertFalse(backup.due(dt.datetime(2026, 10, 9, 4, 1, tzinfo=tz)))
+		self.assertTrue(backup.due(dt.datetime(2026, 10, 10, 9, 0, tzinfo=tz)))
+
+	def test_download_command(self):
+		import tempfile
+		from pathlib import Path
+
+		from . import backup
+
+		backup.run()
+		with tempfile.TemporaryDirectory() as out:
+			call_command("backup_s3", download=out, stdout=open("/dev/null", "w"))
+			files = sorted(p.relative_to(out).as_posix() for p in Path(out).rglob("*") if p.is_file())
+		self.assertEqual(len([f for f in files if f.startswith("db/")]), 1)
+		self.assertIn("media/posts/a.jpg", files)
+
+	def test_server_page_backup_button(self):
+		admin = get_user_model().objects.create_superuser("admin", "a@example.com", "pw")
+		self.client.force_login(admin)
+		with mock.patch("monitor.system.cpu_percent", return_value=5), mock.patch("monitor.backup.start_in_background") as start:
+			self.assertContains(self.client.get(reverse("studio:server")), "아직 백업한 적이 없어요")
+			self.client.post(reverse("studio:server"), {"action": "backup"})
+		start.assert_called_once()
+
+	def test_not_configured(self):
+		from . import backup
+
+		with self.settings(BACKUP_S3_BUCKET=""):
+			self.assertFalse(backup.due())
+			with self.assertRaises(RuntimeError):
+				backup.run()

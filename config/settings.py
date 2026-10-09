@@ -251,6 +251,14 @@ ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 # 서버 상태판: Lightsail 요금제의 월 데이터 전송 허용량 (GB, 선택 — 넣으면 사용 비율 표시)
 SERVER_TRANSFER_ALLOWANCE_GB = float(os.getenv("SERVER_TRANSFER_ALLOWANCE_GB", "0") or 0)
 
+# S3 백업 (monitor/backup.py) — 버킷에만 권한이 있는 IAM 키를 따로 씀
+BACKUP_S3_BUCKET = os.getenv("BACKUP_S3_BUCKET", "")
+BACKUP_S3_REGION = os.getenv("BACKUP_S3_REGION", "ap-northeast-2")
+BACKUP_AWS_ACCESS_KEY_ID = os.getenv("BACKUP_AWS_ACCESS_KEY_ID", "")
+BACKUP_AWS_SECRET_ACCESS_KEY = os.getenv("BACKUP_AWS_SECRET_ACCESS_KEY", "")
+BACKUP_KEEP_DAYS = int(os.getenv("BACKUP_KEEP_DAYS", "30") or 30)
+BACKUP_HOUR = int(os.getenv("BACKUP_HOUR", "4") or 4)
+
 
 # Upload limits (prevent 400 Bad Request on larger form/file payloads)
 DATA_UPLOAD_MAX_MEMORY_SIZE = int(
