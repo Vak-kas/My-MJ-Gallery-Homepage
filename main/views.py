@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.shortcuts import get_object_or_404, render
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.contrib import messages
@@ -273,3 +274,15 @@ def photo_bulk_delete(request):
         return redirect(next_url)
 
     return redirect("main:photos")
+
+
+ROBOTS_DISALLOW = ["/studio/", "/accounts/", "/notifications/", "/admin/", "/s/",
+				   "/tools/share/", "/tools/secret/", "/tools/live/", "/tools/stream/", "/tools/clipboard/"]
+
+
+def robots_txt(request):
+	from django.http import HttpResponse
+
+	lines = ["User-agent: *"] + [f"Disallow: {p}" for p in ROBOTS_DISALLOW]
+	lines += ["", f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml"]
+	return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
