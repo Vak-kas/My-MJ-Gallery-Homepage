@@ -30,6 +30,15 @@ GAMES = [
 		"category": "party",
 	},
 	{
+		"slug": "seconds",
+		"url_name": "games:seconds",
+		"icon": "⏱",
+		"title": "초 맞추기",
+		"description": "'3초를 맞추세요!' 감으로 멈춰서 0.001초까지 비교해요. 타이머가 사라지는 모드, 랜덤 목표, 여럿이 돌려 가며 하는 내기 모드(꼴찌 벌칙).",
+		"tags": ["내기", "반응"],
+		"category": "party",
+	},
+	{
 		"slug": "2048",
 		"url_name": "games:2048",
 		"icon": "🔢",

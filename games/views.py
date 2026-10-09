@@ -24,6 +24,10 @@ def roulette(request):
 	return render(request, "games/roulette.html")
 
 
+def seconds(request):
+	return render(request, "games/seconds.html")
+
+
 @ensure_csrf_cookie
 def g2048(request):
 	return render(request, "games/2048.html", {"board": leaderboard("2048", request.user)})
