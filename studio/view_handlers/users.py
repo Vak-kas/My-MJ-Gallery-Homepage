@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.core.paginator import Paginator
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -9,6 +9,7 @@ from django.utils import timezone
 from accounts.models import SignupRequest
 from blog.models import Comment, GuestbookEntry, Post
 from tools.models import SecretNote, ShortLink
+from tools.permissions import FRIEND_GROUP, set_friend
 
 from .common import admin_view
 
@@ -16,6 +17,7 @@ STATES = [
     ("", "전체"),
     ("pending", "🙋 승인 대기"),
     ("active", "활성"),
+    ("friend", "⭐ 친한 사람"),
     ("inactive", "정지·거절"),
     ("admin", "관리자"),
 ]
@@ -71,6 +73,11 @@ def users(request):
             targets.update(is_active=False)
             _decide(targets, SignupRequest.STATUS_REJECTED, request.user)
             messages.success(request, f"{count}명 가입 거절: {names}")
+        elif action in {"friend_on", "friend_off"}:
+            on = action == "friend_on"
+            for user in targets:
+                set_friend(user, on)
+            messages.success(request, f"{count}명 {'⭐ 친한 사람으로 지정' if on else '친한 사람 해제'}: {names}")
         elif action == "suspend":
             targets.update(is_active=False)
             messages.success(request, f"{count}명 정지: {names}")
@@ -98,7 +105,9 @@ def users(request):
 
     keyword = (request.GET.get("q") or "").strip()
     state = (request.GET.get("state") or "").strip()
+    friend_q = Q(groups__name=FRIEND_GROUP)
     qs = User.objects.select_related("signup_request").annotate(
+        is_friend=Exists(User.groups.through.objects.filter(user_id=OuterRef("pk"), group__name=FRIEND_GROUP)),
         post_count=Count("blog_posts", distinct=True),
         comment_count=Count("blog_comments", distinct=True),
         guestbook_count=Count("guestbook_entries", distinct=True),
@@ -112,6 +121,7 @@ def users(request):
         "": User.objects.count(),
         "pending": User.objects.filter(PENDING).count(),
         "active": User.objects.filter(is_active=True).count(),
+        "friend": User.objects.filter(friend_q).distinct().count(),
         "inactive": User.objects.filter(is_active=False).exclude(PENDING).count(),
         "admin": User.objects.filter(is_superuser=True).count(),
     }
@@ -119,6 +129,8 @@ def users(request):
         qs = qs.filter(PENDING)
     elif state == "active":
         qs = qs.filter(is_active=True)
+    elif state == "friend":
+        qs = qs.filter(is_friend=True)
     elif state == "inactive":
         qs = qs.filter(is_active=False).exclude(PENDING)
     elif state == "admin":

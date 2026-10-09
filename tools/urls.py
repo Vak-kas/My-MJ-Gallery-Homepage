@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, clipboard_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -28,6 +28,10 @@ urlpatterns = [
     path("meet/<str:meet_id>/remove/", meet_views.meet_remove, name="meet_remove"),
     path("meet/<str:meet_id>/delete/", meet_views.meet_delete, name="meet_delete"),
     path("regex/", views.regex, name="regex"),
+    path("regex/ai/", ai_views.regex_ai, name="regex_ai"),
+    path("diff/ai/", ai_views.diff_ai, name="diff_ai"),
+    path("netcheck/ai/", ai_views.netcheck_ai, name="netcheck_ai"),
+    path("ai/status/", ai_views.ai_status, name="ai_status"),
     path("qrcode/ai-style/", qr_ai.qr_ai_style, name="qrcode_ai"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),
     path("netcheck/run/", netcheck.netcheck_run, name="netcheck_run"),

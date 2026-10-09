@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import relay_client
-from .permissions import MEMBER_STREAM_LIMITS, can_create_streams, can_manage_streams, owns_room
+from .permissions import can_create_streams, can_manage_streams, owns_room, stream_limits
 from .registry import CATEGORIES, TOOLS
 from .speedtest import _client_ip
 
@@ -108,9 +108,8 @@ def _daily_room_key(user):
 	return f"stream:rooms:{user.id}:{timezone.localdate().isoformat()}"
 
 
-def _apply_member_limits(payload):
-	"""회원이 만드는 방은 유효 시간·속도·총량을 한도 안으로 줄임."""
-	lim = MEMBER_STREAM_LIMITS
+def _apply_member_limits(payload, lim):
+	"""회원이 만드는 방은 유효 시간·속도·총량을 한도 안으로 줄임 (친한 사람은 더 넉넉한 한도)."""
 	caps = {"ttl": lim["ttl_minutes"] * 60, "rate_limit": int(lim["rate_mb"] * MB), "total_limit": int(lim["total_gb"] * GB)}
 	for key, cap in caps.items():
 		payload[key] = min(payload.get(key, cap), cap)
@@ -153,7 +152,7 @@ def stream_list(request):
 		return denied
 	user = request.user
 	is_admin = can_manage_streams(user)
-	lim = MEMBER_STREAM_LIMITS
+	lim = stream_limits(user)
 
 	if request.method == "POST":
 		payload = _room_payload(request.POST)
@@ -168,7 +167,7 @@ def stream_list(request):
 				if cache.get(_daily_room_key(user), 0) >= lim["rooms_per_day"]:
 					messages.error(request, f"방은 하루에 {lim['rooms_per_day']}개까지 만들 수 있어요. 내일 다시 시도해 주세요.")
 					return redirect("tools:stream")
-				_apply_member_limits(payload)
+				_apply_member_limits(payload, lim)
 			room = relay_client.create_room(payload)
 		except relay_client.RelayError as exc:
 			messages.error(request, str(exc))

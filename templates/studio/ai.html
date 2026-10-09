@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-6 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO AI</p>
+                <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">AI 사용량</h1>
+                <p class="mt-2 text-[14px] text-[#6e6e73]">모델 <span class="font-mono">{{ model }}</span> · 단가 입력 ${{ price_in }} / 출력 ${{ price_out }} (100만 토큰당) · 입력한 글은 저장하지 않아요</p>
+            </div>
+            <div class="flex gap-1.5">
+                {% for d, label in periods %}
+                <a href="?days={{ d }}" class="rounded-full px-4 py-2 text-[13px] {% if d == days %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] bg-white hover:bg-[#f5f5f7]{% endif %}">{{ label }}</a>
+                {% endfor %}
+            </div>
+        </section>
+
+        {% if not configured %}
+        <div class="mb-6 rounded-2xl border border-amber-200 bg-amber-50 px-5 py-4 text-[13px] text-amber-800">⚠️ <code>ANTHROPIC_API_KEY</code> 가 없어서 AI 기능이 꺼져 있어요.</div>
+        {% endif %}
+
+        <section class="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">오늘 쓴 돈 / 하루 예산</p>
+                <p class="mt-2 text-[28px] font-semibold tabular-nums">${{ spent|floatformat:4 }} <span class="text-[15px] font-normal text-[#8e8e93]">/ ${{ budget|floatformat:2 }}</span></p>
+                <p class="text-[12px] text-[#8e8e93]">약 {{ spent_krw }}원 / {{ budget_krw }}원 · 넘으면 관리자 말고 멈춤</p>
+                <div class="mt-3 h-2 rounded-full bg-[#f5f5f7]"><div class="h-2 rounded-full {% if budget_pct >= 90 %}bg-[#ff3b30]{% elif budget_pct >= 60 %}bg-[#f97316]{% else %}bg-[#34c759]{% endif %}" style="width: {{ budget_pct }}%"></div></div>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">호출 ({{ days }}일)</p>
+                <p class="mt-2 text-[28px] font-semibold tabular-nums">{{ total.calls }}</p>
+                <p class="text-[12px] text-[#8e8e93]">성공 {{ total.ok }}{% if total.fail %} · 실패 {{ total.fail }}{% endif %}</p>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">어림 비용 ({{ days }}일)</p>
+                <p class="mt-2 text-[28px] font-semibold tabular-nums">${{ total.cost|default:0|floatformat:4 }}</p>
+                <p class="text-[12px] text-[#8e8e93]">약 {{ total.krw }}원 (1달러 {{ krw_rate }}원으로 계산)</p>
+            </div>
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <p class="text-[13px] text-[#8e8e93]">토큰 ({{ days }}일)</p>
+                <p class="mt-2 text-[20px] font-semibold tabular-nums">입력 {{ total.input_tokens|default:0 }}</p>
+                <p class="text-[14px] tabular-nums text-[#6e6e73]">출력 {{ total.output_tokens|default:0 }}</p>
+            </div>
+        </section>
+
+        <section class="mt-6 rounded-[20px] border border-black/[0.06] bg-white p-5">
+            <h2 class="text-[15px] font-semibold">최근 30일 하루 비용</h2>
+            <div class="mt-4 flex h-[120px] items-end gap-1">
+                {% for b in bars %}
+                <div class="flex flex-1 flex-col items-center justify-end" title="{{ b.day|date:'m.d' }} · {{ b.calls }}번 · ${{ b.cost|floatformat:4 }}">
+                    <div class="w-full rounded-t {% if b.cost %}bg-[#6e56cf]/80{% else %}bg-black/[0.06]{% endif %}" style="height: {% if b.cost %}{{ b.pct }}%{% else %}2px{% endif %}; min-height: 2px"></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-1 flex justify-between text-[11px] text-[#8e8e93]"><span>{{ bars.0.day|date:"m.d" }}</span><span>오늘</span></div>
+        </section>
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-2">
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">기능별</h2>
+                <table class="mt-3 w-full text-[13px]">
+                    <thead class="text-left text-[12px] text-[#8e8e93]"><tr><th class="py-1 font-normal">기능</th><th class="text-right font-normal">호출</th><th class="text-right font-normal">토큰(입/출)</th><th class="text-right font-normal">비용</th></tr></thead>
+                    <tbody>
+                        {% for r in by_feature %}
+                        <tr class="border-t border-black/[0.05]"><td class="py-2">{{ r.label }}</td><td class="text-right tabular-nums">{{ r.calls }}</td><td class="text-right tabular-nums text-[#6e6e73]">{{ r.input_tokens|default:0 }} / {{ r.output_tokens|default:0 }}</td><td class="text-right tabular-nums">${{ r.cost|default:0|floatformat:4 }} <span class="text-[#8e8e93]">≈{{ r.krw }}원</span></td></tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="py-6 text-center text-[#8e8e93]">아직 기록이 없어요.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">회원별</h2>
+                <table class="mt-3 w-full text-[13px]">
+                    <thead class="text-left text-[12px] text-[#8e8e93]"><tr><th class="py-1 font-normal">회원</th><th class="font-normal">등급</th><th class="text-right font-normal">호출</th><th class="text-right font-normal">비용</th></tr></thead>
+                    <tbody>
+                        {% for r in by_user %}
+                        <tr class="border-t border-black/[0.05]"><td class="py-2">{{ r.user__username|default:"(지워진 회원)" }}</td><td class="text-[#6e6e73]">{{ r.tier_label }}</td><td class="text-right tabular-nums">{{ r.calls }}</td><td class="text-right tabular-nums">${{ r.cost|default:0|floatformat:4 }} <span class="text-[#8e8e93]">≈{{ r.krw }}원</span></td></tr>
+                        {% empty %}
+                        <tr><td colspan="4" class="py-6 text-center text-[#8e8e93]">아직 기록이 없어요.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+        </div>
+
+        <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5">
+                <h2 class="text-[15px] font-semibold">최근 호출</h2>
+                <table class="mt-3 w-full text-[13px]">
+                    <tbody>
+                        {% for r in recent %}
+                        <tr class="border-t border-black/[0.05] first:border-t-0">
+                            <td class="py-2 text-[12px] text-[#8e8e93]">{{ r.created_at|date:"m.d H:i" }}</td>
+                            <td>{{ r.get_feature_display }}</td>
+                            <td class="text-[#6e6e73]">{{ r.user.username|default:"-" }}</td>
+                            <td class="text-right tabular-nums text-[#6e6e73]">{{ r.input_tokens }} / {{ r.output_tokens }}</td>
+                            <td class="text-right tabular-nums">{% if r.ok %}${{ r.cost_usd|floatformat:5 }}{% else %}<span class="text-[#c4271d]">실패</span>{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td class="py-6 text-center text-[#8e8e93]">아직 기록이 없어요.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+            <section class="rounded-[20px] border border-black/[0.06] bg-white p-5 text-[13px]">
+                <h2 class="text-[15px] font-semibold">등급별 한도</h2>
+                <table class="mt-3 w-full">
+                    <thead class="text-left text-[12px] text-[#8e8e93]"><tr><th class="py-1 font-normal">등급</th><th class="text-right font-normal">하루</th><th class="text-right font-normal">한 번 글자 수</th></tr></thead>
+                    <tbody>
+                        <tr class="border-t border-black/[0.05]"><td class="py-2">비로그인</td><td class="text-right text-[#8e8e93]" colspan="2">못 씀</td></tr>
+                        {% for label, lim in limits %}
+                        <tr class="border-t border-black/[0.05]"><td class="py-2">{{ label }}</td><td class="text-right tabular-nums">{% if lim.per_day is None %}제한 없음{% else %}{{ lim.per_day }}번{% endif %}</td><td class="text-right tabular-nums">{{ lim.max_chars }}자</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                <p class="mt-3 leading-5 text-[#8e8e93]">⭐ 친한 사람은 <a href="{% url 'studio:users' %}?state=friend" class="text-[#0066cc] hover:underline">Users</a> 에서 지정해요. 하루 예산은 서버 <code>.env</code> 의 <code>AI_DAILY_BUDGET_USD</code>, 등급별 횟수는 <code>tools/permissions.py</code> 의 <code>AI_LIMITS</code>.</p>
+            </section>
+        </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

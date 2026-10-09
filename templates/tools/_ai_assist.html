@@ -1,0 +1,54 @@
+{# ✨AI 버튼 공통: 남은 횟수 표시 + 요청 보내기. 쓰는 쪽: window.mjAI.post(url, body) #}
+<style>
+    .ai-btn { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 7px 14px; font-size: 13px; font-weight: 600; color: #fff; background: linear-gradient(135deg, #6e56cf, #0066cc); white-space: nowrap; }
+    .ai-btn:hover { filter: brightness(1.08); }
+    .ai-btn:disabled { opacity: 0.5; cursor: default; filter: none; }
+    .ai-panel { border-radius: 18px; border: 1px solid rgba(110, 86, 207, 0.25); background: linear-gradient(180deg, rgba(110, 86, 207, 0.06), rgba(0, 102, 204, 0.03)); padding: 16px 18px; }
+    .ai-quota { font-size: 12px; color: #8e8e93; }
+    .ai-tag { display: inline-block; min-width: 38px; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; text-align: center; }
+    .ai-spin { display: inline-block; width: 12px; height: 12px; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.5); border-top-color: #fff; animation: ai-spin 0.8s linear infinite; }
+    @keyframes ai-spin { to { transform: rotate(360deg); } }
+    html.theme-dark .ai-panel { border-color: rgba(167, 139, 250, 0.3); background: linear-gradient(180deg, rgba(167, 139, 250, 0.1), rgba(10, 133, 255, 0.05)); }
+</style>
+<script>
+window.mjAI = (() => {
+    const authed = {{ user.is_authenticated|yesno:"true,false" }};
+    const loginUrl = "{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}";
+    const statusUrl = "{% url 'tools:ai_status' %}";
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+    function quotaText(q) {
+        if (!q || q.reason === 'login') return '로그인한 회원만 쓸 수 있어요';
+        if (q.reason === 'off') return 'AI 기능이 아직 꺼져 있어요';
+        if (q.reason === 'budget') return '오늘 사이트 AI 사용량이 다 찼어요';
+        if (q.per_day === null) return `${q.tier_label} · 제한 없음`;
+        return `${q.tier_label} · 오늘 ${q.remaining}/${q.per_day}번 남음`;
+    }
+    function setQuota(q) {
+        document.querySelectorAll('[data-ai-quota]').forEach((el) => { el.textContent = quotaText(q); });
+    }
+    // 로그인 안 했으면 버튼을 로그인 링크로
+    function guard(btn) {
+        if (authed) return true;
+        location.href = loginUrl;
+        return false;
+    }
+    async function post(url, body, btn) {
+        const label = btn ? btn.innerHTML : '';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="ai-spin"></span> 생각 중…'; }
+        try {
+            const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body) });
+            const d = await r.json().catch(() => ({ error: 'AI 답을 받지 못했어요.' }));
+            if (d.quota) setQuota(d.quota);
+            if (!r.ok) throw new Error(d.error || 'AI 답을 받지 못했어요.');
+            return d;
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = label; }
+        }
+    }
+    if (authed) fetch(statusUrl, { cache: 'no-store' }).then((r) => r.json()).then(setQuota).catch(() => {});
+    else setQuota(null);
+    return { post, guard, esc, authed, loginUrl, setQuota };
+})();
+</script>

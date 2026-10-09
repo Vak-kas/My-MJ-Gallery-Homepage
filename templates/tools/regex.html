@@ -31,6 +31,18 @@
 
     <div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div class="min-w-0 space-y-5">
+            <section class="ai-panel">
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="text-[14px] font-semibold">✨ 말로 만들기</span>
+                    <span class="ai-quota ml-auto" data-ai-quota></span>
+                </div>
+                <form id="rx-ai-form" class="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <input id="rx-ai-prompt" class="rx-input" maxlength="500" placeholder="예: 010-1234-5678 같은 휴대폰 번호 찾기 / 괄호 안 글자만 꺼내기" autocomplete="off">
+                    <button class="ai-btn" id="rx-ai-run">✨ 만들기</button>
+                </form>
+                <label class="mt-2 flex items-center gap-2 text-[12px] text-[#6e6e73]"><input id="rx-ai-use-text" type="checkbox" class="h-4 w-4" checked> 아래 '찾을 글'도 같이 보내서 그 글에 맞게 만들기</label>
+                <div id="rx-ai-out" class="mt-3 hidden space-y-2 text-[13px] leading-6"></div>
+            </section>
             <section class="rounded-[22px] border border-black/[0.08] bg-white p-5">
                 <div class="flex items-center gap-2">
                     <span class="font-mono text-[20px] text-[#8e8e93]">/</span>
@@ -259,6 +271,28 @@
     for (const id of ['rx-pattern', 'rx-text', 'rx-replace']) $(id).addEventListener('input', () => { clearTimeout(t); t = setTimeout(run, 120); });
     $('rx-copy-replaced').addEventListener('click', async (e) => { try { await navigator.clipboard.writeText($('rx-replaced').textContent); e.target.textContent = '복사됨'; setTimeout(() => { e.target.textContent = '결과 복사'; }, 1000); } catch {} });
     run();
+
+    // ✨ 말로 만들기
+    $('rx-ai-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!mjAI.guard()) return;
+        const out = $('rx-ai-out');
+        try {
+            const d = await mjAI.post("{% url 'tools:regex_ai' %}", { prompt: $('rx-ai-prompt').value, sample: $('rx-ai-use-text').checked ? $('rx-text').value : '' }, $('rx-ai-run'));
+            $('rx-pattern').value = d.pattern;
+            document.querySelectorAll('.rx-flag').forEach((f) => f.classList.toggle('on', d.flags.includes(f.dataset.flag)));
+            run();
+            out.innerHTML = `<p><b>/${mjAI.esc(d.pattern)}/${mjAI.esc(d.flags)}</b></p><p>${mjAI.esc(d.explanation)}</p>`
+                + (d.caveats ? `<p class="text-[#b26a00]">⚠️ ${mjAI.esc(d.caveats)}</p>` : '')
+                + (d.sample ? `<button type="button" id="rx-ai-sample" class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px]">예시 글로 시험해 보기</button>` : '');
+            out.classList.remove('hidden');
+            $('rx-ai-sample')?.addEventListener('click', () => { $('rx-text').value = d.sample; run(); });
+        } catch (err) {
+            out.innerHTML = `<p class="text-[#c4271d]">${mjAI.esc(err.message)}</p>`;
+            out.classList.remove('hidden');
+        }
+    });
 })();
 </script>
+{% include "tools/_ai_assist.html" %}
 {% endblock %}

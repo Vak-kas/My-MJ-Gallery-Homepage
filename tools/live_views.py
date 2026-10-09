@@ -22,7 +22,7 @@ from django.views.decorators.http import require_POST
 from main import og_cards, seo
 
 from . import relay_client
-from .permissions import ADMIN_LIVE_LIMITS, MEMBER_LIVE_LIMITS, can_create_streams, can_manage_streams
+from .permissions import ADMIN_LIVE_LIMITS, can_create_streams, can_manage_streams, live_limits
 
 
 def ice_servers(room_id, ttl_seconds):
@@ -58,7 +58,7 @@ def live_list(request):
 		return denied
 	user = request.user
 	is_admin = can_manage_streams(user)
-	limits = ADMIN_LIVE_LIMITS if is_admin else MEMBER_LIVE_LIMITS
+	limits = ADMIN_LIVE_LIMITS if is_admin else live_limits(user)
 
 	if request.method == "POST":
 		try:
@@ -70,11 +70,11 @@ def live_list(request):
 		try:
 			if not is_admin:
 				mine = [r for r in relay_client.list_live() if r.get("owner_id") == user.id]
-				if len(mine) >= MEMBER_LIVE_LIMITS["max_open_rooms"]:
-					messages.error(request, "방송은 동시에 1개만 열 수 있어요. 쓰던 방송을 끝내고 다시 만들어 주세요.")
+				if len(mine) >= limits["max_open_rooms"]:
+					messages.error(request, f"방송은 동시에 {limits['max_open_rooms']}개까지 열 수 있어요. 쓰던 방송을 끝내고 다시 만들어 주세요.")
 					return redirect("tools:live")
-				if cache.get(_daily_key(user), 0) >= MEMBER_LIVE_LIMITS["rooms_per_day"]:
-					messages.error(request, f"방송은 하루에 {MEMBER_LIVE_LIMITS['rooms_per_day']}번까지 열 수 있어요.")
+				if cache.get(_daily_key(user), 0) >= limits["rooms_per_day"]:
+					messages.error(request, f"방송은 하루에 {limits['rooms_per_day']}번까지 열 수 있어요.")
 					return redirect("tools:live")
 			room = relay_client.create_live({
 				"title": (request.POST.get("title") or "").strip()[:80],
@@ -101,7 +101,7 @@ def live_list(request):
 		rooms = [r for r in rooms if r.get("owner_id") == user.id]
 	return render(request, "tools/live_list.html", {
 		"rooms": rooms, "relay_error": relay_error, "is_admin": is_admin, "limits": limits,
-		"member_limits": MEMBER_LIVE_LIMITS, "turn_enabled": bool(settings.TURN_SECRET),
+		"member_limits": live_limits(user), "turn_enabled": bool(settings.TURN_SECRET),
 	})
 
 
