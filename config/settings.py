@@ -240,6 +240,9 @@ RELAY_WS_URL = os.getenv("RELAY_WS_URL", "")  # 비우면 같은 사이트의 /r
 TURN_SECRET = os.getenv("TURN_SECRET", "")
 TURN_HOST = os.getenv("TURN_HOST", os.getenv("RELAY_PUBLIC_HOST", "smjgallery.kr"))
 TURN_PORT = int(os.getenv("TURN_PORT", "3478"))
+# QR AI 스타일 추천 (Claude API). 키가 없으면 AI 추천 버튼만 꺼짐
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
 
 
 # Upload limits (prevent 400 Bad Request on larger form/file payloads)

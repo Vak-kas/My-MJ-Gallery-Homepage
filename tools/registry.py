@@ -66,6 +66,15 @@ TOOLS = [
 		"access": "member",
 	},
 	{
+		"slug": "qrcode",
+		"url_name": "tools:qrcode",
+		"icon": "▦",
+		"title": "QR 코드 만들기",
+		"description": "주소·글·Wi-Fi·연락처·문자·메일을 QR 코드로 만들어요. 색·모양·가운데 로고를 바꾸고 PNG·SVG 로 저장, 사진 속 QR 읽기도 돼요.",
+		"tags": ["생성기", "공유"],
+		"access": "public",
+	},
+	{
 		"slug": "duplex",
 		"url_name": "tools:duplex",
 		"icon": "⇄",

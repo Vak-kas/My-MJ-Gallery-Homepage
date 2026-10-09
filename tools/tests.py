@@ -858,3 +858,71 @@ class LiveViewTests(TestCase):
 		with mock.patch("tools.relay_client.get_live", return_value=self.room()), mock.patch("tools.relay_client.close_live") as close:
 			self.client.post(reverse("tools:live_close", args=["live01"]))
 		close.assert_called_once_with("live01")
+
+
+class QrAiTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.member = get_user_model().objects.create_user("member", "m@example.com", "pw-for-tests-only")
+
+	def post(self, prompt="피카츄 느낌", **extra):
+		import json
+		return self.client.post(reverse("tools:qrcode_ai"), json.dumps({"prompt": prompt, **extra}), content_type="application/json")
+
+	def test_requires_login_and_key(self):
+		from django.test import override_settings
+		self.assertEqual(self.post().status_code, 401)
+		self.client.force_login(self.member)
+		with override_settings(ANTHROPIC_API_KEY=""):
+			self.assertEqual(self.post().status_code, 503)
+
+	def test_sanitizes_and_fixes_contrast(self):
+		from unittest import mock
+		from django.test import override_settings
+		raw = {"name": "피카츄 테마입니다아아아", "reason": "노랑", "shape": "heart", "fg": "#ffee88", "grad": "radial", "fg2": "not-a-color",
+			"eye": "triangle", "eyeball": "circle", "eyec": "#ffd400", "eyeballc": "#e53935", "bg": "#fff8d0", "frame": "ticket", "caption": "", "framec": "#333333"}
+		self.client.force_login(self.member)
+		with override_settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.qr_ai._ask_claude", return_value=raw) as ask:
+			data = self.post(has_logo=True).json()
+		ask.assert_called_once_with("피카츄 느낌", True)
+		from tools.qr_ai import _contrast
+		self.assertEqual(data["shape"], "heart")
+		self.assertEqual(data["eye"], "square")  # 허용되지 않은 값 → 기본값
+		self.assertEqual(data["caption"], "SCAN ME")
+		self.assertLessEqual(len(data["name"]), 12)
+		for key in ("fg", "fg2", "eyec", "eyeballc", "framec"):
+			self.assertGreaterEqual(_contrast(data[key], data["bg"]), 4.5, key)
+
+	def test_dark_background_forced_light(self):
+		from tools.qr_ai import sanitize
+		out = sanitize({"bg": "#111111", "fg": "#eeeeee"})
+		self.assertEqual(out["bg"], "#ffffff")
+
+	def test_daily_limit(self):
+		from unittest import mock
+		from django.test import override_settings
+		self.client.force_login(self.member)
+		with override_settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.qr_ai._ask_claude", return_value={}):
+			codes = [self.post().status_code for _ in range(21)]
+		self.assertEqual(codes[:20], [200] * 20)
+		self.assertEqual(codes[20], 429)
+
+	def test_request_shape(self):
+		import io
+		import json
+		from unittest import mock
+		from django.test import override_settings
+		from tools import qr_ai
+		fake = mock.MagicMock()
+		fake.__enter__.return_value = io.BytesIO(json.dumps({"content": [{"type": "tool_use", "input": {"shape": "star"}}]}).encode())
+		with override_settings(ANTHROPIC_API_KEY="secret-k", ANTHROPIC_MODEL="claude-haiku-5-5"), \
+				mock.patch("tools.qr_ai.urllib.request.urlopen", return_value=fake) as urlopen:
+			result = qr_ai._ask_claude("사이버펑크", False)
+		req = urlopen.call_args.args[0]
+		body = json.loads(req.data)
+		self.assertEqual(result, {"shape": "star"})
+		self.assertEqual(req.get_header("X-api-key"), "secret-k")
+		self.assertEqual(body["tool_choice"], {"type": "tool", "name": "apply_qr_style"})
+		self.assertEqual(body["model"], "claude-haiku-5-5")

@@ -51,6 +51,10 @@ def encode(request):
 	return render(request, "tools/encode.html")
 
 
+def qrcode(request):
+	return render(request, "tools/qrcode.html", {"ai_enabled": bool(settings.ANTHROPIC_API_KEY)})
+
+
 # ── 실시간 데이터 스트림 ─────────────────────────────
 
 MB = 1024 * 1024

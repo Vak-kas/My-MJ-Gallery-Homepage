@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import clipboard_views, link_views, live_views, myip, netcheck, share_views, speedtest, views
+from . import clipboard_views, link_views, live_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -13,6 +13,8 @@ urlpatterns = [
     path("myip/", myip.myip, name="myip"),
     path("myip/lookup/", myip.myip_lookup, name="myip_lookup"),
     path("encode/", views.encode, name="encode"),
+    path("qrcode/", views.qrcode, name="qrcode"),
+    path("qrcode/ai-style/", qr_ai.qr_ai_style, name="qrcode_ai"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),
     path("netcheck/run/", netcheck.netcheck_run, name="netcheck_run"),
     path("shortlink/", link_views.shortlink, name="shortlink"),

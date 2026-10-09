@@ -52,6 +52,7 @@
 | 📡 포트 · 핑 · DNS 체크 | 이 서버에서 TCP 포트·ping·경로 추적·DNS 레코드 확인 (내부 주소 차단, 10분 20회) | 로그인 회원 |
 | 🔗 단축 URL | `smjgallery.kr/s/<코드>` 단축 링크, 클릭 수, 유효 기간 | 만들기는 회원, 열기는 누구나 |
 | 🤫 1회용 비밀 메모 | 브라우저에서 AES-GCM 암호화(키는 링크 `#` 뒤에만), 한 번 열면 서버에서 삭제 | 만들기는 회원, 열기는 누구나 |
+| ▦ QR 코드 만들기 | 주소·글·Wi-Fi·연락처·문자·메일 QR, 테마·점 모양·그라데이션·모서리 눈·테두리 문구·가운데 사진(사진 색 자동 테마), ✨ AI 스타일 추천(회원, 하루 20번), 실시간 스캔 확인, PNG·SVG 저장, 사진 속 QR 읽기 (브라우저 안에서만) | 누구나 |
 | ⇄ 전이중/반이중 계산기 | 회선 속도·프레임 크기·전환 시간으로 Full/Half Duplex 처리량 비교, Wi-Fi 6/7 프리셋 | 누구나 |
 | 🌐 서브넷 계산기 | IP/CIDR·마스크로 네트워크·브로드캐스트·호스트 범위, 2진수 표시, 서브넷 분할 | 누구나 |
 | 📺 라이브 방송 | 화면·소리, 웹캠·마이크를 WebRTC 로 실시간 방송, 채팅, 직접 연결이 막히면 TURN 서버 중계 | 방송은 회원(한도), 시청은 링크만 있으면 누구나 |
@@ -165,6 +166,10 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # RELAY_PORT_MIN=5550
 # RELAY_PORT_MAX=5599
 # RELAY_PUBLIC_HOST=smjgallery.kr
+
+# 선택: QR 코드 AI 스타일 추천 (Claude API)
+# ANTHROPIC_API_KEY=sk-ant-...
+# ANTHROPIC_MODEL=claude-haiku-5-5
 
 # 선택: 관리자 알림 카카오톡
 # SITE_URL=https://smjgallery.kr
