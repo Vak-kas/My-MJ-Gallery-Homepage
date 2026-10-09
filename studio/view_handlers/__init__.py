@@ -97,3 +97,4 @@ from .community import community
 from .users import users
 from .security import security
 from .settings import site_settings_view
+from .analytics import analytics
