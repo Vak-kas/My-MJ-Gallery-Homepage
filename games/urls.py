@@ -8,6 +8,7 @@ urlpatterns = [
 	path("", views.index, name="index"),
 	path("ladder/", views.ladder, name="ladder"),
 	path("roulette/", views.roulette, name="roulette"),
+	path("seconds/", views.seconds, name="seconds"),
 	path("2048/", views.g2048, name="2048"),
 	path("2048/start/", scores.g2048_start, name="2048_start"),
 	path("2048/submit/", scores.g2048_submit, name="2048_submit"),

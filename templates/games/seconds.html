@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .sc-pad { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; min-height: 420px; border-radius: 28px; background: linear-gradient(160deg, #0f172a, #1e293b); color: #fff; cursor: pointer; user-select: none; -webkit-user-select: none; touch-action: manipulation; transition: background 0.25s; overflow: hidden; }
+    .sc-pad.running { background: linear-gradient(160deg, #064e3b, #047857); }
+    .sc-pad.done { background: linear-gradient(160deg, #1e1b4b, #312e81); }
+    .sc-target { font-size: 18px; opacity: 0.85; }
+    .sc-target b { font-size: 30px; font-variant-numeric: tabular-nums; }
+    .sc-time { margin-top: 10px; font-size: clamp(64px, 14vw, 128px); font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; line-height: 1; }
+    .sc-hint { margin-top: 18px; font-size: 15px; opacity: 0.75; }
+    .sc-grade { margin-top: 14px; font-size: 24px; font-weight: 700; animation: sc-pop 0.35s cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes sc-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .sc-who { position: absolute; top: 18px; left: 0; right: 0; text-align: center; font-size: 15px; font-weight: 600; opacity: 0.9; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · TIMING</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">초 맞추기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">한 번 누르면 시작, 정해진 시간이 됐다 싶을 때 다시 누르세요. 타이머는 곧 사라져요. 감으로 맞혀 보세요! (스페이스바도 돼요)</p>
+    </div>
+
+    <div class="mt-6 flex flex-wrap items-center gap-2">
+        <div class="flex gap-1.5" id="sc-mode">
+            <button type="button" class="gm-btn is-on" data-mode="solo">🙋 혼자 연습</button>
+            <button type="button" class="gm-btn" data-mode="party">🍺 내기 (여럿이)</button>
+        </div>
+    </div>
+
+    <div class="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="min-w-0">
+            <div id="sc-pad" class="sc-pad" role="button" tabindex="0" aria-label="눌러서 시작/멈춤">
+                <p class="sc-who" id="sc-who"></p>
+                <p class="sc-target" id="sc-target"></p>
+                <p class="sc-time" id="sc-time">0.000</p>
+                <p class="sc-grade hidden" id="sc-grade"></p>
+                <p class="sc-hint" id="sc-hint">눌러서 시작</p>
+            </div>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card space-y-3">
+                <h2 class="text-[15px] font-semibold">설정</h2>
+                <div>
+                    <p class="text-[12px] text-[#6e6e73]">목표</p>
+                    <div class="mt-1 flex flex-wrap gap-1.5" id="sc-targets"></div>
+                </div>
+                <div>
+                    <p class="text-[12px] text-[#6e6e73]">타이머</p>
+                    <div class="mt-1 flex flex-wrap gap-1.5" id="sc-vis">
+                        <button type="button" class="gm-btn" data-vis="show">계속 보임 (연습)</button>
+                        <button type="button" class="gm-btn is-on" data-vis="1">1초 뒤 사라짐</button>
+                        <button type="button" class="gm-btn" data-vis="hide">처음부터 안 보임</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 혼자: 기록 -->
+            <section class="gm-card" id="sc-solo-box">
+                <div class="flex items-center"><h2 class="text-[15px] font-semibold">내 기록</h2><button type="button" class="ml-auto text-[12px] text-[#8e8e93] hover:text-[#c4271d]" id="sc-solo-clear">지우기</button></div>
+                <p class="mt-1 text-[13px] text-[#6e6e73]" id="sc-solo-stat"></p>
+                <ol class="mt-2 space-y-1 text-[14px] tabular-nums" id="sc-solo-list"></ol>
+            </section>
+
+            <!-- 내기: 참가자·순위 -->
+            <section class="gm-card hidden space-y-3" id="sc-party-box">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-[15px] font-semibold">참가자</h2>
+                    <span class="text-[12px] text-[#8e8e93]" id="sc-round"></span>
+                    <button type="button" class="gm-btn ml-auto !px-2.5 !py-1 !text-[12px]" id="sc-reset">처음부터</button>
+                </div>
+                <textarea id="sc-names" class="gm-in" rows="4" placeholder="한 줄에 한 명 (2~10명)">민재
+지수
+하늘</textarea>
+                <div id="sc-table" class="text-[14px]"></div>
+                <div class="flex flex-wrap gap-1.5">
+                    <button type="button" class="gm-btn" id="sc-next-round">다음 판 ▶</button>
+                    <button type="button" class="gm-btn" id="sc-copy">결과 복사 (카톡용)</button>
+                </div>
+                <p class="text-[12px] leading-5 text-[#8e8e93]">한 판 = 모두 한 번씩. 같은 판에서는 목표가 같아요(랜덤이어도). 누적은 오차를 더한 값이라 작을수록 1등.</p>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 무시 */ } } };
+    const TARGETS = [1, 3, 5, 7, 10, 'random'];
+    const GRADES = [[0.01, '🎯 신의 감각!'], [0.05, '🔥 거의 완벽'], [0.15, '👍 좋아요'], [0.4, '🙂 아쉬워요'], [Infinity, '😅 다시 해 봐요']];
+    const fmt = (s) => s.toFixed(3);
+    const sign = (d) => `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(3)}`;
+
+    let mode = 'solo', targetPick = 3, vis = '1';
+    let target = 3;           // 이번에 맞출 초
+    let phase = 'ready';      // ready / running / done
+    let t0 = 0, raf = 0, lock = 0;
+    // 내기 상태
+    let party = { players: [], round: 1, turn: 0, results: [], totals: {} };
+
+    const pickTarget = () => (targetPick === 'random' ? Math.round((2 + Math.random() * 7) * 10) / 10 : targetPick);
+
+    // ── 화면 ──
+    function paint() {
+        const pad = $('sc-pad');
+        pad.classList.toggle('running', phase === 'running');
+        pad.classList.toggle('done', phase === 'done');
+        $('sc-target').innerHTML = `<b>${target.toFixed(target % 1 ? 1 : 0)}초</b>를 맞추세요`;
+        $('sc-who').textContent = mode === 'party' && party.players.length ? (phase === 'done' ? '' : `🙋 ${party.players[party.turn]} 차례`) : '';
+        if (phase === 'ready') { $('sc-time').textContent = vis === 'hide' ? '?.???' : '0.000'; $('sc-hint').textContent = '눌러서 시작'; $('sc-grade').classList.add('hidden'); }
+    }
+
+    function tick() {
+        const s = (performance.now() - t0) / 1000;
+        const hidden = vis === 'hide' || (vis === '1' && s >= 1);
+        $('sc-time').textContent = hidden ? '?.???' : fmt(s);
+        raf = requestAnimationFrame(tick);
+    }
+
+    function press(ev) {
+        if (ev) ev.preventDefault();
+        const now = performance.now();
+        if (now < lock) return;  // 실수로 두 번 눌림 방지
+        if (phase === 'ready') {
+            if (mode === 'party' && !ensurePlayers()) return;
+            phase = 'running';
+            t0 = now;
+            $('sc-hint').textContent = '지금이다 싶을 때 누르세요';
+            $('sc-grade').classList.add('hidden');
+            paint();
+            raf = requestAnimationFrame(tick);
+            lock = now + 150;
+        } else if (phase === 'running') {
+            cancelAnimationFrame(raf);
+            const s = (now - t0) / 1000;
+            const d = s - target;
+            phase = 'done';
+            lock = now + 600;
+            $('sc-time').textContent = fmt(s);
+            const grade = GRADES.find(([lim]) => Math.abs(d) <= lim)[1];
+            $('sc-grade').textContent = `${sign(d)}초 · ${grade}`;
+            $('sc-grade').classList.remove('hidden');
+            paint();
+            record(s, d);
+        } else {
+            next();
+        }
+    }
+
+    function next() {
+        // 내기에서 한 판이 끝났으면 '다음 판' 을 눌러야 새 판
+        if (mode === 'party' && party.players.length && party.turn >= party.players.length) { $('sc-next-round').click(); return; }
+        phase = 'ready';
+        if (mode === 'solo') target = pickTarget();
+        paint();
+    }
+
+    // ── 혼자 기록 ──
+    function record(s, d) {
+        if (mode === 'party') { partyRecord(s, d); return; }
+        const hist = store.get('mj-seconds-hist', []);
+        hist.unshift({ t: target, s: Math.round(s * 1000) / 1000, d: Math.round(d * 1000) / 1000 });
+        store.set('mj-seconds-hist', hist.slice(0, 30));
+        $('sc-hint').textContent = '한 번 더 누르면 다음';
+        renderSolo();
+    }
+    function renderSolo() {
+        const hist = store.get('mj-seconds-hist', []);
+        if (!hist.length) { $('sc-solo-stat').textContent = '아직 기록이 없어요.'; $('sc-solo-list').innerHTML = ''; return; }
+        const avg = hist.reduce((a, h) => a + Math.abs(h.d), 0) / hist.length;
+        const best = hist.reduce((b, h) => (Math.abs(h.d) < Math.abs(b.d) ? h : b));
+        $('sc-solo-stat').textContent = `평균 오차 ${avg.toFixed(3)}초 · 최고 ${sign(best.d)}초 (${hist.length}번)`;
+        $('sc-solo-list').innerHTML = hist.slice(0, 10).map((h) => `<li class="flex gap-2"><span class="w-12 text-[#8e8e93]">${h.t}초</span><span>${fmt(h.s)}</span><span class="ml-auto ${Math.abs(h.d) <= 0.05 ? 'text-[#0f9f6e] font-semibold' : 'text-[#6e6e73]'}">${sign(h.d)}</span></li>`).join('');
+    }
+    $('sc-solo-clear').addEventListener('click', () => { store.set('mj-seconds-hist', []); renderSolo(); });
+
+    // ── 내기 ──
+    function readNames() {
+        return [...new Set($('sc-names').value.split('\n').map((s) => s.trim()).filter(Boolean))].slice(0, 10);
+    }
+    function ensurePlayers() {
+        if (!party.players.length) {
+            const names = readNames();
+            if (names.length < 2) { alert('두 명 이상 적어 주세요.'); return false; }
+            party = { players: names, round: 1, turn: 0, results: [], totals: Object.fromEntries(names.map((n) => [n, 0])) };
+            $('sc-names').disabled = true;
+            renderParty();
+            paint();
+        }
+        return true;
+    }
+    function partyRecord(s, d) {
+        const name = party.players[party.turn];
+        party.results.push({ name, s, d });
+        party.totals[name] += Math.abs(d);
+        party.turn++;
+        const roundOver = party.turn >= party.players.length;
+        $('sc-hint').textContent = roundOver ? '판 끝! 오른쪽에서 순위를 보세요' : `다음: ${party.players[party.turn]} — 누르면 준비`;
+        renderParty(roundOver);
+    }
+    function sortedRound() { return [...party.results].sort((a, b) => Math.abs(a.d) - Math.abs(b.d)); }
+    function renderParty(roundOver) {
+        $('sc-round').textContent = party.players.length ? `${party.round}판 · 목표 ${target}초` : '';
+        if (!party.players.length) { $('sc-table').innerHTML = ''; return; }
+        const rows = sortedRound();
+        const last = roundOver && rows.length > 1 ? rows[rows.length - 1].name : null;
+        let html = rows.length ? `<p class="text-[12px] text-[#8e8e93]">이번 판</p><ol class="mt-1 space-y-1">${rows.map((r, i) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1 ${i === 0 && roundOver ? 'bg-[#ecfdf5] font-semibold dark:bg-[#14432d]' : ''} ${r.name === last ? 'bg-[#fff1f0] dark:bg-[#3b1717]' : ''}"><span class="w-5 text-center">${i === 0 && roundOver ? '👑' : r.name === last ? '😱' : i + 1}</span><span class="flex-1 truncate">${esc(r.name)}</span><span class="tabular-nums">${fmt(r.s)}</span><span class="w-16 text-right tabular-nums text-[#6e6e73]">${sign(r.d)}</span></li>`).join('')}</ol>` : '';
+        if (last) html += `<p class="mt-2 rounded-xl bg-[#fff1f0] px-3 py-2 text-[14px] font-semibold text-[#c4271d] dark:bg-[#3b1717]">😱 벌칙 당첨: ${esc(last)}</p>`;
+        const waiting = party.players.slice(party.turn);
+        if (waiting.length && !roundOver) html += `<p class="mt-2 text-[12px] text-[#8e8e93]">남은 사람: ${waiting.map(esc).join(', ')}</p>`;
+        if (party.round > 1 || roundOver) {
+            const total = Object.entries(party.totals).sort((a, b) => a[1] - b[1]);
+            html += `<p class="mt-3 text-[12px] text-[#8e8e93]">누적 오차 (${party.round}판)</p><ol class="mt-1 space-y-0.5">${total.map(([n, v], i) => `<li class="flex gap-2"><span class="w-5 text-center">${i + 1}</span><span class="flex-1 truncate">${esc(n)}</span><span class="tabular-nums text-[#6e6e73]">${v.toFixed(3)}초</span></li>`).join('')}</ol>`;
+        }
+        $('sc-table').innerHTML = html;
+        $('sc-next-round').disabled = !roundOver;
+    }
+    $('sc-next-round').addEventListener('click', () => {
+        if (party.turn < party.players.length) return;
+        party.round++; party.turn = 0; party.results = [];
+        target = pickTarget();
+        phase = 'ready';
+        renderParty(); paint();
+    });
+    $('sc-reset').addEventListener('click', () => {
+        party = { players: [], round: 1, turn: 0, results: [], totals: {} };
+        $('sc-names').disabled = false;
+        target = pickTarget(); phase = 'ready';
+        renderParty(); paint();
+    });
+    $('sc-copy').addEventListener('click', async (e) => {
+        const rows = sortedRound();
+        if (!rows.length) return;
+        const text = [`⏱ 초 맞추기 ${party.round}판 (목표 ${target}초)`, ...rows.map((r, i) => `${i + 1}. ${r.name} ${fmt(r.s)}초 (${sign(r.d)})`),
+            rows.length > 1 && party.turn >= party.players.length ? `😱 벌칙: ${rows[rows.length - 1].name}` : '', location.origin + location.pathname].filter(Boolean).join('\n');
+        try { await navigator.clipboard.writeText(text); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '결과 복사 (카톡용)'; }, 1400); } catch (err) { prompt('복사하세요', text); }
+    });
+
+    // ── 설정 ──
+    $('sc-targets').innerHTML = TARGETS.map((t) => `<button type="button" class="gm-btn ${t === targetPick ? 'is-on' : ''}" data-t="${t}">${t === 'random' ? '🎲 랜덤' : `${t}초`}</button>`).join('');
+    $('sc-targets').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-t]');
+        if (!b || phase === 'running') return;
+        targetPick = b.dataset.t === 'random' ? 'random' : +b.dataset.t;
+        document.querySelectorAll('#sc-targets [data-t]').forEach((x) => x.classList.toggle('is-on', x === b));
+        if (mode === 'solo' || party.turn === 0) { target = pickTarget(); phase = 'ready'; paint(); renderParty(); }
+        save();
+    });
+    document.querySelectorAll('#sc-vis [data-vis]').forEach((b) => b.addEventListener('click', () => {
+        if (phase === 'running') return;
+        vis = b.dataset.vis;
+        document.querySelectorAll('#sc-vis [data-vis]').forEach((x) => x.classList.toggle('is-on', x === b));
+        paint(); save();
+    }));
+    document.querySelectorAll('#sc-mode [data-mode]').forEach((b) => b.addEventListener('click', () => {
+        if (phase === 'running') return;
+        mode = b.dataset.mode;
+        document.querySelectorAll('#sc-mode [data-mode]').forEach((x) => x.classList.toggle('is-on', x === b));
+        $('sc-solo-box').classList.toggle('hidden', mode !== 'solo');
+        $('sc-party-box').classList.toggle('hidden', mode !== 'party');
+        phase = 'ready'; target = pickTarget(); paint(); renderParty();
+    }));
+    function save() { store.set('mj-seconds-opt', { targetPick, vis }); }
+    const opt = store.get('mj-seconds-opt', null);
+    if (opt) {
+        targetPick = TARGETS.includes(opt.targetPick) ? opt.targetPick : 3; vis = ['show', '1', 'hide'].includes(opt.vis) ? opt.vis : '1';
+        document.querySelectorAll('#sc-targets [data-t]').forEach((x) => x.classList.toggle('is-on', String(x.dataset.t) === String(targetPick)));
+        document.querySelectorAll('#sc-vis [data-vis]').forEach((x) => x.classList.toggle('is-on', x.dataset.vis === vis));
+    }
+
+    // 누르는 순간(손을 뗄 때 아님) 바로 재야 정확함
+    $('sc-pad').addEventListener('pointerdown', press);
+    document.addEventListener('keydown', (e) => {
+        if (e.code !== 'Space' || e.repeat || e.target.closest('textarea, input')) return;
+        press(e);
+    });
+    target = pickTarget();
+    paint(); renderSolo(); renderParty();
+    window.__sec = { state: () => ({ phase, target, party, mode }), press };
+})();
+</script>
+{% endblock %}
