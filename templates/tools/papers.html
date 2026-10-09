@@ -23,6 +23,39 @@
     .pp-res mark { background: #fff3b0; color: inherit; border-radius: 2px; padding: 0 1px; }
     .pp-label { font-size: 12px; color: #8e8e93; margin-right: 4px; }
     .pp-tog { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: #424245; }
+    .rd-wrap { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.35); display: flex; justify-content: flex-end; }
+    .rd-panel { width: min(100%, 900px); height: 100%; overflow-y: auto; background: #fff; box-shadow: -10px 0 40px rgba(0, 0, 0, 0.18); }
+    .rd-panel.wide { width: min(100%, 1180px); }
+    .rd-head { position: sticky; top: 0; z-index: 2; background: rgba(255, 255, 255, 0.96); backdrop-filter: blur(8px); border-bottom: 1px solid rgba(0, 0, 0, 0.06); padding: 16px 24px 10px; }
+    .rd-body { padding: 18px 24px 80px; font-size: 15px; line-height: 1.75; color: #1d1d1f; }
+    .rd-body h3 { margin: 26px 0 8px; font-size: 18px; font-weight: 700; }
+    .rd-body h4 { margin: 18px 0 6px; font-size: 15px; font-weight: 700; color: #424245; }
+    .rd-body p.rd-p { margin: 0 0 12px; }
+    .rd-body .rd-eq { margin: 10px 0 14px; display: flex; align-items: center; gap: 12px; overflow-x: auto; }
+    .rd-body .rd-eq .mj-katex { flex: 1; text-align: center; }
+    .rd-body .rd-eqno { color: #8e8e93; font-size: 13px; }
+    .rd-body ul, .rd-body ol { margin: 0 0 12px 20px; }
+    .rd-body ul { list-style: disc; } .rd-body ol { list-style: decimal; }
+    .rd-body li { margin: 3px 0; }
+    .rd-body .rd-fig { margin: 0 0 12px; border-left: 3px solid #e5e5ea; padding-left: 10px; font-size: 13px; color: #6e6e73; }
+    .rd-role { display: inline-block; margin-right: 6px; border-radius: 6px; padding: 0 6px; font-size: 11px; font-weight: 700; vertical-align: 2px; }
+    .rd-role.background { background: #f5f5f7; color: #6e6e73; } .rd-role.prior { background: #e8f1fb; color: #0066cc; }
+    .rd-role.gap { background: #fff1f0; color: #c4271d; } .rd-role.this { background: #ecfdf5; color: #0f9f6e; } .rd-role.organization { background: #f3e8ff; color: #7e22ce; }
+    .pp-cite { color: #0066cc; cursor: pointer; border-radius: 4px; padding: 0 1px; white-space: nowrap; }
+    .pp-cite:hover { background: #e8f1fb; }
+    .rd-pop { position: absolute; z-index: 70; width: min(92vw, 460px); border-radius: 14px; background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); border: 1px solid rgba(0, 0, 0, 0.08); padding: 12px 14px; font-size: 13px; line-height: 1.55; }
+    .rd-tab { border-radius: 999px; padding: 5px 12px; font-size: 13px; color: #6e6e73; background: #f5f5f7; white-space: nowrap; }
+    .rd-tab.is-on { background: #1d1d1f; color: #fff; }
+    .rd-tab:disabled { opacity: 0.35; }
+    .cmp-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 55; display: flex; align-items: center; gap: 8px; border-radius: 999px; background: #1d1d1f; color: #fff; padding: 8px 10px 8px 18px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); font-size: 13px; }
+    .cmp-bar select { border-radius: 999px; background: #2c2c2e; color: #fff; padding: 5px 10px; }
+    .pp-btn.picked { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    html.theme-dark .rd-panel { background: #15171c; }
+    html.theme-dark .rd-head { background: rgba(21, 23, 28, 0.96); border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .rd-body { color: #e8e8ea; }
+    html.theme-dark .rd-pop { background: #1c1f26; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .rd-tab { background: #23262d; color: #c7c7cc; }
+    html.theme-dark .rd-tab.is-on { background: #e8e8ea; color: #111; }
     html.theme-dark .pp-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
     html.theme-dark .pp-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
     html.theme-dark .pp-seg { background: #111318; }
@@ -41,9 +74,10 @@
         <p class="mt-3 max-w-[800px] text-[15px] leading-relaxed text-[#6e6e73]">키워드로 논문을 찾아요. <b>NTN·RIS·UAV 같은 통신 약어는 풀어 쓴 말까지 같이</b> 찾고, 인용 많은 순·최신순·저널/학회로 거를 수 있어요. 마음에 드는 논문에서 참고문헌·인용한 논문으로 꼬리를 물고, 바로 인용하거나 내 논문함에 담아 두세요.</p>
     </div>
 
-    <div class="mt-6 flex gap-1.5">
+    <div class="mt-6 flex flex-wrap items-center gap-1.5">
         <button type="button" class="pp-chip is-on !px-4 !py-1.5 !text-[13px]" data-tab="search">🔎 찾기</button>
         <button type="button" class="pp-chip !px-4 !py-1.5 !text-[13px]" data-tab="shelf">📌 내 논문함 <span id="pp-shelf-n"></span></button>
+        <label class="pp-chip ml-auto cursor-pointer !px-4 !py-1.5 !text-[13px]" title="학교에서 받은 논문 PDF 를 섹션별로 나눠 봐요 (서버에 저장하지 않아요)">📄 내 PDF 섹션 보기<input type="file" accept="application/pdf" class="hidden" id="pp-pdf-any"></label>
     </div>
 
     <!-- 찾기 -->
@@ -102,7 +136,30 @@
     </section>
 </main>
 
-<script>window.PAPERS = { search: '{% url "tools:papers_search" %}', shelf: '{% url "tools:papers_shelf" %}', save: '{% url "tools:papers_shelf_save" %}', update: '{% url "tools:papers_shelf" %}', cite: '{% url "tools:cite" %}', login: {{ user.is_authenticated|yesno:"true,false" }}, loginUrl: '{% url "accounts:login" %}?next={{ request.path|urlencode }}' };</script>
+<div class="rd-wrap hidden" id="rd-wrap">
+    <div class="rd-panel" id="rd-panel">
+        <div class="rd-head">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1"><p class="text-[11px] text-[#8e8e93]" id="rd-src"></p><h2 class="mt-0.5 text-[18px] font-semibold leading-snug" id="rd-title"></h2></div>
+                <button type="button" class="pp-btn" id="rd-copy" title="보이는 섹션 글자 복사">복사</button>
+                <button type="button" class="pp-btn !text-[15px]" id="rd-close">✕</button>
+            </div>
+            <div class="mt-3 flex gap-1.5 overflow-x-auto pb-1" id="rd-tabs"></div>
+        </div>
+        <div class="rd-body" id="rd-body"></div>
+    </div>
+</div>
+<div class="rd-pop hidden" id="rd-pop"></div>
+<div class="cmp-bar hidden" id="cmp-bar">
+    <span><b id="cmp-n">0</b>편 고름</span>
+    <select id="cmp-kind"></select>
+    <button type="button" class="rounded-full bg-white px-4 py-1.5 font-semibold text-[#1d1d1f]" id="cmp-go">나란히 보기</button>
+    <button type="button" class="px-2 text-[#c7c7cc] hover:text-white" id="cmp-clear" title="선택 풀기">✕</button>
+</div>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+
+<script>window.PAPERS = { search: '{% url "tools:papers_search" %}', shelf: '{% url "tools:papers_shelf" %}', save: '{% url "tools:papers_shelf_save" %}', update: '{% url "tools:papers_shelf" %}', cite: '{% url "tools:cite" %}', sections: '{% url "tools:papers_sections" %}', sectionsPdf: '{% url "tools:papers_sections_pdf" %}', login: {{ user.is_authenticated|yesno:"true,false" }}, loginUrl: '{% url "accounts:login" %}?next={{ request.path|urlencode }}' };</script>
 <script src="{% static 'js/mj-cite.js' %}?v=1"></script>
 {% verbatim %}
 <script>
@@ -121,6 +178,8 @@
     const st = { source: 'openalex', period: '', sort: 'relevance', venues: [], ...saved, rel: null, page: 1 };
     let items = [], shown = 20, last = null, terms = [];
     let shelf = [];
+    const picked = new Map();  // 나란히 보기로 고른 논문
+    const secCache = new Map();  // 논문 → 섹션 결과
 
     // ── 필터 화면 ──
     $('pp-venues').insertAdjacentHTML('beforeend', VENUE_ORDER.map((k) => `<button type="button" class="pp-chip" data-venue="${k}">${VENUE_LABEL[k]}</button>`).join('') + '<button type="button" class="pp-chip !border-dashed" id="pp-venue-clear">모두 끄기</button>');
@@ -258,6 +317,8 @@
                 <button type="button" class="pp-btn" data-act="ieee">IEEE 복사</button>
                 <button type="button" class="pp-btn" data-act="cite" ${cited ? 'disabled' : ''}>${cited ? '✓ 참고문헌에 있음' : '＋ 내 참고문헌'}</button>
                 ${p.pdf ? `<a class="pp-btn" href="${esc(p.pdf)}" target="_blank" rel="noopener">📄 PDF</a>` : ''}
+                <button type="button" class="pp-btn" data-act="read" title="${p.arxiv ? 'arXiv 원문을 섹션별로' : 'arXiv 에서 같은 논문을 찾아 섹션별로 (없으면 PDF 올리기)'}">📖 섹션 보기</button>
+                <button type="button" class="pp-btn ${picked.has(shelfKey(p)) ? 'picked' : ''}" data-act="pick">${picked.has(shelfKey(p)) ? '✓ 비교' : '＋ 비교'}</button>
                 ${p.id ? `<span class="ml-auto flex gap-1.5">
                     <button type="button" class="pp-btn" data-act="refs" ${p.refs ? '' : 'disabled'}>참고문헌 ${fmtN(p.refs)} →</button>
                     <button type="button" class="pp-btn" data-act="citedby" ${p.cited_by ? '' : 'disabled'}>인용한 논문 ${fmtN(p.cited_by)} →</button></span>` : ''}
@@ -315,6 +376,8 @@
         else if (act === 'cite') { const list = store.get('mj.cite.list', []); const it = toCite(p); if (!list.some((x) => sameItem(x, it))) { list.push(it); store.set('mj.cite.list', list); } b.textContent = '✓ 참고문헌에 있음'; b.disabled = true; }
         else if (act === 'shelf') toggleShelf(p, b);
         else if (act === 'refs' || act === 'citedby') { showTab('search'); openRel(p, act); }
+        else if (act === 'read') openReader(p);
+        else if (act === 'pick') { const k = shelfKey(p); if (picked.has(k)) picked.delete(k); else if (picked.size >= 8) { alert('나란히 보기는 8편까지 고를 수 있어요.'); return; } else picked.set(k, p); renderPicked(); rerender(); }
         else if (act === 'status' || act === 'star' || act === 'remove') shelfAction(art, act, b);
     });
 
@@ -373,6 +436,198 @@
             e.target.innerHTML = `✓ ${n}편 추가 — <u>인용 도구 열기</u>`; e.target.onclick = () => { location.href = P.cite; };
         });
     }
+
+
+    // ── 섹션 보기 ──
+    const KIND_ORDER = ['abstract', 'introduction', 'contrib', 'related', 'system', 'problem', 'proposed', 'analysis', 'simulation', 'conclusion'];
+    const KIND_LABEL = { abstract: '초록', introduction: '서론', contrib: '기여', related: '관련 연구', system: '시스템 모델', problem: '문제 정의', proposed: '제안 기법', analysis: '성능 분석', simulation: '시뮬레이션·결과', conclusion: '결론', all: '전체 목차' };
+    const ROLE_LABEL = { background: '배경', prior: '기존 연구', gap: '한계·문제 제기', this: '이 논문이 한 일', organization: '구성 안내' };
+    $('cmp-kind').innerHTML = KIND_ORDER.map((k) => `<option value="${k}" ${k === 'introduction' ? 'selected' : ''}>${KIND_LABEL[k]}</option>`).join('');
+    let reader = null;  // { data, paper, kind } | { compare: true, kind }
+
+    async function loadSections(p) {
+        const k = shelfKey(p);
+        if (secCache.has(k)) return secCache.get(k);
+        const q = p.arxiv ? `arxiv=${encodeURIComponent(p.arxiv)}` : `title=${encodeURIComponent(p.title)}`;
+        const res = await fetch(`${P.sections}?${q}`, { headers: { Accept: 'application/json' } });
+        const data = await res.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!res.ok) { const e = new Error(data.error || '원문을 가져오지 못했어요.'); e.needPdf = !!data.need_pdf; throw e; }
+        secCache.set(k, data);
+        return data;
+    }
+    async function uploadPdf(file) {
+        if (!P.login) { if (confirm('PDF 섹션 보기는 회원 전용이에요. 로그인할까요?')) location.href = P.loginUrl; throw new Error('로그인이 필요해요.'); }
+        const fd = new FormData(); fd.append('file', file);
+        const res = await fetch(P.sectionsPdf, { method: 'POST', body: fd, headers: { 'X-CSRFToken': csrf() }, credentials: 'same-origin' });
+        const data = await res.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!res.ok) throw new Error(data.error || 'PDF 를 나누지 못했어요.');
+        return data;
+    }
+    const sectionsOf = (data, kind) => kind === 'all' ? data.sections : data.sections.filter((s) => s.kind === kind);
+    const contribOf = (data) => (data.sections.find((s) => s.kind === 'introduction') || {}).contributions || [];
+    function blocksHTML(blocks, withRoles) {
+        return blocks.map((b) => {
+            if (b.t === 'p') return `<p class="rd-p">${withRoles && b.role ? `<span class="rd-role ${b.role}">${ROLE_LABEL[b.role]}</span>` : ''}${b.html}</p>`;
+            if (b.t === 'h') return `<h4>${b.html}</h4>`;
+            if (b.t === 'eq') return b.rows.map((r) => `<div class="rd-eq"><span class="mj-katex" data-display="1" data-latex="${esc(r.latex)}"></span>${r.no ? `<span class="rd-eqno">${esc(r.no)}</span>` : ''}</div>`).join('');
+            if (b.t === 'list') return `<${b.ordered ? 'ol' : 'ul'}>${b.items.map((it) => `<li>${it.html}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
+            if (b.t === 'fig') return `<p class="rd-fig">🖼 ${b.html}</p>`;
+            return '';
+        }).join('');
+    }
+    function sectionHTML(data, kind, opts = {}) {
+        if (kind === 'contrib') {
+            const c = contribOf(data);
+            return c.length ? `<ol>${c.map((x) => `<li>${x}</li>`).join('')}</ol>` : '<p class="text-[13px] text-[#8e8e93]">서론에서 기여 목록을 찾지 못했어요. 서론 탭에서 "이 논문이 한 일" 문단을 보세요.</p>';
+        }
+        const secs = sectionsOf(data, kind);
+        if (!secs.length) return `<p class="text-[13px] text-[#8e8e93]">이 논문에는 '${KIND_LABEL[kind]}'로 보이는 섹션이 없어요. 전체 목차에서 찾아보세요.</p>`;
+        return secs.map((s) => {
+            let h = `${opts.noTitle && secs.length === 1 ? '' : `<h3>${esc(s.title)}</h3>`}${blocksHTML(s.blocks, s.kind === 'introduction')}`;
+            if (s.kind === 'introduction' && !opts.compact) {
+                if (s.contributions?.length) h += `<div class="mt-4 rounded-2xl bg-[#ecfdf5] p-4 dark:bg-[#14432d]"><p class="text-[13px] font-semibold text-[#0f9f6e]">✅ 기여 (Contributions)</p><ol class="mt-1 text-[14px]">${s.contributions.map((x) => `<li>${x}</li>`).join('')}</ol></div>`;
+                if (s.cited?.length) h += `<div class="mt-4 rounded-2xl bg-[#f5f5f7] p-4 dark:bg-[#1c1f26]"><p class="text-[13px] font-semibold">📚 서론에서 인용한 논문 ${s.cited.length}편 <span class="font-normal text-[#8e8e93]">— 그 분야 핵심 선행 연구 목록이에요. 눌러서 찾기</span></p><ol class="mt-2 space-y-1 text-[13px] leading-5">${s.cited.map((k) => { const r = data.refs[k]; return r ? `<li><span class="pp-cite" data-refs="${esc(k)}">${esc(r.label)}</span> ${esc(r.text)}</li>` : ''; }).join('')}</ol></div>`;
+            }
+            return h;
+        }).join('');
+    }
+    function renderMath(root) {
+        if (typeof katex === 'undefined') { setTimeout(() => renderMath(root), 300); return; }
+        root.querySelectorAll('.mj-katex:not([data-done])').forEach((el) => {
+            el.dataset.done = '1';
+            try { katex.render(el.dataset.latex || '', el, { throwOnError: false, displayMode: el.dataset.display === '1' }); } catch (e) { el.textContent = el.dataset.latex; }
+        });
+    }
+    function showReader() { $('rd-wrap').classList.remove('hidden'); document.body.style.overflow = 'hidden'; }
+    function closeReader() { $('rd-wrap').classList.add('hidden'); $('rd-pop').classList.add('hidden'); document.body.style.overflow = ''; reader = null; }
+    $('rd-close').addEventListener('click', closeReader);
+    $('rd-wrap').addEventListener('click', (e) => { if (e.target.id === 'rd-wrap') closeReader(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && reader) closeReader(); });
+
+    function readerTabs(data, kind) {
+        const has = (k) => k === 'all' || (k === 'contrib' ? contribOf(data).length : data.sections.some((s) => s.kind === k));
+        return [...KIND_ORDER, 'all'].map((k) => `<button type="button" class="rd-tab ${k === kind ? 'is-on' : ''}" data-kind="${k}" ${has(k) ? '' : 'disabled'}>${KIND_LABEL[k]}</button>`).join('');
+    }
+    function renderReader() {
+        const r = reader; if (!r) return;
+        $('rd-panel').classList.toggle('wide', !!r.compare);
+        if (r.compare) {
+            $('rd-src').textContent = '나란히 보기 — 같은 섹션을 논문별로 이어서 읽어요';
+            $('rd-title').textContent = `${KIND_LABEL[r.kind]} · ${r.papers.length}편`;
+            $('rd-tabs').innerHTML = KIND_ORDER.map((k) => `<button type="button" class="rd-tab ${k === r.kind ? 'is-on' : ''}" data-kind="${k}">${KIND_LABEL[k]}</button>`).join('');
+            $('rd-body').innerHTML = `<p class="mb-4 text-[12px] text-[#8e8e93]">✍️ 흐름·구성 참고용이에요. 문장을 그대로 옮기면 표절이 되니, 자기 말로 다시 쓰세요.</p>` + r.papers.map((p, i) => {
+                const st = r.state[i];
+                const head = `<div class="mb-2 flex flex-wrap items-baseline gap-2"><span class="text-[12px] font-bold text-[#0066cc]">${i + 1}</span><b class="text-[15px]">${esc(p.title)}</b><span class="text-[12px] text-[#8e8e93]">${esc(p.venue || '')}${p.year ? ' · ' + p.year : ''}</span></div>`;
+                let body;
+                if (!st || st.loading) body = '<p class="text-[13px] text-[#8e8e93]">⏳ 원문 가져오는 중…</p>';
+                else if (st.error) body = `<p class="text-[13px] text-[#c4271d]">${esc(st.error)}</p>${st.needPdf ? `<label class="pp-btn mt-1 inline-block cursor-pointer">📄 이 논문 PDF 올리기<input type="file" accept="application/pdf" class="hidden" data-pdf-for="${i}"></label>` : ''}`;
+                else body = sectionHTML(st.data, r.kind, { compact: true, noTitle: false });
+                return `<section class="mb-8 border-b border-black/[0.06] pb-6 dark:border-white/[0.08]" data-ci="${i}">${head}${body}</section>`;
+            }).join('');
+        } else {
+            const d = r.data;
+            $('rd-src').textContent = d.source === 'pdf' ? `올린 PDF${d.filename ? ' · ' + d.filename : ''} — 글자만 뽑아서 수식·표는 깨질 수 있어요` : `arXiv 원문 (${d.arxiv}) · 약 ${fmtN(d.words)}단어`;
+            $('rd-title').textContent = d.title || r.paper?.title || '';
+            $('rd-tabs').innerHTML = readerTabs(d, r.kind);
+            const toc = r.kind === 'all' ? `<ol class="mb-6 text-[14px]">${d.sections.map((s) => `<li><a class="text-[#0066cc] hover:underline" href="#" data-goto="${s.kind}">${esc(s.title)}</a> <span class="text-[11px] text-[#8e8e93]">${KIND_LABEL[s.kind] || ''}</span></li>`).join('')}</ol>` : '';
+            const note = r.kind === 'introduction' ? `<p class="mb-4 text-[12px] leading-5 text-[#8e8e93]">문단 앞 표시는 표지어("However", "In this paper"…)로 자동 추정한 역할이에요. ✍️ 서론 흐름 참고용 — 문장을 그대로 옮기면 표절이 돼요.</p>` : '';
+            $('rd-body').innerHTML = toc + note + sectionHTML(d, r.kind);
+        }
+        renderMath($('rd-body'));
+        $('rd-body').scrollTop = 0; $('rd-panel').scrollTop = 0;
+    }
+    async function openReader(p) {
+        reader = { paper: p, data: null, kind: 'introduction' };
+        $('rd-panel').classList.remove('wide');
+        $('rd-src').textContent = ''; $('rd-title').textContent = p.title; $('rd-tabs').innerHTML = '';
+        $('rd-body').innerHTML = `<p class="text-[14px] text-[#8e8e93]">⏳ ${p.arxiv ? 'arXiv 원문을 가져오는 중…' : 'arXiv 에서 같은 논문을 찾는 중…'}</p>`;
+        showReader();
+        try {
+            const data = await loadSections(p);
+            if (reader?.paper !== p) return;
+            reader.data = data;
+            reader.kind = data.sections.some((s) => s.kind === 'introduction') ? 'introduction' : 'all';
+            renderReader();
+        } catch (err) {
+            if (reader?.paper !== p) return;
+            $('rd-body').innerHTML = `<p class="text-[14px] text-[#c4271d]">${esc(err.message)}</p>${err.needPdf ? `<p class="mt-3 text-[13px] text-[#6e6e73]">학교 도서관·IEEE Xplore 에서 받은 PDF 를 올리면 같은 방식으로 나눠 봐요. (서버에 저장하지 않아요)</p><label class="pp-btn mt-2 inline-block cursor-pointer !px-4 !py-2 !text-[14px]">📄 PDF 올리기<input type="file" accept="application/pdf" class="hidden" id="rd-pdf"></label>` : ''}`;
+            $('rd-pdf')?.addEventListener('change', async (e) => {
+                const f = e.target.files[0]; if (!f) return;
+                $('rd-body').innerHTML = '<p class="text-[14px] text-[#8e8e93]">⏳ PDF 나누는 중…</p>';
+                try { const data = await uploadPdf(f); secCache.set(shelfKey(p), data); reader.data = data; reader.kind = data.sections.some((s) => s.kind === 'introduction') ? 'introduction' : 'all'; renderReader(); }
+                catch (err2) { $('rd-body').innerHTML = `<p class="text-[14px] text-[#c4271d]">${esc(err2.message)}</p>`; }
+            });
+        }
+    }
+    $('pp-pdf-any').addEventListener('change', async (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        reader = { paper: { title: f.name }, data: null, kind: 'introduction' };
+        $('rd-src').textContent = ''; $('rd-title').textContent = f.name; $('rd-tabs').innerHTML = '';
+        $('rd-body').innerHTML = '<p class="text-[14px] text-[#8e8e93]">⏳ PDF 나누는 중…</p>';
+        showReader();
+        try { const data = await uploadPdf(f); reader.data = data; reader.kind = data.sections.some((s) => s.kind === 'introduction') ? 'introduction' : 'all'; renderReader(); }
+        catch (err) { $('rd-body').innerHTML = `<p class="text-[14px] text-[#c4271d]">${esc(err.message)}</p>`; }
+        e.target.value = '';
+    });
+    $('rd-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-kind]'); if (!b || b.disabled || !reader) return; reader.kind = b.dataset.kind; renderReader(); });
+    $('rd-body').addEventListener('click', (e) => {
+        const g = e.target.closest('[data-goto]'); if (g) { e.preventDefault(); reader.kind = g.dataset.goto === 'other' || g.dataset.goto === 'appendix' ? 'all' : g.dataset.goto; renderReader(); return; }
+        const c = e.target.closest('.pp-cite'); if (c) { showCite(c); return; }
+    });
+    $('rd-body').addEventListener('change', async (e) => {
+        const inp = e.target.closest('[data-pdf-for]'); if (!inp || !reader?.compare) return;
+        const i = +inp.dataset.pdfFor, f = inp.files[0]; if (!f) return;
+        reader.state[i] = { loading: true }; renderReader();
+        try { const data = await uploadPdf(f); secCache.set(shelfKey(reader.papers[i]), data); reader.state[i] = { data }; } catch (err) { reader.state[i] = { error: err.message }; }
+        renderReader();
+    });
+    $('rd-copy').addEventListener('click', async (e) => {
+        try { await navigator.clipboard.writeText($('rd-body').innerText); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '복사'; }, 1200); } catch (err) { /* 무시 */ }
+    });
+
+    // 인용 번호 → 참고문헌 말풍선
+    const refTitle = (text) => { const m = text.match(/[“"]([^”"]{12,300})[,.]?[”"]/); return m ? m[1].replace(/[,.]$/, '') : text.replace(/^[^.]*\.\s*/, '').split('. ')[0].slice(0, 200); };
+    function showCite(el) {
+        const data = reader?.compare ? reader.state[+el.closest('[data-ci]').dataset.ci]?.data : reader?.data;
+        if (!data) return;
+        const keys = (el.dataset.refs || '').split(' ').filter(Boolean);
+        const rows = keys.map((k) => data.refs[k]).filter(Boolean);
+        if (!rows.length) return;
+        const pop = $('rd-pop');
+        pop.innerHTML = rows.map((r) => `<div class="mb-2 last:mb-0"><b>${esc(r.label)}</b> ${esc(r.text)}<div class="mt-1 flex gap-1.5"><button type="button" class="pp-btn" data-find="${esc(refTitle(r.text))}">🔎 이 논문 찾기</button><button type="button" class="pp-btn" data-copyref="${esc(r.text)}">복사</button></div></div>`).join('');
+        const rect = el.getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, rect.left + window.scrollX - 20)) + 'px';
+        pop.style.top = (rect.bottom + window.scrollY + 6) + 'px';
+        pop.classList.remove('hidden');
+        const w = pop.offsetWidth; pop.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, rect.left + window.scrollX - 20)) + 'px';
+    }
+    $('rd-pop').addEventListener('click', (e) => {
+        const f = e.target.closest('[data-find]');
+        if (f) { $('rd-pop').classList.add('hidden'); closeReader(); showTab('search'); $('pp-q').value = f.dataset.find; $('pp-expand').checked = false; run(); return; }
+        const c = e.target.closest('[data-copyref]');
+        if (c) navigator.clipboard.writeText(c.dataset.copyref).then(() => { c.textContent = '✓'; });
+    });
+    document.addEventListener('click', (e) => { if (!e.target.closest('#rd-pop') && !e.target.closest('.pp-cite')) $('rd-pop').classList.add('hidden'); }, true);
+    $('rd-panel').addEventListener('scroll', () => $('rd-pop').classList.add('hidden'));
+
+    // ── 나란히 보기 ──
+    function renderPicked() {
+        $('cmp-n').textContent = picked.size;
+        $('cmp-bar').classList.toggle('hidden', picked.size === 0);
+    }
+    $('cmp-clear').addEventListener('click', () => { picked.clear(); renderPicked(); rerender(); });
+    async function openCompare() {
+        const papers = [...picked.values()];
+        reader = { compare: true, kind: $('cmp-kind').value, papers, state: papers.map(() => ({ loading: true })) };
+        showReader(); renderReader();
+        for (let i = 0; i < papers.length; i++) {  // 하나씩 차례로 (arXiv 에 몰아서 보내지 않게)
+            if (!reader?.compare) return;
+            try { reader.state[i] = { data: await loadSections(papers[i]) }; }
+            catch (err) { reader.state[i] = { error: err.message, needPdf: err.needPdf }; }
+            if (reader?.compare) renderReader();
+        }
+    }
+    $('cmp-go').addEventListener('click', openCompare);
 
     // ── 탭 ──
     function showTab(t) {
