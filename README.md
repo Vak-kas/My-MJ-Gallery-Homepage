@@ -269,9 +269,10 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 # AI_PRICE_INPUT_PER_MTOK=1        # 어림 비용 계산용 단가 (100만 토큰당 달러)
 # AI_PRICE_OUTPUT_PER_MTOK=5
 
-# 선택: 검색엔진 소유 확인 (HTML 태그 방식의 content 값만)
 # 선택: 논문 인용 도구가 Crossref 에 알려 줄 연락처 (넣으면 더 안정적인 polite pool)
 # CROSSREF_MAILTO=you@example.com
+
+# 선택: 검색엔진 소유 확인 (HTML 태그 방식의 content 값만)
 # GOOGLE_SITE_VERIFICATION=...
 # NAVER_SITE_VERIFICATION=...
 
