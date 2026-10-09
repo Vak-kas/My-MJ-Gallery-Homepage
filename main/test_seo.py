@@ -113,3 +113,32 @@ class PostCardImageTests(TestCase):
 		self.assertEqual(res.status_code, 302)
 		self.assertIn("og-default.png", res["Location"])
 		self.assertEqual(self.client.get(reverse("blog:post_og", args=["nope"])).status_code, 302)
+
+
+@override_settings(SITE_URL="https://smjgallery.kr")
+class PageCardTests(TestCase):
+	def setUp(self):
+		import tempfile
+		cache.clear()
+		self.tmp = tempfile.mkdtemp()
+		self.override = override_settings(MEDIA_ROOT=self.tmp)
+		self.override.enable()
+
+	def tearDown(self):
+		import shutil
+		self.override.disable()
+		shutil.rmtree(self.tmp, ignore_errors=True)
+		cache.clear()
+
+	def test_pages_use_own_cards(self):
+		for path, card in (("/tools/", "/og/tool/index.png"), ("/tools/qrcode/", "/og/tool/qrcode.png"),
+						   ("/blog/", "/og/page/blog.png"), ("/blog/tech/", "/og/page/tech.png"), ("/photos/", "/og/page/gallery.png")):
+			html = self.client.get(path).content.decode()
+			self.assertIn(f'content="https://smjgallery.kr{card}?v=', html, path)
+
+	def test_card_png_and_unknown(self):
+		res = self.client.get("/og/tool/index.png")
+		self.assertEqual(res["Content-Type"], "image/png")
+		self.assertTrue(b"".join(res.streaming_content).startswith(b"\x89PNG"))
+		self.assertEqual(self.client.get("/og/tool/nope.png").status_code, 302)
+		self.assertEqual(self.client.get("/og/evil/x.png").status_code, 302)

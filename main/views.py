@@ -286,3 +286,21 @@ def robots_txt(request):
 	lines = ["User-agent: *"] + [f"Disallow: {p}" for p in ROBOTS_DISALLOW]
 	lines += ["", f"Sitemap: {settings.SITE_URL.rstrip('/')}/sitemap.xml"]
 	return HttpResponse("\n".join(lines) + "\n", content_type="text/plain")
+
+
+def og_card(request, kind, key):
+	"""페이지 링크 미리보기 카드 이미지."""
+	from django.core.files.storage import default_storage
+	from django.http import FileResponse
+	from django.shortcuts import redirect
+	from django.templatetags.static import static
+
+	from .og_cards import get_or_create
+
+	path = get_or_create(kind, key[:100])
+	if not path:
+		return redirect(static("images/og-default.png"))
+	response = FileResponse(default_storage.open(path, "rb"), content_type="image/png")
+	response["Cache-Control"] = "public, max-age=86400"
+	return response
+

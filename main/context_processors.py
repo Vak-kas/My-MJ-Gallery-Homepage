@@ -1,4 +1,4 @@
-from . import seo
+from . import og_cards, seo
 
 
 def _tool_meta(url_name):
@@ -6,8 +6,12 @@ def _tool_meta(url_name):
 
 	for tool in TOOLS:
 		if tool["url_name"] == f"tools:{url_name}":
-			return seo.build(f"{tool['title']} · Tool", tool["description"], path="")
+			return seo.build(f"{tool['title']} · Tool", tool["description"], og_cards.image_url("tool", tool["slug"]), path="")
 	return None
+
+
+CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "tech"): ("page", "tech"), ("blog", "board"): ("page", "board"),
+			 ("blog", "life"): ("page", "life"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery")}
 
 
 PAGE_TITLES = {
@@ -26,7 +30,8 @@ def seo_meta(request):
 	meta = None
 	if (ns, name) in PAGE_TITLES:
 		title, desc = PAGE_TITLES[(ns, name)]
-		meta = seo.build(title, desc, path=request.path)
+		card = CARD_KEYS.get((ns, name))
+		meta = seo.build(title, desc, og_cards.image_url(*card) if card else None, path=request.path)
 	elif ns == "tools":
 		meta = _tool_meta(name)
 	meta = meta or seo.build(path=request.path)

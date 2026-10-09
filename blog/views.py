@@ -274,7 +274,11 @@ def series_detail(request, slug: str):
 	parts = list(_single_post_qs(request).filter(series=series).order_by("series_order", "published_at", "id"))
 	if not parts:
 		raise Http404("Not found")
-	context = {"series": series, "series_parts": parts}
+	from main import og_cards
+	from main.seo import build
+
+	context = {"series": series, "series_parts": parts,
+			   "meta": build(f"📚 {series.name}", series.description or f"{len(parts)}편으로 이어지는 시리즈", og_cards.image_url("series", series.slug), path=request.path)}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/series.html", context)
 
