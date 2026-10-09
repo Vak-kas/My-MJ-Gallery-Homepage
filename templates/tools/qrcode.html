@@ -12,7 +12,7 @@
     .qr-tab { border-radius: 999px; padding: 7px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); color: #1d1d1f; }
     .qr-tab.is-active { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
     .qr-preview { background: repeating-conic-gradient(#f0f0f2 0% 25%, #fff 0% 50%) 50% / 20px 20px; }
-    .qr-preview canvas { max-width: 100%; height: auto; image-rendering: pixelated; }
+    .qr-preview canvas { max-width: 100%; height: auto; }
     html.theme-dark .qr-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
     html.theme-dark .qr-label { color: #e8e8ea; }
     html.theme-dark .qr-tab { color: #e8e8ea; border-color: rgba(255, 255, 255, 0.18); }
@@ -75,28 +75,72 @@
             </div>
 
             <div class="mt-6 border-t border-black/[0.06] pt-5">
-                <h2 class="text-[14px] font-semibold">모양</h2>
-                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    <div><label class="qr-label" for="o-ec">오류 복원</label>
-                        <select id="o-ec" class="qr-input"><option value="L">낮음 7%</option><option value="M" selected>보통 15%</option><option value="Q">높음 25%</option><option value="H">최고 30%</option></select></div>
-                    <div><label class="qr-label" for="o-shape">점 모양</label>
-                        <select id="o-shape" class="qr-input"><option value="square">네모</option><option value="round">둥근 점</option><option value="soft">둥근 네모</option></select></div>
-                    <div><label class="qr-label" for="o-size">크기 <span id="o-size-v" class="font-normal text-[#8e8e93]"></span></label>
-                        <input id="o-size" type="range" min="200" max="1600" step="40" value="720" class="w-full accent-[#0066cc]"></div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="mr-1 text-[14px] font-semibold">테마</h2>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="basic">기본</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="ocean">🌊 오션</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="sunset">🌅 선셋</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="pika">⚡ 옐로</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="mint">🌿 민트</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="night">🌙 나이트</button>
+                    <button type="button" class="qr-preset rounded-full border border-black/[0.1] px-3 py-1 text-[12px]" data-preset="gold">✨ 골드</button>
+                </div>
+
+                <h2 class="mt-5 text-[14px] font-semibold">점</h2>
+                <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div><label class="qr-label" for="o-shape">모양</label>
+                        <select id="o-shape" class="qr-input"><option value="square">네모</option><option value="round">둥근 점</option><option value="soft">둥근 네모</option><option value="diamond">다이아몬드</option><option value="star">별</option><option value="heart">하트</option></select></div>
                     <div><label class="qr-label" for="o-fg">색</label><input id="o-fg" type="color" value="#1d1d1f" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                    <div><label class="qr-label" for="o-grad">그라데이션</label>
+                        <select id="o-grad" class="qr-input"><option value="none">없음</option><option value="linear">직선</option><option value="diagonal">대각선</option><option value="radial">원형 (가운데→바깥)</option></select></div>
+                    <div data-needs-grad hidden><label class="qr-label" for="o-fg2">두 번째 색</label><input id="o-fg2" type="color" value="#0066cc" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                </div>
+
+                <h2 class="mt-5 text-[14px] font-semibold">모서리 눈 (네모 3개)</h2>
+                <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div><label class="qr-label" for="o-eye">바깥 모양</label>
+                        <select id="o-eye" class="qr-input"><option value="square">네모</option><option value="rounded">둥근 네모</option><option value="circle">원</option><option value="leaf">잎사귀</option></select></div>
+                    <div><label class="qr-label" for="o-eyeball">안쪽 모양</label>
+                        <select id="o-eyeball" class="qr-input"><option value="square">네모</option><option value="rounded">둥근 네모</option><option value="circle">원</option><option value="leaf">잎사귀</option></select></div>
+                    <div><label class="qr-label" for="o-eyec">바깥 색</label><input id="o-eyec" type="color" value="#1d1d1f" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                    <div><label class="qr-label" for="o-eyeballc">안쪽 색</label><input id="o-eyeballc" type="color" value="#1d1d1f" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                </div>
+                <label class="mt-2 flex items-center gap-2 text-[13px]"><input id="o-eye-same" type="checkbox" checked class="h-4 w-4"> 눈 색을 점 색과 같게</label>
+
+                <h2 class="mt-5 text-[14px] font-semibold">배경 · 크기</h2>
+                <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <div><label class="qr-label" for="o-bg">배경</label><input id="o-bg" type="color" value="#ffffff" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
                     <div><label class="qr-label" for="o-margin">여백</label>
                         <select id="o-margin" class="qr-input"><option value="0">없음</option><option value="2">좁게</option><option value="4" selected>보통</option><option value="6">넓게</option></select></div>
+                    <div><label class="qr-label" for="o-ec">오류 복원</label>
+                        <select id="o-ec" class="qr-input"><option value="L">낮음 7%</option><option value="M" selected>보통 15%</option><option value="Q">높음 25%</option><option value="H">최고 30%</option></select></div>
+                    <div><label class="qr-label" for="o-size">크기 <span id="o-size-v" class="font-normal text-[#8e8e93]"></span></label>
+                        <input id="o-size" type="range" min="200" max="1600" step="40" value="720" class="mt-3 w-full accent-[#0066cc]"></div>
                 </div>
-                <label class="mt-3 flex items-center gap-2 text-[13px]"><input id="o-transparent" type="checkbox" class="h-4 w-4"> 배경 투명 (PNG)</label>
-                <div class="mt-4 rounded-xl bg-[#f5f5f7] p-3">
+                <label class="mt-2 flex items-center gap-2 text-[13px]"><input id="o-transparent" type="checkbox" class="h-4 w-4"> 배경 투명 (PNG·SVG)</label>
+
+                <h2 class="mt-5 text-[14px] font-semibold">테두리 · 문구</h2>
+                <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div><label class="qr-label" for="o-frame">스타일</label>
+                        <select id="o-frame" class="qr-input"><option value="none">없음</option><option value="label">아래 문구</option><option value="box">테두리 + 문구</option><option value="ticket">말풍선 + 문구</option></select></div>
+                    <div class="col-span-1 sm:col-span-2" data-needs-frame hidden><label class="qr-label" for="o-caption">문구</label><input id="o-caption" class="qr-input" maxlength="30" value="SCAN ME"></div>
+                    <div data-needs-frame hidden><label class="qr-label" for="o-framec">테두리 색</label><input id="o-framec" type="color" value="#1d1d1f" class="h-11 w-full cursor-pointer rounded-xl border border-black/[0.1]"></div>
+                </div>
+
+                <div class="mt-5 rounded-xl bg-[#f5f5f7] p-3">
                     <div class="flex flex-wrap items-center gap-2">
-                        <span class="text-[13px] font-semibold">가운데 로고</span>
+                        <span class="text-[13px] font-semibold">가운데 사진 · 로고</span>
                         <label class="cursor-pointer rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px]">이미지 고르기<input id="o-logo" type="file" accept="image/*" class="hidden"></label>
                         <button type="button" id="o-logo-mj" class="rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px]">MJ 로고</button>
+                        <button type="button" id="o-logo-palette" class="rounded-full border border-black/[0.1] bg-white px-3 py-1 text-[12px]" hidden>🎨 사진 색으로 꾸미기</button>
                         <button type="button" id="o-logo-clear" class="rounded-full px-3 py-1 text-[12px] text-[#c4271d]" hidden>빼기</button>
                     </div>
-                    <p class="mt-1.5 text-[12px] text-[#8e8e93]">로고를 넣으면 가려지는 만큼을 복원할 수 있게 오류 복원이 자동으로 "최고"가 돼요.</p>
+                    <div class="mt-2 grid grid-cols-2 gap-3" data-needs-logo hidden>
+                        <div><label class="qr-label" for="o-logo-size">사진 크기</label><input id="o-logo-size" type="range" min="14" max="30" value="22" class="w-full accent-[#0066cc]"></div>
+                        <div><label class="qr-label" for="o-logo-shape">사진 모양</label>
+                            <select id="o-logo-shape" class="qr-input"><option value="rounded">둥근 네모</option><option value="circle">원</option><option value="square">네모</option></select></div>
+                    </div>
+                    <p class="mt-1.5 text-[12px] text-[#8e8e93]">사진을 넣으면 가려지는 만큼 복원할 수 있게 오류 복원이 자동으로 "최고"가 돼요. 캐릭터 이미지는 개인적으로만 쓰세요 (공개·판매용은 저작권 주의).</p>
                 </div>
             </div>
         </section>
@@ -105,7 +149,10 @@
             <div class="qr-preview flex min-h-[320px] items-center justify-center rounded-2xl p-4">
                 <canvas id="qr-canvas" width="720" height="720"></canvas>
             </div>
-            <p id="qr-info" class="mt-3 text-[12px] text-[#8e8e93]"></p>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span id="qr-scan" class="rounded-full px-3 py-1 text-[12px]" hidden></span>
+                <p id="qr-info" class="text-[12px] text-[#8e8e93]"></p>
+            </div>
             <p id="qr-error" class="mt-1 min-h-[18px] text-[13px] text-[#d44c47]"></p>
             <div class="mt-3 flex flex-wrap gap-2">
                 <button type="button" id="dl-png" class="rounded-full bg-[#0066cc] px-5 py-2.5 text-[14px] font-semibold text-white">PNG 저장</button>
@@ -166,47 +213,214 @@
         },
     };
 
-    // ── 그리기
-    function drawTo(ctx, size, { forPng }) {
+    // ── 그리기: 모든 모양을 "칸" 단위 SVG 경로로 만든 뒤, 캔버스(Path2D)와 SVG 에 똑같이 그림
+    const f = (n) => +n.toFixed(3);
+    const rectD = (x, y, w, h, r = 0) => {
+        r = Math.min(r, w / 2, h / 2);
+        if (!r) return `M${f(x)} ${f(y)}h${f(w)}v${f(h)}h${f(-w)}z`;
+        return `M${f(x + r)} ${f(y)}h${f(w - 2 * r)}a${f(r)} ${f(r)} 0 0 1 ${f(r)} ${f(r)}v${f(h - 2 * r)}a${f(r)} ${f(r)} 0 0 1 ${f(-r)} ${f(r)}h${f(-(w - 2 * r))}a${f(r)} ${f(r)} 0 0 1 ${f(-r)} ${f(-r)}v${f(-(h - 2 * r))}a${f(r)} ${f(r)} 0 0 1 ${f(r)} ${f(-r)}z`;
+    };
+    const circleD = (cx, cy, r) => `M${f(cx - r)} ${f(cy)}a${f(r)} ${f(r)} 0 1 0 ${f(2 * r)} 0a${f(r)} ${f(r)} 0 1 0 ${f(-2 * r)} 0z`;
+    const leafD = (x, y, w, h, r) => `M${f(x + r)} ${f(y)}H${f(x + w)}V${f(y + h - r)}a${f(r)} ${f(r)} 0 0 1 ${f(-r)} ${f(r)}H${f(x)}V${f(y + r)}a${f(r)} ${f(r)} 0 0 1 ${f(r)} ${f(-r)}z`;
+    const polyD = (pts) => 'M' + pts.map(([a, b]) => `${f(a)} ${f(b)}`).join('L') + 'z';
+    const shapeD = (kind, x, y, w) => {
+        if (kind === 'circle') return circleD(x + w / 2, y + w / 2, w / 2);
+        if (kind === 'rounded') return rectD(x, y, w, w, w * 0.28);
+        if (kind === 'leaf') return leafD(x, y, w, w, w * 0.45);
+        return rectD(x, y, w, w);
+    };
+    const dotD = (shape, x, y) => {
+        const c = 0.5;
+        if (shape === 'round') return circleD(x + c, y + c, 0.45);
+        if (shape === 'soft') return rectD(x + 0.06, y + 0.06, 0.88, 0.88, 0.3);
+        if (shape === 'diamond') return polyD([[x + c, y + 0.02], [x + 0.98, y + c], [x + c, y + 0.98], [x + 0.02, y + c]]);
+        if (shape === 'star') {
+            const pts = [];
+            for (let k = 0; k < 10; k++) { const a = Math.PI / 5 * k - Math.PI / 2, r = k % 2 ? 0.22 : 0.52; pts.push([x + c + r * Math.cos(a), y + c + 0.04 + r * Math.sin(a)]); }
+            return polyD(pts);
+        }
+        if (shape === 'heart') return `M${f(x + c)} ${f(y + 0.88)}C${f(x - 0.15)} ${f(y + 0.4)} ${f(x + 0.22)} ${f(y - 0.05)} ${f(x + c)} ${f(y + 0.28)}C${f(x + 0.78)} ${f(y - 0.05)} ${f(x + 1.15)} ${f(y + 0.4)} ${f(x + c)} ${f(y + 0.88)}z`;
+        return rectD(x, y, 1, 1);
+    };
+
+    function opts() {
+        const same = $('o-eye-same').checked;
+        return {
+            margin: +$('o-margin').value, shape: $('o-shape').value,
+            fg: $('o-fg').value, fg2: $('o-fg2').value, grad: $('o-grad').value,
+            eye: $('o-eye').value, eyeball: $('o-eyeball').value,
+            eyeC: same ? null : $('o-eyec').value, eyeballC: same ? null : $('o-eyeballc').value,
+            bg: $('o-bg').value, transparent: $('o-transparent').checked,
+            frame: $('o-frame').value, caption: $('o-caption').value.trim(), frameC: $('o-framec').value,
+            logoSize: +$('o-logo-size').value / 100, logoShape: $('o-logo-shape').value,
+        };
+    }
+
+    /** 장면: 칸 단위 좌표의 도형 목록 + 전체 크기 */
+    function scene(o) {
         const { qr, count } = current;
-        const margin = +$('o-margin').value;
-        const cell = size / (count + margin * 2);
-        const fg = $('o-fg').value, bg = $('o-bg').value, shape = $('o-shape').value;
-        ctx.clearRect(0, 0, size, size);
-        if (!(forPng && $('o-transparent').checked)) { ctx.fillStyle = bg; ctx.fillRect(0, 0, size, size); }
-        ctx.fillStyle = fg;
-        const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= count - 7) || (r >= count - 7 && c < 7);
-        for (let r = 0; r < count; r++) {
-            for (let c = 0; c < count; c++) {
-                if (!qr.isDark(r, c)) continue;
-                const x = (c + margin) * cell, y = (r + margin) * cell;
-                if (shape === 'round' && !isFinder(r, c)) {
-                    ctx.beginPath(); ctx.arc(x + cell / 2, y + cell / 2, cell * 0.45, 0, Math.PI * 2); ctx.fill();
-                } else if (shape === 'soft' && !isFinder(r, c)) {
-                    ctx.beginPath(); ctx.roundRect(x + cell * 0.06, y + cell * 0.06, cell * 0.88, cell * 0.88, cell * 0.3); ctx.fill();
-                } else {
-                    ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(cell), Math.ceil(cell));
-                }
-            }
+        const n = count + o.margin * 2;
+        const pad = o.frame === 'box' || o.frame === 'ticket' ? 2 : 0;
+        const labelH = o.frame === 'none' || !o.caption ? 0 : Math.max(4, n * 0.16);
+        const W = n + pad * 2, H = n + pad * 2 + labelH + (o.frame === 'ticket' ? 1.5 : 0);
+        const ox = pad, oy = pad;
+        const inEye = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= count - 7) || (r >= count - 7 && c < 7);
+        const logoCells = logo ? Math.max(5, Math.round(count * o.logoSize)) : 0;
+        const lo = (count - logoCells) / 2;
+        const underLogo = (r, c) => logo && r >= lo - 1 && r < lo + logoCells + 1 && c >= lo - 1 && c < lo + logoCells + 1;
+        let dots = '';
+        for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) {
+            if (qr.isDark(r, c) && !inEye(r, c) && !underLogo(r, c)) dots += dotD(o.shape, ox + o.margin + c, oy + o.margin + r);
+        }
+        const eyes = [[0, 0], [0, count - 7], [count - 7, 0]].map(([r, c]) => {
+            const x = ox + o.margin + c, y = oy + o.margin + r;
+            return { outer: shapeD(o.eye, x, y, 7) + shapeD(o.eye, x + 1, y + 1, 5), inner: shapeD(o.eyeball, x + 2, y + 2, 3) };
+        });
+        return { W, H, n, ox, oy, pad, labelH, dots, eyes, logoCells, logoX: ox + o.margin + lo, logoY: oy + o.margin + lo };
+    }
+
+    function paint(ctx, px, o, { forExport }) {
+        const sc = scene(o);
+        const unit = px / sc.W;
+        ctx.canvas.width = Math.round(sc.W * unit);
+        ctx.canvas.height = Math.round(sc.H * unit);
+        ctx.setTransform(unit, 0, 0, unit, 0, 0);
+        ctx.clearRect(0, 0, sc.W, sc.H);
+        const transparent = o.transparent && forExport;
+        // 테두리·배경
+        if (o.frame === 'box' || o.frame === 'ticket') {
+            ctx.fillStyle = o.frameC;
+            ctx.fill(new Path2D(rectD(0, 0, sc.W, sc.H - (o.frame === 'ticket' ? 1.5 : 0), 2)));
+            if (o.frame === 'ticket') ctx.fill(new Path2D(polyD([[sc.W / 2 - 1.5, sc.H - 1.5], [sc.W / 2 + 1.5, sc.H - 1.5], [sc.W / 2, sc.H]])));
+            ctx.fillStyle = o.bg;
+            ctx.fill(new Path2D(rectD(sc.pad / 2, sc.pad / 2, sc.W - sc.pad, sc.n + sc.pad, 1.2)));
+        } else if (!transparent) {
+            ctx.fillStyle = o.bg;
+            ctx.fillRect(0, 0, sc.W, sc.H);
+        }
+        // 점 (그라데이션)
+        let paintFg = o.fg;
+        if (o.grad !== 'none') {
+            const x0 = sc.ox + o.margin, y0 = sc.oy + o.margin, len = current.count;
+            const g = o.grad === 'radial' ? ctx.createRadialGradient(x0 + len / 2, y0 + len / 2, 0, x0 + len / 2, y0 + len / 2, len * 0.72)
+                : o.grad === 'diagonal' ? ctx.createLinearGradient(x0, y0, x0 + len, y0 + len) : ctx.createLinearGradient(x0, y0, x0 + len, y0);
+            g.addColorStop(0, o.fg); g.addColorStop(1, o.fg2);
+            paintFg = g;
+        }
+        ctx.fillStyle = paintFg;
+        ctx.fill(new Path2D(sc.dots));
+        for (const e of sc.eyes) {
+            ctx.fillStyle = o.eyeC || paintFg; ctx.fill(new Path2D(e.outer), 'evenodd');
+            ctx.fillStyle = o.eyeballC || paintFg; ctx.fill(new Path2D(e.inner));
+        }
+        // 가운데 사진
+        if (logo) {
+            const s = sc.logoCells, x = sc.logoX, y = sc.logoY;
+            const clip = o.logoShape === 'circle' ? circleD(x + s / 2, y + s / 2, s / 2) : rectD(x, y, s, s, o.logoShape === 'rounded' ? s * 0.18 : 0);
+            ctx.save();
+            ctx.clip(new Path2D(clip));
+            const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1, k = Math.max(s / nw, s / nh);
+            if (!transparent || o.frame !== 'none') { ctx.fillStyle = o.bg; ctx.fillRect(x, y, s, s); }
+            ctx.drawImage(logo, x + s / 2 - nw * k / 2, y + s / 2 - nh * k / 2, nw * k, nh * k);
+            ctx.restore();
+        }
+        // 문구
+        if (sc.labelH) {
+            const boxed = o.frame !== 'label';
+            ctx.fillStyle = boxed ? o.bg : o.frameC;
+            ctx.font = `700 ${sc.labelH * 0.5}px -apple-system, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(o.caption, sc.W / 2, sc.n + sc.pad * 1.5 + sc.labelH / 2 - (boxed ? 0.3 : 0), sc.W - 2);
+        }
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        return sc;
+    }
+
+    async function svgString(o) {
+        const sc = scene(o);
+        const px = +$('o-size').value, unit = px / sc.W;
+        const parts = [];
+        const defs = [];
+        if (o.frame === 'box' || o.frame === 'ticket') {
+            parts.push(`<path fill="${o.frameC}" d="${rectD(0, 0, sc.W, sc.H - (o.frame === 'ticket' ? 1.5 : 0), 2)}${o.frame === 'ticket' ? polyD([[sc.W / 2 - 1.5, sc.H - 1.5], [sc.W / 2 + 1.5, sc.H - 1.5], [sc.W / 2, sc.H]]) : ''}"/>`);
+            parts.push(`<path fill="${o.bg}" d="${rectD(sc.pad / 2, sc.pad / 2, sc.W - sc.pad, sc.n + sc.pad, 1.2)}"/>`);
+        } else if (!o.transparent) parts.push(`<rect width="${f(sc.W)}" height="${f(sc.H)}" fill="${o.bg}"/>`);
+        let fill = o.fg;
+        if (o.grad !== 'none') {
+            const x0 = sc.ox + o.margin, y0 = sc.oy + o.margin, len = current.count;
+            defs.push(o.grad === 'radial'
+                ? `<radialGradient id="g" gradientUnits="userSpaceOnUse" cx="${f(x0 + len / 2)}" cy="${f(y0 + len / 2)}" r="${f(len * 0.72)}"><stop offset="0" stop-color="${o.fg}"/><stop offset="1" stop-color="${o.fg2}"/></radialGradient>`
+                : `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="${f(x0)}" y1="${f(y0)}" x2="${f(x0 + len)}" y2="${f(o.grad === 'diagonal' ? y0 + len : y0)}"><stop offset="0" stop-color="${o.fg}"/><stop offset="1" stop-color="${o.fg2}"/></linearGradient>`);
+            fill = 'url(#g)';
+        }
+        parts.push(`<path fill="${fill}" d="${sc.dots}"/>`);
+        for (const e of sc.eyes) {
+            parts.push(`<path fill="${o.eyeC || fill}" fill-rule="evenodd" d="${e.outer}"/><path fill="${o.eyeballC || fill}" d="${e.inner}"/>`);
         }
         if (logo) {
-            const box = cell * Math.round(count * 0.22);
-            const pad = cell * 0.6;
-            const cx = size / 2 - box / 2, cy = size / 2 - box / 2;
-            ctx.fillStyle = bg;
-            ctx.beginPath(); ctx.roundRect(cx - pad, cy - pad, box + pad * 2, box + pad * 2, cell); ctx.fill();
-            const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1;  // 크기 없는 SVG 는 정사각형으로
-            const ratio = Math.min(box / nw, box / nh);
-            const w = nw * ratio, h = nh * ratio;
-            ctx.drawImage(logo, size / 2 - w / 2, size / 2 - h / 2, w, h);
+            const s = sc.logoCells, x = sc.logoX, y = sc.logoY;
+            const data = await new Promise((resolve) => {
+                const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+                const nw = logo.naturalWidth || 1, nh = logo.naturalHeight || 1, k = Math.max(512 / nw, 512 / nh);
+                c.getContext('2d').drawImage(logo, 256 - nw * k / 2, 256 - nh * k / 2, nw * k, nh * k);
+                resolve(c.toDataURL('image/png'));
+            });
+            const clip = o.logoShape === 'circle' ? circleD(x + s / 2, y + s / 2, s / 2) : rectD(x, y, s, s, o.logoShape === 'rounded' ? s * 0.18 : 0);
+            defs.push(`<clipPath id="lc"><path d="${clip}"/></clipPath>`);
+            parts.push(`<g clip-path="url(#lc)"><rect x="${f(x)}" y="${f(y)}" width="${s}" height="${s}" fill="${o.bg}"/><image href="${data}" x="${f(x)}" y="${f(y)}" width="${s}" height="${s}" preserveAspectRatio="xMidYMid slice"/></g>`);
         }
+        if (sc.labelH) {
+            const boxed = o.frame !== 'label';
+            parts.push(`<text x="${f(sc.W / 2)}" y="${f(sc.n + sc.pad * 1.5 + sc.labelH / 2 - (boxed ? 0.3 : 0))}" text-anchor="middle" dominant-baseline="middle" font-family="-apple-system, 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif" font-weight="700" font-size="${f(sc.labelH * 0.5)}" fill="${boxed ? o.bg : o.frameC}">${esc(o.caption)}</text>`);
+        }
+        return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${f(sc.W)} ${f(sc.H)}" width="${Math.round(sc.W * unit)}" height="${Math.round(sc.H * unit)}">${defs.length ? `<defs>${defs.join('')}</defs>` : ''}${parts.join('')}</svg>`;
+    }
+
+    // ── 대비·스캔 확인
+    const lum = (hex) => {
+        const v = [1, 3, 5].map((k) => parseInt(hex.slice(k, k + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+        return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2];
+    };
+    const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+    const detector = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+    let scanTimer;
+    function checkScan() {
+        const tag = $('qr-scan');
+        const o = opts();
+        const colors = [o.fg, ...(o.grad !== 'none' ? [o.fg2] : []), ...(o.eyeC ? [o.eyeC, o.eyeballC] : [])];
+        const worst = Math.min(...colors.map((c) => contrast(c, o.bg)));
+        const lightDots = colors.some((c) => lum(c) > lum(o.bg));
+        clearTimeout(scanTimer);
+        scanTimer = setTimeout(async () => {
+            let state = worst < 2.5 ? 'warn' : 'ok', msg = worst < 2.5 ? '⚠️ 색 대비가 약해요' : '';
+            if (lightDots) { state = 'warn'; msg = '⚠️ 점이 배경보다 밝으면 못 읽는 앱이 있어요'; }
+            if (detector && current) {
+                try {
+                    const found = await detector.detect($('qr-canvas'));
+                    const okRead = found.some((x) => x.rawValue === current.text);
+                    if (!okRead) { state = 'bad'; msg = '✗ 읽히지 않아요 — 색 대비·사진 크기를 조정해 보세요'; }
+                    else if (state === 'ok') msg = '✓ 스캔 확인됨';
+                } catch { /* 검사 실패는 무시 */ }
+            } else if (state === 'ok') msg = '색 대비 좋음';
+            tag.hidden = false;
+            tag.textContent = msg;
+            tag.className = 'rounded-full px-3 py-1 text-[12px] ' + (state === 'ok' ? 'bg-[#34c759]/15 text-[#1e7a35]' : state === 'warn' ? 'bg-[#b26a00]/10 text-[#b26a00]' : 'bg-[#ff3b30]/10 text-[#c4271d]');
+        }, 250);
     }
 
     function render() {
         $('o-size-v').textContent = `${$('o-size').value}px`;
+        document.querySelectorAll('[data-needs-grad]').forEach((el) => { el.hidden = $('o-grad').value === 'none'; });
+        document.querySelectorAll('[data-needs-frame]').forEach((el) => { el.hidden = $('o-frame').value === 'none'; });
+        document.querySelectorAll('[data-needs-logo]').forEach((el) => { el.hidden = !logo; });
+        $('o-eyec').disabled = $('o-eyeballc').disabled = $('o-eye-same').checked;
         const text = BUILD[mode]();
         $('qr-error').textContent = '';
-        if (!text) { current = null; $('qr-info').textContent = '내용을 입력하면 QR 코드가 생겨요.'; const c = $('qr-canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); return; }
+        if (!text) {
+            current = null; $('qr-scan').hidden = true;
+            $('qr-info').textContent = '내용을 입력하면 QR 코드가 생겨요.';
+            const c = $('qr-canvas'); c.getContext('2d').clearRect(0, 0, c.width, c.height); return;
+        }
         if (logo && $('o-ec').value !== 'H') $('o-ec').value = 'H';
         try {
             const qr = qrcode(0, $('o-ec').value);
@@ -214,74 +428,81 @@
             qr.make();
             current = { qr, count: qr.getModuleCount(), text };
         } catch (err) {
-            current = null;
+            current = null; $('qr-scan').hidden = true;
             $('qr-error').textContent = '내용이 너무 길어요. 줄이거나 오류 복원 단계를 낮춰 주세요.';
             return;
         }
-        const size = +$('o-size').value;
-        const canvas = $('qr-canvas');
-        canvas.width = canvas.height = size;
-        drawTo(canvas.getContext('2d'), size, { forPng: false });
+        paint($('qr-canvas').getContext('2d'), +$('o-size').value, opts(), { forExport: false });
         const bytes = new TextEncoder().encode(text).length;
         $('qr-info').textContent = `버전 ${(current.count - 17) / 4} · ${current.count}×${current.count} 칸 · ${bytes} 바이트`;
+        checkScan();
     }
 
     // ── 저장 · 복사
     const filename = (ext) => `qrcode-${mode}-${new Date().toISOString().slice(0, 10)}.${ext}`;
     const pngBlob = () => new Promise((resolve) => {
-        const size = +$('o-size').value;
-        const c = document.createElement('canvas'); c.width = c.height = size;
-        drawTo(c.getContext('2d'), size, { forPng: true });
+        const c = document.createElement('canvas');
+        paint(c.getContext('2d'), +$('o-size').value, opts(), { forExport: true });
         c.toBlob(resolve, 'image/png');
     });
     const download = (blob, name) => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
-
     $('dl-png').addEventListener('click', async () => { if (current) download(await pngBlob(), filename('png')); });
-    $('dl-svg').addEventListener('click', async () => {
-        if (!current) return;
-        const { qr, count } = current;
-        const m = +$('o-margin').value, n = count + m * 2, shape = $('o-shape').value;
-        const fg = $('o-fg').value, bg = $('o-bg').value;
-        const isFinder = (r, c) => (r < 7 && c < 7) || (r < 7 && c >= count - 7) || (r >= count - 7 && c < 7);
-        let path = '', dots = '';
-        for (let r = 0; r < count; r++) for (let c = 0; c < count; c++) {
-            if (!qr.isDark(r, c)) continue;
-            const x = c + m, y = r + m;
-            if (shape === 'round' && !isFinder(r, c)) dots += `<circle cx="${x + 0.5}" cy="${y + 0.5}" r="0.45"/>`;
-            else if (shape === 'soft' && !isFinder(r, c)) dots += `<rect x="${x + 0.06}" y="${y + 0.06}" width="0.88" height="0.88" rx="0.3"/>`;
-            else path += `M${x} ${y}h1v1h-1z`;
-        }
-        let logoSvg = '';
-        if (logo) {
-            const box = Math.round(count * 0.22), pad = 0.6, start = n / 2 - box / 2;
-            const data = await new Promise((resolve) => {
-                const c = document.createElement('canvas'); c.width = logo.naturalWidth || 512; c.height = logo.naturalHeight || 512;
-                c.getContext('2d').drawImage(logo, 0, 0, c.width, c.height); resolve(c.toDataURL('image/png'));
-            });
-            logoSvg = `<rect x="${start - pad}" y="${start - pad}" width="${box + pad * 2}" height="${box + pad * 2}" rx="1" fill="${bg}"/><image href="${data}" x="${start}" y="${start}" width="${box}" height="${box}" preserveAspectRatio="xMidYMid meet"/>`;
-        }
-        const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${n} ${n}" width="${$('o-size').value}" height="${$('o-size').value}" shape-rendering="${shape === 'square' ? 'crispEdges' : 'geometricPrecision'}">`
-            + `${$('o-transparent').checked ? '' : `<rect width="${n}" height="${n}" fill="${bg}"/>`}<g fill="${fg}"><path d="${path}"/>${dots}</g>${logoSvg}</svg>`;
-        download(new Blob([svg], { type: 'image/svg+xml' }), filename('svg'));
-    });
+    $('dl-svg').addEventListener('click', async () => { if (current) download(new Blob([await svgString(opts())], { type: 'image/svg+xml' }), filename('svg')); });
     $('cp-img').addEventListener('click', async (e) => {
         if (!current) return;
-        try {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob() })]);
-            e.target.textContent = '복사됨';
-        } catch { e.target.textContent = '복사 안 됨 — PNG 저장을 써 주세요'; }
+        try { await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob() })]); e.target.textContent = '복사됨'; }
+        catch { e.target.textContent = '복사 안 됨 — PNG 저장을 써 주세요'; }
         setTimeout(() => { e.target.textContent = '이미지 복사'; }, 1500);
     });
 
-    // ── 로고
+    // ── 테마
+    const PRESETS = {
+        basic: { 'o-shape': 'square', 'o-fg': '#1d1d1f', 'o-grad': 'none', 'o-eye': 'square', 'o-eyeball': 'square', 'o-bg': '#ffffff', 'o-eye-same': true, 'o-frame': 'none' },
+        ocean: { 'o-shape': 'round', 'o-fg': '#0b4f9c', 'o-fg2': '#14b8c4', 'o-grad': 'diagonal', 'o-eye': 'rounded', 'o-eyeball': 'circle', 'o-eye-same': false, 'o-eyec': '#0b3d7a', 'o-eyeballc': '#0aa3b0', 'o-bg': '#f2fbff', 'o-frame': 'box', 'o-framec': '#0b4f9c' },
+        sunset: { 'o-shape': 'soft', 'o-fg': '#c2185b', 'o-fg2': '#f57c00', 'o-grad': 'linear', 'o-eye': 'leaf', 'o-eyeball': 'leaf', 'o-eye-same': true, 'o-bg': '#fff8f2', 'o-frame': 'label', 'o-framec': '#c2185b' },
+        pika: { 'o-shape': 'round', 'o-fg': '#3b2a00', 'o-grad': 'none', 'o-eye': 'rounded', 'o-eyeball': 'circle', 'o-eye-same': false, 'o-eyec': '#3b2a00', 'o-eyeballc': '#e53935', 'o-bg': '#ffe14d', 'o-frame': 'ticket', 'o-framec': '#3b2a00' },
+        mint: { 'o-shape': 'diamond', 'o-fg': '#0f766e', 'o-fg2': '#22c55e', 'o-grad': 'radial', 'o-eye': 'circle', 'o-eyeball': 'circle', 'o-eye-same': true, 'o-bg': '#f0fdf8', 'o-frame': 'none' },
+        night: { 'o-shape': 'soft', 'o-fg': '#e8e8ff', 'o-fg2': '#a78bfa', 'o-grad': 'none', 'o-eye': 'rounded', 'o-eyeball': 'rounded', 'o-eye-same': true, 'o-bg': '#111827', 'o-frame': 'box', 'o-framec': '#a78bfa' },
+        gold: { 'o-shape': 'star', 'o-fg': '#8a6d1d', 'o-fg2': '#d4af37', 'o-grad': 'radial', 'o-eye': 'rounded', 'o-eyeball': 'circle', 'o-eye-same': false, 'o-eyec': '#6b5212', 'o-eyeballc': '#b8860b', 'o-bg': '#fffdf5', 'o-frame': 'label', 'o-framec': '#8a6d1d' },
+    };
+    const applyPreset = (values) => {
+        for (const [id, v] of Object.entries(values)) {
+            const el = $(id); if (!el) continue;
+            if (el.type === 'checkbox') el.checked = !!v; else el.value = v;
+        }
+        render();
+    };
+    document.querySelectorAll('.qr-preset').forEach((b) => b.addEventListener('click', () => applyPreset(PRESETS[b.dataset.preset])));
+
+    // ── 사진 · 로고
     const setLogo = (src) => {
         const img = new Image();
-        img.onload = () => { logo = img; $('o-logo-clear').hidden = false; render(); };
+        img.onload = () => { logo = img; $('o-logo-clear').hidden = false; $('o-logo-palette').hidden = false; render(); };
         img.src = src;
     };
-    $('o-logo').addEventListener('change', (e) => { const f = e.target.files[0]; if (f) setLogo(URL.createObjectURL(f)); e.target.value = ''; });
+    $('o-logo').addEventListener('change', (e) => { const file = e.target.files[0]; if (file) setLogo(URL.createObjectURL(file)); e.target.value = ''; });
     $('o-logo-mj').addEventListener('click', () => setLogo(LOGO_MJ));
-    $('o-logo-clear').addEventListener('click', () => { logo = null; $('o-logo-clear').hidden = true; render(); });
+    $('o-logo-clear').addEventListener('click', () => { logo = null; $('o-logo-clear').hidden = true; $('o-logo-palette').hidden = true; render(); });
+    // 사진에서 어두운 대표색(점)·밝은 대표색(배경)을 뽑아 테마로
+    $('o-logo-palette').addEventListener('click', () => {
+        if (!logo) return;
+        const c = document.createElement('canvas'); c.width = c.height = 48;
+        const g = c.getContext('2d'); g.drawImage(logo, 0, 0, 48, 48);
+        const px = g.getImageData(0, 0, 48, 48).data;
+        const cols = [];
+        for (let k = 0; k < px.length; k += 4) if (px[k + 3] > 200) cols.push([px[k], px[k + 1], px[k + 2]]);
+        if (cols.length < 10) return;
+        const L = (p) => 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
+        const sat = (p) => Math.max(...p) - Math.min(...p);
+        cols.sort((a, b) => L(a) - L(b));
+        const dark = cols.slice(0, Math.ceil(cols.length * 0.25)).sort((a, b) => sat(b) - sat(a))[0];
+        const light = cols.slice(Math.floor(cols.length * 0.75)).sort((a, b) => sat(b) - sat(a))[0];
+        const hex = (p, k = 1) => '#' + p.map((v) => Math.max(0, Math.min(255, Math.round(v * k))).toString(16).padStart(2, '0')).join('');
+        const mix = (p, w) => p.map((v) => v + (255 - v) * w);
+        let fg = hex(dark), bg = hex(mix(light, 0.75));
+        for (let k = 0.85; contrast(fg, bg) < 4.5 && k > 0.2; k -= 0.1) fg = hex(dark, k);  // 대비가 모자라면 점을 더 어둡게
+        applyPreset({ 'o-fg': fg, 'o-fg2': hex(mix(dark, 0.25), 0.9), 'o-bg': bg, 'o-eye-same': false, 'o-eyec': fg, 'o-eyeballc': hex(dark, 0.9), 'o-framec': fg });
+    });
 
     // ── 탭
     document.querySelectorAll('.qr-tab').forEach((tab) => tab.addEventListener('click', () => {
