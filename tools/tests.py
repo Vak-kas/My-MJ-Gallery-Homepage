@@ -941,7 +941,7 @@ class ToolRegistryTests(TestCase):
 		keys = {key for key, *_ in CATEGORIES}
 		for tool in TOOLS:
 			self.assertIn(tool.get("category"), keys, tool["slug"])
-			self.assertIn(tool.get("access"), {"public", "member", "admin"}, tool["slug"])
+			self.assertIn(tool.get("access"), {"public", "member", "vip", "admin"}, tool["slug"])
 		slugs = [t["slug"] for t in TOOLS]
 		self.assertEqual(len(slugs), len(set(slugs)))
 
