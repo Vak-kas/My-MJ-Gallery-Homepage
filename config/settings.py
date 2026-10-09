@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'main',
     'blog',
     'tools',
+    'games',
     'notifications',
     'security',
     'analytics',

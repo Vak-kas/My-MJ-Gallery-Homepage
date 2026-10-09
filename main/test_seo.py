@@ -65,7 +65,7 @@ class LinkPreviewTests(TestCase):
 		admin = get_user_model().objects.create_superuser("admin", "a@example.com", "pw")
 		self.client.force_login(admin)
 		order = ["profile", "skill", "career", "activity", "award", "publication", "project", "blog_links"]
-		self.client.post(reverse("studio:settings"), {"nav_order": ["home", "blog", "tool", "photo"], "home_order": order,
+		self.client.post(reverse("studio:settings"), {"nav_order": ["home", "blog", "tool", "photo", "game"], "home_order": order,
 			"nav_state_blog": "admin", **{f"home_on_{k}": "on" for k in order}})
 		self.client.logout()
 		xml = self.client.get("/sitemap.xml").content.decode()

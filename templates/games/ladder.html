@@ -1,0 +1,284 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 8px 10px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-go { border-radius: 999px; padding: 10px 20px; font-size: 15px; font-weight: 600; color: #fff; background: #10b981; }
+    .gm-go:hover { background: #0f9f6e; }
+    #ld-svg { display: block; width: 100%; height: auto; max-height: 72vh; margin: 0 auto; user-select: none; }
+    #ld-svg .rail { stroke: #c7c7cc; stroke-width: 4; stroke-linecap: round; }
+    #ld-svg .rung { stroke: #c7c7cc; stroke-width: 4; stroke-linecap: round; }
+    #ld-svg .name { cursor: pointer; }
+    #ld-svg .name rect { fill: #fff; stroke: rgba(0, 0, 0, 0.12); stroke-width: 1.5; transition: fill 0.15s; }
+    #ld-svg .name:hover rect { fill: #ecfdf5; }
+    #ld-svg .name.done rect { fill: #f5f5f7; }
+    #ld-svg text { font-size: 15px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+    #ld-svg .res rect { fill: #f5f5f7; stroke: rgba(0, 0, 0, 0.08); }
+    #ld-svg .res .cover { fill: #1d1d1f; transition: opacity 0.4s; }
+    #ld-svg .res .cover-q { fill: #fff; }
+    #ld-svg .path { fill: none; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark #ld-svg .rail, html.theme-dark #ld-svg .rung { stroke: #4b4f58; }
+    html.theme-dark #ld-svg .name rect { fill: #171a20; stroke: rgba(255, 255, 255, 0.16); }
+    html.theme-dark #ld-svg .name:hover rect { fill: #14432d; }
+    html.theme-dark #ld-svg .name.done rect, html.theme-dark #ld-svg .res rect { fill: #111318; }
+    html.theme-dark #ld-svg text { fill: #f3f4f6; }
+    html.theme-dark #ld-svg .res .cover { fill: #e8e8ea; }
+    html.theme-dark #ld-svg .res .cover-q { fill: #111318; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · LADDER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">사다리타기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">이름과 결과를 넣고 사다리를 만들어요. 위의 이름을 누르면 길을 따라 내려가요. 결과는 내려가기 전까지 가려져 있어요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <aside class="gm-card space-y-4 lg:self-start">
+            <div class="flex items-center gap-2">
+                <span class="text-[14px] font-semibold">인원</span>
+                <button type="button" class="gm-btn !px-3" id="ld-minus">−</button>
+                <b id="ld-n" class="w-6 text-center text-[18px] tabular-nums">4</b>
+                <button type="button" class="gm-btn !px-3" id="ld-plus">＋</button>
+                <span class="ml-auto text-[12px] text-[#8e8e93]">2~12명</span>
+            </div>
+            <div>
+                <p class="text-[12px] text-[#6e6e73]">참가자</p>
+                <div id="ld-names" class="mt-1 grid grid-cols-2 gap-1.5"></div>
+            </div>
+            <div>
+                <div class="flex items-center gap-1.5">
+                    <p class="text-[12px] text-[#6e6e73]">결과</p>
+                    <div class="ml-auto flex flex-wrap justify-end gap-1" id="ld-presets"></div>
+                </div>
+                <div id="ld-results" class="mt-1 grid grid-cols-2 gap-1.5"></div>
+            </div>
+            <label class="block text-[12px] text-[#6e6e73]">가로줄 <span id="ld-density-v">보통</span>
+                <input id="ld-density" type="range" min="1" max="3" value="2" class="mt-1 w-full">
+            </label>
+            <label class="flex items-center gap-2 text-[13px]"><input id="ld-show" type="checkbox" class="h-4 w-4"> 결과 미리 보이기</label>
+            <button type="button" class="gm-go w-full" id="ld-make">🪜 사다리 만들기</button>
+        </aside>
+
+        <section class="gm-card min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="text-[14px] text-[#6e6e73]" id="ld-tip">위의 이름을 누르세요</p>
+                <div class="ml-auto flex gap-1.5">
+                    <button type="button" class="gm-btn" id="ld-all">▶ 모두 내려가기</button>
+                    <button type="button" class="gm-btn" id="ld-reshuffle">🔀 다시 섞기</button>
+                    <button type="button" class="gm-btn" id="ld-share">🔗 링크 복사</button>
+                </div>
+            </div>
+            <div class="mt-4 overflow-x-auto"><svg id="ld-svg"></svg></div>
+            <ul id="ld-summary" class="mt-4 hidden grid-cols-2 gap-2 sm:grid-cols-3"></ul>
+        </section>
+    </div>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const COLORS = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#84cc16', '#06b6d4', '#e11d48'];
+    const PRESETS = {
+        '당첨 1명': (n) => ['🎉 당첨', ...Array(n - 1).fill('꽝')],
+        '커피 쏘기': (n) => ['☕ 커피 쏘기', ...Array(n - 1).fill('통과')],
+        '순서 정하기': (n) => Array.from({ length: n }, (_, i) => `${i + 1}번`),
+        '청소 당번': (n) => ['🧹 청소', '🗑 분리수거', ...Array(Math.max(0, n - 2)).fill('쉬기')].slice(0, n),
+    };
+    const DENSITY = { 1: ['적게', 0.32], 2: ['보통', 0.48], 3: ['많이', 0.62] };
+
+    // 같은 seed 면 같은 사다리 (링크 공유용)
+    const rng = (seed) => () => { seed |= 0; seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+
+    let state = { names: ['민재', '지수', '하늘', '도윤'], results: PRESETS['당첨 1명'](4), seed: 1, density: 2 };
+    let ladder = null;        // { n, levels, rungs: Set('level:col') }
+    let revealed = new Set(); // 내려간 참가자 번호
+    let animating = false;
+
+    // ── 입력 칸 ──
+    function fit(arr, n, make) { const out = arr.slice(0, n); while (out.length < n) out.push(make(out.length)); return out; }
+    function renderInputs() {
+        const n = state.names.length;
+        $('ld-n').textContent = n;
+        $('ld-names').innerHTML = state.names.map((v, i) => `<input class="gm-in" data-name="${i}" maxlength="12" value="${esc(v)}" style="border-left:4px solid ${COLORS[i % COLORS.length]}">`).join('');
+        $('ld-results').innerHTML = state.results.map((v, i) => `<input class="gm-in" data-res="${i}" maxlength="16" value="${esc(v)}">`).join('');
+        $('ld-density-v').textContent = DENSITY[state.density][0];
+        $('ld-density').value = state.density;
+    }
+    function setCount(n) {
+        n = Math.max(2, Math.min(12, n));
+        state.names = fit(state.names, n, (i) => `${i + 1}번`);
+        state.results = fit(state.results, n, () => '꽝');
+        renderInputs(); make(true);
+    }
+    $('ld-minus').addEventListener('click', () => setCount(state.names.length - 1));
+    $('ld-plus').addEventListener('click', () => setCount(state.names.length + 1));
+    $('ld-names').addEventListener('input', (e) => { state.names[+e.target.dataset.name] = e.target.value; draw(); });
+    $('ld-results').addEventListener('input', (e) => { state.results[+e.target.dataset.res] = e.target.value; draw(); });
+    $('ld-presets').innerHTML = Object.keys(PRESETS).map((k) => `<button type="button" class="gm-btn !px-2 !py-0.5 !text-[11px]" data-p="${k}">${k}</button>`).join('');
+    $('ld-presets').addEventListener('click', (e) => { const k = e.target.dataset.p; if (!k) return; state.results = PRESETS[k](state.names.length); renderInputs(); make(true); });
+    $('ld-density').addEventListener('input', (e) => { state.density = +e.target.value; renderInputs(); make(true); });
+    $('ld-show').addEventListener('change', draw);
+
+    // ── 사다리 만들기 ──
+    function make(newSeed) {
+        if (newSeed) state.seed = (Math.random() * 2 ** 31) | 0;
+        const n = state.names.length;
+        const rand = rng(state.seed);
+        const levels = Math.max(8, n + 6);
+        const p = DENSITY[state.density][1];
+        const rungs = new Set();
+        for (let l = 0; l < levels; l++) {
+            for (let c = 0; c < n - 1; c++) {
+                if (rungs.has(`${l}:${c - 1}`)) continue;  // 바로 옆 가로줄과 붙지 않게
+                if (rand() < p) rungs.add(`${l}:${c}`);
+            }
+        }
+        // 빈 칸 사이가 하나도 안 이어지면 섞임이 약하니 하나씩은 보장
+        for (let c = 0; c < n - 1; c++) {
+            if (![...Array(levels).keys()].some((l) => rungs.has(`${l}:${c}`))) {
+                const l = Math.floor(rand() * levels);
+                if (!rungs.has(`${l}:${c - 1}`) && !rungs.has(`${l}:${c + 1}`)) rungs.add(`${l}:${c}`);
+            }
+        }
+        ladder = { n, levels, rungs };
+        revealed = new Set();
+        draw();
+        saveHash();
+    }
+
+    // 참가자 i 가 내려가는 길: [[col, level], ...] 과 도착 칸
+    function walk(i) {
+        let c = i;
+        const steps = [{ c, l: -1 }];
+        for (let l = 0; l < ladder.levels; l++) {
+            steps.push({ c, l });
+            if (ladder.rungs.has(`${l}:${c - 1}`)) c -= 1;
+            else if (ladder.rungs.has(`${l}:${c}`)) c += 1;
+            steps.push({ c, l });
+        }
+        steps.push({ c, l: ladder.levels });
+        return { steps, end: c };
+    }
+
+    // ── 그리기 ──
+    const G = { colW: 96, top: 60, gap: 34, boxW: 84, boxH: 38 };
+    const xOf = (c) => G.colW / 2 + c * G.colW;
+    const yOf = (l) => G.top + 30 + (l + 0.5) * G.gap;
+    function draw() {
+        if (!ladder) return;
+        const { n, levels } = ladder;
+        const W = n * G.colW, bottom = yOf(levels - 0.5) + 20, H = bottom + 60;
+        const svg = $('ld-svg');
+        svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+        svg.style.minWidth = `${n * 64}px`;  // 휴대폰에서도 5명까지는 한 화면, 그보다 많으면 옆으로 밀어서
+        svg.style.maxWidth = `${W * 1.4}px`;
+        const show = $('ld-show').checked;
+        let html = '';
+        for (let c = 0; c < n; c++) html += `<line class="rail" x1="${xOf(c)}" y1="${G.top + 20}" x2="${xOf(c)}" y2="${bottom}"/>`;
+        ladder.rungs.forEach((k) => { const [l, c] = k.split(':').map(Number); html += `<line class="rung" x1="${xOf(c)}" y1="${yOf(l)}" x2="${xOf(c + 1)}" y2="${yOf(l)}"/>`; });
+        html += '<g id="ld-paths"></g>';
+        state.names.forEach((name, i) => {
+            html += `<g class="name ${revealed.has(i) ? 'done' : ''}" data-i="${i}"><rect x="${xOf(i) - G.boxW / 2}" y="${G.top - G.boxH / 2}" width="${G.boxW}" height="${G.boxH}" rx="12" style="stroke:${COLORS[i % COLORS.length]};stroke-width:2.5"/><text x="${xOf(i)}" y="${G.top}">${esc(name || `${i + 1}번`)}</text></g>`;
+        });
+        const ends = new Map([...revealed].map((i) => [walk(i).end, i]));
+        state.results.forEach((res, c) => {
+            const open = show || ends.has(c);
+            const owner = ends.get(c);
+            html += `<g class="res" data-c="${c}"><rect x="${xOf(c) - G.boxW / 2}" y="${bottom + 22 - G.boxH / 2}" width="${G.boxW}" height="${G.boxH}" rx="12" ${owner !== undefined ? `style="stroke:${COLORS[owner % COLORS.length]};stroke-width:2.5"` : ''}/>
+                <text x="${xOf(c)}" y="${bottom + 22}">${esc(res || '-')}</text>
+                ${open ? '' : `<rect class="cover" x="${xOf(c) - G.boxW / 2}" y="${bottom + 22 - G.boxH / 2}" width="${G.boxW}" height="${G.boxH}" rx="12"/><text class="cover-q" x="${xOf(c)}" y="${bottom + 22}">?</text>`}</g>`;
+        });
+        svg.innerHTML = html;
+        // 이미 내려간 길은 그대로 그려 둠
+        const paths = svg.querySelector('#ld-paths');
+        revealed.forEach((i) => paths.appendChild(pathEl(i, false)));
+        summary();
+    }
+
+    function pathEl(i, animate) {
+        const { steps } = walk(i);
+        const pts = steps.map((s) => `${xOf(s.c)},${s.l === -1 ? G.top + 20 : s.l === ladder.levels ? yOf(ladder.levels - 0.5) + 20 : yOf(s.l)}`).join(' ');
+        const el = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+        el.setAttribute('points', pts);
+        el.setAttribute('class', 'path');
+        el.style.stroke = COLORS[i % COLORS.length];
+        el.dur = 0;
+        if (animate) {
+            // 길이만큼 선을 숨겼다가 위에서부터 그려 내려감
+            el.style.opacity = '0.95';
+            el.dur = 1.6;
+            requestAnimationFrame(() => {
+                const L = el.getTotalLength();
+                el.style.strokeDasharray = L;
+                el.style.strokeDashoffset = L;
+                el.getBoundingClientRect();
+                el.style.transition = `stroke-dashoffset ${el.dur}s ease-in-out`;
+                el.style.strokeDashoffset = '0';
+            });
+        }
+        return el;
+    }
+
+    function go(i) {
+        return new Promise((done) => {
+            if (revealed.has(i) || animating) { done(); return; }
+            animating = true;
+            const el = pathEl(i, true);
+            $('ld-svg').querySelector('#ld-paths').appendChild(el);
+            setTimeout(() => {
+                revealed.add(i);
+                animating = false;
+                draw();
+                const { end } = walk(i);
+                $('ld-tip').innerHTML = `<b style="color:${COLORS[i % COLORS.length]}">${esc(state.names[i] || `${i + 1}번`)}</b> → <b>${esc(state.results[end] || '-')}</b>`;
+                done();
+            }, el.dur * 1000 + 150);
+        });
+    }
+
+    function summary() {
+        const box = $('ld-summary');
+        if (!revealed.size) { box.classList.add('hidden'); box.classList.remove('grid'); return; }
+        box.classList.remove('hidden'); box.classList.add('grid');
+        box.innerHTML = [...revealed].sort((a, b) => a - b).map((i) => `<li class="flex items-center gap-2 rounded-xl bg-[#f5f5f7] px-3 py-2 text-[14px] dark:bg-[#111318]"><span class="h-3 w-3 rounded-full" style="background:${COLORS[i % COLORS.length]}"></span><b>${esc(state.names[i] || `${i + 1}번`)}</b><span class="text-[#8e8e93]">→</span><span>${esc(state.results[walk(i).end] || '-')}</span></li>`).join('');
+    }
+
+    $('ld-svg').addEventListener('click', (e) => { const g = e.target.closest('.name'); if (g) go(+g.dataset.i); });
+    $('ld-all').addEventListener('click', async () => { for (let i = 0; i < ladder.n; i++) await go(i); $('ld-tip').textContent = '모두 내려갔어요!'; });
+    $('ld-reshuffle').addEventListener('click', () => make(true));
+    $('ld-make').addEventListener('click', () => { make(true); $('ld-svg').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+
+    // ── 링크 공유: 이름·결과·사다리 모양을 주소 # 뒤에 ──
+    const enc = (o) => btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const dec = (s) => JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/')))));
+    function saveHash() { history.replaceState(null, '', `#${enc({ n: state.names, r: state.results, s: state.seed, d: state.density })}`); }
+    $('ld-share').addEventListener('click', async (e) => {
+        saveHash();
+        try { await navigator.clipboard.writeText(location.href); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '🔗 링크 복사'; }, 1400); } catch (err) { prompt('링크를 복사하세요', location.href); }
+    });
+    try {
+        if (location.hash.length > 1) {
+            const o = dec(location.hash.slice(1));
+            if (Array.isArray(o.n) && Array.isArray(o.r) && o.n.length >= 2 && o.n.length <= 12) {
+                state = { names: o.n.map(String), results: fit(o.r.map(String), o.n.length, () => '꽝'), seed: o.s | 0, density: [1, 2, 3].includes(o.d) ? o.d : 2 };
+            }
+        }
+    } catch (e) { /* 잘못된 링크면 기본값 */ }
+    renderInputs();
+    make(!location.hash);
+    window.__ladder = { walk, state: () => state, ladder: () => ladder, go };
+})();
+</script>
+{% endblock %}

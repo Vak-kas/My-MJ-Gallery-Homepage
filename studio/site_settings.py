@@ -20,6 +20,7 @@ NAV_DEFAULTS = [
     {"key": "blog", "label": "Blog", "url_name": "blog:index", "state": "public"},
     {"key": "tool", "label": "Tool", "url_name": "tools:index", "state": "public"},
     {"key": "photo", "label": "Gallery", "url_name": "main:photos", "state": "public"},
+    {"key": "game", "label": "Game", "url_name": "games:index", "state": "public"},
 ]
 NAV_STATES = [("public", "모두에게 공개"), ("members", "로그인 회원만"), ("admin", "숨김 (관리자만)")]
 
@@ -28,6 +29,7 @@ SECTION_PATHS = {
     "blog": ["/blog/"],
     "tool": ["/tools/"],
     "photo": ["/photos/"],
+    "game": ["/games/"],
 }
 ALWAYS_OPEN = [re.compile(p) for p in (
     r"^/tools/share/[^/]+/(download/)?$",          # 맡겨두기 다운로드

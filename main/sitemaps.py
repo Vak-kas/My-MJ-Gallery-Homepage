@@ -23,6 +23,10 @@ class StaticSitemap(Sitemap):
 			from tools.registry import TOOLS
 			names.append("tools:index")
 			names += [t["url_name"] for t in TOOLS if t.get("access") == "public"]
+		if _open("game"):
+			from games.registry import GAMES
+			names.append("games:index")
+			names += [g["url_name"] for g in GAMES if g["url_name"]]
 		return names
 
 	def location(self, item):

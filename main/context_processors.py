@@ -10,8 +10,18 @@ def _tool_meta(url_name):
 	return None
 
 
+def _game_meta(url_name):
+	from games.registry import GAMES
+
+	for game in GAMES:
+		if game["url_name"] == f"games:{url_name}":
+			return seo.build(f"{game['title']} · Game", game["description"], og_cards.image_url("game", game["slug"]), path="")
+	return None
+
+
 CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "tech"): ("page", "tech"), ("blog", "board"): ("page", "board"),
-			 ("blog", "life"): ("page", "life"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery")}
+			 ("blog", "life"): ("page", "life"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
+			 ("games", "index"): ("page", "games")}
 
 
 PAGE_TITLES = {
@@ -21,6 +31,7 @@ PAGE_TITLES = {
 	("blog", "life"): ("Life", "기록 · 생각 · 메모."),
 	("tools", "index"): ("Tool", "살면서 ‘이런 게 있었으면’ 싶었던 것들을 직접 만들어 모아둔 곳. 문서·사진·학점, 파일 공유, 네트워크, 개발 도구."),
 	("main", "photos"): ("Gallery", "사진 갤러리."),
+	("games", "index"): ("Game", "사다리타기·돌림판 같은 모임 게임과 혼자 하기·같이 하기 게임, 추억의 게임관."),
 }
 
 
@@ -34,6 +45,8 @@ def seo_meta(request):
 		meta = seo.build(title, desc, og_cards.image_url(*card) if card else None, path=request.path)
 	elif ns == "tools":
 		meta = _tool_meta(name)
+	elif ns == "games":
+		meta = _game_meta(name)
 	meta = meta or seo.build(path=request.path)
 	meta["url"] = seo.absolute(request.path)
 	meta["noindex"] = request.path.startswith(seo.NOINDEX_PREFIXES)

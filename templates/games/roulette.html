@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 12px; font-size: 14px; line-height: 1.7; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .rl-wrap { position: relative; width: min(100%, 560px); margin: 0 auto; aspect-ratio: 1; }
+    .rl-wrap canvas { width: 100%; height: 100%; display: block; }
+    .rl-pin { position: absolute; left: 50%; top: -6px; transform: translateX(-50%); width: 0; height: 0; border-left: 18px solid transparent; border-right: 18px solid transparent; border-top: 34px solid #1d1d1f; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3)); z-index: 2; }
+    .rl-spin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 22%; aspect-ratio: 1; border-radius: 999px; background: #fff; border: 5px solid #1d1d1f; font-size: clamp(14px, 2.6vw, 20px); font-weight: 800; color: #1d1d1f; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2); z-index: 2; transition: transform 0.12s; }
+    .rl-spin:hover { transform: translate(-50%, -50%) scale(1.05); }
+    .rl-spin:disabled { opacity: 0.7; cursor: default; transform: translate(-50%, -50%); }
+    #rl-confetti { position: fixed; inset: 0; pointer-events: none; z-index: 80; }
+    .rl-win { animation: rl-pop 0.45s cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes rl-pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .rl-pin { border-top-color: #f3f4f6; }
+    html.theme-dark .rl-spin { background: #171a20; color: #f3f4f6; border-color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">PARTY · ROULETTE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">돌림판.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">한 줄에 하나씩 적고 가운데를 누르세요. <code class="rounded bg-black/[0.05] px-1">치킨 *3</code> 처럼 쓰면 그 칸이 3배 넓어져요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section class="gm-card">
+            <div class="rl-wrap">
+                <div class="rl-pin"></div>
+                <canvas id="rl-canvas" width="1120" height="1120"></canvas>
+                <button type="button" class="rl-spin" id="rl-spin">돌려!</button>
+            </div>
+            <div id="rl-result" class="mt-6 min-h-[64px] text-center"></div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-3">
+                <div class="flex items-center gap-2">
+                    <h2 class="text-[15px] font-semibold">항목</h2>
+                    <span id="rl-count" class="text-[12px] text-[#8e8e93]"></span>
+                    <button type="button" class="gm-btn ml-auto" id="rl-shuffle">🔀 섞기</button>
+                </div>
+                <textarea id="rl-items" class="gm-in" rows="9" spellcheck="false"></textarea>
+                <div class="flex flex-wrap gap-1.5" id="rl-presets"></div>
+                <label class="flex items-center gap-2 text-[13px]"><input id="rl-remove" type="checkbox" class="h-4 w-4"> 당첨된 항목은 빼고 다음 판</label>
+                <label class="flex items-center gap-2 text-[13px]"><input id="rl-sound" type="checkbox" class="h-4 w-4" checked> 🔊 딸깍 소리</label>
+                <button type="button" class="gm-btn w-full" id="rl-share">🔗 이 돌림판 링크 복사</button>
+            </section>
+            <section class="gm-card">
+                <div class="flex items-center"><h2 class="text-[15px] font-semibold">기록</h2><button type="button" class="ml-auto text-[12px] text-[#8e8e93] hover:text-[#c4271d]" id="rl-clear">지우기</button></div>
+                <ol id="rl-history" class="mt-2 space-y-1 text-[14px]"></ol>
+            </section>
+        </aside>
+    </div>
+</main>
+<canvas id="rl-confetti"></canvas>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const PALETTE = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#ec4899'];
+    const PRESETS = {
+        '🍱 점심 메뉴': '김치찌개\n돈까스\n제육볶음\n짜장면\n짬뽕\n국밥\n햄버거\n초밥 *0.5',
+        '🎲 1~10': Array.from({ length: 10 }, (_, i) => i + 1).join('\n'),
+        '😈 벌칙': '노래 한 곡\n애교\n커피 쏘기 *2\n통과!\n엉덩이로 이름 쓰기\n성대모사',
+        '🙋 예 / 아니오': '예\n아니오',
+        '🎤 발표 순서': '1조\n2조\n3조\n4조\n5조',
+    };
+    const KEY = 'mj-roulette-v1';
+    const canvas = $('rl-canvas'), ctx = canvas.getContext('2d');
+    let items = [];        // { label, weight, color }
+    let angle = 0;         // 지금 돌아간 각도 (라디안, 시계 방향)
+    let spinning = false;
+    let history = [];
+
+    function parse(text) {
+        return text.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 60).map((line, i) => {
+            const m = line.match(/^(.*?)\s*\*\s*(\d+(?:\.\d+)?)$/);
+            const label = (m ? m[1] : line).slice(0, 30) || '?';
+            const weight = m ? Math.min(20, Math.max(0.1, parseFloat(m[2]))) : 1;
+            return { label, weight, color: PALETTE[i % PALETTE.length] };
+        });
+    }
+    const total = () => items.reduce((a, it) => a + it.weight, 0);
+
+    function draw() {
+        const W = canvas.width, R = W / 2 - 14, cx = W / 2, cy = W / 2;
+        ctx.clearRect(0, 0, W, W);
+        if (!items.length) {
+            ctx.fillStyle = '#f5f5f7'; ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#8e8e93'; ctx.font = '600 40px system-ui'; ctx.textAlign = 'center'; ctx.fillText('항목을 넣어 주세요', cx, cy + R * 0.6);
+            return;
+        }
+        let start = -Math.PI / 2 + angle;  // 12시 방향부터
+        const T = total();
+        items.forEach((it) => {
+            const sweep = (it.weight / T) * Math.PI * 2;
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.arc(cx, cy, R, start, start + sweep); ctx.closePath();
+            ctx.fillStyle = it.color; ctx.fill();
+            ctx.strokeStyle = 'rgba(255,255,255,0.9)'; ctx.lineWidth = 4; ctx.stroke();
+            // 글자: 칸 가운데에서 바깥쪽으로
+            ctx.save();
+            ctx.translate(cx, cy); ctx.rotate(start + sweep / 2);
+            const size = Math.max(18, Math.min(46, sweep * R * 0.42, 560 / Math.max(4, it.label.length)));
+            ctx.font = `700 ${size}px "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif`;
+            ctx.fillStyle = '#fff'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+            ctx.shadowColor = 'rgba(0,0,0,0.25)'; ctx.shadowBlur = 4;
+            if (sweep > 0.06) ctx.fillText(it.label, R - 28, 0);
+            ctx.restore();
+            start += sweep;
+        });
+        ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.lineWidth = 10; ctx.strokeStyle = '#1d1d1f'; ctx.stroke();
+    }
+
+    // 지금 각도에서 12시 바늘이 가리키는 칸
+    function pointed(a = angle) {
+        const T = total();
+        let at = ((-a % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);  // 바늘 기준으로 돌려 본 위치
+        for (let i = 0; i < items.length; i++) {
+            const sweep = (items[i].weight / T) * Math.PI * 2;
+            if (at < sweep) return i;
+            at -= sweep;
+        }
+        return items.length - 1;
+    }
+
+    // 딸깍 소리 (칸 경계를 지날 때)
+    let audio = null;
+    function tick() {
+        if (!$('rl-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain();
+            o.type = 'triangle'; o.frequency.value = 1400;
+            g.gain.setValueAtTime(0.12, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + 0.04);
+            o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + 0.05);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    function spin() {
+        if (spinning || items.length < 2) return;
+        spinning = true;
+        $('rl-spin').disabled = true;
+        $('rl-result').innerHTML = '';
+        // 먼저 비율대로 당첨을 정하고, 그 칸 안 아무 데서나 멈추게 각도를 계산
+        const T = total();
+        let r = Math.random() * T, win = 0;
+        for (; win < items.length - 1; win++) { if (r < items[win].weight) break; r -= items[win].weight; }
+        let before = 0;
+        for (let i = 0; i < win; i++) before += (items[i].weight / T) * Math.PI * 2;
+        const sweep = (items[win].weight / T) * Math.PI * 2;
+        const inside = before + sweep * (0.12 + Math.random() * 0.76);
+        const target = -inside;  // 이 각도가 되면 바늘이 그 위치를 가리킴
+        const turns = 6 + Math.floor(Math.random() * 3);
+        const from = angle;
+        const base = from - (from % (Math.PI * 2));
+        const to = base + turns * Math.PI * 2 + ((target % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+        const dur = 4200 + Math.random() * 1200;
+        const t0 = performance.now();
+        let last = pointed(from);
+        const ease = (t) => 1 - Math.pow(1 - t, 4);
+        const frame = (now) => {
+            const t = Math.min(1, (now - t0) / dur);
+            angle = from + (to - from) * ease(t);
+            draw();
+            const p = pointed();
+            if (p !== last) { tick(); last = p; }
+            if (t < 1) requestAnimationFrame(frame);
+            else finish(pointed());
+        };
+        requestAnimationFrame(frame);
+    }
+
+    function finish(i) {
+        const it = items[i];
+        spinning = false;
+        $('rl-spin').disabled = false;
+        $('rl-result').innerHTML = `<p class="rl-win text-[36px] font-extrabold tracking-[-0.02em]" style="color:${it.color}">🎉 ${esc(it.label)}</p>`;
+        history.unshift(it.label);
+        history = history.slice(0, 30);
+        renderHistory();
+        confetti(it.color);
+        if ($('rl-remove').checked && items.length > 2) {
+            setTimeout(() => {
+                const lines = $('rl-items').value.split('\n');
+                let skip = i, out = [];
+                for (const line of lines) { if (line.trim()) { if (skip-- === 0) continue; } out.push(line); }
+                $('rl-items').value = out.join('\n');
+                update();
+            }, 1200);
+        }
+        save();
+    }
+
+    function renderHistory() {
+        $('rl-history').innerHTML = history.map((h, k) => `<li class="flex gap-2"><span class="w-6 text-right tabular-nums text-[#8e8e93]">${history.length - k}</span><span>${esc(h)}</span></li>`).join('') || '<li class="text-[#8e8e93]">아직 없어요</li>';
+    }
+
+    // 종이 꽃가루
+    function confetti(color) {
+        const c = $('rl-confetti'), g = c.getContext('2d');
+        c.width = innerWidth; c.height = innerHeight;
+        const colors = [color, '#f59e0b', '#3b82f6', '#ec4899', '#10b981'];
+        const parts = Array.from({ length: 140 }, () => ({ x: innerWidth / 2, y: innerHeight / 3, vx: (Math.random() - 0.5) * 16, vy: -Math.random() * 14 - 4, r: Math.random() * 6 + 3, c: colors[(Math.random() * colors.length) | 0], a: Math.random() * 6 }));
+        const t0 = performance.now();
+        const step = (now) => {
+            g.clearRect(0, 0, c.width, c.height);
+            parts.forEach((p) => { p.vy += 0.42; p.x += p.vx; p.y += p.vy; p.a += 0.2; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; g.fillRect(-p.r, -p.r / 2, p.r * 2, p.r); g.restore(); });
+            if (now - t0 < 2200) requestAnimationFrame(step); else g.clearRect(0, 0, c.width, c.height);
+        };
+        requestAnimationFrame(step);
+    }
+
+    function update() {
+        items = parse($('rl-items').value);
+        $('rl-count').textContent = `${items.length}개`;
+        $('rl-spin').disabled = spinning || items.length < 2;
+        draw();
+        save();
+    }
+    function save() { try { localStorage.setItem(KEY, JSON.stringify({ text: $('rl-items').value, history })); } catch (e) { /* 무시 */ } }
+
+    $('rl-items').addEventListener('input', update);
+    $('rl-spin').addEventListener('click', spin);
+    document.addEventListener('keydown', (e) => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); spin(); } });
+    $('rl-presets').innerHTML = Object.keys(PRESETS).map((k) => `<button type="button" class="gm-btn !px-2.5 !py-1 !text-[12px]" data-p="${k}">${k}</button>`).join('');
+    $('rl-presets').addEventListener('click', (e) => { const k = e.target.dataset.p; if (!k || spinning) return; $('rl-items').value = PRESETS[k]; update(); });
+    $('rl-shuffle').addEventListener('click', () => {
+        if (spinning) return;
+        const lines = $('rl-items').value.split('\n').filter((l) => l.trim());
+        for (let i = lines.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [lines[i], lines[j]] = [lines[j], lines[i]]; }
+        $('rl-items').value = lines.join('\n'); update();
+    });
+    $('rl-clear').addEventListener('click', () => { history = []; renderHistory(); save(); });
+
+    // 링크 공유: 항목을 주소 # 뒤에
+    const enc = (s) => btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const dec = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+    $('rl-share').addEventListener('click', async (e) => {
+        const url = `${location.origin}${location.pathname}#${enc($('rl-items').value)}`;
+        try { await navigator.clipboard.writeText(url); e.target.textContent = '✓ 복사됨'; setTimeout(() => { e.target.textContent = '🔗 이 돌림판 링크 복사'; }, 1400); } catch (err) { prompt('링크를 복사하세요', url); }
+    });
+
+    let text = PRESETS['🍱 점심 메뉴'];
+    try {
+        const saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+        if (saved?.text) text = saved.text;
+        if (Array.isArray(saved?.history)) history = saved.history.slice(0, 30);
+    } catch (e) { /* 무시 */ }
+    try { if (location.hash.length > 1) text = dec(location.hash.slice(1)); } catch (e) { /* 잘못된 링크 */ }
+    $('rl-items').value = text;
+    renderHistory();
+    update();
+    window.__roulette = { items: () => items, pointed, spin, angle: () => angle };
+})();
+</script>
+{% endblock %}
