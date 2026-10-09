@@ -1,6 +1,7 @@
-"""실시간 대전 게임 (오목 등) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
+"""실시간 대전 게임 (오목·그림 맞추기) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
 
 방 만들기는 로그인 회원, 링크를 받은 사람은 로그인 없이 닉네임만으로 참여.
+게임 종류는 KINDS 에 한 줄 + 방 화면 템플릿 하나.
 """
 
 import hmac
@@ -17,44 +18,73 @@ from main import og_cards, seo
 from tools import relay_client
 
 MAX_ROOMS_PER_USER = 3
-KINDS = {"omok": {"title": "오목", "icon": "⚫"}}
+KINDS = {
+	"omok": {
+		"title": "오목", "icon": "⚫", "eyebrow": "VERSUS · OMOK", "template": "games/omok_room.html",
+		"intro": "방을 만들고 링크를 보내면 실시간으로 같이 둬요. 받은 사람은 로그인 없이 닉네임만 넣으면 돼요. 15×15, 흑 먼저, 다섯 개 이상 이으면 승리(자유룰).",
+		"invite": "님이 오목 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.",
+		"placeholder": "방 이름 (예: 점심 내기 한 판)",
+	},
+	"catchmind": {
+		"title": "그림 맞추기", "icon": "🎨", "eyebrow": "VERSUS · DRAW & GUESS", "template": "games/catchmind_room.html",
+		"intro": "방을 만들고 링크를 보내면 다 같이 들어와요. 차례대로 한 명이 제시어를 그리고, 나머지는 채팅으로 맞혀요. 빨리 맞힐수록 점수가 커요. (2~10명)",
+		"invite": "님이 그림 맞추기 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.",
+		"placeholder": "방 이름 (예: 금요일 그림 퀴즈)",
+	},
+}
+
+
+def _kind(kind):
+	if kind not in KINDS:
+		raise Http404
+	return KINDS[kind]
 
 
 def _ws_base(request):
 	return settings.RELAY_WS_URL or f"{'wss' if request.is_secure() or request.META.get('HTTP_X_FORWARDED_PROTO') == 'https' else 'ws'}://{request.get_host()}"
 
 
-def _link(request, room):
-	path = reverse("games:omok_room", args=[room["id"]]) + f"?t={room['token']}"
+def _room_path(kind, room):
+	return reverse(f"games:{kind}_room", args=[room["id"]]) + f"?t={room['token']}"
+
+
+def _link(request, kind, room):
+	path = _room_path(kind, room)
 	if request.get_host().split(":")[0] in {"127.0.0.1", "localhost"}:
 		return request.build_absolute_uri(path)
 	return settings.SITE_URL.rstrip("/") + path
 
 
-def omok_lobby(request):
+def lobby(request, kind):
+	info = _kind(kind)
 	relay_error = None
 	try:
-		rooms = [r for r in relay_client.list_games() if r.get("kind") == "omok"]
+		rooms = [r for r in relay_client.list_games() if r.get("kind") == kind]
 	except relay_client.RelayError as exc:
 		rooms, relay_error = [], str(exc)
 	user = request.user
 	mine = [r for r in rooms if user.is_authenticated and r.get("owner_id") == user.id]
 	open_rooms = [r for r in rooms if r.get("public") and r not in mine]
 	for r in mine + open_rooms:
-		r["url"] = reverse("games:omok_room", args=[r["id"]]) + f"?t={r['token']}"
-	return render(request, "games/omok.html", {"mine": mine, "open_rooms": open_rooms, "relay_error": relay_error, "max_rooms": MAX_ROOMS_PER_USER})
+		r["url"] = _room_path(kind, r)
+		r["close_url"] = reverse(f"games:{kind}_close", args=[r["id"]])
+	return render(request, "games/live_lobby.html", {
+		"kind": kind, "info": info, "mine": mine, "open_rooms": open_rooms, "relay_error": relay_error, "max_rooms": MAX_ROOMS_PER_USER,
+		"create_url": reverse(f"games:{kind}_create"), "lobby_url": reverse(f"games:{kind}"),
+	})
 
 
 @login_required
 @require_POST
-def omok_create(request):
+def create(request, kind):
+	_kind(kind)
 	try:
 		mine = [r for r in relay_client.list_games() if r.get("owner_id") == request.user.id]
 		if len(mine) >= MAX_ROOMS_PER_USER and not request.user.is_superuser:
 			messages.error(request, f"방은 {MAX_ROOMS_PER_USER}개까지 열 수 있어요. 안 쓰는 방을 닫아 주세요.")
-			return redirect("games:omok")
+			return redirect(f"games:{kind}")
 		room = relay_client.create_game({
-			"kind": "omok",
+			"kind": kind,
 			"title": request.POST.get("title", ""),
 			"owner_id": request.user.id,
 			"owner": request.user.username,
@@ -62,33 +92,38 @@ def omok_create(request):
 		})
 	except relay_client.RelayError as exc:
 		messages.error(request, str(exc))
-		return redirect("games:omok")
-	return redirect(reverse("games:omok_room", args=[room["id"]]) + f"?t={room['token']}")
+		return redirect(f"games:{kind}")
+	return redirect(_room_path(kind, room))
 
 
-def omok_room(request, room_id):
+def room(request, kind, room_id):
+	info = _kind(kind)
 	try:
 		room = relay_client.get_game(room_id)
 	except relay_client.RelayError as exc:
-		return render(request, "games/omok_room.html", {"relay_error": str(exc)}, status=503)
+		return render(request, info["template"], {"relay_error": str(exc), "kind": kind, "info": info}, status=503)
 	token = request.GET.get("t", "")
-	if not room or room.get("kind") != "omok" or not token or not hmac.compare_digest(token, room["token"]):
+	if not room or room.get("kind") != kind or not token or not hmac.compare_digest(token, room["token"]):
 		raise Http404("방이 없거나 닫혔어요.")
 	user = request.user
-	return render(request, "games/omok_room.html", {
+	return render(request, info["template"], {
+		"kind": kind,
+		"info": info,
 		"room": {k: v for k, v in room.items() if k != "token"},
 		"ws_url": f"{_ws_base(request).rstrip('/')}/relay/ws/game/{room_id}?token={token}",
-		"share_url": _link(request, room),
+		"share_url": _link(request, kind, room),
 		"default_name": user.username if user.is_authenticated else "",
 		"is_owner": user.is_authenticated and (room.get("owner_id") == user.id or user.is_superuser),
-		"meta": seo.build(f"⚫ {room.get('title') or '오목'} · 오목 한 판", f"{room.get('owner') or '누군가'} 님이 오목 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.",
-						  og_cards.image_url("game", "omok"), path=request.path, noindex=True),  # 초대 링크는 검색에 안 나오게
+		"meta": seo.build(f"{info['icon']} {room.get('title') or info['title']} · {info['title']}",
+						  f"{room.get('owner') or '누군가'} {info['invite']}",
+						  og_cards.image_url("game", kind), path=request.path, noindex=True),  # 초대 링크는 검색에 안 나오게
 	})
 
 
 @login_required
 @require_POST
-def omok_close(request, room_id):
+def close(request, kind, room_id):
+	_kind(kind)
 	try:
 		room = relay_client.get_game(room_id)
 		if room and (room.get("owner_id") == request.user.id or request.user.is_superuser):
@@ -96,4 +131,4 @@ def omok_close(request, room_id):
 			messages.success(request, "방을 닫았어요.")
 	except relay_client.RelayError as exc:
 		messages.error(request, str(exc))
-	return redirect("games:omok")
+	return redirect(f"games:{kind}")
