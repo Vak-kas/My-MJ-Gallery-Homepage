@@ -105,7 +105,10 @@
 |---|---|
 | 🪜 사다리타기 | 2~12명, 결과 프리셋(당첨 1명·커피 쏘기·순서·청소 당번), 가로줄 양 조절, 결과는 내려가기 전까지 가림, 이름을 누르면 길을 따라 그려 내려감 / 모두 내려가기, 같은 사다리를 링크(#)로 공유 (seed 로 똑같이 다시 만듦) |
 | 🎡 돌림판 | 한 줄에 하나 (`치킨 *3` 처럼 비율), 프리셋(점심 메뉴·1~10·벌칙·예/아니오·발표 순서), 딸깍 소리·꽃가루, 당첨 항목 빼고 다음 판, 기록, 링크 공유, 스페이스바로 돌리기 |
-| 준비 중 | 🔢 2048 · ⌨️ 한글 타자 연습(랭킹) → ⚫ 오목 · 🎨 그림 맞추기(실시간) → 🖍 그림 ↔ 글 이어하기 → 💣 물풍선 대전 · 📼 플래시 게임관(Ruffle, 올려도 되는 게임만) |
+| 🔢 2048 | 방향키·WASD·밀기, 부드러운 이동·합치기 애니메이션, **서버가 준 seed 로 움직임(U·D·L·R)을 처음부터 다시 둬서 점수 계산**(`games/engine2048.py`, JS 와 같은 난수 mulberry32) → 점수 조작 불가, 한 판은 한 번만 등록 |
+| ⌨️ 한글 타자 연습 | 한글(속담·생활 문장)·영어·코딩 문장 10개, 타수는 한컴타자처럼 자모 단위(겹모음·겹받침 2타), 틀린 글자 빨강·조합 중인 글자는 봐줌, 붙여넣기 막음. **문장은 서버가 고르고 채점·시간도 서버 기준**, 정확도 90% 이상·1,500타 이하만 랭킹 |
+| 🏆 랭킹 | 로그인 회원만 저장(`games.Score`), 사람마다 최고 기록 하나로 TOP 10 + 내 순위 |
+| 준비 중 | ⚫ 오목 · 🎨 그림 맞추기(실시간) → 🖍 그림 ↔ 글 이어하기 |
 
 ### 1.7 회원 · 가입 승인
 - 회원가입: 아이디, **이름(실명)**, 이메일, 비밀번호, 가입 인사(선택) + **개인정보 수집·이용 동의(필수)**
@@ -181,7 +184,7 @@ MjGallery/
 ├─ analytics/         # 방문 기록 미들웨어, 통계 집계
 ├─ monitor/           # 서버 상태·트래픽·업타임 모니터, S3 백업, 예약 작업(run_scheduled)
 ├─ security/          # 로그인 기록·잠금, IP 차단 미들웨어, 작성 IP 보관 기간 정리
-├─ games/             # Game 메뉴 (사다리타기·돌림판, registry.py 에 게임 목록)
+├─ games/             # Game 메뉴 (사다리타기·돌림판·2048·타자 연습, 랭킹, registry.py 에 게임 목록)
 ├─ tools/             # Tool 메뉴 (QR·JSON·정규식·키 생성기·네트워크 진단·단축 URL·비밀 메모·클립보드·라이브 방송·데이터 전송 등)
 ├─ relay/             # 중계 데몬(mj_relay.py: 데이터 전송, mj_live.py: 라이브 방송 시그널링), CLI(mj_stream.py), 설치 스크립트(TURN 포함)
 ├─ scripts/           # gen_dark_css.py (다크 모드 CSS 생성)
@@ -303,7 +306,7 @@ python -m unittest discover -s relay/tests -t .
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
-| `/games/` | Game 메뉴 (`ladder/`, `roulette/`) |
+| `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `2048/`, `typing/`, `scores/<랭킹>/`) |
 | `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |

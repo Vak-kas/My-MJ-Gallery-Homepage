@@ -17,7 +17,7 @@ PAGES = {
     "board": {"title": "자유게시판", "subtitle": "공지 · 소통 · 자유 글", "pill": "BOARD", "accent": ORANGE, "eyebrow": "SMJ GALLERY · BLOG"},
     "life": {"title": "Life", "subtitle": "일상 메모 · 생각 기록 · 회고", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
     "gallery": {"title": "Gallery", "subtitle": "사진으로 남긴 순간들", "pill": "PHOTO", "accent": GOLD, "eyebrow": "SMJ GALLERY"},
-    "games": {"title": "Game", "subtitle": "사다리타기 · 돌림판, 그리고 추억의 게임들", "pill": "GAME", "accent": GREEN, "eyebrow": "SMJ GALLERY"},
+    "games": {"title": "Game", "subtitle": "사다리타기 · 돌림판 · 2048 · 한글 타자 연습", "pill": "GAME", "accent": GREEN, "eyebrow": "SMJ GALLERY"},
 }
 
 
