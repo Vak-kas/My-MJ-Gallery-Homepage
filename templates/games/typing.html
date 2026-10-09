@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 22px; }
+    .gm-btn { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; border-color: #1d1d1f; color: #fff; }
+    .gm-go { border-radius: 999px; padding: 12px 28px; font-size: 16px; font-weight: 700; color: #fff; background: #10b981; }
+    .gm-go:hover { background: #0f9f6e; }
+    .ty-target { font-size: clamp(20px, 3vw, 28px); line-height: 1.7; letter-spacing: 0.01em; word-break: keep-all; color: #8e8e93; min-height: 2.4em; }
+    .ty-target .ok { color: #1d1d1f; }
+    .ty-target .bad { color: #e5484d; background: rgba(229, 72, 77, 0.12); border-radius: 3px; }
+    .ty-target .cur { box-shadow: inset 0 -3px 0 #10b981; color: #1d1d1f; }
+    .ty-input { width: 100%; border-radius: 16px; border: 2px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 14px 18px; font-size: clamp(18px, 2.6vw, 24px); color: #1d1d1f; outline: none; }
+    .ty-input:focus { border-color: #10b981; }
+    .ty-code .ty-target, .ty-code .ty-input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .ty-stat { border-radius: 16px; background: #f5f5f7; padding: 10px 14px; }
+    .ty-stat b { display: block; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; color: #1d1d1f; }
+    .ty-count { font-size: 96px; font-weight: 800; color: #10b981; animation: ty-beat 1s ease-out; }
+    @keyframes ty-beat { from { transform: scale(1.4); opacity: 0.3; } to { transform: scale(1); opacity: 1; } }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .ty-target .ok, html.theme-dark .ty-target .cur { color: #f3f4f6; }
+    html.theme-dark .ty-input { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #f3f4f6; }
+    html.theme-dark .ty-stat { background: #111318; }
+    html.theme-dark .ty-stat b { color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">SOLO · TYPING</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">한글 타자 연습.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">문장 {{ round }}개를 치고 Enter. 타수는 한컴타자처럼 자모 단위('의' = 3타)로 세요. 정확도 {{ min_accuracy }}% 이상이면 랭킹에 올라가요.</p>
+    </div>
+
+    <div class="mt-6 flex flex-wrap gap-1.5" id="ty-langs">
+        {% for key, label in langs.items %}<button type="button" class="gm-btn {% if forloop.first %}is-on{% endif %}" data-lang="{{ key }}">{{ label }}</button>{% endfor %}
+    </div>
+
+    <div class="mt-5 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0" id="ty-stage">
+            <!-- 시작 전 -->
+            <div id="ty-ready" class="flex flex-col items-center justify-center gap-4 py-16 text-center">
+                <p class="text-[48px]">⌨️</p>
+                <p class="text-[15px] text-[#6e6e73]">준비되면 시작! 3초 센 뒤 첫 문장이 나와요.</p>
+                <button type="button" class="gm-go" id="ty-start">시작하기</button>
+            </div>
+            <div id="ty-countdown" class="hidden py-16 text-center"></div>
+            <!-- 치는 중 -->
+            <div id="ty-play" class="hidden">
+                <div class="grid grid-cols-3 gap-2.5">
+                    <div class="ty-stat"><span class="text-[12px] text-[#6e6e73]">타수</span><b id="ty-cpm">0</b></div>
+                    <div class="ty-stat"><span class="text-[12px] text-[#6e6e73]">정확도</span><b id="ty-acc">100%</b></div>
+                    <div class="ty-stat"><span class="text-[12px] text-[#6e6e73]">문장</span><b id="ty-prog">1 / {{ round }}</b></div>
+                </div>
+                <div class="mt-3 h-1.5 rounded-full bg-[#f5f5f7] dark:bg-[#111318]"><div id="ty-bar" class="h-1.5 rounded-full bg-[#10b981] transition-all" style="width:0%"></div></div>
+                <p id="ty-target" class="ty-target mt-6"></p>
+                <input id="ty-input" class="ty-input mt-4" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="여기에 치고 Enter">
+                <p id="ty-next" class="mt-3 truncate text-[14px] text-[#8e8e93]"></p>
+            </div>
+            <!-- 결과 -->
+            <div id="ty-result" class="hidden py-8 text-center"></div>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">🏆 랭킹 <span id="ty-lb-name" class="text-[13px] font-normal text-[#8e8e93]">한글 문장</span></h2>
+                {% for key, label, board in boards %}
+                <div class="ty-lb mt-3 {% if not forloop.first %}hidden{% endif %}" data-lang="{{ key }}">{% include "games/_leaderboard.html" with board=board unit="타" %}</div>
+                {% endfor %}
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">타수 기준</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>200타: 처음 배우는 중 · 300타: 보통</li>
+                    <li>400타: 빠른 편 · 600타 이상: 고수</li>
+                    <li>시간은 서버 기준이라 문장 사이에 쉬면 타수가 내려가요.</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+{{ langs|json_script:"ty-langs-data" }}
+<script>
+(() => {
+    const URLS = { start: "{% url 'games:typing_start' %}", submit: "{% url 'games:typing_submit' %}" };
+    const LANG_LABELS = JSON.parse(document.getElementById('ty-langs-data').textContent);
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body || {}) }).then((r) => r.json());
+
+    // games/typing.py 의 keystrokes 와 같은 규칙
+    const JUNG = [1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 2, 2, 2, 1, 1, 2, 1];
+    const JONG = [0, 1, 1, 2, 1, 2, 2, 1, 1, 2, 2, 2, 2, 2, 2, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+    const keys = (ch) => { const c = ch.charCodeAt(0) - 0xAC00; return c >= 0 && c < 11172 ? 1 + JUNG[Math.floor(c / 28) % 21] + JONG[c % 28] : 1; };
+
+    let lang = 'ko', run = null, composing = false;
+
+    document.querySelectorAll('#ty-langs [data-lang]').forEach((b) => b.addEventListener('click', () => {
+        if (run && !run.done) return;
+        lang = b.dataset.lang;
+        document.querySelectorAll('#ty-langs [data-lang]').forEach((x) => x.classList.toggle('is-on', x === b));
+        document.querySelectorAll('.ty-lb').forEach((x) => x.classList.toggle('hidden', x.dataset.lang !== lang));
+        $('ty-lb-name').textContent = LANG_LABELS[lang];
+        $('ty-stage').classList.toggle('ty-code', lang === 'code');
+        show('ready');
+    }));
+
+    function show(which) { ['ready', 'countdown', 'play', 'result'].forEach((k) => $(`ty-${k}`).classList.toggle('hidden', k !== which)); }
+
+    async function start() {
+        const s = await post(URLS.start, { lang }).catch(() => null);
+        if (!s || !s.texts) { alert('시작하지 못했어요. 잠시 뒤 다시 해 주세요.'); return; }
+        run = { token: s.token, texts: s.texts, typed: [], i: 0, t0: 0, done: false };
+        show('countdown');
+        for (const n of [3, 2, 1]) { $('ty-countdown').innerHTML = `<span class="ty-count">${n}</span>`; await new Promise((r) => setTimeout(r, 1000)); }
+        show('play');
+        run.t0 = performance.now();
+        sentence();
+        $('ty-input').focus();
+    }
+
+    function sentence() {
+        $('ty-input').value = '';
+        paint();
+        $('ty-prog').textContent = `${run.i + 1} / ${run.texts.length}`;
+        $('ty-bar').style.width = `${(run.i / run.texts.length) * 100}%`;
+        $('ty-next').textContent = run.texts[run.i + 1] ? `다음: ${run.texts[run.i + 1]}` : '마지막 문장!';
+    }
+
+    // 맞은 글자는 진하게, 틀린 글자는 빨갛게. 조합 중인 마지막 한글은 틀림으로 치지 않음
+    function paint() {
+        const target = run.texts[run.i], got = $('ty-input').value;
+        const lastPending = composing ? got.length - 1 : -1;
+        $('ty-target').innerHTML = [...target].map((ch, k) => {
+            let cls = '';
+            if (k < got.length) cls = got[k] === ch || k === lastPending ? 'ok' : 'bad';
+            else if (k === got.length) cls = 'cur';
+            return `<span class="${cls}">${esc(ch)}</span>`;
+        }).join('');
+        stats();
+    }
+    function stats() {
+        let okKeys = 0, okChars = 0, total = 0;
+        const all = [...run.typed, $('ty-input').value];
+        all.forEach((got, n) => {
+            const target = run.texts[n] || '';
+            const upto = n < run.typed.length ? Math.max(target.length, got.length) : got.length;
+            total += upto;
+            [...target].forEach((ch, k) => { if (k < got.length && got[k] === ch) { okChars++; okKeys += keys(ch); } });
+        });
+        const min = Math.max(0.05, (performance.now() - run.t0) / 60000);
+        $('ty-cpm').textContent = Math.round(okKeys / min);
+        $('ty-acc').textContent = `${total ? Math.round((okChars / total) * 1000) / 10 : 100}%`;
+    }
+
+    const input = $('ty-input');
+    input.addEventListener('compositionstart', () => { composing = true; });
+    input.addEventListener('compositionend', () => { composing = false; paint(); });
+    input.addEventListener('input', paint);
+    input.addEventListener('paste', (e) => e.preventDefault());  // 붙여넣기는 안 돼요
+    input.addEventListener('drop', (e) => e.preventDefault());
+    input.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter' || e.isComposing || !run || run.done) return;
+        e.preventDefault();
+        if (!input.value.trim()) return;
+        run.typed.push(input.value);
+        run.i++;
+        if (run.i >= run.texts.length) finish(); else sentence();
+    });
+
+    async function finish() {
+        run.done = true;
+        const seconds = (performance.now() - run.t0) / 1000;
+        show('result');
+        $('ty-result').innerHTML = '<p class="text-[15px] text-[#6e6e73]">채점 중…</p>';
+        const r = await post(URLS.submit, { token: run.token, typed: run.typed, seconds }).catch(() => ({ ok: false, error: '서버에 보내지 못했어요.' }));
+        if (!r.ok) { $('ty-result').innerHTML = `<p class="text-[15px] text-[#e5484d]">${esc(r.error)}</p><button class="gm-go mt-6" data-again>다시 하기</button>`; bindAgain(); return; }
+        let msg = '';
+        if (r.saved) msg = r.best ? '🎉 내 최고 기록! 랭킹에 올렸어요' : '랭킹에 저장했어요';
+        else if (r.reason === 'accuracy') msg = `정확도 ${r.min_accuracy}% 이상이어야 랭킹에 올라가요`;
+        else if (r.reason === 'speed') msg = '사람이 칠 수 있는 속도를 넘어서 랭킹에는 올리지 않았어요 🤖';
+        else if (r.login) msg = '<a class="underline" href="{% url "accounts:login" %}?next={{ request.path|urlencode }}">로그인</a>하면 랭킹에 올라가요';
+        $('ty-result').innerHTML = `
+            <p class="text-[14px] text-[#8e8e93]">${esc(LANG_LABELS[lang])} · ${r.seconds}초</p>
+            <p class="mt-2 text-[64px] font-extrabold leading-none tracking-[-0.03em] text-[#10b981]">${r.cpm}<span class="text-[24px]">타</span></p>
+            <p class="mt-3 text-[18px]">정확도 <b>${r.accuracy}%</b>${lang === 'ko' ? '' : ` · ${r.wpm} WPM`}</p>
+            <p class="mt-3 text-[14px] font-semibold">${msg}</p>
+            <button class="gm-go mt-6" data-again>한 번 더</button>`;
+        bindAgain();
+        if (r.leaderboard) renderBoard(r.leaderboard);
+    }
+    function bindAgain() { $('ty-result').querySelector('[data-again]')?.addEventListener('click', start); }
+
+    function renderBoard(data) {
+        const box = document.querySelector(`.ty-lb[data-lang="${lang}"]`);
+        const medal = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : n);
+        box.querySelector('.lb-rows').innerHTML = data.rows.map((r) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1.5 ${r.me ? 'bg-[#ecfdf5] font-semibold dark:bg-[#14432d]' : ''}"><span class="w-6 text-center tabular-nums">${medal(r.rank)}</span><span class="min-w-0 flex-1 truncate">${esc(r.name)}</span><span class="tabular-nums">${r.score}타</span></li>`).join('') || '<li class="px-2 py-3 text-[13px] text-[#8e8e93]">아직 기록이 없어요.</li>';
+        if (data.mine) box.querySelector('.lb-mine').textContent = `내 최고 ${data.mine.score}타 · ${data.mine.rank}위`;
+    }
+
+    $('ty-start').addEventListener('click', start);
+    document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !$('ty-ready').classList.contains('hidden') && e.target === document.body) start(); });
+    window.__typing = { keys, state: () => run };
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{# 랭킹 표. board = scores.leaderboard() 결과, unit = 점수 단위. JS 로 다시 그릴 때는 window.renderBoard(el, data, unit) #}
+<div class="lb" data-board="{{ board.board }}">
+    <ol class="lb-rows space-y-1 text-[14px]">
+        {% for r in board.rows %}
+        <li class="flex items-center gap-2 rounded-xl px-2 py-1.5 {% if r.me %}bg-[#ecfdf5] font-semibold dark:bg-[#14432d]{% endif %}">
+            <span class="w-6 text-center tabular-nums {% if r.rank <= 3 %}text-[16px]{% else %}text-[#8e8e93]{% endif %}">{% if r.rank == 1 %}🥇{% elif r.rank == 2 %}🥈{% elif r.rank == 3 %}🥉{% else %}{{ r.rank }}{% endif %}</span>
+            <span class="min-w-0 flex-1 truncate">{{ r.name }}</span>
+            <span class="tabular-nums">{{ r.score }}{{ unit }}</span>
+        </li>
+        {% empty %}
+        <li class="px-2 py-3 text-[13px] text-[#8e8e93]">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>
+        {% endfor %}
+    </ol>
+    <p class="lb-mine mt-2 border-t border-black/[0.06] pt-2 text-[13px] text-[#6e6e73]">
+        {% if board.mine %}내 최고 {{ board.mine.score }}{{ unit }} · {{ board.mine.rank }}위{% elif user.is_authenticated %}아직 내 기록이 없어요.{% else %}<a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="text-[#0f9f6e] hover:underline">로그인</a>하면 랭킹에 올라가요.{% endif %}
+    </p>
+</div>

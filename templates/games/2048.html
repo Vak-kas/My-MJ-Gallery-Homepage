@@ -1,0 +1,224 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-btn { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .g-stat { border-radius: 14px; background: #bbada0; color: #fff; padding: 6px 14px; text-align: center; min-width: 92px; }
+    .g-stat span { display: block; font-size: 11px; color: #eee4da; text-transform: uppercase; letter-spacing: 0.08em; }
+    .g-stat b { font-size: 22px; font-variant-numeric: tabular-nums; }
+    .g-board { position: relative; width: min(100%, 500px); aspect-ratio: 1; margin: 0 auto; border-radius: 16px; background: #bbada0; padding: 3%; touch-action: none; user-select: none; }
+    .g-cell, .g-tile { position: absolute; left: 3%; top: 3%; width: 21.25%; height: 21.25%; border-radius: 10px; }
+    .g-cell { background: rgba(238, 228, 218, 0.35); }
+    .g-tile { display: flex; align-items: center; justify-content: center; font-weight: 800; transition: transform 0.11s ease-in-out; will-change: transform; }
+    .g-tile.new { animation: g-appear 0.18s ease 0.08s backwards; }
+    .g-tile.merged { animation: g-pop 0.18s ease 0.08s; }
+    @keyframes g-appear { from { opacity: 0; scale: 0.2; } to { opacity: 1; scale: 1; } }
+    @keyframes g-pop { 50% { scale: 1.18; } }
+    .g-over { position: absolute; inset: 0; border-radius: 16px; background: rgba(238, 228, 218, 0.78); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; z-index: 5; animation: g-appear 0.4s; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .g-board { background: #3a3a3c; }
+    html.theme-dark .g-cell { background: rgba(255, 255, 255, 0.06); }
+    html.theme-dark .g-over { background: rgba(23, 26, 32, 0.85); color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">SOLO · PUZZLE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">2048.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">방향키·WASD 로, 휴대폰은 밀어서. 같은 숫자끼리 부딪히면 합쳐져요. 2048 을 만들어 보세요!</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card">
+            <div class="mx-auto flex w-[min(100%,500px)] flex-wrap items-center gap-2">
+                <div class="g-stat"><span>점수</span><b id="g-score">0</b></div>
+                <div class="g-stat"><span>최고</span><b id="g-best">0</b></div>
+                <button type="button" class="gm-btn ml-auto" id="g-new">새 게임</button>
+            </div>
+            <div class="g-board mt-4" id="g-board"></div>
+            <p class="mt-3 text-center text-[12px] text-[#8e8e93]" id="g-hint">점수는 게임이 끝나면 서버가 움직임을 처음부터 다시 둬서 확인해요.</p>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">🏆 랭킹</h2>
+                <div class="mt-3" id="g-lb">{% include "games/_leaderboard.html" with board=board unit="점" %}</div>
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">요령</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>가장 큰 숫자를 한쪽 모서리에 붙여 두세요.</li>
+                    <li>두 방향 위주로만 밀고, 반대 방향은 아껴요.</li>
+                    <li>더 못 움직이면 끝나요. 중간에 '기록 등록'도 돼요.</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+<script>
+(() => {
+    const URLS = { start: "{% url 'games:2048_start' %}", submit: "{% url 'games:2048_submit' %}", board: "{% url 'games:scores' '2048' %}" };
+    const LOGGED_IN = {{ user.is_authenticated|yesno:"true,false" }};
+    const $ = (id) => document.getElementById(id);
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body || {}) }).then((r) => r.json());
+    const COLORS = { 2: ['#eee4da', '#776e65'], 4: ['#ede0c8', '#776e65'], 8: ['#f2b179', '#fff'], 16: ['#f59563', '#fff'], 32: ['#f67c5f', '#fff'], 64: ['#f65e3b', '#fff'], 128: ['#edcf72', '#fff'], 256: ['#edcc61', '#fff'], 512: ['#edc850', '#fff'], 1024: ['#edc53f', '#fff'], 2048: ['#edc22e', '#fff'] };
+
+    // ── 규칙: games/engine2048.py 와 똑같아야 함 ──
+    function mulberry32(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+    const LINES = { L: [], R: [], U: [], D: [] };
+    for (let i = 0; i < 4; i++) {
+        LINES.L.push([0, 1, 2, 3].map((c) => i * 4 + c)); LINES.R.push([3, 2, 1, 0].map((c) => i * 4 + c));
+        LINES.U.push([0, 1, 2, 3].map((r) => r * 4 + i)); LINES.D.push([3, 2, 1, 0].map((r) => r * 4 + i));
+    }
+
+    let g = null;  // { rnd, cells: [tile|null]*16, score, moves:'', token, over, seq }
+    function spawn() {
+        const empty = g.cells.map((t, i) => (t ? -1 : i)).filter((i) => i >= 0);
+        if (!empty.length) return;
+        const i = empty[Math.floor(g.rnd() * empty.length)];
+        g.cells[i] = { id: ++g.seq, v: g.rnd() < 0.9 ? 2 : 4, isNew: true };
+    }
+    function move(d) {
+        let moved = false;
+        g.cells.forEach((t) => { if (t) { t.isNew = false; t.merged = false; } });
+        g.ghosts = [];
+        for (const line of LINES[d]) {
+            const tiles = line.map((i) => g.cells[i]).filter(Boolean);
+            const out = [];
+            for (let k = 0; k < tiles.length; k++) {
+                if (k + 1 < tiles.length && tiles[k].v === tiles[k + 1].v) {
+                    const keep = tiles[k];
+                    g.ghosts.push({ ...tiles[k + 1], to: line[out.length] });  // 합쳐지며 사라지는 타일도 미끄러져 들어가게
+                    keep.v *= 2; keep.merged = true; g.score += keep.v;
+                    out.push(keep); k++;
+                } else out.push(tiles[k]);
+            }
+            line.forEach((idx, j) => {
+                const t = out[j] || null;
+                if (g.cells[idx] !== t || (t && t.merged)) moved = true;
+                g.cells[idx] = t;
+            });
+        }
+        if (moved) { g.moves += d; spawn(); }
+        return moved;
+    }
+    function isOver() {
+        if (g.cells.some((t) => !t)) return false;
+        for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) {
+            const v = g.cells[r * 4 + c].v;
+            if ((c < 3 && g.cells[r * 4 + c + 1].v === v) || (r < 3 && g.cells[(r + 1) * 4 + c].v === v)) return false;
+        }
+        return true;
+    }
+
+    // ── 그리기 ──
+    const board = $('g-board');
+    const STEP = (21.25 + 3) / 21.25 * 100;  // 한 칸 이동 = 칸 크기 + 칸 사이 (%)
+    const pos = (i) => `translate(${(i % 4) * STEP}%, ${Math.floor(i / 4) * STEP}%)`;
+    function render() {
+        const els = new Map([...board.querySelectorAll('.g-tile')].map((el) => [+el.dataset.id, el]));
+        const size = board.clientWidth;
+        g.cells.forEach((t, i) => {
+            if (!t) return;
+            let el = els.get(t.id);
+            if (!el) { el = document.createElement('div'); el.className = 'g-tile'; el.dataset.id = t.id; board.appendChild(el); el.style.transform = pos(i); }
+            els.delete(t.id);
+            const [bg, fg] = COLORS[t.v] || ['#3c3a32', '#fff'];
+            el.style.background = bg; el.style.color = fg;
+            el.style.fontSize = `${size * (t.v >= 1024 ? 0.07 : t.v >= 128 ? 0.085 : 0.1)}px`;
+            el.textContent = t.v;
+            el.classList.toggle('new', !!t.isNew);
+            el.classList.toggle('merged', !!t.merged);
+            el.style.zIndex = t.merged ? 2 : 1;
+            requestAnimationFrame(() => { el.style.transform = pos(i); });
+        });
+        // 합쳐진 쪽 타일은 목적지까지 미끄러진 뒤 사라짐
+        (g.ghosts || []).forEach((gh) => { const el = els.get(gh.id); if (el) { els.delete(gh.id); el.style.zIndex = 0; el.style.transform = pos(gh.to); setTimeout(() => el.remove(), 120); } });
+        els.forEach((el) => el.remove());
+        $('g-score').textContent = g.score;
+        const best = Math.max(+localStorage.getItem('mj-2048-best') || 0, g.score);
+        try { localStorage.setItem('mj-2048-best', best); } catch (e) { /* 무시 */ }
+        $('g-best').textContent = best;
+    }
+
+    function overlay(html) {
+        board.querySelector('.g-over')?.remove();
+        if (!html) return;
+        const o = document.createElement('div'); o.className = 'g-over'; o.innerHTML = html; board.appendChild(o);
+        o.querySelector('[data-new]')?.addEventListener('click', start);
+        o.querySelector('[data-submit]')?.addEventListener('click', submit);
+    }
+
+    async function start() {
+        overlay('');
+        board.querySelectorAll('.g-tile').forEach((el) => el.remove());
+        const s = await post(URLS.start).catch(() => null);
+        if (!s) { overlay('<p class="text-[16px] font-semibold">게임을 시작하지 못했어요.</p><button class="gm-btn" data-new>다시</button>'); return; }
+        g = { rnd: mulberry32(s.seed), cells: Array(16).fill(null), score: 0, moves: '', token: s.token, over: false, seq: 0 };
+        spawn(); spawn();
+        render();
+        $('g-hint').textContent = '점수는 게임이 끝나면 서버가 움직임을 처음부터 다시 둬서 확인해요.';
+    }
+
+    async function submit() {
+        if (!g || g.submitted) return;
+        g.submitted = true;
+        overlay('<p class="text-[16px] font-semibold">기록 확인 중…</p>');
+        const r = await post(URLS.submit, { token: g.token, moves: g.moves }).catch(() => ({ ok: false, error: '서버에 보내지 못했어요.' }));
+        if (!r.ok) { overlay(`<p class="text-[16px]">${r.error}</p><button class="gm-btn" data-new>새 게임</button>`); return; }
+        const msg = r.saved ? (r.best ? '🎉 내 최고 기록!' : '랭킹에 저장했어요') : (r.login ? '로그인하면 랭킹에 올라가요' : '');
+        overlay(`<p class="text-[30px] font-extrabold">${r.score}점</p><p class="text-[14px]">가장 큰 숫자 ${r.max_tile} · ${r.moves}번 움직임</p><p class="text-[14px] font-semibold">${msg}</p><button class="gm-btn" data-new>새 게임</button>`);
+        if (r.leaderboard) renderBoard(r.leaderboard);
+    }
+
+    function renderBoard(data) {
+        const medal = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : n);
+        const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        $('g-lb').querySelector('.lb-rows').innerHTML = data.rows.map((r) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1.5 ${r.me ? 'bg-[#ecfdf5] font-semibold dark:bg-[#14432d]' : ''}"><span class="w-6 text-center tabular-nums">${medal(r.rank)}</span><span class="min-w-0 flex-1 truncate">${esc(r.name)}</span><span class="tabular-nums">${r.score}점</span></li>`).join('') || '<li class="px-2 py-3 text-[13px] text-[#8e8e93]">아직 기록이 없어요.</li>';
+        if (data.mine) $('g-lb').querySelector('.lb-mine').textContent = `내 최고 ${data.mine.score}점 · ${data.mine.rank}위`;
+    }
+
+    function act(d) {
+        if (!g || g.over || g.submitted) return;
+        if (!move(d)) return;
+        render();
+        if (isOver()) {
+            g.over = true;
+            setTimeout(() => (LOGGED_IN ? submit() : overlay(`<p class="text-[30px] font-extrabold">${g.score}점</p><p class="text-[14px]">더 움직일 수 없어요!</p><a class="text-[14px] font-semibold text-[#0f9f6e] underline" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">로그인하면 랭킹에 올라가요</a><button class="gm-btn" data-new>새 게임</button>`)), 400);
+        }
+    }
+
+    const KEYS = { ArrowLeft: 'L', ArrowRight: 'R', ArrowUp: 'U', ArrowDown: 'D', a: 'L', d: 'R', w: 'U', s: 'D', A: 'L', D: 'R', W: 'U', S: 'D' };
+    document.addEventListener('keydown', (e) => {
+        if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey) return;
+        const d = KEYS[e.key];
+        if (d) { e.preventDefault(); act(d); }
+    });
+    let touch = null;
+    board.addEventListener('pointerdown', (e) => { touch = { x: e.clientX, y: e.clientY }; });
+    board.addEventListener('pointerup', (e) => {
+        if (!touch) return;
+        const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+        touch = null;
+        if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) return;
+        act(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'R' : 'L') : (dy > 0 ? 'D' : 'U'));
+    });
+    $('g-new').addEventListener('click', () => {
+        if (g && g.moves.length > 20 && !g.submitted && !g.over && LOGGED_IN && confirm('지금 점수를 랭킹에 등록하고 새로 시작할까요? (취소하면 그냥 새 게임)')) { submit(); return; }
+        start();
+    });
+    // 빈 칸 배경
+    for (let i = 0; i < 16; i++) { const c = document.createElement('div'); c.className = 'g-cell'; c.style.transform = pos(i); board.appendChild(c); }
+    start();
+    window.__g2048 = { state: () => g, move: act, submit, isOver };
+})();
+</script>
+{% endblock %}

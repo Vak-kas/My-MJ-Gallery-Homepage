@@ -1,7 +1,10 @@
 from django.shortcuts import render
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.urls import reverse
 
 from .registry import CATEGORIES, GAMES
+from .scores import leaderboard
+from .typing import LANGS, MIN_ACCURACY, ROUND
 
 
 def index(request):
@@ -19,3 +22,14 @@ def ladder(request):
 
 def roulette(request):
 	return render(request, "games/roulette.html")
+
+
+@ensure_csrf_cookie
+def g2048(request):
+	return render(request, "games/2048.html", {"board": leaderboard("2048", request.user)})
+
+
+@ensure_csrf_cookie
+def typing_page(request):
+	boards = [(lang, label, leaderboard(f"typing-{lang}", request.user)) for lang, label in LANGS.items()]
+	return render(request, "games/typing.html", {"langs": LANGS, "boards": boards, "round": ROUND, "min_accuracy": MIN_ACCURACY})
