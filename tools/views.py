@@ -65,6 +65,10 @@ def textdiff(request):
 	return render(request, "tools/textdiff.html")
 
 
+def gpa(request):
+	return render(request, "tools/gpa.html")
+
+
 def pdf_tool(request):
 	return render(request, "tools/pdf.html")
 
