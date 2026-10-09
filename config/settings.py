@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'notifications',
     'security',
     'analytics',
+    'monitor',
 ]
 
 MIDDLEWARE = [
@@ -247,6 +248,8 @@ TURN_PORT = int(os.getenv("TURN_PORT", "3478"))
 # QR AI 스타일 추천 (Claude API). 키가 없으면 AI 추천 버튼만 꺼짐
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-haiku-5-5")
+# 서버 상태판: Lightsail 요금제의 월 데이터 전송 허용량 (GB, 선택 — 넣으면 사용 비율 표시)
+SERVER_TRANSFER_ALLOWANCE_GB = float(os.getenv("SERVER_TRANSFER_ALLOWANCE_GB", "0") or 0)
 
 
 # Upload limits (prevent 400 Bad Request on larger form/file payloads)
