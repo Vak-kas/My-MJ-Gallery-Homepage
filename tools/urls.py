@@ -19,6 +19,7 @@ urlpatterns = [
     path("charcount/", views.charcount, name="charcount"),
     path("diff/", views.textdiff, name="textdiff"),
     path("gpa/", views.gpa, name="gpa"),
+    path("image/", views.image_tool, name="image"),
     path("regex/", views.regex, name="regex"),
     path("qrcode/ai-style/", qr_ai.qr_ai_style, name="qrcode_ai"),
     path("netcheck/", netcheck.netcheck, name="netcheck"),

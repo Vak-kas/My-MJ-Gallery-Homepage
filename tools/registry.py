@@ -54,6 +54,16 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "image",
+		"url_name": "tools:image",
+		"icon": "🖼",
+		"title": "이미지 도구",
+		"description": "사진 용량 줄이기(“5MB 이하로”), 크기·형식 바꾸기(HEIC → JPG, PNG ↔ WebP), 자르기·돌리기, 위치정보 지우기. 여러 장을 한꺼번에 ZIP 으로 받아요. 브라우저 안에서만 처리돼요.",
+		"tags": ["사진", "변환"],
+		"category": "docs",
+		"access": "public",
+	},
+	{
 		"slug": "gpa",
 		"url_name": "tools:gpa",
 		"icon": "🎓",

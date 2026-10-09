@@ -69,6 +69,10 @@ def gpa(request):
 	return render(request, "tools/gpa.html")
 
 
+def image_tool(request):
+	return render(request, "tools/image.html")
+
+
 def pdf_tool(request):
 	return render(request, "tools/pdf.html")
 
