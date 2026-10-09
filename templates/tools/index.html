@@ -10,29 +10,50 @@
         <p class="mt-3 text-[16px] text-[#6e6e73]">공부하고 일하면서 필요했던 계산기와 편의 기능을 모아둔 공간입니다.</p>
     </div>
 
+    {% if sections %}
+    <div class="mt-10 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div id="tool-chips" class="flex flex-wrap gap-2" role="tablist" aria-label="도구 분류">
+            <button type="button" data-cat="" class="tool-chip rounded-full border px-4 py-2 text-[14px] transition">전체 <span class="text-[12px] opacity-60">{{ tool_count }}</span></button>
+            {% for section in sections %}
+            <button type="button" data-cat="{{ section.key }}" class="tool-chip rounded-full border px-4 py-2 text-[14px] transition">{{ section.icon }} {{ section.title }} <span class="text-[12px] opacity-60">{{ section.tools|length }}</span></button>
+            {% endfor %}
+        </div>
+        <label class="relative block w-full lg:w-[300px]">
+            <span class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[14px] text-[#8e8e93]">⌕</span>
+            <input id="tool-search" type="search" placeholder="도구 찾기 (예: pdf, ip, 자소서)" autocomplete="off"
+                   class="w-full rounded-full border border-black/[0.1] bg-white py-2.5 pl-10 pr-4 text-[14px] outline-none focus:border-[#0066cc]/50">
+        </label>
+    </div>
+
+    {% if has_member_tools and not user.is_authenticated %}
+    <p class="mt-4 text-[13px] text-[#8e8e93]">🔒 표시가 있는 도구는 서버 자원을 써서 회원만 쓸 수 있어요. <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="text-[#0066cc] hover:underline">로그인하고 쓰기 →</a></p>
+    {% endif %}
+    {% endif %}
+
     {% for section in sections %}
-    <section class="mt-12">
+    <section class="tool-section mt-12 scroll-mt-24" id="cat-{{ section.key }}" data-cat="{{ section.key }}">
         <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 class="text-[22px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">
-                {% if section.key == 'member' %}🔒 {% elif section.key == 'admin' %}🛠 {% endif %}{{ section.title }}
-            </h2>
+            <h2 class="text-[22px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">{{ section.icon }} {{ section.title }}</h2>
             <p class="text-[14px] text-[#8e8e93]">{{ section.note }}</p>
-            {% if section.key == 'member' and not user.is_authenticated %}
-            <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="ml-auto rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#0066cc] hover:bg-white">로그인하고 쓰기 →</a>
-            {% endif %}
         </div>
 
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {% for tool in section.tools %}
-            <a href="{{ tool.url }}" class="group flex flex-col rounded-[22px] border {% if section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08]{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#0066cc]/40 hover:shadow-md">
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl {% if section.key == 'admin' %}bg-[#fff6e8] text-[#b26a00]{% else %}bg-[#f0f7ff] text-[#0066cc]{% endif %} text-[22px]">{{ tool.icon }}</div>
+            <a href="{{ tool.url }}" data-search="{{ tool.title|lower }} {{ tool.description|lower }} {{ tool.tags|join:' '|lower }} {{ tool.slug }}"
+               class="tool-card group flex flex-col rounded-[22px] border {% if section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08]{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#0066cc]/40 hover:shadow-md">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-2xl {% if section.key == 'admin' %}bg-[#fff6e8] text-[#b26a00]{% else %}bg-[#f0f7ff] text-[#0066cc]{% endif %} text-[22px]">{{ tool.icon }}</div>
+                    {% if tool.access == 'member' %}
+                    <span class="rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] text-[#6e6e73]" title="로그인한 회원만 쓸 수 있어요">🔒 회원</span>
+                    {% endif %}
+                </div>
                 <h3 class="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">{{ tool.title }}</h3>
                 <p class="mt-2 flex-1 text-[14px] leading-relaxed text-[#6e6e73]">{{ tool.description }}</p>
                 <div class="mt-5 flex flex-wrap items-center gap-2">
                     {% for tag in tool.tags %}
                     <span class="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-[#6e6e73]">{{ tag }}</span>
                     {% endfor %}
-                    <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">{% if section.key == 'member' and not user.is_authenticated %}로그인 →{% else %}열기 →{% endif %}</span>
+                    <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">{% if tool.access == 'member' and not user.is_authenticated %}로그인 →{% else %}열기 →{% endif %}</span>
                 </div>
             </a>
             {% endfor %}
@@ -42,6 +63,67 @@
     <p class="mt-8 rounded-[22px] border border-dashed border-black/[0.12] p-8 text-[14px] text-[#8e8e93]">아직 등록된 도구가 없습니다.</p>
     {% endfor %}
 
+    <p id="tool-none" class="mt-12 hidden rounded-[22px] border border-dashed border-black/[0.12] p-8 text-center text-[14px] text-[#8e8e93]">맞는 도구가 없어요. 다른 말로 찾아보세요.</p>
+
     <p class="mt-12 text-[13px] text-[#8e8e93]">＋ 새 도구가 계속 추가될 예정입니다.</p>
 </main>
+
+<style>
+    .tool-chip { border-color: rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; }
+    .tool-chip:hover { background: #f5f5f7; }
+    .tool-chip.is-on { border-color: #1d1d1f; background: #1d1d1f; color: #fff; }
+    html.theme-dark .tool-chip { border-color: rgba(255, 255, 255, 0.14); background: #171a20; color: #e8e8ed; }
+    html.theme-dark .tool-chip:hover { background: #22262e; }
+    html.theme-dark .tool-chip.is-on { border-color: #e8e8ed; background: #e8e8ed; color: #111; }
+</style>
+<script>
+(() => {
+    // 분류 칩 + 검색: 고른 분류만 보이고, 검색어가 있으면 이름·설명·태그로 걸러냄. 주소 #docs 처럼 공유 가능
+    const chips = [...document.querySelectorAll('.tool-chip')];
+    const sections = [...document.querySelectorAll('.tool-section')];
+    const search = document.getElementById('tool-search');
+    const none = document.getElementById('tool-none');
+    if (!chips.length) return;
+    const keys = new Set(sections.map((s) => s.dataset.cat));
+    let cat = keys.has(location.hash.slice(1)) ? location.hash.slice(1) : '';
+
+    const apply = () => {
+        const words = (search.value || '').toLowerCase().split(/\s+/).filter(Boolean);
+        let shown = 0;
+        sections.forEach((sec) => {
+            let n = 0;
+            sec.querySelectorAll('.tool-card').forEach((card) => {
+                const ok = words.every((w) => card.dataset.search.includes(w));
+                card.style.display = ok ? '' : 'none';
+                if (ok) n += 1;
+            });
+            const visible = n > 0 && (!cat || sec.dataset.cat === cat);
+            sec.style.display = visible ? '' : 'none';
+            if (visible) shown += n;
+        });
+        chips.forEach((c) => {
+            const on = c.dataset.cat === cat;
+            c.classList.toggle('is-on', on);
+            c.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        none.classList.toggle('hidden', shown > 0);
+    };
+
+    chips.forEach((c) => c.addEventListener('click', () => {
+        cat = c.dataset.cat;
+        history.replaceState(null, '', cat ? `#${cat}` : location.pathname + location.search);
+        apply();
+    }));
+    search.addEventListener('input', apply);
+    search.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { search.value = ''; apply(); }
+        if (e.key === 'Enter') {  // 하나만 남으면 바로 열기
+            const left = [...document.querySelectorAll('.tool-card')].filter((a) => a.offsetParent !== null);
+            if (left.length === 1) location.href = left[0].href;
+        }
+    });
+    window.addEventListener('hashchange', () => { cat = keys.has(location.hash.slice(1)) ? location.hash.slice(1) : ''; apply(); });
+    apply();
+})();
+</script>
 {% endblock %}

@@ -163,8 +163,12 @@ class StreamViewTests(TestCase):
 		from unittest import mock
 		from tools import registry
 		resp = self.client.get(reverse("tools:index"))
-		self.assertContains(resp, "누구나 쓸 수 있는 도구")
-		self.assertContains(resp, "회원 전용")
+		titles = [s["title"] for s in resp.context["sections"]]
+		self.assertEqual(titles, [title for _, _, title, _ in registry.CATEGORIES])  # 분류 순서대로
+		for section in resp.context["sections"]:
+			self.assertTrue(all(t["category"] == section["key"] for t in section["tools"]))
+		self.assertEqual(resp.context["tool_count"], len(registry.TOOLS))
+		self.assertContains(resp, "🔒 회원")
 		self.assertContains(resp, "로그인하고 쓰기")
 		self.assertNotContains(resp, "관리자 전용")  # 관리자 도구가 없으면 칸 자체가 없음
 		admin_tool = {"slug": "x", "url_name": "tools:index", "icon": "🛠", "title": "관리자 테스트 도구", "description": "", "tags": [], "access": "admin"}
@@ -173,6 +177,7 @@ class StreamViewTests(TestCase):
 			resp = self.client.get(reverse("tools:index"))
 			self.assertNotContains(resp, "관리자 테스트 도구")
 			self.assertNotContains(resp, "로그인하고 쓰기")
+			self.assertNotContains(resp, "로그인 →")
 			self.client.force_login(self.admin)
 			resp = self.client.get(reverse("tools:index"))
 			self.assertContains(resp, "관리자 전용")
@@ -926,3 +931,15 @@ class QrAiTests(TestCase):
 		self.assertEqual(req.get_header("X-api-key"), "secret-k")
 		self.assertEqual(body["tool_choice"], {"type": "tool", "name": "apply_qr_style"})
 		self.assertEqual(body["model"], "claude-haiku-5-5")
+
+
+class ToolRegistryTests(TestCase):
+	def test_every_tool_has_known_category_and_unique_slug(self):
+		from .registry import CATEGORIES
+
+		keys = {key for key, *_ in CATEGORIES}
+		for tool in TOOLS:
+			self.assertIn(tool.get("category"), keys, tool["slug"])
+			self.assertIn(tool.get("access"), {"public", "member", "admin"}, tool["slug"])
+		slugs = [t["slug"] for t in TOOLS]
+		self.assertEqual(len(slugs), len(set(slugs)))
