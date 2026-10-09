@@ -49,6 +49,10 @@ def time_tool(request):
 	return render(request, "tools/time.html")
 
 
+def wifi(request):
+	return render(request, "tools/wifi.html")
+
+
 def linkbudget(request):
 	return render(request, "tools/linkbudget.html")
 
