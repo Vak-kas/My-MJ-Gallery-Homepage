@@ -101,7 +101,6 @@ GAMES = [
 		"tags": ["1:1", "실시간"],
 		"category": "versus",
 	},
-	{"slug": "wordchain", "url_name": None, "icon": "🔤", "title": "끝말잇기", "description": "끄투처럼 실시간 끝말잇기. 사전에 있는 단어만, 두음법칙, 시간 제한.", "tags": ["여럿이", "실시간"], "category": "versus"},
 	{"slug": "catchmind", "url_name": None, "icon": "🎨", "title": "그림 맞추기", "description": "한 명이 그리고 나머지가 맞혀요.", "tags": ["여럿이"], "category": "versus"},
 	{"slug": "relay", "url_name": None, "icon": "🖍", "title": "그림 ↔ 글 이어하기", "description": "그림을 보고 글로, 글을 보고 그림으로. 끝에 처음과 비교하면 웃음 폭발.", "tags": ["여럿이"], "category": "versus"},
 ]
