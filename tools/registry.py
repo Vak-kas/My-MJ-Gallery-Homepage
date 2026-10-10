@@ -262,7 +262,7 @@ TOOLS = [
 		"description": "'이런 거 누가 만들어 놨을 텐데' 싶을 때 — 아이디어를 한국어로 쓰면 ✨AI 가 검색어로 바꿔 찾고, 별·언어·라이선스(가져다 써도 되는지)·README 를 보고, 내 아이디어와 맞는지 평가. 논문 코드도.",
 		"tags": ["깃허브", "오픈소스"],
 		"category": "dev",
-		"access": "public",
+		"access": "member",
 	},
 	{
 		"slug": "json",

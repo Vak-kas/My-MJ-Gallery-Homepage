@@ -1369,10 +1369,18 @@ class GithubFindTests(TestCase):
 			"created_at": "2018-01-01T00:00:00Z", "topics": ["3gpp", "bibtex"], "archived": False, "fork": False, "owner": {"avatar_url": "https://a"}}
 
 	def setUp(self):
+		from django.contrib.auth import get_user_model
 		from django.core.cache import cache
 		cache.clear()
+		self.member = get_user_model().objects.create_user("gm", "gm@example.com", "pw")
+
+	def test_member_only(self):
+		self.assertEqual(self.client.get("/tools/github/").status_code, 302)
+		self.assertEqual(self.client.get("/tools/github/search/", {"q": "x"}).status_code, 302)
+		self.assertEqual(self.client.get("/tools/github/readme/", {"name": "a/b"}).status_code, 302)
 
 	def test_search_merge_and_cache(self):
+		self.client.force_login(self.member)
 		import json
 		from unittest import mock
 		other = {**self.REPO, "full_name": "x/y", "html_url": "https://github.com/x/y", "license": None, "stargazers_count": 999}
@@ -1391,14 +1399,16 @@ class GithubFindTests(TestCase):
 		import json
 		from unittest import mock
 		from django.contrib.auth import get_user_model
+		self.client.force_login(self.member)
 		md = base64.b64encode("# 3GPP\n![badge](x.svg)\n<img src=a>Generate bib".encode()).decode()
 		with mock.patch("tools.ghfind._get", return_value=json.dumps({"content": md}).encode()):
 			text = self.client.get("/tools/github/readme/", {"name": "martisak/3gpp-citations"}).json()["text"]
 		self.assertEqual(text, "# 3GPP\n\nGenerate bib")
 		self.assertEqual(self.client.get("/tools/github/readme/", {"name": "../etc"}).status_code, 400)
 		post = lambda body: self.client.post("/tools/github/ai/", json.dumps(body), content_type="application/json")
+		self.client.logout()
 		self.assertEqual(post({"mode": "queries", "idea": "3GPP 인용 만들기"}).status_code, 401)  # AI 는 회원
-		self.client.force_login(get_user_model().objects.create_user("u", "u@example.com", "pw"))
+		self.client.force_login(self.member)
 		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value={"queries": ["3gpp bibtex", " "], "intent": "3GPP BibTeX"}) as call:
 			d = post({"mode": "queries", "idea": "3GPP 규격 BibTeX 파이썬"}).json()
 			post({"mode": "queries", "idea": "3GPP 규격 BibTeX 파이썬"})

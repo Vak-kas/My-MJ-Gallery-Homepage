@@ -1,7 +1,7 @@
 """깃허브 코드 찾기 — 키워드 또는 아이디어(✨AI 가 검색어로 바꿈)로 저장소를 찾고, ✨AI 가 내 아이디어와 맞는지 평가.
 
 - GitHub REST 검색 API. 토큰 없이는 검색 분당 10번·README 시간당 60번 → GITHUB_TOKEN(권한 없는 무료 토큰)을 넣으면 분당 30번·시간당 5000번.
-- 검색 결과 6시간, README 하루 캐시. 사람마다 10분 횟수 제한.
+- 회원 전용 (깃허브 검색 한도를 아끼려고). 검색 결과 6시간, README 하루 캐시. 사람마다 10분 횟수 제한.
 - 논문 코드: arXiv 번호·제목이 README·설명에 들어간 저장소.
 """
 
@@ -15,6 +15,7 @@ import urllib.parse
 import urllib.request
 
 from django.conf import settings
+from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import JsonResponse
 from django.shortcuts import render
@@ -29,7 +30,7 @@ from .permissions import AI_LIMITS, quota_multiplier, tier
 
 API = "https://api.github.com"
 WINDOW = 10 * 60
-LIMITS = {"anon": 10, "member": 40, "vip": 40, "admin": None}
+LIMITS = {"anon": 0, "member": 40, "vip": 40, "admin": None}  # 회원 전용
 SORTS = {"best": None, "stars": "stars", "updated": "updated"}
 # 라이선스: 가져다 써도 되는지 한 줄 안내
 LICENSE_NOTE = {
@@ -152,11 +153,13 @@ def _count(request):
 	return False
 
 
+@login_required
 @ensure_csrf_cookie
 def page(request):
 	return render(request, "tools/github.html", {"has_token": bool(getattr(settings, "GITHUB_TOKEN", ""))})
 
 
+@login_required
 @require_GET
 def search_view(request):
 	g = request.GET
@@ -196,6 +199,7 @@ def search_view(request):
 	return JsonResponse({"items": items[:40], "queries": queries, "warning": errors[0] if errors else ""})
 
 
+@login_required
 @require_GET
 def readme_view(request):
 	name = request.GET.get("name") or ""
