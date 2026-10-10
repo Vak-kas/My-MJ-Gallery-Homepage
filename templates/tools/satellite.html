@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+    .sat-tab { border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 600; color: #6e6e73; white-space: nowrap; }
+    .sat-tab.on { background: #1d1d1f; color: #fff; }
+    .sat-input { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 9px 12px; font-size: 15px; outline: none; color: #1d1d1f; }
+    .sat-input:focus { border-color: #0066cc; }
+    .sat-label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 4px; }
+    .sat-chip { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); padding: 4px 11px; font-size: 12.5px; white-space: nowrap; }
+    .sat-chip:hover { background: #f5f5f7; }
+    .sat-panel { border-radius: 20px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .sat-card { border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.07); background: #fff; padding: 14px 16px; }
+    .sat-card-t { font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .sat-kv { width: 100%; border-collapse: collapse; }
+    .sat-kv td, .sat-kv th { padding: 5px 4px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); font-size: 13px; vertical-align: top; text-align: left; }
+    .sat-kv th { font-size: 11.5px; color: #8e8e93; font-weight: 600; }
+    .sat-kv td:first-child { color: #6e6e73; padding-right: 10px; }
+    .sat-kv td:last-child { font-variant-numeric: tabular-nums; }
+    .sat-note { margin-top: 8px; font-size: 11.5px; line-height: 1.6; color: #8e8e93; }
+    .sat-dim { color: #8e8e93; font-size: 12px; }
+    .sat-chart { width: 100%; height: 240px; display: block; }
+    .sat-badge { border-radius: 999px; padding: 2px 9px; font-size: 11.5px; background: #ececf0; color: #6e6e73; }
+    .sat-badge.on { background: #ffe1df; color: #c4271d; font-weight: 600; }
+    .sat-row { display: flex; width: 100%; justify-content: space-between; gap: 8px; padding: 6px 8px; border-radius: 8px; font-size: 13px; text-align: left; }
+    .sat-row:hover { background: rgba(0, 102, 204, 0.06); }
+    .sat-row.on { background: rgba(255, 149, 0, 0.14); }
+    #sky-map { width: 100%; display: block; border-radius: 14px; cursor: crosshair; }
+    #sky-polar { width: 100%; aspect-ratio: 1; display: block; }
+    html.theme-dark .sat-tab.on { background: #e8e8ea; color: #1d1d1f; }
+    html.theme-dark .sat-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .sat-chip { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .sat-chip:hover { background: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .sat-panel, html.theme-dark .sat-card { background: #1c1c1f; border-color: rgba(255, 255, 255, 0.1); }
+    html.theme-dark .sat-kv td, html.theme-dark .sat-kv th { border-color: rgba(255, 255, 255, 0.06); }
+    html.theme-dark .sat-kv td:first-child { color: #a1a1a6; }
+    html.theme-dark .sat-badge { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .sat-badge.on { background: #4a1d1a; color: #ff8a80; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-4 py-10 sm:px-6 lg:py-14">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NETWORK · SATELLITE · NTN</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Satellite.</h1>
+        <p class="mt-3 max-w-[820px] text-[15px] leading-relaxed text-[#6e6e73]">고도만 넣으면 공전 주기·지연·도플러·경로 손실·덮는 범위가 나오고, 실제 위성(ISS·스타링크·GPS…)이 지금 어디 있는지, 내 위치 위로 언제 지나가는지 봐요. 궤도·NTN 개념 정리도 한곳에 모았어요. 계산은 모두 브라우저에서 해요.</p>
+    </div>
+
+    <nav class="mt-6 flex gap-1 overflow-x-auto" role="tablist">
+        <button type="button" class="sat-tab on" data-tab="calc">📐 궤도 계산기</button>
+        <button type="button" class="sat-tab" data-tab="sky">🌍 지금 하늘</button>
+        <button type="button" class="sat-tab" data-tab="learn">📚 개념 정리</button>
+    </nav>
+
+    <!-- ───────── 궤도 계산기 ───────── -->
+    <section id="tab-calc" class="mt-5">
+        <div class="sat-panel">
+            <div class="flex flex-wrap items-center gap-1.5" id="sc-presets"></div>
+            <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                    <label class="sat-label" for="sc-h">고도 h (km)</label>
+                    <input id="sc-h" class="sat-input" type="number" min="100" max="400000" value="600">
+                    <input id="sc-h-range" type="range" min="2" max="4.7" step="0.001" value="2.778" class="mt-2 w-full" aria-label="고도 조절">
+                </div>
+                <div>
+                    <label class="sat-label" for="sc-e">최소 앙각 (°) — 단말이 위성을 볼 수 있는 가장 낮은 각도</label>
+                    <input id="sc-e" class="sat-input" type="number" min="0" max="89" step="0.5" value="10">
+                </div>
+                <div>
+                    <label class="sat-label" for="sc-f">주파수 (GHz)</label>
+                    <input id="sc-f" class="sat-input" type="number" min="0.001" step="0.1" value="2">
+                    <div class="mt-2 flex flex-wrap gap-1" id="sc-freqs"></div>
+                </div>
+                <div>
+                    <label class="sat-label" for="sc-eg">게이트웨이 최소 앙각 (°) — 투명 중계 왕복 지연에 씀</label>
+                    <input id="sc-eg" class="sat-input" type="number" min="0" max="89" step="0.5" value="10">
+                </div>
+            </div>
+        </div>
+
+        <div id="sc-out" class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3"></div>
+
+        <div class="mt-4 grid gap-4 lg:grid-cols-2">
+            <div class="sat-panel">
+                <div class="mb-2 flex flex-wrap items-center gap-2">
+                    <p class="text-[14px] font-semibold">앙각에 따라</p>
+                    <select id="sc-metric" class="sat-input ml-auto !w-auto !py-1.5 !text-[13px]" aria-label="볼 값">
+                        <option value="delay">편도 지연</option>
+                        <option value="dist">거리</option>
+                        <option value="fspl">경로 손실</option>
+                        <option value="dop">최대 도플러</option>
+                    </select>
+                </div>
+                <canvas id="sc-chart-el" class="sat-chart"></canvas>
+            </div>
+            <div class="sat-panel">
+                <p class="mb-2 text-[14px] font-semibold">머리 위로 한 번 지나갈 때 <span class="sat-dim">— 도플러가 + 에서 − 로 'S 자'로 바뀌어요</span></p>
+                <canvas id="sc-chart-pass" class="sat-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="sat-panel mt-4">
+            <p class="text-[14px] font-semibold">📡 정지궤도 위성 바라보는 방향 <span class="sat-dim">— 위성 안테나·접시를 어디로 돌릴지</span></p>
+            <div class="mt-3 flex flex-wrap items-center gap-1.5" id="sg-presets"></div>
+            <div class="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
+                <div><label class="sat-label" for="sg-lat">내 위도</label><input id="sg-lat" class="sat-input" type="number" step="0.0001" value="37.5665"></div>
+                <div><label class="sat-label" for="sg-lon">내 경도</label><input id="sg-lon" class="sat-input" type="number" step="0.0001" value="126.978"></div>
+                <div><label class="sat-label" for="sg-slon">위성 경도 (동경 +)</label><input id="sg-slon" class="sat-input" type="number" step="0.1" value="116"></div>
+                <button type="button" id="sg-here" class="sat-chip self-end !py-2.5">📍 내 위치</button>
+            </div>
+            <p class="mt-3 text-[14px]" id="sg-out"></p>
+        </div>
+    </section>
+
+    <!-- ───────── 지금 하늘 ───────── -->
+    <section id="tab-sky" class="mt-5 hidden">
+        <div id="sky-root" data-tle-url="{% url 'tools:satellite_tle' %}">
+            <div class="sat-panel">
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+                    <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                        <div>
+                            <label class="sat-label" for="sky-group">위성 묶음</label>
+                            <select id="sky-group" class="sat-input">
+                                {% for value, label in groups %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+                            </select>
+                        </div>
+                        <form id="sky-search">
+                            <label class="sat-label" for="sky-q">이름·번호로 찾기</label>
+                            <div class="flex gap-2"><input id="sky-q" class="sat-input" maxlength="30" placeholder="ISS, KOMPSAT, 25544" autocomplete="off"><button class="sat-chip">찾기</button></div>
+                        </form>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div><label class="sat-label" for="sky-lat">관측 위도</label><input id="sky-lat" class="sat-input" type="number" step="0.0001" value="37.5665"></div>
+                        <div><label class="sat-label" for="sky-lon">관측 경도</label><input id="sky-lon" class="sat-input" type="number" step="0.0001" value="126.978"></div>
+                        <div><label class="sat-label" for="sky-minel">최소 앙각 °</label><input id="sky-minel" class="sat-input" type="number" min="0" max="80" value="10"></div>
+                        <div><label class="sat-label" for="sky-f">주파수 GHz</label><input id="sky-f" class="sat-input" type="number" min="0.001" step="0.1" value="2"></div>
+                    </div>
+                </div>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" id="sky-here" class="sat-chip">📍 내 위치로</button>
+                    <select id="sky-speed" class="sat-input !w-auto !py-1.5 !text-[13px]" aria-label="시간 빠르기">
+                        <option value="1">실제 시간</option>
+                        <option value="10">10배 빠르게</option>
+                        <option value="60">60배 (1초에 1분)</option>
+                        <option value="600">600배 (1초에 10분)</option>
+                    </select>
+                    <button type="button" id="sky-reset" class="sat-chip">지금으로</button>
+                    <span class="text-[12px] text-[#6e6e73]" id="sky-clock"></span>
+                    <span class="ml-auto text-[12px]" id="sky-msg"></span>
+                </div>
+                <details class="mt-3">
+                    <summary class="cursor-pointer text-[12.5px] text-[#0066cc]">TLE 직접 붙여 넣기 (논문·내 위성 궤도 자료)</summary>
+                    <textarea id="sky-paste" class="sat-input mt-2 font-mono !text-[12px]" rows="4" spellcheck="false" placeholder="ISS (ZARYA)&#10;1 25544U 98067A   26282.95044904  .00006711  00000+0  13074-3 0  9997&#10;2 25544  51.6315  92.1575 0006672 244.0714 115.9587 15.48795780589546"></textarea>
+                    <button type="button" id="sky-paste-go" class="sat-chip mt-2">이 궤도로 보기</button>
+                </details>
+            </div>
+
+            <div class="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+                <div class="sat-panel min-w-0 !p-3">
+                    <canvas id="sky-map" aria-label="위성 위치 지도"></canvas>
+                    <p class="mt-2 px-1 text-[11.5px] text-[#8e8e93]">🟢 관측 위치 · 🟠 고른 위성(진한 선: 앞으로 갈 길, 옅은 선: 지나온 길, 칠한 곳: 앙각 최소값 이상으로 보이는 범위) · 🔴 지금 보이는 위성 · 점을 누르면 골라져요</p>
+                </div>
+                <div class="sat-panel min-w-0">
+                    <p class="text-[13px] font-semibold">하늘 그림 <span class="sat-dim">— 가운데가 머리 위, 바깥 원이 지평선</span></p>
+                    <canvas id="sky-polar" class="mt-2" aria-label="하늘에서 위성 방향"></canvas>
+                </div>
+            </div>
+
+            <div class="mt-4 grid gap-4 lg:grid-cols-3">
+                <div class="sat-panel min-w-0" id="sky-info"></div>
+                <div class="sat-panel min-w-0">
+                    <p class="text-[13px] font-semibold">다음 24시간 지나가는 시각</p>
+                    <div class="mt-2 overflow-x-auto" id="sky-passes"></div>
+                </div>
+                <div class="sat-panel min-w-0">
+                    <p class="text-[13px] font-semibold">지금 보이는 위성 <span class="text-[#c4271d]" id="sky-vis-count"></span></p>
+                    <div class="mt-2 max-h-[300px] overflow-auto" id="sky-vis"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ───────── 개념 정리 ───────── -->
+    <section id="tab-learn" class="mt-5 hidden">
+        {% include "tools/_satellite_learn.html" %}
+    </section>
+</main>
+
+<script src="{% static 'js/sat-calc.js' %}?v=2"></script>
+<script src="{% static 'js/sat-sky.js' %}?v=2"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script>
+(() => {
+    const tabs = ['calc', 'sky', 'learn'];
+    let mathDone = false;
+    function show(name) {
+        if (!tabs.includes(name)) name = 'calc';
+        tabs.forEach((t) => document.getElementById('tab-' + t).classList.toggle('hidden', t !== name));
+        document.querySelectorAll('.sat-tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+        if (name === 'calc') window.MJSat.redrawCalc?.();
+        if (name === 'sky') window.MJSat.bootSky().then(() => window.MJSat.tickSky());
+        if (name === 'learn' && !mathDone) renderMath();
+    }
+    function renderMath() {
+        if (typeof renderMathInElement === 'undefined') { setTimeout(renderMath, 200); return; }
+        renderMathInElement(document.getElementById('tab-learn'), { delimiters: [{ left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }], throwOnError: false });
+        mathDone = true;
+    }
+    document.querySelectorAll('.sat-tab').forEach((b) => b.addEventListener('click', () => { history.replaceState(null, '', '#' + b.dataset.tab); show(b.dataset.tab); }));
+    // 개념 정리 → 계산기로 바로 (data-calc="h,앙각,주파수")
+    document.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-calc]');
+        if (!b) return;
+        const [h, el, f] = b.dataset.calc.split(',').map(Number);
+        window.MJSat.setCalc({ h, e: el, f: f || undefined });
+        history.replaceState(null, '', '#calc');
+        show('calc');
+        window.scrollTo({ top: document.getElementById('tab-calc').offsetTop - 80, behavior: 'smooth' });
+    });
+    function fromHash() {
+        const first = location.hash.replace('#', '').split('-')[0];
+        show(first || 'calc');
+        if (first === 'learn' && location.hash.length > 7) setTimeout(() => document.getElementById(location.hash.slice(1))?.scrollIntoView(), 400);
+    }
+    window.addEventListener('hashchange', fromHash);
+    fromHash();
+})();
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, satellite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -10,6 +10,8 @@ urlpatterns = [
     path("subnet/", views.subnet, name="subnet"),
     path("linkbudget/", views.linkbudget, name="linkbudget"),
     path("wifi/", views.wifi, name="wifi"),
+    path("satellite/", satellite.page, name="satellite"),
+    path("satellite/tle/", satellite.tle, name="satellite_tle"),
     path("time/", views.time_tool, name="time"),
     path("units/", views.units_tool, name="units"),
     path("diagram/", views.diagram, name="diagram"),

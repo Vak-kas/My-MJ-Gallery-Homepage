@@ -1,0 +1,474 @@
+{# 🛰 위성 · NTN 개념 정리 — 수식은 KaTeX(\( \), \[ \]) #}
+<style>
+    .lr-toc a { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); padding: 4px 11px; font-size: 12.5px; white-space: nowrap; display: inline-block; }
+    .lr-toc a:hover { background: #f5f5f7; }
+    .lr-sec { border-radius: 20px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px 22px; scroll-margin-top: 90px; }
+    .lr-sec h2 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; }
+    .lr-sec h3 { margin-top: 18px; font-size: 15.5px; font-weight: 600; }
+    .lr-sec p, .lr-sec li { font-size: 14.5px; line-height: 1.8; color: #333336; }
+    .lr-sec ul { margin-top: 6px; padding-left: 18px; list-style: disc; }
+    .lr-sec ul li { margin-top: 2px; }
+    .lr-sec p + p { margin-top: 8px; }
+    .lr-sec b { color: #1d1d1f; }
+    .lr-sec code { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; background: #f2f2f5; border-radius: 5px; padding: 1px 5px; }
+    .lr-tbl { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+    .lr-tbl th, .lr-tbl td { border-bottom: 1px solid rgba(0, 0, 0, 0.07); padding: 7px 8px; text-align: left; vertical-align: top; line-height: 1.55; }
+    .lr-tbl th { font-size: 12px; color: #6e6e73; font-weight: 600; background: #fafafa; }
+    .lr-wrap { overflow-x: auto; }
+    .lr-box { margin-top: 12px; border-radius: 14px; background: rgba(0, 102, 204, 0.05); border: 1px solid rgba(0, 102, 204, 0.15); padding: 12px 14px; }
+    .lr-warn { margin-top: 12px; border-radius: 14px; background: rgba(255, 149, 0, 0.07); border: 1px solid rgba(255, 149, 0, 0.25); padding: 12px 14px; }
+    .lr-go { margin-top: 10px; display: inline-flex; gap: 4px; border-radius: 999px; background: #0066cc; color: #fff; padding: 5px 13px; font-size: 12.5px; font-weight: 600; }
+    .lr-go:hover { filter: brightness(1.08); }
+    .lr-fig { margin-top: 12px; width: 100%; max-width: 560px; height: auto; }
+    .lr-fig text { font-size: 13px; fill: #1d1d1f; font-family: -apple-system, BlinkMacSystemFont, sans-serif; }
+    .lr-sec .katex-display { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+    .lr-hide { display: none !important; }
+    html.theme-dark .lr-toc a { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .lr-sec { background: #1c1c1f; border-color: rgba(255, 255, 255, 0.1); }
+    html.theme-dark .lr-sec p, html.theme-dark .lr-sec li { color: #d1d1d6; }
+    html.theme-dark .lr-sec b { color: #f5f5f7; }
+    html.theme-dark .lr-sec code { background: #2c2c30; }
+    html.theme-dark .lr-tbl th { background: #232327; color: #a1a1a6; }
+    html.theme-dark .lr-tbl th, html.theme-dark .lr-tbl td { border-color: rgba(255, 255, 255, 0.07); }
+    html.theme-dark .lr-fig text { fill: #e8e8ea; }
+    html.theme-dark .lr-fig .ink { stroke: #e8e8ea; }
+</style>
+
+<div class="sat-panel">
+    <input id="lr-q" class="sat-input" type="search" placeholder="찾기: 도플러, SIB19, 앙각, Ka, 재밍, TLE …" autocomplete="off">
+    <nav class="lr-toc mt-3 flex flex-wrap gap-1.5">
+        <a href="#learn-kinds">궤도 종류</a><a href="#learn-mech">궤도 역학</a><a href="#learn-coord">좌표·TLE</a><a href="#learn-geom">앙각·거리</a>
+        <a href="#learn-delay">지연</a><a href="#learn-doppler">도플러</a><a href="#learn-link">링크 버짓</a><a href="#learn-band">주파수 대역</a>
+        <a href="#learn-beam">안테나·빔</a><a href="#learn-arch">시스템 구조</a><a href="#learn-ntn">3GPP NTN</a><a href="#learn-mobility">NTN 이동성</a>
+        <a href="#learn-systems">실제 위성 시스템</a><a href="#learn-jam">간섭·재밍</a><a href="#learn-env">우주 환경·규제</a><a href="#learn-gloss">용어집</a>
+    </nav>
+    <p class="mt-2 text-[12px] text-[#8e8e93]" id="lr-count"></p>
+</div>
+
+<div class="mt-4 space-y-4" id="lr-list">
+
+<!-- 1 -->
+<section class="lr-sec" id="learn-kinds">
+    <h2>🛰 궤도 종류 한눈에</h2>
+    <p>위성은 높이(고도)에 따라 성격이 완전히 달라져요. 낮을수록 <b>가깝고(지연·손실 작음)</b> 대신 <b>빨리 지나가서(도플러 큼, 위성이 많이 필요)</b>, 높을수록 그 반대예요.</p>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>종류</th><th>고도</th><th>한 바퀴</th><th>왕복 지연(직접)</th><th>예</th><th>특징</th></tr>
+        <tr><td><b>LEO</b> 저궤도</td><td>약 160~2,000 km</td><td>88~127분</td><td>수~수십 ms</td><td>스타링크, 원웹, 이리듐, ISS</td><td>지연 작음, 도플러 큼, 한 위성이 몇 분만 보여서 수백~수천 기로 군집</td></tr>
+        <tr><td><b>MEO</b> 중궤도</td><td>2,000~35,786 km 사이</td><td>2~24시간</td><td>수십~100 ms대</td><td>GPS(20,200), 갈릴레오(23,222), O3b(8,062)</td><td>항법 위성 대부분, 수십 기로 지구 전체</td></tr>
+        <tr><td><b>GEO</b> 정지궤도</td><td>35,786 km (적도 위)</td><td>23시간 56분 4초</td><td>약 240~280 ms (편도 경로 기준 왕복)</td><td>무궁화, 천리안, 위성 방송</td><td>하늘에 멈춰 보임 → 접시 고정, 3기로 극지방 빼고 덮음, 지연 큼</td></tr>
+        <tr><td><b>HEO</b> 고타원</td><td>근지점 수백 km ~ 원지점 수만 km</td><td>보통 12·24시간</td><td>위치 따라 다름</td><td>몰니야, 툰드라</td><td>원지점에서 오래 머묾 → 고위도(러시아·북극) 통신</td></tr>
+        <tr><td><b>SSO</b> 태양 동기</td><td>보통 500~800 km (LEO 의 한 종류)</td><td>약 95~100분</td><td>–</td><td>아리랑(KOMPSAT), Sentinel</td><td>경사각 약 97~98°, 늘 같은 지방시에 지나감 → 지구 관측 사진 그림자 일정</td></tr>
+    </table></div>
+    <p class="mt-2 text-[12.5px] text-[#8e8e93]">GEO 지연은 단말↔위성 한 번 오가는 것만이에요. 투명 중계로 단말 → 위성 → 지상국까지 왕복하면 약 480~540 ms 가 돼요.</p>
+    <div class="flex flex-wrap gap-2">
+        <button type="button" class="lr-go" data-calc="550,25,12">🧮 스타링크 고도로 계산</button>
+        <button type="button" class="lr-go" data-calc="20200,10,1.575">🧮 GPS 고도로 계산</button>
+        <button type="button" class="lr-go" data-calc="35786,10,12">🧮 정지궤도로 계산</button>
+    </div>
+</section>
+
+<!-- 2 -->
+<section class="lr-sec" id="learn-mech">
+    <h2>🌀 궤도 역학 기초</h2>
+    <h3>케플러 법칙</h3>
+    <ul>
+        <li><b>1법칙</b> — 궤도는 지구 중심을 한 초점으로 하는 타원(원은 특별한 경우).</li>
+        <li><b>2법칙</b> — 같은 시간에 쓸고 지나가는 넓이가 같아요. 지구에 가까울수록(근지점) 빠르고, 멀수록(원지점) 느려요.</li>
+        <li><b>3법칙</b> — 공전 주기의 제곱은 궤도 긴반지름의 세제곱에 비례해요.</li>
+    </ul>
+    <h3>원 궤도의 속도와 주기</h3>
+    <p>중력이 원운동에 필요한 힘과 같다고 두면 바로 나와요. \(\mu = GM_\oplus \approx 398{,}600\ \mathrm{km^3/s^2}\), \(a = R_\oplus + h\).</p>
+    <p>\[ v = \sqrt{\frac{\mu}{a}}, \qquad T = 2\pi\sqrt{\frac{a^3}{\mu}} \]</p>
+    <p>고도 600 km 면 \(v \approx 7.56\) km/s, \(T \approx 96.7\) 분. 높아질수록 느려지고 주기가 길어져요. 타원 궤도 속도는 활력 방정식 \( v^2 = \mu\left(\frac{2}{r} - \frac{1}{a}\right) \).</p>
+    <h3>궤도 6요소 (케플러 요소)</h3>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>요소</th><th>기호</th><th>뜻</th></tr>
+        <tr><td>긴반지름</td><td>\(a\)</td><td>궤도 크기 → 주기를 정함</td></tr>
+        <tr><td>이심률</td><td>\(e\)</td><td>얼마나 찌그러졌는지 (0 = 원, 0~1 = 타원)</td></tr>
+        <tr><td>경사각</td><td>\(i\)</td><td>적도면과 궤도면 사이 각. 위성이 갈 수 있는 위도 = ±\(i\) (90° 넘으면 역행)</td></tr>
+        <tr><td>승교점 적경 (RAAN)</td><td>\(\Omega\)</td><td>궤도가 남→북으로 적도를 지나는 점(승교점)이 하늘 어디인지 → 궤도면 방향</td></tr>
+        <tr><td>근지점 인수</td><td>\(\omega\)</td><td>궤도면 안에서 근지점이 어디 있는지</td></tr>
+        <tr><td>진근점 이각 (또는 평균 근점 이각)</td><td>\(\nu\) (\(M\))</td><td>지금 위성이 궤도 위 어디 있는지</td></tr>
+    </table></div>
+    <h3>섭동 — 궤도가 조금씩 바뀌는 이유</h3>
+    <ul>
+        <li><b>J2 (지구가 적도 쪽으로 불룩함)</b> — 궤도면이 천천히 돌아요(승교점 세차). 이걸 이용한 게 <b>태양 동기 궤도</b>: 궤도면이 1년에 한 바퀴(하루 약 0.9856°) 돌게 경사각을 맞추면 늘 같은 지방시에 지나가요.</li>
+        <li><b>대기 저항</b> — 저궤도일수록 커서 고도가 떨어져요. 400 km 대(ISS)는 주기적으로 올려 줘야 하고, 태양 활동이 강하면 대기가 부풀어 더 빨리 떨어져요.</li>
+        <li><b>달·태양 인력, 태양 복사압</b> — 정지궤도 위성은 경사각이 해마다 조금씩 커져서 남북 위치 유지(station keeping)를 해요.</li>
+    </ul>
+    <p>\[ \dot{\Omega} = -\frac{3}{2} J_2 \left(\frac{R_\oplus}{a}\right)^2 n \cos i \qquad (n = \sqrt{\mu/a^3}) \]</p>
+    <h3>지상 궤적</h3>
+    <p>위성 바로 아래 지점을 이은 선. 위성이 한 바퀴 도는 동안 지구가 동쪽으로 돌기 때문에 다음 바퀴 궤적은 <b>서쪽으로 밀려요</b>(LEO 600 km 면 약 24°). 정지궤도는 한 점, 경사진 GEO 는 '8자'를 그려요.</p>
+    <button type="button" class="lr-go" data-calc="700,10,2">🧮 태양 동기 경사각 계산해 보기 (700 km)</button>
+</section>
+
+<!-- 3 -->
+<section class="lr-sec" id="learn-coord">
+    <h2>🧭 좌표계 · 시간 · TLE</h2>
+    <h3>좌표계</h3>
+    <ul>
+        <li><b>ECI</b> (지구 중심 관성 좌표) — 별에 대해 고정. 궤도 계산(운동 방정식)은 여기서 해요. J2000, TEME(SGP4 결과) 등 여러 종류가 있어요.</li>
+        <li><b>ECEF</b> (지구 중심 지구 고정 좌표) — 지구와 같이 돌아요. 지상국·단말 위치는 여기. ECI ↔ ECEF 는 그리니치 항성시(GMST) 만큼 돌리면 돼요.</li>
+        <li><b>측지 좌표</b> — 위도·경도·고도 (WGS84 타원체 기준).</li>
+        <li><b>ENU / 방위각·앙각</b> — 내 위치에서 본 동·북·위. 안테나는 이걸로 돌려요(방위각 = 북에서 시계 방향, 앙각 = 지평선에서 위로).</li>
+    </ul>
+    <h3>TLE (두 줄 궤도 요소)</h3>
+    <p>미국 우주군(CelesTrak 이 다시 배포)이 내는 궤도 자료 형식. <b>SGP4</b> 모델로 돌려야 맞는 값이 나와요(일반 케플러 공식에 넣으면 안 됨). 공개된 기준 시각(epoch)에서 멀어질수록 오차가 커져서, 저궤도는 며칠만 지나도 km 단위로 틀려요.</p>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>줄</th><th>칸</th><th>예 (ISS)</th><th>뜻</th></tr>
+        <tr><td>1</td><td>3–7</td><td><code>25544</code></td><td>NORAD 번호 (5자리 넘으면 Alpha-5·GP 형식)</td></tr>
+        <tr><td>1</td><td>10–17</td><td><code>98067A</code></td><td>국제 식별 번호 (1998년 67번째 발사, 첫 물체)</td></tr>
+        <tr><td>1</td><td>19–32</td><td><code>26282.95044904</code></td><td>기준 시각: 2026년 282.95일째 (UTC)</td></tr>
+        <tr><td>1</td><td>54–61</td><td><code>13074-3</code></td><td>B* — 대기 저항 계수</td></tr>
+        <tr><td>2</td><td>9–16</td><td><code>51.6315</code></td><td>경사각 \(i\) (°)</td></tr>
+        <tr><td>2</td><td>18–25</td><td><code>92.1575</code></td><td>승교점 적경 \(\Omega\) (°)</td></tr>
+        <tr><td>2</td><td>27–33</td><td><code>0006672</code></td><td>이심률 0.0006672 (소수점 생략)</td></tr>
+        <tr><td>2</td><td>35–42 · 44–51</td><td><code>244.0714</code> · <code>115.9587</code></td><td>근지점 인수 \(\omega\) · 평균 근점 이각 \(M\)</td></tr>
+        <tr><td>2</td><td>53–63</td><td><code>15.48795780</code></td><td>하루에 도는 바퀴 수 → 주기 1440/15.49 ≈ 93분</td></tr>
+        <tr><td>1·2</td><td>69</td><td></td><td>검사 숫자 (각 줄 숫자 합 mod 10, '−'는 1)</td></tr>
+    </table></div>
+    <h3>시간</h3>
+    <p>UTC, GPS 시간(윤초 없음, 2026년 기준 UTC 보다 18초 빠름), TAI 가 있어요. NTN 에서 단말은 GNSS 로 시간과 위치를 맞추고, 위성 위치(ephemeris)는 기지국이 기준 시각(epoch)과 함께 알려 줘요.</p>
+</section>
+
+<!-- 4 -->
+<section class="lr-sec" id="learn-geom">
+    <h2>📐 앙각 · 경사 거리 · 덮는 범위</h2>
+    <svg class="lr-fig" viewBox="0 0 560 260" role="img" aria-label="지구, 단말, 위성 사이 기하">
+        <path d="M30 250 Q280 150 530 250" fill="rgba(0,102,204,0.08)" stroke="#0066cc" stroke-width="1.5"/>
+        <circle cx="280" cy="420" r="3" fill="#0066cc"/>
+        <line x1="150" y1="213" x2="420" y2="40" stroke="#ff9500" stroke-width="2"/>
+        <line x1="150" y1="213" x2="310" y2="180" class="ink" stroke="#1d1d1f" stroke-dasharray="4 3"/>
+        <line x1="420" y1="40" x2="420" y2="216" class="ink" stroke="#1d1d1f" stroke-dasharray="4 3"/>
+        <circle cx="150" cy="213" r="6" fill="#34c759"/><text x="92" y="238">단말 (UE)</text>
+        <circle cx="420" cy="40" r="8" fill="#ff9500"/><text x="434" y="44">위성</text>
+        <text x="282" y="118" fill="#ff9500">경사 거리 d</text>
+        <text x="428" y="112">고도 h</text>
+        <path d="M189 205 A40 40 0 0 0 184 191" fill="none" stroke="#d0453a" stroke-width="1.5"/>
+        <text x="194" y="197" fill="#d0453a">ε (앙각)</text>
+        <text x="236" y="258">지표면 (반지름 R)</text>
+    </svg>
+    <p>단말에서 지평선 위로 위성을 올려다본 각이 <b>앙각 ε</b>. 앙각이 낮을수록 위성이 멀고(거리·지연·손실 ↑), 건물·나무에 가리기 쉬워요. 그래서 시스템마다 <b>최소 앙각</b>(보통 10°, 스타링크 25° 안팎)을 정해요.</p>
+    <p>\[ d(\varepsilon) = \sqrt{R^2\sin^2\varepsilon + h^2 + 2Rh} - R\sin\varepsilon \]</p>
+    <p>위성 바로 아래 점과 단말 사이 지구 중심각 \(\lambda\), 위성에서 본 각(nadir angle) \(\eta\):</p>
+    <p>\[ \lambda = \arccos\!\left(\frac{R\cos\varepsilon}{R+h}\right) - \varepsilon, \qquad \sin\eta = \frac{R\cos\varepsilon}{R+h}, \qquad \varepsilon + \eta + \lambda = 90^\circ \]</p>
+    <p>한 위성이 덮는 반지름은 \(R\lambda\), 넓이는 \(2\pi R^2(1-\cos\lambda)\). LEO 600 km·최소 앙각 10° 면 반지름 약 1,800 km — 한반도가 넉넉히 들어가요. 하지만 실제로는 이 넓은 범위를 여러 개 <b>빔</b>으로 쪼개서 써요.</p>
+    <button type="button" class="lr-go" data-calc="600,10,2">🧮 LEO 600 km 로 계산</button>
+</section>
+
+<!-- 5 -->
+<section class="lr-sec" id="learn-delay">
+    <h2>⏱ 전파 지연</h2>
+    <p>전파는 빛의 속도(약 30만 km/s)로 가요 → <b>1,000 km 에 약 3.34 ms</b>. 지상망(수십 km)과 달리 위성은 이게 수~수백 ms 라서 프로토콜 타이밍을 다시 설계해야 했어요.</p>
+    <svg class="lr-fig" viewBox="0 0 560 200" role="img" aria-label="투명 중계와 재생 중계">
+        <text x="10" y="20" font-weight="600">① 투명 중계 (bent-pipe)</text>
+        <circle cx="40" cy="80" r="6" fill="#34c759"/><text x="20" y="104">단말</text>
+        <circle cx="200" cy="40" r="8" fill="#ff9500"/><text x="176" y="26">위성 (주파수만 바꿔 되돌림)</text>
+        <rect x="330" y="72" width="70" height="20" rx="4" fill="rgba(0,102,204,0.15)"/><text x="336" y="87">게이트웨이</text>
+        <rect x="440" y="72" width="60" height="20" rx="4" fill="rgba(0,102,204,0.3)"/><text x="452" y="87">gNB</text>
+        <path d="M46 78 L192 44 M208 44 L340 72 M400 82 L440 82" stroke="#0066cc" stroke-width="1.8" fill="none"/>
+        <text x="80" y="58" fill="#0066cc">서비스 링크</text><text x="262" y="52" fill="#0066cc">피더 링크</text>
+        <text x="10" y="130" font-weight="600">② 재생 중계 (regenerative)</text>
+        <circle cx="40" cy="185" r="6" fill="#34c759"/><text x="54" y="190">단말</text>
+        <circle cx="200" cy="145" r="8" fill="#ff9500"/><text x="214" y="149">위성 = gNB (또는 DU)</text>
+        <rect x="380" y="170" width="80" height="20" rx="4" fill="rgba(0,102,204,0.15)"/><text x="386" y="185">게이트웨이→코어</text>
+        <path d="M46 183 L192 149 M208 149 L380 180" stroke="#0066cc" stroke-width="1.8" fill="none"/>
+    </svg>
+    <ul>
+        <li><b>투명 중계</b>: 위성은 신호를 증폭·주파수 변환만 해요. 기지국(gNB)이 땅에 있어서 단말↔gNB 왕복 = <b>2 × (서비스 링크 + 피더 링크)</b>.</li>
+        <li><b>재생 중계</b>: 위성이 신호를 복조·처리(기지국 일부·전체 탑재). 단말↔gNB 왕복 = <b>2 × 서비스 링크</b>로 줄어요.</li>
+    </ul>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>3GPP TR 38.821 최대 왕복 지연</th><th>투명 중계</th><th>재생 중계</th></tr>
+        <tr><td>GEO 35,786 km</td><td>541.46 ms</td><td>270.73 ms</td></tr>
+        <tr><td>LEO 1,200 km</td><td>41.77 ms</td><td>20.89 ms</td></tr>
+        <tr><td>LEO 600 km</td><td>25.77 ms</td><td>12.89 ms</td></tr>
+    </table></div>
+    <p class="mt-2">단말과 게이트웨이 앙각 둘 다 10° 일 때예요. 계산기에서 같은 조건을 넣으면 거의 같은 값이 나와요. 같은 빔 안에서도 단말 위치에 따라 지연이 달라요(<b>차등 지연</b>, LEO 에서 수 ms) → 기지국은 공통 부분만 알려 주고 나머지는 단말이 계산해요(3GPP NTN 참고).</p>
+    <button type="button" class="lr-go" data-calc="1200,10,2">🧮 LEO 1200 km 로 맞춰 보기</button>
+</section>
+
+<!-- 6 -->
+<section class="lr-sec" id="learn-doppler">
+    <h2>〰️ 도플러</h2>
+    <p>위성이 다가오면 주파수가 올라가고, 멀어지면 내려가요. 받는 주파수 변화는 거리 변화율(시선 속도) \(\dot d\) 에 비례해요.</p>
+    <p>\[ f_D = -\frac{\dot d}{c} f_c, \qquad |\dot d|_{\max} = v\,\frac{R\cos\varepsilon}{R+h} \]</p>
+    <ul>
+        <li>LEO 600 km, 2 GHz 면 약 ±45 kHz (약 23 ppm). Ka 20 GHz 면 10배인 수백 kHz. NR 부반송파 간격(15·30 kHz)보다 커서 그대로 두면 수신이 안 돼요.</li>
+        <li>머리 위를 지날 때 가장 빨리 바뀌어요: 변화율 \(\dot f_D \approx \frac{f_c}{c}\cdot\frac{R v^2}{(R+h)h}\) → 600 km·2 GHz 에서 수백 Hz/s.</li>
+        <li>정지궤도는 거의 0 (실제로는 경사 때문에 아주 조금).</li>
+    </ul>
+    <h3>어떻게 맞추나</h3>
+    <ul>
+        <li><b>하향(위성→단말)</b>: 위성·기지국이 빔 가운데 기준으로 미리 보정 → 단말은 남은 만큼만 추적.</li>
+        <li><b>상향(단말→위성)</b>: 단말이 GNSS 로 자기 위치를, 기지국이 알려 준 위성 궤도(ephemeris)로 위성 위치·속도를 알아서 <b>보낼 때 미리 반대로 보정(사전 보상)</b>해요. 그래서 3GPP NTN 단말은 GNSS 가 필수예요.</li>
+        <li>피더 링크 도플러는 게이트웨이·기지국이 처리해요.</li>
+    </ul>
+    <button type="button" class="lr-go" data-calc="600,10,20">🧮 Ka 20 GHz 로 도플러 보기</button>
+</section>
+
+<!-- 7 -->
+<section class="lr-sec" id="learn-link">
+    <h2>📶 링크 버짓 기초</h2>
+    <p>받은 신호가 잡음보다 얼마나 센지 계산해요(모두 dB 로 더하고 빼기).</p>
+    <p>\[ \frac{C}{N_0}\,[\mathrm{dBHz}] = \mathrm{EIRP} - L_{\mathrm{FS}} - L_{\mathrm{atm}} - L_{\mathrm{etc}} + \frac{G}{T} - 10\log_{10} k \]</p>
+    <p>\[ L_{\mathrm{FS}} = 20\log_{10} d_{\mathrm{km}} + 20\log_{10} f_{\mathrm{GHz}} + 92.45, \qquad 10\log_{10}k = -228.6\ \mathrm{dBW/K/Hz} \]</p>
+    <ul>
+        <li><b>EIRP</b> — 보내는 전력 + 안테나 이득 (dBW).</li>
+        <li><b>G/T</b> — 받는 쪽 안테나 이득 ÷ 잡음 온도 (dB/K). 받는 성능의 한 숫자 요약.</li>
+        <li><b>C/N</b> = C/N₀ − 10log₁₀(대역폭), <b>Eb/N₀</b> = C/N₀ − 10log₁₀(비트율).</li>
+        <li><b>대기·비 감쇠</b> — 10 GHz 넘으면 비가 문제(Ka 에서 폭우 때 수~20 dB 이상). 낮은 앙각일수록 대기를 길게 지나서 더 커요.</li>
+        <li><b>편파</b> — L·S 대역은 전리층 패러데이 회전으로 직선 편파가 돌아가서 원편파를 많이 써요. 휴대폰처럼 직선 편파 안테나로 원편파를 받으면 약 3 dB 손해.</li>
+        <li><b>기타</b> — 안테나 지향 오차, 위상 배열의 비스듬히 쏠 때(scan) 손실, 그림자(shadowing), 다중 경로.</li>
+    </ul>
+    <p class="mt-2"><a href="{% url 'tools:linkbudget' %}" class="text-[#0066cc]">📡 링크 버짓 계산기 (3GPP TR 38.821 프리셋) →</a></p>
+</section>
+
+<!-- 8 -->
+<section class="lr-sec" id="learn-band">
+    <h2>📻 주파수 대역</h2>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>대역</th><th>대략 범위</th><th>주로 쓰는 곳</th><th>특징</th></tr>
+        <tr><td><b>L</b></td><td>1~2 GHz</td><td>GPS·GNSS, 이리듐, 인마샛, NTN n255</td><td>비에 강함, 작은 안테나·휴대폰 직접 연결에 좋음, 대역폭 좁음</td></tr>
+        <tr><td><b>S</b></td><td>2~4 GHz</td><td>위성 휴대폰·IoT, NTN n256, 글로벌스타</td><td>L 과 비슷, 지상 이동통신과 이웃</td></tr>
+        <tr><td><b>C</b></td><td>4~8 GHz (하향 3.4~4.2 / 상향 5.85~6.725)</td><td>위성 중계·방송 배급</td><td>비에 강함, 큰 접시, 지상 5G(3.5 GHz)와 간섭 문제</td></tr>
+        <tr><td><b>X</b></td><td>8~12 GHz</td><td>군 통신, 지구 관측 자료 내려받기</td><td></td></tr>
+        <tr><td><b>Ku</b></td><td>12~18 GHz (하향 10.7~12.75 / 상향 13.75~14.5)</td><td>위성 방송, 스타링크 단말 링크, VSAT</td><td>작은 접시, 비 감쇠 시작</td></tr>
+        <tr><td><b>Ka</b></td><td>26.5~40 GHz (위성은 하향 17.7~20.2 / 상향 27.5~30 도 Ka 라 부름)</td><td>고속 인터넷 위성(HTS), 피더 링크</td><td>대역폭 넓음, 비 감쇠 큼</td></tr>
+        <tr><td><b>Q/V</b></td><td>40~75 GHz</td><td>차세대 피더 링크</td><td>감쇠 매우 큼, 다이버시티 필요</td></tr>
+        <tr><td><b>광 (레이저)</b></td><td>–</td><td>위성 사이 링크(ISL), 지상국</td><td>우주에선 대기가 없어 아주 빠름, 지상은 구름에 막힘</td></tr>
+    </table></div>
+    <h3>3GPP NR-NTN 대역</h3>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>대역</th><th>상향 (UL)</th><th>하향 (DL)</th><th>릴리스</th></tr>
+        <tr><td>n256 (S)</td><td>1980–2010 MHz</td><td>2170–2200 MHz</td><td>Rel-17</td></tr>
+        <tr><td>n255 (L)</td><td>1626.5–1660.5 MHz</td><td>1525–1559 MHz</td><td>Rel-17</td></tr>
+        <tr><td>n254</td><td>1610–1626.5 MHz</td><td>2483.5–2500 MHz</td><td>Rel-18</td></tr>
+        <tr><td>Ka 대역 (FR2-NTN)</td><td colspan="2">10 GHz 위 대역(Ka)으로 VSAT·이동 단말(배·비행기·차) 지원</td><td>Rel-18 이후</td></tr>
+    </table></div>
+    <p class="mt-2 text-[12.5px] text-[#8e8e93]">대역 번호·범위는 3GPP TS 38.101-5 (NTN 단말 무선 규격) 기준이에요. 새 릴리스에서 더 늘어날 수 있어요.</p>
+</section>
+
+<!-- 9 -->
+<section class="lr-sec" id="learn-beam">
+    <h2>📡 안테나 · 빔</h2>
+    <ul>
+        <li><b>빔 폭</b> — 안테나가 클수록, 주파수가 높을수록 좁아져요: \(\theta_{3\mathrm{dB}} \approx 70^\circ \cdot \lambda / D\). 좁은 빔 = 이득 큼 = 덮는 땅 작음.</li>
+        <li><b>스폿 빔 · 멀티 빔</b> — 넓은 범위를 작은 빔 수십~수천 개로 나눠 같은 주파수를 여러 번 재사용 → 용량 ↑. 요즘 고속 위성(HTS)의 핵심.</li>
+        <li><b>주파수 재사용 (색칠)</b> — 이웃 빔끼리 다른 주파수·편파를 써서 간섭을 줄여요. 4색(주파수 2 × 편파 2)이 흔하고, 3GPP 시뮬레이션은 재사용 1·3 도 봐요.</li>
+        <li><b>위상 배열 안테나</b> — 소자마다 위상을 바꿔 전기적으로 빔을 돌려요(기계 회전 없음). 스타링크 단말 접시가 이 방식. 비스듬히 쏠수록 이득이 떨어져요(scan loss ≈ cos 의 거듭제곱).</li>
+        <li><b>빔 호핑</b> — 위성 하나가 빔을 시간마다 옮겨 다니며 수요 많은 곳에 자원을 줘요.</li>
+        <li><b>빔 널링</b> — 특정 방향(간섭·재밍원)으로 이득을 0 에 가깝게 → 간섭·재밍 대응.</li>
+    </ul>
+    <p>\[ \text{배열 인자}\ AF(\theta) = \sum_{n=0}^{N-1} w_n\, e^{\,j\,2\pi n \frac{d}{\lambda}\sin\theta}, \qquad w_n = e^{-j\,2\pi n \frac{d}{\lambda}\sin\theta_0}\ (\theta_0\ \text{로 조향}) \]</p>
+</section>
+
+<!-- 10 -->
+<section class="lr-sec" id="learn-arch">
+    <h2>🏗 위성 통신 시스템 구조</h2>
+    <ul>
+        <li><b>서비스 링크</b> — 단말 ↔ 위성. <b>피더 링크</b> — 위성 ↔ 게이트웨이(지상국, NTN-GW).</li>
+        <li><b>게이트웨이</b> — 위성과 지상망(인터넷·코어망)을 이어 주는 큰 안테나 기지. LEO 는 위성이 계속 바뀌어서 게이트웨이를 넓게 많이 깔거나 ISL 로 우회해요.</li>
+        <li><b>위성 사이 링크 (ISL)</b> — 위성끼리 직접 연결(레이저·RF). 바다·극지방 위에서도 게이트웨이까지 우주로 전달. 이리듐(RF), 스타링크(레이저)가 사용.</li>
+        <li><b>탑재체</b> — 투명(bent-pipe) / 재생(regenerative: 기지국 전체 또는 DU 만 탑재, 코어 기능 일부 탑재 연구도).</li>
+        <li><b>단말 종류</b> — 휴대폰(직접 연결, D2D), IoT 모듈, VSAT(작은 접시), 이동형(배·비행기·차량, 위상 배열).</li>
+        <li><b>HAPS · UAS</b> — 성층권 비행선·드론(약 20 km)도 3GPP 에선 NTN 의 한 종류로 봐요.</li>
+        <li><b>TN–NTN 연동</b> — 지상망(TN)이 있으면 지상망, 없으면 위성으로. 같은 단말·같은 코어로 이어지는 게 3GPP NTN 의 목표.</li>
+    </ul>
+</section>
+
+<!-- 11 -->
+<section class="lr-sec" id="learn-ntn">
+    <h2>📱 3GPP NTN (NR-NTN · IoT-NTN)</h2>
+    <h3>흐름</h3>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>릴리스</th><th>내용</th></tr>
+        <tr><td>Rel-15</td><td>연구: TR 38.811 — 위성 채널 모델, 시나리오</td></tr>
+        <tr><td>Rel-16</td><td>연구: TR 38.821 — NR 을 위성에 맞추는 방법(타이밍·HARQ·도플러 등), 시뮬레이션 가정</td></tr>
+        <tr><td>Rel-17</td><td>첫 표준: <b>NR-NTN</b>(투명 중계, FR1 L·S 대역, GNSS 단말) + <b>IoT-NTN</b>(NB-IoT·eMTC 를 위성으로)</td></tr>
+        <tr><td>Rel-18</td><td>커버리지 향상, 10 GHz 위 대역(Ka), 이동성·위성 교체 개선, 망에서 단말 위치 확인(NR-NTN)</td></tr>
+        <tr><td>Rel-19</td><td>재생 중계(위성에 gNB) 지원, 하향 커버리지·용량 개선, RedCap 단말 등 확장</td></tr>
+    </table></div>
+    <h3>핵심 장치들</h3>
+    <ul>
+        <li><b>GNSS 필수 단말 + 사전 보상</b> — 단말이 자기 위치와 위성 궤도로 지연·도플러를 계산해 <b>상향 신호의 시간(TA)·주파수를 미리 보정</b>.</li>
+        <li><b>타이밍 어드밴스(TA)</b> — \( T_{TA} = (N_{TA} + N_{TA,\mathrm{UE\text{-}specific}} + N_{TA,\mathrm{common}} + N_{TA,\mathrm{offset}})\,T_c \). 단말별 부분(서비스 링크)은 단말이 계산, 공통 부분(피더 링크 등)은 기지국이 <code>ta-Common</code>·<code>ta-CommonDrift</code>·<code>ta-CommonDriftVariation</code> 으로 알려 줘요.</li>
+        <li><b>SIB19</b> (NR-NTN) / <b>SIB31</b> (IoT-NTN) — 위성 궤도(ephemeris: 위치·속도 또는 궤도 요소), 기준 시각(epoch), 공통 TA, <code>K_offset</code>, 상향 동기 유효 시간(<code>ntn-UlSyncValidityDuration</code>), 이웃 셀 위성 정보 등을 방송.</li>
+        <li><b>K_offset · K_mac</b> — 왕복 지연이 길어서 "DCI 받고 몇 슬롯 뒤에 보내라" 같은 타이밍에 오프셋을 더해요(<code>K_offset</code>: 스케줄링, <code>K_mac</code>: MAC CE 적용 시점).</li>
+        <li><b>HARQ</b> — RTT 동안 놀지 않게 프로세스 수를 <b>최대 32개</b>로 늘리고, 아예 <b>HARQ 피드백 끄기</b>(프로세스별)도 가능. 대신 RLC 재전송 등에 맡겨요.</li>
+        <li><b>임의 접속(RACH)</b> — 응답 창(RAR window) 시작을 왕복 지연만큼 미루고, 경쟁 해소 타이머 등을 늘려요.</li>
+        <li><b>타이머 늘리기</b> — 스케줄링 요청·불연속 수신(DRX)·RLC·PDCP 타이머가 지연을 견디게.</li>
+        <li><b>상향 주파수 사전 보상</b> — 도플러를 단말이 미리 빼서 보냄. 하향은 기지국 쪽에서 빔 중심 기준 보상.</li>
+        <li><b>편파</b> — 위성은 원편파(RHCP/LHCP)를 쓸 수 있어 기지국이 편파 정보를 알려 줘요.</li>
+    </ul>
+    <div class="lr-box text-[13.5px] leading-6">💡 논문 시스템 모델을 쓸 때: 궤도(고도·경사각), 탑재체(투명/재생), 주파수·대역폭, 빔 배치(수·크기·재사용), 최소 앙각, 채널 모델(TR 38.811: LOS 확률·그림자 페이딩·대기 손실), 단말 종류(휴대폰·VSAT) 를 표로 정리하면 TR 38.821 의 Set-1/Set-2 가정과 비교하기 좋아요.</div>
+</section>
+
+<!-- 12 -->
+<section class="lr-sec" id="learn-mobility">
+    <h2>🔄 NTN 이동성 · 셀</h2>
+    <ul>
+        <li><b>셀 종류</b> — <b>지구 고정 셀</b>(위성이 빔을 계속 같은 땅에 비춤, 위성 바뀔 때 셀 교체), <b>준지구 고정</b>(일정 시간 고정하다 다음 위성으로 넘김), <b>지구 이동 셀</b>(빔이 위성과 같이 땅 위를 쓸고 지나감 → 가만히 있어도 셀이 바뀜).</li>
+        <li><b>신호 세기 차이가 작음</b> — 지상망은 셀 가장자리에서 신호가 확 약해지지만, 위성은 빔 가운데와 가장자리 차이가 작아서 RSRP 만으로 핸드오버 시점을 잡기 어려워요.</li>
+        <li><b>조건부 핸드오버(CHO)</b> — Rel-17 에서 <b>시간 기반</b>(이 시각 이후 실행)과 <b>위치 기반</b>(기준점에서 거리 조건, 이벤트 D1) 조건 추가.</li>
+        <li><b>위치·시간 기반 측정</b> — 셀이 끝나는 시각·위치를 알려 줘서 단말이 미리 이웃 셀을 측정.</li>
+        <li><b>위성 교체 · 피더 링크 교체</b> — 같은 셀을 다른 위성이 이어받거나 게이트웨이가 바뀌는 상황. Rel-18 에서 다시 접속 없이(RACH-less) 넘어가는 방법 등 개선.</li>
+        <li><b>추적 영역(TA/TAC)</b> — 지구 이동 셀이면 같은 셀이 여러 나라 위를 지나가서 추적 영역 코드를 여러 개 방송하는 방법을 써요. 단말 위치 확인은 규제(나라별 서비스·긴급 전화)에도 중요해요.</li>
+    </ul>
+</section>
+
+<!-- 13 -->
+<section class="lr-sec" id="learn-systems">
+    <h2>🌐 실제 위성 시스템</h2>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>시스템</th><th>궤도</th><th>대역 · 방식</th><th>메모</th></tr>
+        <tr><td>스타링크 (SpaceX)</td><td>LEO 주로 540~570 km, 여러 경사각 껍질</td><td>Ku(단말)·Ka/E(게이트웨이), 레이저 ISL</td><td>가장 큰 군집. 휴대폰 직접 연결(Direct to Cell) 위성도 운용</td></tr>
+        <tr><td>원웹 (Eutelsat OneWeb)</td><td>LEO 약 1,200 km, 극궤도에 가까움</td><td>Ku·Ka, 투명 중계</td><td>기업·통신사 백홀 위주</td></tr>
+        <tr><td>Kuiper (Amazon)</td><td>LEO 약 590~630 km</td><td>Ka</td><td>2025년부터 본격 발사</td></tr>
+        <tr><td>이리듐 NEXT</td><td>LEO 약 780 km, 66기 + 예비, 86.4°</td><td>L 대역 단말, Ka ISL</td><td>극지방까지 전 지구 음성·데이터·IoT</td></tr>
+        <tr><td>글로벌스타</td><td>LEO 약 1,414 km, 52°</td><td>L/S, 투명 중계</td><td>아이폰 긴급 SOS 메시지</td></tr>
+        <tr><td>AST SpaceMobile</td><td>LEO</td><td>이동통신 대역, 거대 위상 배열</td><td>일반 휴대폰에 직접 광대역 연결이 목표</td></tr>
+        <tr><td>GPS · 갈릴레오 · 베이더우 · GLONASS</td><td>MEO (BeiDou 는 GEO·IGSO 도)</td><td>L 대역</td><td>위치·시간 → NTN 단말에도 필수</td></tr>
+        <tr><td>무궁화 (KT SAT)</td><td>GEO 113°E·116°E 등</td><td>Ku·Ka</td><td>방송·통신</td></tr>
+        <tr><td>천리안 2A·2B</td><td>GEO 128.2°E</td><td>–</td><td>기상·해양·환경 관측</td></tr>
+        <tr><td>아리랑 (KOMPSAT)</td><td>LEO 태양 동기</td><td>X 대역 자료 전송</td><td>지구 관측</td></tr>
+        <tr><td>KPS (한국형 위성항법)</td><td>GEO·경사 지구 동기(IGSO)</td><td>L 대역</td><td>2035년 서비스 목표</td></tr>
+    </table></div>
+    <p class="mt-2 text-[12.5px] text-[#8e8e93]">숫자는 공개 자료 기준 대략값이에요. 실제 궤도는 '지금 하늘' 탭에서 확인해 보세요.</p>
+</section>
+
+<!-- 14 -->
+<section class="lr-sec" id="learn-jam">
+    <h2>⚡ 간섭 · 재밍 · 스푸핑</h2>
+    <h3>재밍 종류</h3>
+    <div class="lr-wrap"><table class="lr-tbl">
+        <tr><th>종류</th><th>방식</th><th>특징</th></tr>
+        <tr><td>광대역(잡음)</td><td>대역 전체에 잡음</td><td>단순하지만 전력이 많이 듦</td></tr>
+        <tr><td>부분 대역</td><td>대역 일부에 전력 집중</td><td>같은 전력으로 일부 채널을 확실히 막음</td></tr>
+        <tr><td>톤 · 다중 톤</td><td>좁은 주파수 몇 개</td><td>파일럿·동기 신호를 노림</td></tr>
+        <tr><td>스윕</td><td>좁은 재밍을 대역 위로 쓸고 다님</td><td>순간은 좁지만 시간 평균으로 넓게</td></tr>
+        <tr><td>펄스</td><td>짧고 센 펄스</td><td>평균 전력 대비 효과 큼, 코드·인터리빙으로 버팀</td></tr>
+        <tr><td>반응형 · 추종형</td><td>신호를 감지한 뒤 그 채널만</td><td>주파수 도약 대응, 지능형</td></tr>
+    </table></div>
+    <h3>위성이라서 생기는 점</h3>
+    <ul>
+        <li><b>상향 재밍</b> — 투명 중계 위성은 받은 걸 그대로 증폭해서 되돌리므로, 위성 수신 빔 안에서 한 번 쏜 재밍이 <b>빔 전체·게이트웨이까지</b> 퍼져요. 재생 중계는 위성에서 걸러낼 기회가 있어요.</li>
+        <li><b>하향 재밍</b> — 위성 신호가 땅에선 아주 약해서(먼 거리) 작은 재머도 가까운 단말을 쉽게 막아요. 대신 범위는 국지적.</li>
+        <li><b>J/S (재밍 대 신호비)</b> — \( J/S = P_J + G_J - L_J - (P_S + G_S - L_S) \) [dB]. LEO 는 위성이 움직여서 재머와 단말·위성 기하(거리·앙각·빔 이득)가 계속 바뀌어 J/S 도 시간에 따라 바뀌어요.</li>
+        <li><b>GNSS 재밍·스푸핑</b> — NTN 단말은 GNSS 로 TA·도플러를 미리 보정하므로, GNSS 가 막히거나 속으면 위성 접속까지 흔들려요.</li>
+    </ul>
+    <h3>대응</h3>
+    <ul>
+        <li><b>확산 대역</b> — 직접 확산(DSSS, 처리 이득 = 10log(칩률/비트율)), 주파수 도약(FHSS).</li>
+        <li><b>공간 대응</b> — 적응 배열·빔 널링으로 재머 방향 이득을 낮춤, 스폿 빔을 좁게.</li>
+        <li><b>부호화·인터리빙·적응 변조</b> — 펄스·부분 대역 재밍을 오류 정정으로 흡수.</li>
+        <li><b>탐지·위치 찾기</b> — 이상 잡음 감지, 여러 위성으로 TDOA(도착 시간 차)·FDOA(도착 주파수 차)로 재머 위치 추정.</li>
+        <li><b>다중 경로 · 다중 궤도</b> — 다른 위성·다른 궤도·지상망으로 우회.</li>
+    </ul>
+    <h3>다른 위성과의 간섭</h3>
+    <ul>
+        <li><b>NGSO ↔ GSO 공존</b> — 저궤도 군집이 정지궤도 위성 서비스를 방해하지 않도록 ITU 전파 규칙(Article 22)의 <b>EPFD</b>(등가 전력 속 밀도) 한도를 지켜야 해요. 그래서 저궤도 위성은 적도 근처에서 GEO 방향을 피해 빔을 돌리기도 해요(GSO arc avoidance).</li>
+        <li><b>인접 위성 간섭</b> — 정지궤도는 2° 간격으로 붙어 있어 작은 접시는 옆 위성까지 받거나 쏠 수 있어요.</li>
+        <li><b>지상망과 간섭</b> — C 대역 위성 수신과 지상 5G(3.5 GHz) 같은 사례.</li>
+    </ul>
+</section>
+
+<!-- 15 -->
+<section class="lr-sec" id="learn-env">
+    <h2>🌌 우주 환경 · 규제</h2>
+    <ul>
+        <li><b>대기 저항·궤도 수명</b> — 300 km 대는 몇 주~몇 달, 500 km 대는 수 년, 800 km 넘으면 수십 년 이상. 태양 활동이 강하면 짧아져요.</li>
+        <li><b>방사선</b> — 반 알렌대(약 1,000~6,000 km 안쪽대, 13,000~60,000 km 바깥대), 남대서양 이상 지역(SAA)에서 전자 부품 오류(SEU)가 늘어요. MEO 는 방사선이 센 곳이라 부품이 튼튼해야 해요.</li>
+        <li><b>우주 날씨</b> — 태양 폭풍은 전리층을 흔들어 L·S 대역 신호가 깜빡이고(신틸레이션), GNSS 오차가 커져요.</li>
+        <li><b>우주 쓰레기·케슬러 증후군</b> — 충돌 파편이 또 충돌을 부르는 연쇄. 큰 군집은 충돌 회피 기동을 자주 해요.</li>
+        <li><b>임무 후 처리</b> — 오래 쓰이던 "25년 안에 대기권 재진입" 기준을 미국 FCC 는 2022년 저궤도 위성에 대해 <b>5년</b>으로 줄였어요. 정지궤도는 수명 끝에 300 km 쯤 위 '무덤 궤도'로 올려요.</li>
+        <li><b>주파수·궤도 등록</b> — 위성을 쓰려면 국가가 ITU 에 주파수·궤도를 신고·조정해야 해요(정지궤도 슬롯은 한정된 자원). 각 나라 안에서 서비스하려면 그 나라 허가(착륙권)도 필요해요.</li>
+    </ul>
+</section>
+
+<!-- 16 -->
+<section class="lr-sec" id="learn-gloss">
+    <h2>🔤 용어집</h2>
+    <div class="lr-wrap"><table class="lr-tbl" id="lr-gloss">
+        <tr><th>용어</th><th>풀이</th></tr>
+        <tr><td>NTN</td><td>Non-Terrestrial Network, 위성·HAPS 를 쓰는 비지상 통신망</td></tr>
+        <tr><td>TN</td><td>Terrestrial Network, 지상 이동통신망</td></tr>
+        <tr><td>LEO · MEO · GEO · HEO</td><td>저궤도 · 중궤도 · 정지궤도 · 고타원 궤도</td></tr>
+        <tr><td>GSO · NGSO</td><td>정지궤도(지구 동기) 위성 · 그 밖의 위성(LEO·MEO 군집)</td></tr>
+        <tr><td>IGSO</td><td>경사 지구 동기 궤도 — 주기는 하루인데 경사가 있어 8자 궤적</td></tr>
+        <tr><td>SSO</td><td>태양 동기 궤도</td></tr>
+        <tr><td>RAAN</td><td>승교점 적경 — 궤도면 방향</td></tr>
+        <tr><td>TLE · GP</td><td>두 줄 궤도 요소 · 일반 섭동(General Perturbations) 궤도 자료</td></tr>
+        <tr><td>SGP4</td><td>TLE 를 돌리는 궤도 예측 모델</td></tr>
+        <tr><td>Ephemeris</td><td>위성 궤도 정보 (NTN 에선 SIB19 로 방송)</td></tr>
+        <tr><td>Epoch</td><td>궤도 자료의 기준 시각</td></tr>
+        <tr><td>ECI · ECEF · TEME</td><td>관성 좌표 · 지구 고정 좌표 · SGP4 결과 좌표계</td></tr>
+        <tr><td>Elevation · Azimuth</td><td>앙각 · 방위각</td></tr>
+        <tr><td>Nadir</td><td>위성 바로 아래 방향</td></tr>
+        <tr><td>Footprint</td><td>위성·빔이 덮는 땅</td></tr>
+        <tr><td>Slant range</td><td>경사 거리 — 단말과 위성 사이 직선 거리</td></tr>
+        <tr><td>Service link · Feeder link</td><td>단말↔위성 · 위성↔게이트웨이</td></tr>
+        <tr><td>NTN-GW</td><td>NTN 게이트웨이(지상국)</td></tr>
+        <tr><td>Transparent · Regenerative</td><td>투명(bent-pipe) 중계 · 재생(위성에서 처리) 중계</td></tr>
+        <tr><td>ISL</td><td>Inter-Satellite Link, 위성 사이 링크</td></tr>
+        <tr><td>HTS</td><td>High Throughput Satellite, 다수 스폿 빔 고속 위성</td></tr>
+        <tr><td>VSAT</td><td>작은 접시 위성 단말</td></tr>
+        <tr><td>D2D · DTC</td><td>Direct-to-Device / Direct-to-Cell, 일반 휴대폰 직접 연결</td></tr>
+        <tr><td>HAPS · UAS</td><td>성층권 비행체 · 무인 항공 시스템</td></tr>
+        <tr><td>EIRP</td><td>유효 등방성 복사 전력 = 송신 전력 + 안테나 이득</td></tr>
+        <tr><td>G/T</td><td>수신 안테나 이득 ÷ 잡음 온도 (dB/K)</td></tr>
+        <tr><td>C/N₀ · Eb/N₀</td><td>반송파 대 잡음 밀도비 · 비트 에너지 대 잡음 밀도비</td></tr>
+        <tr><td>FSPL</td><td>자유 공간 경로 손실</td></tr>
+        <tr><td>PFD · EPFD</td><td>전력 속 밀도 · 등가 전력 속 밀도 (위성 간섭 규제 한도)</td></tr>
+        <tr><td>RHCP · LHCP</td><td>오른·왼 원편파</td></tr>
+        <tr><td>RTT</td><td>왕복 지연</td></tr>
+        <tr><td>TA</td><td>Timing Advance, 상향 신호를 미리 보내는 시간</td></tr>
+        <tr><td>Common TA</td><td>빔 안 모든 단말에 공통인 TA (피더 링크 등), 기지국이 방송</td></tr>
+        <tr><td>K_offset · K_mac</td><td>NTN 스케줄링 타이밍 오프셋 · MAC CE 적용 오프셋</td></tr>
+        <tr><td>SIB19 · SIB31</td><td>NR-NTN · IoT-NTN 위성 정보 방송</td></tr>
+        <tr><td>HARQ</td><td>재전송 기법 — NTN 에서 최대 32 프로세스, 피드백 끄기 가능</td></tr>
+        <tr><td>CHO</td><td>조건부 핸드오버 (NTN: 시간·위치 조건)</td></tr>
+        <tr><td>Earth-fixed · Earth-moving cell</td><td>지구 고정 셀 · 지구 이동 셀</td></tr>
+        <tr><td>Doppler pre-compensation</td><td>도플러 사전 보상</td></tr>
+        <tr><td>Beam hopping</td><td>빔을 시간마다 옮겨 다니며 쓰기</td></tr>
+        <tr><td>Frequency reuse</td><td>주파수 재사용 (빔 색칠)</td></tr>
+        <tr><td>Scan loss</td><td>위상 배열이 비스듬히 쏠 때 이득 손실</td></tr>
+        <tr><td>Rain fade</td><td>비 감쇠 (10 GHz 이상)</td></tr>
+        <tr><td>Scintillation</td><td>전리층·대류권 때문에 신호가 깜빡임</td></tr>
+        <tr><td>SAA</td><td>남대서양 이상 지역 — 방사선 강한 곳</td></tr>
+        <tr><td>J/S</td><td>재밍 대 신호비</td></tr>
+        <tr><td>TDOA · FDOA</td><td>도착 시간 차 · 도착 주파수 차 (전파원 위치 찾기)</td></tr>
+        <tr><td>DSSS · FHSS</td><td>직접 확산 · 주파수 도약 확산</td></tr>
+        <tr><td>Station keeping</td><td>궤도 위치 유지 기동</td></tr>
+        <tr><td>Graveyard orbit</td><td>무덤 궤도 — 수명 다한 정지궤도 위성을 올려 두는 곳</td></tr>
+        <tr><td>TR 38.811 · TR 38.821</td><td>3GPP NTN 연구 보고서 (채널·시나리오 · 해결책·시뮬레이션 가정)</td></tr>
+    </table></div>
+</section>
+
+</div>
+
+<script>
+(() => {
+    const q = document.getElementById('lr-q');
+    const secs = [...document.querySelectorAll('#lr-list .lr-sec')];
+    const rows = [...document.querySelectorAll('#lr-gloss tr')].slice(1);
+    q.addEventListener('input', () => {
+        const t = q.value.trim().toLowerCase();
+        let n = 0;
+        secs.forEach((s) => {
+            const hit = !t || s.textContent.toLowerCase().includes(t);
+            s.classList.toggle('lr-hide', !hit);
+            if (hit) n++;
+        });
+        rows.forEach((r) => r.classList.toggle('lr-hide', !!t && !r.textContent.toLowerCase().includes(t)));
+        document.getElementById('lr-count').textContent = t ? `'${q.value.trim()}' 이(가) 나오는 곳 ${n}개` : '';
+    });
+    // 목차: 탭 안에서 부드럽게 이동 + 주소에 남김 (#learn-…)
+    document.querySelectorAll('.lr-toc a').forEach((a) => a.addEventListener('click', (e) => {
+        e.preventDefault();
+        const id = a.getAttribute('href').slice(1);
+        history.replaceState(null, '', '#' + id);
+        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+    }));
+})();
+</script>
