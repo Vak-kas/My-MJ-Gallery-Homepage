@@ -75,6 +75,16 @@ TOOLS = [
 		"access": "public",  # 무료 읽기는 누구나, AI 읽기는 회원
 	},
 	{
+		"slug": "stdlib",
+		"url_name": "tools:stdlib",
+		"icon": "📖",
+		"title": "표준 서재",
+		"description": "갖고 있는 표준 PDF(IEEE 802.11be·ax, 3GPP 등)를 올리면 절 단위로 나눠서 'puncturing pattern'·'펑처링'처럼 찾고, 원문 쪽을 그림으로 보고, ✨AI 에게 절·쪽 근거를 붙여 물어봐요. 내 문서는 나만 봐요.",
+		"tags": ["표준", "802.11"],
+		"category": "docs",
+		"access": "vip",
+	},
+	{
 		"slug": "papers",
 		"url_name": "tools:papers",
 		"icon": "📑",

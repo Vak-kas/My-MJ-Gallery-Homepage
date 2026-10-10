@@ -190,7 +190,7 @@ class MeetingResponse(models.Model):
 class AIUsage(models.Model):
 	"""AI 기능 한 번 부를 때마다 한 줄. 입력한 글·결과는 저장하지 않고 토큰 수·어림 비용만."""
 
-	FEATURES = [("qr", "QR 스타일 추천"), ("regex", "정규식 만들기"), ("diff", "글 비교 요약"), ("netcheck", "네트워크 결과 풀이"), ("ocr", "사진 글자 추출"), ("paper", "논문 정리")]
+	FEATURES = [("qr", "QR 스타일 추천"), ("regex", "정규식 만들기"), ("diff", "글 비교 요약"), ("netcheck", "네트워크 결과 풀이"), ("ocr", "사진 글자 추출"), ("paper", "논문 정리"), ("stdlib", "표준 서재 질문")]
 
 	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="ai_usages")
 	feature = models.CharField(max_length=20, choices=FEATURES)
@@ -231,3 +231,61 @@ class SavedPaper(models.Model):
 
 	def __str__(self):
 		return f"{self.user_id}:{self.key}"
+
+
+def stddoc_upload_to(instance, filename):
+	return f"stdlib/{instance.user_id}/{uuid4().hex}.pdf"
+
+
+class StdDoc(models.Model):
+	"""표준 서재(VIP)의 문서 한 개. 올린 사람만 볼 수 있음 (IEEE 등 저작권 문서라 다른 사람에게 보여 주지 않음)."""
+
+	STATUS_PROCESSING = "processing"
+	STATUS_READY = "ready"
+	STATUS_ERROR = "error"
+	STATUS_CHOICES = [(STATUS_PROCESSING, "나누는 중"), (STATUS_READY, "준비됨"), (STATUS_ERROR, "실패")]
+
+	user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="std_docs")
+	title = models.CharField(max_length=200)
+	file = models.FileField(upload_to=stddoc_upload_to, storage=private_storage)
+	filename = models.CharField(max_length=255, blank=True)
+	size = models.BigIntegerField(default=0)
+	pages = models.PositiveIntegerField(default=0)
+	chunks = models.PositiveIntegerField(default=0)
+	status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PROCESSING)
+	progress = models.PositiveSmallIntegerField(default=0)  # 0~100
+	error = models.CharField(max_length=300, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"{self.user_id}:{self.title}"
+
+
+class StdChunk(models.Model):
+	"""표준 문서의 한 조각 — 절(clause) 하나 또는 긴 절의 일부, 표·그림 제목."""
+
+	KIND_CLAUSE = "clause"
+	KIND_TABLE = "table"
+	KIND_FIGURE = "figure"
+
+	doc = models.ForeignKey(StdDoc, on_delete=models.CASCADE, related_name="parts")
+	order = models.PositiveIntegerField()
+	kind = models.CharField(max_length=8, default=KIND_CLAUSE)
+	clause = models.CharField(max_length=40, blank=True)  # 36.3.12.11 / Z.2 / Table 36-30
+	title = models.CharField(max_length=300, blank=True)
+	page = models.PositiveIntegerField(default=1)  # PDF 쪽 번호 (1부터)
+	text = models.TextField()
+
+	class Meta:
+		ordering = ["doc_id", "order"]
+		indexes = [models.Index(fields=["doc", "clause"])]
+
+
+@receiver(post_delete, sender=StdDoc)
+def _delete_std_file(sender, instance, **kwargs):
+	if instance.file:
+		instance.file.delete(save=False)

@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sl-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px 20px; }
+    .sl-in { width: 100%; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 14px; font-size: 15px; color: #1d1d1f; outline: none; }
+    .sl-in:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12); }
+    .sl-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 4px 11px; font-size: 12px; color: #1d1d1f; white-space: nowrap; }
+    .sl-btn:hover { background: #f5f5f7; }
+    .sl-seg { display: inline-flex; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .sl-seg button { border-radius: 999px; padding: 4px 11px; font-size: 13px; color: #6e6e73; }
+    .sl-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .sl-res mark { background: #fff3b0; color: inherit; border-radius: 2px; padding: 0 1px; }
+    .sl-clause { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; color: #7c3aed; }
+    .sl-text { white-space: pre-wrap; font-size: 13.5px; line-height: 1.65; color: #1d1d1f; }
+    .sl-full { margin-top: 10px; border-radius: 14px; background: #f9f9fb; padding: 12px 14px; max-height: 60vh; overflow-y: auto; }
+    .sl-full .cur { border-left: 3px solid #7c3aed; padding-left: 10px; }
+    .sl-bar { height: 6px; border-radius: 999px; background: #f0f0f3; overflow: hidden; }
+    .sl-bar > span { display: block; height: 100%; background: linear-gradient(90deg, #a78bfa, #7c3aed); }
+    .sl-modal { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .sl-modal.hidden { display: none !important; }
+    .sl-page { max-height: calc(100vh - 120px); max-width: min(100%, 980px); background: #fff; border-radius: 8px; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4); }
+    .sl-answer { white-space: pre-wrap; font-size: 14.5px; line-height: 1.75; }
+    .sl-ref { color: #7c3aed; font-weight: 700; cursor: pointer; }
+    html.theme-dark .sl-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .sl-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .sl-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .sl-seg { background: #111318; } html.theme-dark .sl-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .sl-text { color: #e8e8ea; }
+    html.theme-dark .sl-full { background: #111318; }
+    html.theme-dark .sl-res mark { background: #5c4a00; }
+    html.theme-dark .sl-bar { background: #2a2a2e; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#7c3aed]">STANDARDS · LIBRARY · 💎 VIP</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">표준 서재.</h1>
+        <p class="mt-3 max-w-[820px] text-[15px] leading-relaxed text-[#6e6e73]">갖고 있는 표준 PDF(IEEE 802.11be·ax, 3GPP TS 등)를 올리면 <b>절 번호 단위로 나눠서</b> 원문 그대로 찾아 줘요. 표는 원문 쪽을 그림으로 보고, ✨AI 에게 물으면 절·쪽 근거를 붙여 답해요.</p>
+    </div>
+
+    {% if denied %}
+    <div class="sl-card mt-8 text-[14px] leading-7 text-[#6e6e73]">
+        <p class="text-[16px] font-semibold text-[#1d1d1f]">💎 VIP 회원 전용이에요</p>
+        <p class="mt-1">표준 문서를 통째로 나눠 저장하고 검색하는 기능이라 서버 자원이 많이 들어서, 지금은 VIP 회원만 쓸 수 있어요. 필요하면 사이트 주인에게 말해 주세요.</p>
+    </div>
+    {% else %}
+    <div class="mt-8 grid grid-cols-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <!-- 내 문서 -->
+        <aside class="space-y-4 lg:sticky lg:top-6 lg:self-start">
+            <section class="sl-card">
+                <div class="flex items-center gap-2"><h2 class="text-[15px] font-semibold">📚 내 문서</h2><span class="ml-auto text-[11px] text-[#8e8e93]" id="sl-used"></span></div>
+                <div class="mt-3 space-y-2" id="sl-docs"><p class="text-[13px] text-[#8e8e93]">불러오는 중…</p></div>
+                <form id="sl-upload" class="mt-4 space-y-2 border-t border-black/[0.06] pt-4 dark:border-white/[0.08]">
+                    <input type="text" id="sl-title" class="sl-in !py-2 !text-[13px]" placeholder="이름 (예: IEEE 802.11be-2024) — 비우면 파일 이름">
+                    <label class="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-[#7c3aed]/40 px-3 py-3 text-[13px] text-[#7c3aed] hover:bg-[#f5f3ff] dark:hover:bg-[#1f1a2e]">📄 PDF 올리기 (최대 {{ max_mb }}MB)<input type="file" accept="application/pdf" class="hidden" id="sl-file"></label>
+                    <div class="hidden" id="sl-up-prog"><div class="sl-bar"><span style="width:0%"></span></div><p class="mt-1 text-[11px] text-[#8e8e93]"></p></div>
+                    <p class="text-[11px] leading-5 text-[#8e8e93]">🔒 올린 문서는 나만 볼 수 있어요. IEEE·3GPP 표준은 저작권 문서라 다른 사람과 같이 쓰지 않아요 — 친구도 자기 PDF 를 자기 서재에 올려요.</p>
+                </form>
+            </section>
+            <section class="sl-card text-[12px] leading-5 text-[#6e6e73]">
+                <p class="font-semibold text-[#1d1d1f] dark:text-[#e8e8ea]">💡 찾는 법</p>
+                <p>· 영어 키워드: <code>preamble puncturing</code>, <code>multi-link setup</code></p>
+                <p>· 한국어 몇 개는 영어로 바꿔요: 펑처링, 프리앰블, 다중링크, 부반송파 …</p>
+                <p>· 절 번호로 바로: <code>36.3.12.11</code> · 표: <code>Table 36-30</code></p>
+                <p>· "정확한 문구": <code>"puncturing pattern"</code>, 빼기: <code>-OFDMA</code></p>
+            </section>
+        </aside>
+
+        <!-- 찾기 -->
+        <section class="min-w-0 space-y-4">
+            <div class="sl-card">
+                <form id="sl-form" class="flex gap-2">
+                    <input id="sl-q" class="sl-in" placeholder="예) puncturing pattern · 펑처링 · 36.3.12.11 · Table 36-30" autocomplete="off">
+                    <button class="shrink-0 rounded-full bg-[#7c3aed] px-6 text-[15px] font-semibold text-white">찾기</button>
+                </form>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <select id="sl-doc" class="sl-in !w-auto !py-1.5 !text-[13px]"><option value="">모든 문서</option></select>
+                    <span class="sl-seg" id="sl-kind"><button type="button" class="is-on" data-v="">전체</button><button type="button" data-v="table">표</button><button type="button" data-v="figure">그림</button></span>
+                    <span class="ml-auto text-[12px] text-[#8e8e93]" id="sl-head"></span>
+                </div>
+            </div>
+
+            <!-- AI 질문 -->
+            <div class="ai-panel">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="text-[14px] font-semibold">✨ 표준에 물어보기</p>
+                    <span class="ai-quota" data-ai-quota></span>
+                </div>
+                <form id="sl-ask" class="mt-2 flex gap-2">
+                    <input id="sl-question" class="sl-in !text-[14px]" placeholder="예) 320 MHz PPDU 에서 쓸 수 있는 펑처링 패턴은? / EHT-SIG 의 Punctured Channel Information 필드는 몇 비트야?" autocomplete="off">
+                    <button class="ai-btn shrink-0" id="sl-ask-btn">✨ 묻기</button>
+                </form>
+                <p class="mt-1 text-[11px] text-[#8e8e93]">위에서 찾은 결과 중 ☑ 고른 절이 있으면 그것만, 없으면 질문으로 다시 찾아서 상위 8개 절을 근거로 답해요. AI 1번 사용.</p>
+                <div class="mt-3 hidden" id="sl-answer"></div>
+            </div>
+
+            <div class="sl-res space-y-3" id="sl-results"></div>
+        </section>
+    </div>
+
+    <div class="sl-modal hidden" id="sl-modal">
+        <div class="flex max-h-full w-full max-w-[1000px] flex-col items-center gap-2">
+            <div class="flex w-full items-center gap-2 text-white">
+                <span class="text-[14px]" id="sl-modal-title"></span>
+                <span class="ml-auto flex items-center gap-1.5">
+                    <button type="button" class="rounded-full bg-white/15 px-3 py-1 text-[13px]" id="sl-prev">‹ 앞쪽</button>
+                    <span class="text-[13px] tabular-nums" id="sl-pno"></span>
+                    <button type="button" class="rounded-full bg-white/15 px-3 py-1 text-[13px]" id="sl-next">뒤쪽 ›</button>
+                    <button type="button" class="ml-2 rounded-full bg-white/15 px-3 py-1 text-[13px]" id="sl-close">✕</button>
+                </span>
+            </div>
+            <img class="sl-page" id="sl-img" alt="표준 원문 쪽">
+        </div>
+    </div>
+    {% endif %}
+</main>
+
+{% if not denied %}
+{% include "tools/_ai_assist.html" %}
+<script>window.SL = { docs: '{% url "tools:stdlib_docs" %}', upload: '{% url "tools:stdlib_upload" %}', search: '{% url "tools:stdlib_search" %}', ask: '{% url "tools:stdlib_ask" %}', chunk: '{% url "tools:stdlib_chunk" 0 %}', base: '{% url "tools:stdlib" %}' };</script>
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const mb = (b) => (b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(1)} GB` : `${(b / 1024 ** 2).toFixed(1)} MB`);
+    const S = window.SL;
+    let docs = [], results = [], kind = '', lastQ = '', poll = null;
+    const picked = new Set();
+
+    async function getJSON(url, opts) {
+        const r = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json', ...(opts?.headers || {}) }, ...opts });
+        const d = await r.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!r.ok) throw new Error(d.error || '실패했어요.');
+        return d;
+    }
+    const post = (url, body) => getJSON(url, { method: 'POST', headers: { 'X-CSRFToken': csrf(), 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
+
+    // ── 내 문서 ──
+    async function loadDocs() {
+        const d = await getJSON(S.docs);
+        docs = d.items;
+        $('sl-used').textContent = `${mb(d.used)} / ${mb(d.max_total)}`;
+        $('sl-docs').innerHTML = docs.map((x) => `<div class="rounded-xl border border-black/[0.06] p-3 dark:border-white/[0.08]" data-doc="${x.id}">
+            <div class="flex items-start gap-2"><b class="min-w-0 flex-1 break-words text-[13px]">${esc(x.title)}</b>
+                <button type="button" class="text-[12px] text-[#8e8e93] hover:text-[#1d1d1f]" data-act="rename" title="이름 바꾸기">✎</button>
+                <button type="button" class="text-[12px] text-[#8e8e93] hover:text-[#c4271d]" data-act="delete" title="지우기">✕</button></div>
+            ${x.status === 'ready' ? `<p class="mt-0.5 text-[11px] text-[#8e8e93]">${x.pages}쪽 · ${x.chunks.toLocaleString()}조각 · ${mb(x.size)}</p>`
+            : x.status === 'processing' ? `<div class="sl-bar mt-2"><span style="width:${Math.max(4, x.progress)}%"></span></div><p class="mt-1 text-[11px] text-[#8e8e93]">절 단위로 나누는 중… ${x.progress}%</p>`
+            : `<p class="mt-1 text-[11px] text-[#c4271d]">${esc(x.error || '실패')}</p><button type="button" class="sl-btn mt-1" data-act="reindex">다시 나누기</button>`}</div>`).join('') || '<p class="text-[13px] text-[#8e8e93]">아직 문서가 없어요. 아래에서 PDF 를 올려 주세요.</p>';
+        const sel = $('sl-doc'), keep = sel.value;
+        sel.innerHTML = '<option value="">모든 문서</option>' + docs.filter((x) => x.status === 'ready').map((x) => `<option value="${x.id}">${esc(x.title)}</option>`).join('');
+        sel.value = keep;
+        clearTimeout(poll);
+        if (docs.some((x) => x.status === 'processing')) poll = setTimeout(loadDocs, 2500);
+    }
+    $('sl-docs').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        const id = b.closest('[data-doc]').dataset.doc, act = b.dataset.act;
+        try {
+            if (act === 'delete') { if (!confirm('이 문서와 나눈 내용을 지울까요?')) return; await post(`${S.base}doc/${id}/delete/`); }
+            if (act === 'reindex') await post(`${S.base}doc/${id}/reindex/`);
+            if (act === 'rename') { const t = prompt('새 이름', docs.find((x) => String(x.id) === id)?.title || ''); if (!t) return; await post(`${S.base}doc/${id}/rename/`, { title: t }); }
+        } catch (err) { alert(err.message); }
+        loadDocs();
+    });
+    $('sl-file').addEventListener('change', (e) => {
+        const f = e.target.files[0]; if (!f) return;
+        const fd = new FormData(); fd.append('file', f); fd.append('title', $('sl-title').value.trim());
+        const box = $('sl-up-prog'), bar = box.querySelector('span'), msg = box.querySelector('p');
+        box.classList.remove('hidden');
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', S.upload); xhr.setRequestHeader('X-CSRFToken', csrf());
+        xhr.upload.onprogress = (ev) => { if (ev.lengthComputable) { bar.style.width = `${ev.loaded / ev.total * 100}%`; msg.textContent = `올리는 중… ${mb(ev.loaded)} / ${mb(ev.total)}`; } };
+        xhr.onload = () => {
+            let d = {}; try { d = JSON.parse(xhr.responseText); } catch (err) { /* 무시 */ }
+            if (xhr.status >= 400) msg.textContent = d.error || `실패 (${xhr.status})`;
+            else { msg.textContent = '올렸어요. 절 단위로 나누는 중이에요 (1000쪽에 10초쯤).'; $('sl-title').value = ''; setTimeout(() => box.classList.add('hidden'), 4000); }
+            e.target.value = ''; loadDocs();
+        };
+        xhr.onerror = () => { msg.textContent = '올리지 못했어요. 연결을 확인해 주세요.'; };
+        xhr.send(fd);
+    });
+
+    // ── 찾기 ──
+    const KIND_BADGE = { clause: ['절', '#f5f3ff', '#7c3aed'], table: ['표', '#e8f1fb', '#0066cc'], figure: ['그림', '#ecfdf5', '#0f9f6e'] };
+    async function run() {
+        const q = $('sl-q').value.trim(); if (q.length < 2) return;
+        lastQ = q;
+        $('sl-results').innerHTML = '<div class="sl-card text-[14px] text-[#8e8e93]">⏳ 찾는 중…</div>';
+        try {
+            const p = new URLSearchParams({ q, doc: $('sl-doc').value, kind });
+            const d = await getJSON(`${S.search}?${p}`);
+            results = d.items; picked.clear();
+            $('sl-head').textContent = `${results.length}개${d.query !== q ? ` · "${d.query}" 로 찾음` : ''}`;
+            render();
+        } catch (err) { $('sl-results').innerHTML = `<div class="sl-card text-[14px] text-[#c4271d]">${esc(err.message)}</div>`; }
+    }
+    function render() {
+        $('sl-results').innerHTML = results.map((r, i) => {
+            const [kb, bg, fg] = KIND_BADGE[r.kind] || KIND_BADGE.clause;
+            return `<article class="sl-card" data-i="${i}">
+                <div class="flex flex-wrap items-center gap-2">
+                    <label class="flex items-center" title="AI 질문 근거로 고르기"><input type="checkbox" data-pick ${picked.has(r.id) ? 'checked' : ''}></label>
+                    <span class="rounded-md px-1.5 text-[11px] font-semibold" style="background:${bg};color:${fg}">${kb}</span>
+                    <span class="sl-clause">${esc(r.clause || '—')}</span><b class="text-[15px]">${esc(r.title)}</b>
+                    <span class="ml-auto text-[12px] text-[#8e8e93]">${esc(r.doc_title)} · p.${r.page}</span>
+                </div>
+                <p class="sl-text mt-2">${r.snippet}</p>
+                <div class="mt-2 flex flex-wrap gap-1.5">
+                    <button type="button" class="sl-btn" data-act="full">📖 절 전체 펼치기</button>
+                    <button type="button" class="sl-btn" data-act="page">📄 원문 쪽 보기 (p.${r.page})</button>
+                    <button type="button" class="sl-btn" data-act="copy">인용 복사</button>
+                </div>
+                <div class="sl-full hidden"></div>
+            </article>`;
+        }).join('') || `<div class="sl-card text-[14px] text-[#8e8e93]">${docs.some((x) => x.status === 'ready') ? '찾은 게 없어요. 영어 키워드나 절 번호로 찾아보세요.' : '먼저 왼쪽에서 표준 PDF 를 올려 주세요.'}</div>`;
+    }
+    $('sl-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    $('sl-doc').addEventListener('change', () => { if ($('sl-q').value.trim()) run(); });
+    $('sl-kind').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; kind = b.dataset.v; $('sl-kind').querySelectorAll('[data-v]').forEach((x) => x.classList.toggle('is-on', x === b)); if ($('sl-q').value.trim()) run(); });
+    $('sl-results').addEventListener('change', (e) => { const c = e.target.closest('[data-pick]'); if (!c) return; const r = results[+c.closest('[data-i]').dataset.i]; if (c.checked) picked.add(r.id); else picked.delete(r.id); });
+    $('sl-results').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        const art = b.closest('[data-i]'), r = results[+art.dataset.i];
+        if (b.dataset.act === 'page') openPage(r.doc, r.page, `${r.doc_title} · ${r.clause} ${r.title}`);
+        if (b.dataset.act === 'copy') {
+            const text = `${r.doc_title}, ${r.clause} ${r.title}, p.${r.page}: "${art.querySelector('.sl-text').textContent.replace(/^… |\s…$/g, '').trim()}"`;
+            navigator.clipboard.writeText(text).then(() => { b.textContent = '✓ 복사됨'; });
+        }
+        if (b.dataset.act === 'full') {
+            const box = art.querySelector('.sl-full');
+            if (!box.classList.contains('hidden')) { box.classList.add('hidden'); b.textContent = '📖 절 전체 펼치기'; return; }
+            box.classList.remove('hidden'); box.innerHTML = '⏳';
+            try {
+                const d = await getJSON(`${S.chunk.replace('/0/', `/${r.id}/`)}?q=${encodeURIComponent(lastQ)}`);
+                box.innerHTML = d.parts.map((x) => `<div class="${x.current ? 'cur' : ''} mb-3"><p class="mb-1 text-[11px] text-[#8e8e93]">p.${x.page}</p><div class="sl-text">${x.html}</div></div>`).join('');
+                b.textContent = '접기';
+                box.querySelector('.cur')?.scrollIntoView({ block: 'nearest' });
+            } catch (err) { box.textContent = err.message; }
+        }
+    });
+
+    // ── 원문 쪽 ──
+    let pg = null;
+    function openPage(doc, page, title) {
+        const d = docs.find((x) => x.id === doc);
+        pg = { doc, page, max: d?.pages || page, title };
+        showPage();
+        $('sl-modal').classList.remove('hidden');
+    }
+    function showPage() {
+        $('sl-img').src = `${S.base}doc/${pg.doc}/page/${pg.page}.png`;
+        $('sl-pno').textContent = `p.${pg.page} / ${pg.max}`;
+        $('sl-modal-title').textContent = pg.title;
+    }
+    $('sl-prev').addEventListener('click', () => { if (pg.page > 1) { pg.page--; showPage(); } });
+    $('sl-next').addEventListener('click', () => { if (pg.page < pg.max) { pg.page++; showPage(); } });
+    $('sl-close').addEventListener('click', () => $('sl-modal').classList.add('hidden'));
+    $('sl-modal').addEventListener('click', (e) => { if (e.target.id === 'sl-modal') $('sl-modal').classList.add('hidden'); });
+    document.addEventListener('keydown', (e) => {
+        if ($('sl-modal').classList.contains('hidden')) return;
+        if (e.key === 'Escape') $('sl-modal').classList.add('hidden');
+        if (e.key === 'ArrowLeft') $('sl-prev').click();
+        if (e.key === 'ArrowRight') $('sl-next').click();
+    });
+
+    // ── ✨ 묻기 ──
+    $('sl-ask').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const q = $('sl-question').value.trim(); if (q.length < 3) return;
+        const box = $('sl-answer'); box.classList.remove('hidden'); box.innerHTML = '<p class="text-[13px] text-[#8e8e93]">⏳ 관련 절을 찾아 읽는 중…</p>';
+        try {
+            const d = await window.mjAI.post(S.ask, { q, chunks: [...picked], search: lastQ && !picked.size ? `${lastQ}` : '', doc: $('sl-doc').value }, $('sl-ask-btn'));
+            const ans = esc(d.answer).replace(/\[(\d+)\]/g, (m, n) => `<span class="sl-ref" data-n="${n}">[${n}]</span>`);
+            box.innerHTML = `<div class="sl-card"><p class="sl-answer">${ans}</p>
+                ${d.confident ? '' : '<p class="mt-2 text-[12px] text-[#b26a00]">⚠️ 찾은 절만으로는 충분하지 않을 수 있어요. 키워드로 더 찾아서 ☑ 고른 뒤 다시 물어보세요.</p>'}
+                ${d.quotes.length ? `<div class="mt-3 space-y-2">${d.quotes.map((x) => { const s = d.sources.find((y) => y.n === x.n); return `<blockquote class="border-l-2 border-[#7c3aed] pl-3 text-[13px] italic text-[#424245] dark:text-[#c7c7cc]">"${esc(x.quote)}"<span class="not-italic block text-[11px] text-[#8e8e93]">[${x.n}] ${esc(s?.clause || '')} ${esc(s?.title || '')} · p.${s?.page}</span></blockquote>`; }).join('')}</div>` : ''}
+                <p class="mt-3 text-[12px] font-semibold text-[#6e6e73]">근거로 읽은 절</p>
+                <ol class="mt-1 space-y-0.5 text-[12.5px]">${d.sources.map((s) => `<li><span class="sl-ref" data-n="${s.n}">[${s.n}]</span> <span class="sl-clause">${esc(s.clause)}</span> ${esc(s.title)} <span class="text-[#8e8e93]">· ${esc(s.doc_title)} p.${s.page}</span> <button type="button" class="sl-btn !py-0" data-page="${s.doc}:${s.page}:${esc(s.clause)}">쪽 보기</button></li>`).join('')}</ol></div>`;
+            box.dataset.sources = JSON.stringify(d.sources);
+        } catch (err) { box.innerHTML = `<p class="text-[13px] text-[#c4271d]">${esc(err.message)}</p>`; }
+    });
+    $('sl-answer').addEventListener('click', (e) => {
+        const p = e.target.closest('[data-page]');
+        if (p) { const [doc, page, clause] = p.dataset.page.split(':'); openPage(+doc, +page, clause); return; }
+        const r = e.target.closest('.sl-ref');
+        if (r) { const s = JSON.parse($('sl-answer').dataset.sources || '[]').find((x) => x.n === +r.dataset.n); if (s) openPage(s.doc, s.page, `${s.clause} ${s.title}`); }
+    });
+
+    loadDocs().catch((err) => { $('sl-docs').innerHTML = `<p class="text-[13px] text-[#c4271d]">${esc(err.message)}</p>`; });
+    window.__sl = { run, loadDocs, results: () => results };
+})();
+</script>
+{% endverbatim %}
+{% endif %}
+{% endblock %}
