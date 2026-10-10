@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, satellite, specs, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, satellite, specdocs, specs, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -30,6 +30,10 @@ urlpatterns = [
     path("cite/", views.cite_page, name="cite"),
     path("specs/", specs.page, name="specs"),
     path("specs/search/", specs.search_view, name="specs_search"),
+    path("specs/text/", specdocs.search_view, name="specs_text"),
+    path("specs/text/docs/", specdocs.docs_view, name="specs_text_docs"),
+    path("specs/text/admin/", specdocs.admin_view, name="specs_text_admin"),
+    path("specs/text/<int:pk>/", specdocs.chunk_view, name="specs_text_chunk"),
     path("cite/lookup/", cite.lookup, name="cite_lookup"),
     path("papers/", views.papers_page, name="papers"),
     path("papers/search/", papers.search_view, name="papers_search"),

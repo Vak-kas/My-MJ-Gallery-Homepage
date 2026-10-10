@@ -1737,3 +1737,103 @@ class SpecsTests(TestCase):
 			self.assertFalse(specs.refresh_index())
 		with mock.patch("tools.specs._refresh_later"):
 			self.assertEqual(self.client.get(url, {"q": "RRC"}).json()["count"], 605)  # 예비 사본
+
+
+class SpecDocsTests(TestCase):
+	def make_docx(self, path):
+		import zipfile
+		W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+
+		def p(text, style=""):
+			st = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
+			runs = "".join(f"<w:r><w:t>{t}</w:t></w:r>" + ("<w:r><w:tab/></w:r>" if i == 0 and "\t" in text else "") for i, t in enumerate(text.split("\t")))
+			return f"<w:p>{st}{runs}</w:p>"
+		cell = lambda *paras: "<w:tc>" + "".join(p(x) for x in paras) + "</w:tc>"
+		body = "".join([
+			p("Contents", "TOC1"),
+			p("6.3.2\tRadio resource control information elements", "Heading3"),
+			p("–\tNTN-Config", "Heading4"),
+			p("The IE NTN-Config provides parameters needed for the UE to access NR via NTN access."),
+			p("-- ASN1START", "PL"), p("NTN-Config-r17 ::= SEQUENCE {", "PL"), p("    ta-Info-r17   TA-Info-r17   OPTIONAL", "PL"), p("}", "PL"),
+			p("NTN-Config field descriptions", "TH"),
+			"<w:tbl><w:tr>" + cell("ta-Common") + "</w:tr><w:tr>" + cell("ta-Common", "Network-controlled common timing advance value.") + "</w:tr></w:tbl>",
+			p("7\tVariables and constants", "Heading1"),
+			p("Some text about timers.", "B1"),
+		])
+		with zipfile.ZipFile(path, "w") as z:
+			z.writestr("word/document.xml", f'<?xml version="1.0"?><w:document {W}><w:body>{body}</w:body></w:document>')
+
+	def test_parse_docx(self):
+		import os, tempfile
+		from tools import specdocs
+		path = os.path.join(tempfile.mkdtemp(), "t.docx")
+		self.make_docx(path)
+		ch = specdocs.parse_docx(path)
+		kinds = [(c["kind"], c["clause"], c["title"]) for c in ch]
+		self.assertIn(("clause", "6.3.2", "NTN-Config"), kinds)  # 번호 없는 IE 제목은 위 절 번호
+		asn = next(c for c in ch if c["kind"] == "asn1")
+		self.assertEqual(asn["title"], "NTN-Config-r17")
+		table = next(c for c in ch if c["kind"] == "table")
+		self.assertEqual(table["title"], "NTN-Config field descriptions")
+		self.assertIn("ta-Common · Network-controlled", table["text"])
+		self.assertIn("• Some text about timers.", next(c for c in ch if c["clause"] == "7")["text"])
+		self.assertFalse(any("Contents" in c["text"] for c in ch))  # 목차 빼기
+		self.assertEqual(specdocs.normalize("K_offset 와 K_{mac}"), "Koffset 와 Kmac")
+
+	def test_index_search_and_access(self):
+		import os, tempfile, zipfile
+		from unittest import mock
+		from django.contrib.auth import get_user_model
+		from tools import specdocs
+		from tools.models import SpecChunk, SpecDoc
+		tmp = tempfile.mkdtemp()
+		self.make_docx(os.path.join(tmp, "38331-j40.docx"))
+
+		def fake_download(url, dest):
+			with zipfile.ZipFile(dest, "w") as z:
+				z.write(os.path.join(tmp, "38331-j40.docx"), "38331-j40.docx")
+		info = {"type": "TS", "number": "38.331", "title": "NR; RRC", "wg": "R2", "rels": {"19": "19.4.0"}, "dead": False, "top": 19}
+		with mock.patch("tools.specs.load_index", return_value={"specs": {"38.331": info}, "fetched": ""}), \
+				mock.patch("tools.specdocs._download", side_effect=fake_download) as dl, mock.patch("tools.specdocs.PAUSE", 0):
+			specdocs.queue(["38.331"])
+			self.assertEqual(specdocs.run_pending(), 1)
+			doc = SpecDoc.objects.get()
+			self.assertEqual((doc.status, doc.version, doc.release), ("ready", "19.4.0", "19"))
+			self.assertGreater(doc.chunks, 3)
+			specdocs.queue(["38.331"])
+			specdocs.run_pending()  # 같은 버전이면 다시 안 받음
+			self.assertEqual(dl.call_count, 1)
+		res = self.client.get(reverse("tools:specs_text"), {"q": "ta-Common"}).json()
+		self.assertTrue(res["items"])
+		self.assertEqual(res["items"][0]["doc_label"], "TS 38.331 v19.4.0")
+		self.assertIn("<mark>", res["items"][0]["snippet"])
+		asn = self.client.get(reverse("tools:specs_text"), {"q": "NTN-Config", "kind": "asn1"}).json()["items"]
+		self.assertEqual([c["kind"] for c in asn], ["asn1"])
+		pk = res["items"][0]["id"]
+		self.assertEqual(self.client.get(reverse("tools:specs_text_chunk", args=[pk])).status_code, 401)  # 절 전체는 회원만
+		user = get_user_model().objects.create_user("sd", "sd@example.com", "pw-for-tests-only")
+		self.client.force_login(user)
+		full = self.client.get(reverse("tools:specs_text_chunk", args=[pk])).json()
+		self.assertTrue(full["cite"].startswith("3GPP TS 38.331 V19.4.0"))
+		self.assertEqual(self.client.post(reverse("tools:specs_text_admin"), {"action": "default"}).status_code, 403)  # 관리자만
+		admin = get_user_model().objects.create_superuser("sda", "sda@example.com", "pw-for-tests-only")
+		self.client.force_login(admin)
+		with mock.patch("tools.specdocs.start_worker") as worker, mock.patch("tools.specs.load_index", return_value={"specs": {}, "fetched": ""}):
+			d = self.client.post(reverse("tools:specs_text_admin"), {"action": "add", "numbers": "38.321, 38.300"}).json()
+			worker.assert_called_once()
+		self.assertEqual(sorted(x["number"] for x in d["docs"]), ["38.300", "38.321", "38.331"])
+		self.assertEqual(SpecChunk.objects.filter(doc__number="38.331").count(), doc.chunks)
+
+	def test_download_failure_keeps_old(self):
+		from unittest import mock
+		from tools import specdocs
+		from tools.models import SpecChunk, SpecDoc
+		doc = SpecDoc.objects.create(number="38.321", version="18.0.0", chunks=1, status="pending")
+		SpecChunk.objects.create(doc=doc, order=0, text="old text")
+		info = {"type": "TS", "number": "38.321", "title": "MAC", "wg": "R2", "rels": {"19": "19.4.0"}, "dead": False, "top": 19}
+		with mock.patch("tools.specs.load_index", return_value={"specs": {"38.321": info}, "fetched": ""}), \
+				mock.patch("tools.specdocs._download", side_effect=OSError("slow")), mock.patch("tools.specdocs.PAUSE", 0):
+			specdocs.run_pending()
+		doc.refresh_from_db()
+		self.assertEqual((doc.status, doc.version), ("ready", "18.0.0"))  # 예전 버전 그대로 쓰고 이유만 남김
+		self.assertTrue(doc.error)
