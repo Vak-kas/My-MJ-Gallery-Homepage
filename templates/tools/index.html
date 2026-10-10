@@ -3,6 +3,23 @@
 {% block content %}
 {% include "components/main_nav.html" with nav_active="tool" %}
 
+<style>
+    /* 등급 테두리: 회원 = 금색, VIP = 무지개. 안쪽은 카드 색, 바깥 2px 만 그라디언트 */
+    .tier-member, .tier-vip { border: 2px solid transparent !important; background-origin: border-box; background-clip: padding-box, border-box; }
+    .tier-member { background-image: linear-gradient(#fff, #fff), linear-gradient(135deg, #f6d365, #d4a017 35%, #fff1b8 55%, #c99700 80%, #f6d365); }
+    .tier-vip { background-image: linear-gradient(#fff, #fff), linear-gradient(120deg, #ff6b6b, #f7b733, #4ade80, #38bdf8, #a78bfa, #f472b6, #ff6b6b); background-size: 100% 100%, 300% 300%; animation: tier-flow 8s linear infinite; }
+    @keyframes tier-flow { from { background-position: 0 0, 0% 50%; } to { background-position: 0 0, 300% 50%; } }
+    .tier-member:hover { box-shadow: 0 8px 24px rgba(212, 160, 23, 0.25); }
+    .tier-vip:hover { box-shadow: 0 8px 26px rgba(167, 139, 250, 0.3); }
+    .badge-member { background: linear-gradient(135deg, #fff4cc, #ffe08a); color: #7a5200; }
+    .badge-vip { background: linear-gradient(120deg, #ffe1e1, #fff1c9, #dcfce7, #dbeafe, #ede9fe, #fce7f3); color: #6d28d9; }
+    html.theme-dark .tier-member { background-image: linear-gradient(#171a20, #171a20), linear-gradient(135deg, #f6d365, #d4a017 35%, #fff1b8 55%, #c99700 80%, #f6d365); }
+    html.theme-dark .tier-vip { background-image: linear-gradient(#171a20, #171a20), linear-gradient(120deg, #ff6b6b, #f7b733, #4ade80, #38bdf8, #a78bfa, #f472b6, #ff6b6b); }
+    html.theme-dark .badge-member { background: linear-gradient(135deg, #4a3a10, #6b5214); color: #ffd866; }
+    html.theme-dark .badge-vip { background: linear-gradient(120deg, #4c1d2b, #4a3a10, #14432d, #142e43, #2e1f4d, #4c1d3d); color: #e9d5ff; }
+    @media (prefers-reduced-motion: reduce) { .tier-vip { animation: none; } }
+</style>
+
 <main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
     <div>
         <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">UTILITIES</p>
@@ -25,8 +42,12 @@
         </label>
     </div>
 
-    {% if has_member_tools and not user.is_authenticated %}
-    <p class="mt-4 text-[13px] text-[#8e8e93]">🔒 표시가 있는 도구는 서버 자원을 써서 회원만 쓸 수 있어요. <a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="text-[#0066cc] hover:underline">로그인하고 쓰기 →</a></p>
+    {% if has_member_tools %}
+    <p class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#8e8e93]">
+        <span><span class="badge-member rounded-full px-2 py-0.5 text-[11px] font-semibold">🔒 회원</span> 금색 테두리는 로그인한 회원 전용</span>
+        {% if has_vip_tools %}<span><span class="badge-vip rounded-full px-2 py-0.5 text-[11px] font-semibold">💎 VIP</span> 무지개 테두리는 VIP 회원 전용</span>{% endif %}
+        {% if not user.is_authenticated %}<a href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}" class="text-[#0066cc] hover:underline">로그인하고 쓰기 →</a>{% endif %}
+    </p>
     {% endif %}
     {% endif %}
 
@@ -40,11 +61,13 @@
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {% for tool in section.tools %}
             <a href="{{ tool.url }}" data-search="{{ tool.title|lower }} {{ tool.description|lower }} {{ tool.tags|join:' '|lower }} {{ tool.slug }}"
-               class="tool-card group flex flex-col rounded-[22px] border {% if section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08]{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:border-[#0066cc]/40 hover:shadow-md">
+               class="tool-card group flex flex-col rounded-[22px] border {% if tool.access == 'member' %}tier-member{% elif tool.access == 'vip' %}tier-vip{% elif section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08] hover:border-[#0066cc]/40{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-md">
                 <div class="flex items-start justify-between gap-3">
                     <div class="flex h-12 w-12 items-center justify-center rounded-2xl {% if section.key == 'admin' %}bg-[#fff6e8] text-[#b26a00]{% else %}bg-[#f0f7ff] text-[#0066cc]{% endif %} text-[22px]">{{ tool.icon }}</div>
                     {% if tool.access == 'member' %}
-                    <span class="rounded-full bg-[#f5f5f7] px-2.5 py-1 text-[11px] text-[#6e6e73]" title="로그인한 회원만 쓸 수 있어요">🔒 회원</span>
+                    <span class="badge-member rounded-full px-2.5 py-1 text-[11px] font-semibold" title="로그인한 회원만 쓸 수 있어요">🔒 회원</span>
+                    {% elif tool.access == 'vip' %}
+                    <span class="badge-vip rounded-full px-2.5 py-1 text-[11px] font-semibold" title="VIP 회원만 쓸 수 있어요">💎 VIP</span>
                     {% endif %}
                 </div>
                 <h3 class="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">{{ tool.title }}</h3>
@@ -53,7 +76,7 @@
                     {% for tag in tool.tags %}
                     <span class="rounded-full border border-black/[0.08] px-2.5 py-0.5 text-[11px] text-[#6e6e73]">{{ tag }}</span>
                     {% endfor %}
-                    <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">{% if tool.access == 'member' and not user.is_authenticated %}로그인 →{% else %}열기 →{% endif %}</span>
+                    <span class="ml-auto text-[13px] font-semibold text-[#0066cc] transition group-hover:translate-x-0.5">{% if tool.access == 'member' and not user.is_authenticated or tool.access == 'vip' and not user.is_authenticated %}로그인 →{% else %}열기 →{% endif %}</span>
                 </div>
             </a>
             {% endfor %}

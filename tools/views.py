@@ -33,7 +33,8 @@ def index(request):
 	return render(request, "tools/index.html", {
 		"sections": sections,
 		"tool_count": sum(len(s["tools"]) for s in sections),
-		"has_member_tools": any(t.get("access") == "member" for s in sections for t in s["tools"]),
+		"has_member_tools": any(t.get("access") in ("member", "vip") for s in sections for t in s["tools"]),
+		"has_vip_tools": any(t.get("access") == "vip" for s in sections for t in s["tools"]),
 	})
 
 
