@@ -83,56 +83,66 @@ def _doc(request, pk):
 
 # ── PDF 나누기 ──
 
-def _lines(doc):
-	"""쪽마다 (글자, 크기, 굵게) 줄 목록. 같은 높이의 조각(절 번호 · 제목 등)은 한 줄로 합치고, 줄 간격이 벌어지면 "" 로 문단을 끊음."""
-	pages = []
-	for page in doc:
-		raw = []
-		for block in page.get_text("dict").get("blocks", []):
-			for line in block.get("lines", []):
-				spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
-				if not spans:
-					continue
-				text = " ".join("".join(s.get("text", "") for s in line.get("spans", [])).split())
-				size = max(s.get("size", 0) for s in spans)
-				bold = all(("bold" in s.get("font", "").lower() or (s.get("flags", 0) & 16)) for s in spans)
-				x0, y0, _, y1 = line["bbox"]
-				raw.append([round(y0, 1), x0, y1, text, round(size, 1), bold])
-		raw.sort(key=lambda r: (r[0], r[1]))
-		rows = []
-		for r in raw:
-			if rows and abs(r[0] - rows[-1][0]) < 2.5 and abs(r[4] - rows[-1][4]) < 1.5:
-				rows[-1][3] += " " + r[3]
-				rows[-1][2] = max(rows[-1][2], r[2])
-				rows[-1][5] = rows[-1][5] and r[5]
-			else:
-				rows.append(r)
-		out, prev = [], None
-		for y0, _, y1, text, size, bold in rows:
-			if prev is not None and y0 - prev > max(4.0, size * 0.6):
-				out.append(("", 0, False))
-			out.append((text, size, bold))
-			prev = y1
-		out.append(("", 0, False))
-		pages.append(out)
-	return pages
+def _page_lines(page):
+	"""한 쪽의 (글자, 크기, 굵게) 줄 목록과 위·아래 가장자리 줄(머리말·꼬리말 후보).
+	같은 높이의 조각(절 번호 · 제목 등)은 한 줄로 합치고, 줄 간격이 벌어지면 "" 로 문단을 끊음."""
+	height = page.rect.height or 842
+	raw = []
+	for block in page.get_text("dict").get("blocks", []):
+		for line in block.get("lines", []):
+			spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
+			if not spans:
+				continue
+			text = " ".join("".join(s.get("text", "") for s in line.get("spans", [])).split())
+			size = max(s.get("size", 0) for s in spans)
+			bold = all(("bold" in s.get("font", "").lower() or (s.get("flags", 0) & 16)) for s in spans)
+			x0, y0, _, y1 = line["bbox"]
+			raw.append([round(y0, 1), x0, y1, text, round(size, 1), bold])
+	raw.sort(key=lambda r: (r[0], r[1]))
+	rows = []
+	for r in raw:
+		if rows and abs(r[0] - rows[-1][0]) < 2.5 and abs(r[4] - rows[-1][4]) < 1.5:
+			rows[-1][3] += " " + r[3]
+			rows[-1][2] = max(rows[-1][2], r[2])
+			rows[-1][5] = rows[-1][5] and r[5]
+		else:
+			rows.append(r)
+	out, edges, prev = [], set(), None
+	for y0, _, y1, text, size, bold in rows:
+		if y0 < height * 0.09 or y1 > height * 0.91:
+			edges.add(text)
+		if prev is not None and y0 - prev > max(4.0, size * 0.6):
+			out.append(("", 0, False))
+		out.append((text, size, bold))
+		prev = y1
+	out.append(("", 0, False))
+	return out, edges
 
 
 def parse(path, progress=None):
-	"""PDF → 조각 목록 [{kind, clause, title, page, text}]."""
+	"""PDF → 조각 목록 [{kind, clause, title, page, text}].
+
+	메모리를 아끼려고 두 번 훑음: ① 가장자리 줄(머리말·꼬리말) 횟수와 글자 크기만 세고,
+	② 한 쪽씩 다시 읽으며 바로 조각으로 만듦 (전체 쪽을 메모리에 올려 두지 않음).
+	"""
 	import fitz  # PyMuPDF
 
 	doc = fitz.open(path)
-	if doc.page_count > MAX_PAGES:
+	n = doc.page_count
+	if n > MAX_PAGES:
 		raise ValueError(f"{MAX_PAGES}쪽이 넘는 문서는 나누지 않아요.")
-	pages = _lines(doc)
-	n = len(pages)
-	# 여러 쪽에 반복되는 머리말·꼬리말 (숫자는 # 로 바꿔서 셈)
 	norm = lambda t: re.sub(r"\d+", "#", t)
-	freq = Counter(norm(t) for p in pages for t in {x[0] for x in p if x[0]})
+	freq, sizes = Counter(), Counter()
+	for pno in range(n):
+		lines, edges = _page_lines(doc[pno])
+		freq.update({norm(t) for t in edges})
+		sizes.update(s for t, s, _ in lines if t)
+		if progress and pno % 100 == 99:
+			progress(int(pno / n * 30))
+			fitz.TOOLS.store_shrink(100)  # PyMuPDF 내부 캐시 비우기
 	repeat = {k for k, c in freq.items() if c >= max(5, n * 0.15) and len(k) < 160}
-	sizes = Counter(s for p in pages for t, s, _ in p if t)
 	body = sizes.most_common(1)[0][0] if sizes else 10
+	del freq, sizes
 
 	chunks = []
 	cur = {"kind": StdChunk.KIND_CLAUSE, "clause": "", "title": "앞부분", "page": 1, "buf": []}
@@ -160,9 +170,12 @@ def parse(path, progress=None):
 				chunks.append({"kind": cur["kind"], "clause": cur["clause"], "title": cur["title"], "page": start_page, "text": "\n".join(piece)})
 		cur["buf"] = []
 
-	for pno, lines in enumerate(pages, start=1):
-		if progress and pno % 40 == 0:
-			progress(int(pno / n * 90))
+	for pno in range(1, n + 1):
+		lines, _ = _page_lines(doc[pno - 1])
+		if pno % 100 == 0:
+			fitz.TOOLS.store_shrink(100)
+			if progress:
+				progress(30 + int(pno / n * 65))
 		for text, size, bold in lines:
 			if not text:
 				flush_para()
@@ -203,6 +216,7 @@ def parse(path, progress=None):
 	flush_clause(force=True)
 	if cap:
 		chunks.append(cap)
+	doc.close()
 	ctrl = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")  # PostgreSQL 은 NUL 등 제어 문자를 못 받음
 	for c in chunks:
 		c.pop("left", None)
@@ -274,8 +288,9 @@ def search(user, q, doc_id=None, kind="", limit=30):
 		expr = "to_tsvector('english', coalesce(tools_stdchunk.clause, '') || ' ' || coalesce(tools_stdchunk.title, '') || ' ' || tools_stdchunk.text)"
 		query = "websearch_to_tsquery('english', %s)"
 		# 변경 이력·앞부분은 용어가 다 나와서 점수가 부풀므로 낮춤
-		rank = (f"(ts_rank_cd({expr}, {query}) + CASE WHEN to_tsvector('english', coalesce(tools_stdchunk.title, '')) @@ {query} THEN 0.6 ELSE 0 END"
-				f" + CASE WHEN tools_stdchunk.kind <> 'clause' THEN 0.1 ELSE 0 END)"
+		fig = "1" if kind == StdChunk.KIND_FIGURE or re.search(r"\bfig(ure)?s?\b|그림", q, re.I) else "0.55"
+		rank = (f"(ts_rank_cd({expr}, {query}) + CASE WHEN to_tsvector('english', coalesce(tools_stdchunk.title, '')) @@ {query} THEN 0.6 ELSE 0 END)"
+				f" * CASE WHEN tools_stdchunk.kind = 'figure' THEN {fig} ELSE 1 END"
 				f" * CASE WHEN tools_stdchunk.title ILIKE '%%change history%%' OR tools_stdchunk.title ILIKE '%%revision history%%' OR tools_stdchunk.title = '앞부분' THEN 0.15 ELSE 1 END")
 		def run(text):
 			return list(qs.extra(where=[f"{expr} @@ {query}"], params=[text], select={"rank": rank}, select_params=[text, text]).order_by("-rank")[:limit])
@@ -301,7 +316,8 @@ def search(user, q, doc_id=None, kind="", limit=30):
 		stem = t[:-1] if len(t) > 5 and t.endswith("s") else t
 		qs = qs.filter(models_q(stem))
 	rows = list(qs[:400])
-	low = lambda c: 0.15 if ("change history" in c.title.lower() or c.title == "앞부분") else 1
+	want_fig = kind == StdChunk.KIND_FIGURE or re.search(r"\bfig(ure)?s?\b|그림", q, re.I)
+	low = lambda c: (0.15 if ("change history" in c.title.lower() or c.title == "앞부분") else 1) * (0.55 if c.kind == StdChunk.KIND_FIGURE and not want_fig else 1)
 	rows.sort(key=lambda c: (-low(c) * sum(c.title.lower().count(t.lower()) * 5 + c.text.lower().count(t.lower()) for t in terms), c.order))
 	return rows[:limit], q
 
