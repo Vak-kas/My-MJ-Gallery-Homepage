@@ -21,6 +21,7 @@ from django.contrib.sitemaps.views import sitemap
 
 from blog.feeds import LatestPostsFeed
 from main.sitemaps import PostSitemap, StaticSitemap
+from main import pwa
 from main.views import og_card, robots_txt
 from tools.link_views import short_redirect
 from django.conf import settings
@@ -34,6 +35,10 @@ urlpatterns = [
     path('s/<str:code>', short_redirect, name='short_redirect'),
     path('sitemap.xml', sitemap, {'sitemaps': {'pages': StaticSitemap, 'posts': PostSitemap}}, name='sitemap'),
     path('robots.txt', robots_txt, name='robots_txt'),
+    path('manifest.webmanifest', pwa.manifest, name='pwa_manifest'),
+    path('sw.js', pwa.service_worker, name='pwa_sw'),
+    path('offline/', pwa.offline, name='pwa_offline'),
+    path('app/', pwa.install, name='pwa_install'),
     path('og/<str:kind>/<str:key>.png', og_card, name='og_card'),
     path('', include('main.urls')),
     path('admin/', admin.site.urls),

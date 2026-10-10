@@ -41,6 +41,7 @@
   - Tool 목록·각 도구·블로그·카테고리·갤러리·시리즈·라이브 방송 링크도 **페이지 전용 카드**를 자동 생성 (`/og/<종류>/<키>.png`, `media/og/` 에 저장·재사용)
   - 카드 글꼴: 나눔고딕(SIL OFL, `blog/fonts/`), 기본 이미지 `static/images/og-default.png`
 - `/sitemap.xml`(공개 페이지·글, Settings 에서 닫은 메뉴 제외), `/robots.txt`(관리·공유 링크 크롤링 금지), 개인·공유 페이지는 noindex
+- **📱 앱으로 설치 (PWA)**: `/manifest.webmanifest`(이름·아이콘 192/512·maskable·주소창 없이 열기·꾹 누르면 클립보드·논문 찾기·Tool·Game 바로가기), `/sw.js` 서비스 워커(정적 파일과 '연결이 끊겼어요' 화면 `/offline/` 만 저장 — 개인 정보가 섞일 수 있는 HTML 은 저장 안 함, 버전은 `main/pwa.py` 의 `SW_VERSION`), 아이폰용 `apple-touch-icon`. 꼬리말의 **📱 앱으로 설치** → `/app/` 안내(안드로이드·크롬은 버튼, 아이폰은 공유 → 홈 화면에 추가 그림 안내, 이미 앱이면 숨김). 아이콘은 `static/images/app/`(로고 SVG 를 PyMuPDF 로 그림)
 - **다크 모드**: `scripts/gen_dark_css.py` 가 템플릿 전체의 색(클래스·`<style>`)을 훑어 `static/css/theme-dark.css` 를 자동 생성 — 밝은 배경은 어둡게, 대비가 모자란 글자는 밝게
 
 ### 1.5 Gallery

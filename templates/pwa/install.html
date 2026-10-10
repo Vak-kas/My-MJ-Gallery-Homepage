@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" %}
+
+<style>
+    .app-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 22px; }
+    .app-step { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.6; }
+    .app-step b.n { flex: none; display: inline-flex; width: 26px; height: 26px; align-items: center; justify-content: center; border-radius: 999px; background: #0066cc; color: #fff; font-size: 13px; }
+    .app-kbd { display: inline-flex; align-items: center; gap: 4px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.12); background: #f5f5f7; padding: 1px 8px; font-size: 13px; }
+    html.theme-dark .app-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .app-kbd { background: #23262d; border-color: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[760px] px-6 py-14 lg:py-16">
+    <div class="flex items-center gap-4">
+        <img src="{% static 'images/app/icon-192.png' %}" alt="MJ Gallery 아이콘" class="h-16 w-16 rounded-[18px] shadow-md">
+        <div>
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">APP</p>
+            <h1 class="apple-display mt-1 text-[34px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">앱으로 설치하기</h1>
+        </div>
+    </div>
+    <p class="mt-4 text-[15px] leading-relaxed text-[#6e6e73]">휴대폰 홈 화면(또는 컴퓨터)에 <b>MJ Gallery</b> 아이콘으로 깔려서, 주소창 없이 앱처럼 열려요. 앱 스토어를 거치지 않고 용량도 거의 차지하지 않아요.</p>
+
+    <!-- 이미 앱으로 열림 -->
+    <section class="app-card mt-6 hidden" id="app-done">
+        <p class="text-[17px] font-semibold">✅ 지금 앱으로 열려 있어요</p>
+        <p class="mt-1 text-[14px] text-[#6e6e73]">홈 화면의 MJ Gallery 아이콘으로 언제든 바로 열 수 있어요.</p>
+    </section>
+
+    <!-- 버튼으로 설치 (안드로이드·크롬·엣지) -->
+    <section class="app-card mt-6 hidden" id="app-prompt">
+        <p class="text-[17px] font-semibold">버튼 한 번이면 돼요</p>
+        <button type="button" id="app-install" class="mt-4 rounded-full bg-[#0066cc] px-6 py-3 text-[16px] font-semibold text-white">📱 MJ Gallery 설치</button>
+        <p class="mt-3 text-[13px] text-[#8e8e93]" id="app-msg"></p>
+    </section>
+
+    <!-- 아이폰·아이패드 -->
+    <section class="app-card mt-6 hidden space-y-3" id="app-ios">
+        <p class="text-[17px] font-semibold">아이폰 · 아이패드 (Safari)</p>
+        <p class="app-step"><b class="n">1</b><span>화면 아래(아이패드는 위)의 <span class="app-kbd">공유 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg></span> 버튼을 눌러요.</span></p>
+        <p class="app-step"><b class="n">2</b><span>메뉴를 조금 내려서 <span class="app-kbd">홈 화면에 추가 ⊞</span> 를 눌러요.</span></p>
+        <p class="app-step"><b class="n">3</b><span>오른쪽 위 <span class="app-kbd">추가</span> 를 누르면 끝! 홈 화면에 MJ Gallery 아이콘이 생겨요.</span></p>
+        <p class="text-[12px] text-[#8e8e93]">카카오톡·네이버 앱 안에서 열었다면, 오른쪽 위 메뉴의 <b>Safari 로 열기</b> 를 먼저 눌러 주세요. 아이폰 크롬에서도 공유 → 홈 화면에 추가로 돼요.</p>
+    </section>
+
+    <!-- 그 밖의 브라우저 -->
+    <section class="app-card mt-6 hidden space-y-3" id="app-other">
+        <p class="text-[17px] font-semibold">브라우저 메뉴에서 추가해요</p>
+        <p class="app-step"><b class="n">·</b><span><b>삼성 인터넷</b>: 아래 메뉴 <span class="app-kbd">≡</span> → <span class="app-kbd">현재 페이지 추가</span> → <span class="app-kbd">홈 화면</span></span></p>
+        <p class="app-step"><b class="n">·</b><span><b>크롬 (안드로이드)</b>: 오른쪽 위 <span class="app-kbd">⋮</span> → <span class="app-kbd">앱 설치</span> 또는 <span class="app-kbd">홈 화면에 추가</span></span></p>
+        <p class="app-step"><b class="n">·</b><span><b>컴퓨터 크롬·엣지</b>: 주소창 오른쪽의 <span class="app-kbd">⊕ 설치</span> 아이콘</span></p>
+        <p class="text-[12px] text-[#8e8e93]">카카오톡 안에서 열었다면 오른쪽 아래 메뉴의 <b>다른 브라우저로 열기</b> 를 먼저 눌러 주세요.</p>
+    </section>
+
+    <section class="app-card mt-6">
+        <p class="text-[15px] font-semibold">앱으로 쓰면 좋은 점</p>
+        <ul class="mt-2 space-y-1.5 text-[14px] leading-relaxed text-[#424245] dark:text-[#c7c7cc]">
+            <li>· 주소창·탭 없이 화면을 넓게 써요</li>
+            <li>· 안드로이드는 아이콘을 꾹 누르면 <b>클립보드 · 논문 찾기 · Tool · Game</b> 바로가기가 나와요</li>
+            <li>· 인터넷이 끊기면 하얀 화면 대신 "연결이 끊겼어요" 안내가 나와요</li>
+            <li>· 로그인은 브라우저와 따로라서, 앱에서 한 번 더 로그인해야 할 수 있어요</li>
+        </ul>
+    </section>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+    const ua = navigator.userAgent;
+    const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    function show() {
+        ['app-done', 'app-prompt', 'app-ios', 'app-other'].forEach((id) => $(id).classList.add('hidden'));
+        if (standalone) { $('app-done').classList.remove('hidden'); return; }
+        if (window.__mjInstallPrompt) { $('app-prompt').classList.remove('hidden'); return; }
+        $(ios ? 'app-ios' : 'app-other').classList.remove('hidden');
+    }
+    window.addEventListener('mj-install-ready', show);
+    $('app-install').addEventListener('click', async () => {
+        const p = window.__mjInstallPrompt; if (!p) return;
+        p.prompt();
+        const { outcome } = await p.userChoice;
+        window.__mjInstallPrompt = null;
+        $('app-msg').textContent = outcome === 'accepted' ? '설치했어요! 홈 화면(또는 앱 목록)에서 MJ Gallery 를 찾아보세요.' : '나중에 언제든 다시 설치할 수 있어요.';
+        if (outcome === 'accepted') setTimeout(show, 1500);
+    });
+    window.addEventListener('appinstalled', () => { $('app-msg').textContent = '설치했어요! 🎉'; });
+    show();
+})();
+</script>
+{% endblock %}

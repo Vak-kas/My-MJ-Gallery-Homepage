@@ -31,6 +31,20 @@
 
     {% load static %}
     <link rel="icon" type="image/svg+xml" href="{% static 'images/mj-logo.svg' %}?v=2">
+    <!-- 앱처럼 설치 (PWA) -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
+    <link rel="apple-touch-icon" href="{% static 'images/app/apple-touch-icon.png' %}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="MJ Gallery">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <script>
+        // 설치 버튼용: 브라우저가 설치를 허락하면 기억해 둠 (/app/ 화면에서 씀)
+        window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); window.__mjInstallPrompt = e; window.dispatchEvent(new Event("mj-install-ready")); });
+        if ("serviceWorker" in navigator) window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+    </script>
     <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22><rect width=%22120%22 height=%22120%22 fill=%22%23ffffff%22 rx=%2228%22/><circle cx=%2260%22 cy=%2260%22 r=%2248%22 fill=%22none%22 stroke=%22%23d4af37%22 stroke-width=%222.5%22 opacity=%220.9%22/><text x=%2238%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%23d4af37%22 letter-spacing=%22-3%22>M</text><text x=%2275%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%231a1a1a%22 letter-spacing=%22-2%22>J</text></svg>">
 
     <script>
