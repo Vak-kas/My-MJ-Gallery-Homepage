@@ -289,3 +289,28 @@ class StdChunk(models.Model):
 def _delete_std_file(sender, instance, **kwargs):
 	if instance.file:
 		instance.file.delete(save=False)
+
+
+def _paste_id():
+	return secrets.token_urlsafe(9)
+
+
+class Paste(models.Model):
+	"""코드 붙여넣기 공유. 만들기는 회원, 링크가 있으면 누구나 봄 (목록·검색에는 안 나옴)."""
+
+	paste_id = models.CharField(max_length=24, unique=True, default=_paste_id)
+	owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="pastes")
+	title = models.CharField(max_length=100, blank=True)
+	language = models.CharField(max_length=30, default="auto")
+	content = models.TextField()
+	size = models.PositiveIntegerField(default=0)  # UTF-8 바이트
+	forked_from = models.CharField(max_length=24, blank=True)
+	view_count = models.PositiveIntegerField(default=0)
+	created_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField(null=True, blank=True, db_index=True)  # 비어 있으면 지울 때까지
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"paste:{self.paste_id}"

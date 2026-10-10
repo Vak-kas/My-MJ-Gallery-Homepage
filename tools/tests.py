@@ -1482,3 +1482,70 @@ class DiagramTests(TestCase):
 			self.assertEqual(self.post({"mode": "fix", "code": ""}).status_code, 400)
 			with mock.patch("tools.ai.call", return_value={"code": "<script>x</script>", "explanation": ""}):
 				self.assertEqual(self.post({"mode": "fix", "code": "graph TD\nA-->", "error": "Parse error"}).status_code, 502)
+
+
+class PasteTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		User = get_user_model()
+		self.member = User.objects.create_user("pm", "pm@example.com", "pw-for-tests-only")
+		self.other = User.objects.create_user("po", "po@example.com", "pw-for-tests-only")
+
+	def create(self, **extra):
+		import json
+		body = {"title": "main.py", "language": "python", "content": "print('안녕')\r\n<script>alert(1)</script>\n", "ttl": "24", **extra}
+		return self.client.post(reverse("tools:paste_create"), json.dumps(body), content_type="application/json")
+
+	def test_create_needs_login_and_view_is_public(self):
+		from tools.models import Paste
+		self.assertEqual(self.create().status_code, 302)
+		self.client.force_login(self.member)
+		d = self.create().json()
+		p = Paste.objects.get()
+		self.assertEqual(p.content, "print('안녕')\n<script>alert(1)</script>\n")  # 줄 끝 통일
+		self.assertIn(p.paste_id, d["url"])
+		self.client.logout()
+		res = self.client.get(d["path"])
+		self.assertEqual(res["X-Robots-Tag"], "noindex")
+		self.assertNotContains(res, "<script>alert(1)</script>")  # 내용은 JSON 으로만, 이스케이프됨
+		p.refresh_from_db()
+		self.assertEqual(p.view_count, 1)
+		raw = self.client.get(reverse("tools:paste_raw", args=[p.paste_id]))
+		self.assertEqual(raw["Content-Type"], "text/plain; charset=utf-8")
+		self.assertEqual(raw["X-Content-Type-Options"], "nosniff")
+		self.assertIn("sandbox", raw["Content-Security-Policy"])
+		dl = self.client.get(reverse("tools:paste_raw", args=[p.paste_id]) + "?download=1")
+		self.assertIn('filename="main.py"', dl["Content-Disposition"])
+
+	def test_expired_is_gone_and_limits(self):
+		from datetime import timedelta
+		from unittest import mock
+		from django.utils import timezone
+		from tools import paste_views
+		from tools.models import Paste
+		self.client.force_login(self.member)
+		self.assertEqual(self.create(content="  ").status_code, 400)
+		self.assertEqual(self.create(content="x" * (512 * 1024 + 1)).status_code, 400)
+		d = self.create(ttl="never", language="weird").json()
+		p = Paste.objects.get(paste_id=d["id"])
+		self.assertIsNone(p.expires_at)
+		self.assertEqual(p.language, "auto")
+		Paste.objects.filter(pk=p.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+		self.assertEqual(self.client.get(d["path"]).status_code, 404)
+		self.assertEqual(self.client.get(reverse("tools:paste_raw", args=[p.paste_id])).status_code, 404)
+		with mock.patch.dict(paste_views.PASTE_LIMITS["member"], {"max_count": 1}):
+			self.assertEqual(self.create().status_code, 200)  # 만료된 건 개수에 안 셈
+			self.assertEqual(self.create().status_code, 400)
+
+	def test_only_owner_deletes_and_fork(self):
+		from tools.models import Paste
+		self.client.force_login(self.member)
+		d = self.create().json()
+		self.client.force_login(self.other)
+		self.assertContains(self.client.get(reverse("tools:paste") + f"?fork={d['id']}"), "원래 붙여넣기")
+		self.assertEqual(self.client.post(reverse("tools:paste_delete", args=[d["id"]])).status_code, 404)
+		f = self.create(forked_from=d["id"]).json()
+		self.assertEqual(Paste.objects.get(paste_id=f["id"]).forked_from, d["id"])
+		self.client.force_login(self.member)
+		self.client.post(reverse("tools:paste_delete", args=[d["id"]]))
+		self.assertFalse(Paste.objects.filter(paste_id=d["id"]).exists())
