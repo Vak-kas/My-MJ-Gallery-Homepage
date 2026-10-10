@@ -1636,3 +1636,50 @@ class WebhookTests(TestCase):
 			self.client.post(reverse("tools:webhook"), {"ttl": "1"})
 			self.client.post(reverse("tools:webhook"), {"ttl": "1"})
 		self.assertEqual(HookBin.objects.count(), 1)
+
+
+class SatelliteTests(TestCase):
+	TLE = "ISS (ZARYA)\n1 25544U 98067A   26282.95044904  .00006711  00000+0  13074-3 0  9997\n2 25544  51.6315  92.1575 0006672 244.0714 115.9587 15.48795780589546\n"
+
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_page_and_parse(self):
+		from tools import satellite
+		res = self.client.get(reverse("tools:satellite"))
+		self.assertContains(res, "/tools/satellite/tle/")
+		self.assertContains(res, "learn-ntn")
+		sats = satellite._parse_tle("garbage\n" + self.TLE + "1 bad\n")
+		self.assertEqual(sats, [{"name": "ISS (ZARYA)", "l1": self.TLE.splitlines()[1], "l2": self.TLE.splitlines()[2]}])
+
+	def test_tle_api_caches_and_validates(self):
+		from unittest import mock
+		url = reverse("tools:satellite_tle")
+		self.assertEqual(self.client.get(url, {"group": "../etc"}).status_code, 400)
+		self.assertEqual(self.client.get(url, {"name": "<script>"}).status_code, 400)
+		self.assertEqual(self.client.get(url, {"catnr": "12a"}).status_code, 400)
+		with mock.patch("tools.satellite._fetch", return_value=self.TLE) as fetch:
+			d = self.client.get(url, {"group": "stations"}).json()
+			self.client.get(url, {"group": "stations"})
+		self.assertEqual(fetch.call_count, 1)  # 4시간 저장
+		self.assertEqual(fetch.call_args.args[0], {"GROUP": "stations"})
+		self.assertEqual(d["count"], 1)
+		with mock.patch("tools.satellite._fetch", return_value=""):
+			self.assertEqual(self.client.get(url, {"catnr": "99999"}).status_code, 404)
+		# CelesTrak 이 거절하면 예비 사본
+		from django.core.cache import cache
+		cache.delete("sat:tle:g:stations")
+		with mock.patch("tools.satellite._fetch", side_effect=OSError("403")):
+			d = self.client.get(url, {"group": "stations"}).json()
+			self.assertTrue(d["stale"])
+			self.assertEqual(d["count"], 1)
+			self.assertEqual(self.client.get(url, {"group": "oneweb"}).status_code, 502)
+
+	def test_search_rate_limit(self):
+		from unittest import mock
+		from tools import satellite
+		url = reverse("tools:satellite_tle")
+		with mock.patch("tools.satellite._fetch", return_value=self.TLE), mock.patch.object(satellite, "SEARCH_PER_MIN", 2):
+			codes = [self.client.get(url, {"name": f"SAT{i}"}).status_code for i in range(3)]
+		self.assertEqual(codes, [200, 200, 429])

@@ -269,6 +269,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "satellite",
+		"url_name": "tools:satellite",
+		"icon": "🛰",
+		"title": "위성 궤도 · NTN 계산기",
+		"description": "고도만 넣으면 공전 주기·왕복 지연(투명/재생)·도플러·경로 손실·덮는 범위. 실제 위성(ISS·스타링크·GPS)이 지금 어디 있고 언제 내 위로 지나가는지, 궤도·3GPP NTN·재밍 개념 정리까지.",
+		"tags": ["위성", "NTN"],
+		"category": "network",
+		"added": "2026-10-11T00:46",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "linkbudget",
 		"url_name": "tools:linkbudget",
 		"icon": "📡",
