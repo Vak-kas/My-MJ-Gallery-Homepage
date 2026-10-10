@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block title %}{{ paste.title|default:"붙여넣기" }} · 서민재 갤러리{% endblock %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<link rel="stylesheet" id="pv-hl-light" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css">
+<link rel="stylesheet" id="pv-hl-dark" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github-dark.min.css" disabled>
+<style>
+    .pv-box { border-radius: 18px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; overflow: hidden; }
+    .pv-scroll { overflow: auto; max-height: 80vh; }
+    .pv-table { border-collapse: collapse; width: 100%; font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.6; tab-size: 4; }
+    .pv-table td { padding: 0; vertical-align: top; }
+    .pv-no { width: 1%; min-width: 44px; padding: 0 10px 0 14px !important; text-align: right; color: #a1a1a6; user-select: none; cursor: pointer; white-space: nowrap; position: sticky; left: 0; background: #fafafa; border-right: 1px solid rgba(0, 0, 0, 0.06); }
+    .pv-no:hover { color: #0066cc; }
+    .pv-line { padding: 0 16px !important; white-space: pre; }
+    .pv-wrap .pv-line { white-space: pre-wrap; word-break: break-all; }
+    .pv-table tr.on td { background: rgba(255, 196, 0, 0.18); }
+    .pv-table tr.on .pv-no { color: #b26a00; font-weight: 600; }
+    .pv-table tr:first-child td { padding-top: 12px !important; }
+    .pv-table tr:last-child td { padding-bottom: 12px !important; }
+    .pv-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); padding: 6px 13px; font-size: 13px; white-space: nowrap; color: inherit; }
+    .pv-btn:hover { background: #f5f5f7; }
+    .pv-table .hljs, .pv-line { background: transparent; }
+    html.theme-dark .pv-box { background: #0d1117; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .pv-no { background: #161b22; color: #6e7681; border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .pv-line { color: #e6edf3; }
+    html.theme-dark .pv-btn { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .pv-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .pv-table tr.on td { background: rgba(255, 196, 0, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1200px] px-4 py-10 sm:px-6 lg:py-14">
+    {% if is_owner %}<a href="{% url 'tools:paste' %}" class="text-[13px] text-[#0066cc]">← 내 붙여넣기</a>{% endif %}
+
+    <div id="pv-new" class="mt-4 hidden rounded-[16px] border border-[#0066cc]/25 bg-[#0066cc]/[0.05] p-4">
+        <p class="text-[14px] font-semibold text-[#1d1d1f]">✅ 링크를 만들었어요</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <code class="min-w-0 flex-1 truncate rounded-lg bg-white/70 px-3 py-1.5 text-[13px]">{{ share_url }}</code>
+            <button type="button" class="pv-btn" data-copy-link>링크 복사</button>
+        </div>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-end gap-x-4 gap-y-2">
+        <div class="min-w-0 flex-1">
+            <h1 class="truncate text-[26px] font-semibold tracking-[-0.03em] text-[#1d1d1f] sm:text-[30px]">{{ paste.title|default:"붙여넣기" }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">
+                <span id="pv-lang">{{ language_name }}</span> · {{ lines }}줄 · {{ paste.size|filesizeformat }} · 👀 {{ paste.view_count }}
+                · {% if paste.expires_at %}{{ paste.expires_at|timeuntil }} 뒤 사라짐{% else %}지울 때까지 남음{% endif %}
+                {% if paste.forked_from %}· 🍴 <a href="{% url 'tools:paste_view' paste.forked_from %}" class="text-[#0066cc]">원본</a>{% endif %}
+            </p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+            <button type="button" class="pv-btn" id="pv-copy">📋 코드 복사</button>
+            <button type="button" class="pv-btn" data-copy-link>🔗 링크 복사</button>
+            <button type="button" class="pv-btn" id="pv-wrap-btn">줄 바꿈</button>
+            <a class="pv-btn" href="{% url 'tools:paste_raw' paste.paste_id %}" target="_blank" rel="noopener">원본</a>
+            <a class="pv-btn" href="{% url 'tools:paste_raw' paste.paste_id %}?download=1">⬇ 받기</a>
+            <a class="pv-btn" href="{% url 'tools:paste' %}?fork={{ paste.paste_id }}" title="이 코드를 고쳐서 새 링크로">🍴 고쳐서 새로</a>
+            {% if can_delete %}
+            <form method="post" action="{% url 'tools:paste_delete' paste.paste_id %}" onsubmit="return confirm('지울까요? 링크를 받은 사람도 더는 못 봐요.')">
+                {% csrf_token %}
+                <button class="pv-btn !text-[#c4271d]">지우기</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="pv-box mt-4">
+        <div class="pv-scroll" id="pv-scroll">
+            <table class="pv-table hljs" id="pv-table"><tbody id="pv-body"></tbody></table>
+        </div>
+    </div>
+    <p class="mt-3 text-[12px] text-[#8e8e93]">줄 번호를 누르면 그 줄을 가리키는 링크가 돼요. <kbd>Shift</kbd> 를 누른 채 다른 줄을 누르면 여러 줄. 이 사이트 회원이 올린 글이에요 — 받은 코드는 확인하고 실행하세요.</p>
+    <p class="mt-6 text-[13px]"><a href="{% url 'tools:paste' %}" class="text-[#0066cc]">📋 나도 코드 붙여넣기 →</a></p>
+</main>
+
+{{ paste.content|json_script:"pv-content" }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/matlab.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/latex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/dockerfile.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/verilog.min.js"></script>
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const content = JSON.parse($('pv-content').textContent);
+    const language = "{{ paste.language|escapejs }}";
+    const shareUrl = "{{ share_url|escapejs }}";
+    const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const AUTO = ['python', 'c', 'cpp', 'java', 'javascript', 'typescript', 'json', 'yaml', 'bash', 'sql', 'go', 'rust', 'kotlin', 'swift', 'csharp', 'php', 'matlab', 'r', 'xml', 'css', 'markdown', 'latex', 'diff', 'ini', 'dockerfile', 'verilog'];
+    const NAMES = { python: 'Python', c: 'C', cpp: 'C++', java: 'Java', javascript: 'JavaScript', typescript: 'TypeScript', json: 'JSON', yaml: 'YAML', bash: 'Shell', sql: 'SQL', go: 'Go', rust: 'Rust', kotlin: 'Kotlin', swift: 'Swift', csharp: 'C#', php: 'PHP', matlab: 'MATLAB', r: 'R', xml: 'HTML · XML', css: 'CSS', markdown: 'Markdown', latex: 'LaTeX', diff: 'Diff', ini: 'INI', dockerfile: 'Dockerfile', verilog: 'Verilog' };
+
+    // 사이트 밝게/어둡게에 맞춰 색 테마
+    function syncTheme() {
+        const dark = document.documentElement.classList.contains('theme-dark');
+        $('pv-hl-light').disabled = dark;
+        $('pv-hl-dark').disabled = !dark;
+    }
+    syncTheme();
+    new MutationObserver(syncTheme).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+    // 색칠한 HTML 을 줄마다 나눔 (줄을 넘는 <span> 은 줄 끝에서 닫고 다음 줄에서 다시 엶)
+    function splitLines(html) {
+        const out = [];
+        let open = [], line = '';
+        const re = /(<span[^>]*>)|(<\/span>)|(\n)|([^<\n]+)/g;
+        let m;
+        while ((m = re.exec(html))) {
+            if (m[1]) { open.push(m[1]); line += m[1]; }
+            else if (m[2]) { open.pop(); line += m[2]; }
+            else if (m[3]) { out.push(line + '</span>'.repeat(open.length)); line = open.join(''); }
+            else line += m[4];
+        }
+        out.push(line + '</span>'.repeat(open.length));
+        return out;
+    }
+
+    let html;
+    const hl = window.hljs;
+    if (!hl || content.length > 300000 || language === 'plaintext') {
+        html = esc(content);
+    } else if (language === 'auto') {
+        const r = hl.highlightAuto(content, AUTO);
+        html = r.value;
+        if (r.language && r.relevance > 5) $('pv-lang').textContent = `${NAMES[r.language] || r.language} (자동 감지)`;
+        else html = esc(content);
+    } else {
+        try { html = hl.highlight(content, { language, ignoreIllegals: true }).value; } catch { html = esc(content); }
+    }
+    const lines = splitLines(html);
+    if (lines.length > 1 && lines[lines.length - 1] === '') lines.pop();
+    $('pv-body').innerHTML = lines.map((l, i) => `<tr id="L${i + 1}"><td class="pv-no" data-n="${i + 1}">${i + 1}</td><td class="pv-line">${l || ' '}</td></tr>`).join('');
+
+    // 줄 가리키기 #L5 · #L5-L9
+    let anchor = null;
+    function mark(a, b) {
+        document.querySelectorAll('#pv-body tr.on').forEach((tr) => tr.classList.remove('on'));
+        if (!a) return;
+        const [lo, hi] = a <= b ? [a, b] : [b, a];
+        for (let n = lo; n <= hi; n++) $('L' + n)?.classList.add('on');
+    }
+    function fromHash(scroll) {
+        const m = location.hash.match(/^#L(\d+)(?:-L?(\d+))?$/);
+        if (!m) return;
+        const a = +m[1], b = +(m[2] || m[1]);
+        anchor = a;
+        mark(a, b);
+        if (scroll) $('L' + Math.min(a, b))?.scrollIntoView({ block: 'center' });
+    }
+    $('pv-body').addEventListener('click', (e) => {
+        const td = e.target.closest('.pv-no');
+        if (!td) return;
+        const n = +td.dataset.n;
+        if (e.shiftKey && anchor) {
+            const [lo, hi] = anchor <= n ? [anchor, n] : [n, anchor];
+            history.replaceState(null, '', `#L${lo}-L${hi}`);
+            mark(lo, hi);
+        } else {
+            anchor = n;
+            history.replaceState(null, '', `#L${n}`);
+            mark(n, n);
+        }
+    });
+    window.addEventListener('hashchange', () => fromHash(true));
+    fromHash(true);
+
+    // 복사·줄 바꿈
+    async function copy(text, btn) {
+        const label = btn.textContent;
+        try { await navigator.clipboard.writeText(text); btn.textContent = '✓ 복사됨'; }
+        catch { btn.textContent = '복사 실패'; }
+        setTimeout(() => { btn.textContent = label; }, 1200);
+    }
+    $('pv-copy').addEventListener('click', (e) => copy(content, e.currentTarget));
+    document.querySelectorAll('[data-copy-link]').forEach((b) => b.addEventListener('click', () => copy(shareUrl + (location.hash.startsWith('#L') ? location.hash : ''), b)));
+    const WRAP = 'mj-paste-wrap';
+    function setWrap(on) {
+        $('pv-table').classList.toggle('pv-wrap', on);
+        $('pv-wrap-btn').textContent = on ? '줄 바꿈 끄기' : '줄 바꿈';
+        try { localStorage.setItem(WRAP, on ? '1' : ''); } catch {}
+    }
+    $('pv-wrap-btn').addEventListener('click', () => setWrap(!$('pv-table').classList.contains('pv-wrap')));
+    try { setWrap(localStorage.getItem(WRAP) === '1'); } catch {}
+
+    // 방금 만든 경우 링크 안내
+    if (new URLSearchParams(location.search).get('new')) {
+        $('pv-new').classList.remove('hidden');
+        history.replaceState(null, '', location.pathname + location.hash);
+    }
+})();
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -83,6 +83,11 @@ urlpatterns = [
     path("clipboard/api/items/<int:item_id>/pin/", clipboard_views.clipboard_pin, name="clipboard_pin"),
     path("clipboard/api/items/<int:item_id>/delete/", clipboard_views.clipboard_delete, name="clipboard_delete"),
     path("clipboard/<int:item_id>/file/", clipboard_views.clipboard_file, name="clipboard_file"),
+    path("paste/", paste_views.paste_page, name="paste"),
+    path("paste/new/", paste_views.paste_create, name="paste_create"),
+    path("paste/<str:paste_id>/", paste_views.paste_view, name="paste_view"),
+    path("paste/<str:paste_id>/raw/", paste_views.paste_raw, name="paste_raw"),
+    path("paste/<str:paste_id>/delete/", paste_views.paste_delete, name="paste_delete"),
     path("share/", share_views.share_page, name="share"),
     path("share/new/", share_views.share_create, name="share_create"),
     path("share/<str:token>/", share_views.share_download_page, name="share_download_page"),

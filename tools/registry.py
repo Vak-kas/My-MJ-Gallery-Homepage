@@ -181,6 +181,17 @@ TOOLS = [
 		"access": "member",
 	},
 	{
+		"slug": "paste",
+		"url_name": "tools:paste",
+		"icon": "📋",
+		"title": "코드 붙여넣기 공유",
+		"description": "코드·로그·설정 파일을 붙여 넣으면 색칠된 링크가 생겨요. 줄 번호 눌러 그 줄만 가리키기, 원본·내려받기, 고쳐서 새로 만들기. 카톡에 코드가 깨지지 않아요.",
+		"tags": ["코드", "공유"],
+		"category": "share",
+		"added": "2026-10-10T23:02",  # 처음 만든 때 (새로 나온 순)
+		"access": "member",
+	},
+	{
 		"slug": "secret",
 		"url_name": "tools:secret",
 		"icon": "🤫",
