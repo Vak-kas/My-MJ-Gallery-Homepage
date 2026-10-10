@@ -1334,3 +1334,30 @@ class StdLibTests(TestCase):
 		self.client.force_login(self.vip)
 		res = self.client.post("/tools/stdlib/upload/", {"file": SimpleUploadedFile("x.pdf", b"hello", content_type="application/pdf")})
 		self.assertEqual(res.status_code, 400)
+
+
+class PaperTranslateTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.user = get_user_model().objects.create_user("u", "u@example.com", "pw")
+
+	def test_translate(self):
+		import json
+		from unittest import mock
+		post = lambda body: self.client.post("/tools/papers/ai/", json.dumps(body), content_type="application/json")
+		self.client.force_login(self.user)
+		items = [{"i": 0, "text": "We consider a LEO satellite ⟦m0⟧ [⟦c1⟧]."}, {"i": 1, "text": "System Model"}]
+		raw = {"items": [{"i": 0, "ko": "LEO 위성 ⟦m0⟧ 를 고려한다 [⟦c1⟧]."}, {"i": 1, "ko": "시스템 모델"}, {"i": 9, "ko": "없는 번호"}]}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=raw) as call:
+			body = post({"mode": "translate", "title": "T", "items": items}).json()
+			again = post({"mode": "translate", "title": "T", "items": items}).json()
+		self.assertEqual([x["i"] for x in body["items"]], [0, 1])
+		self.assertIn("⟦m0⟧", body["items"][0]["ko"])
+		self.assertIn("[0] We consider", call.call_args.kwargs["content"])
+		self.assertEqual(call.call_count, 1)  # 같은 글은 저장된 번역
+		self.assertTrue(again["cached"])
+		too_long = [{"i": 0, "text": "x" * 5000}]
+		with self.settings(ANTHROPIC_API_KEY="k"):
+			self.assertEqual(post({"mode": "translate", "items": too_long}).status_code, 400)  # 회원 4000자 넘으면 나눠 보내라고
