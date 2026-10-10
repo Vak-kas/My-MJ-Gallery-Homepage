@@ -77,6 +77,10 @@ def time_tool(request):
 	return render(request, "tools/time.html")
 
 
+def diagram(request):
+	return render(request, "tools/diagram.html")
+
+
 def wifi(request):
 	return render(request, "tools/wifi.html")
 

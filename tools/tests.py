@@ -1447,3 +1447,38 @@ class ToolViewsTests(TestCase):
 		from .registry import TOOLS
 		for t in TOOLS:
 			self.assertRegex(t.get("added", ""), r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$", t["slug"])
+
+
+class DiagramTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.user = get_user_model().objects.create_user("d", "d@example.com", "pw")
+
+	def post(self, body):
+		import json
+		return self.client.post("/tools/diagram/ai/", json.dumps(body), content_type="application/json")
+
+	def test_page_is_public(self):
+		res = self.client.get("/tools/diagram/")
+		self.assertContains(res, "mermaid@11.4.1")
+		self.assertContains(res, "securityLevel: 'strict'")
+
+	def test_ai_needs_login_and_strips_fences(self):
+		from unittest import mock
+		self.assertEqual(self.post({"prompt": "흐름도"}).status_code, 401)
+		self.client.force_login(self.user)
+		raw = {"code": "```mermaid\nflowchart TD\n  A --> B\n```", "explanation": "그렸어요"}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=raw) as call:
+			body = self.post({"prompt": "A 에서 B 로", "code": "flowchart LR\n X", "mode": "make"}).json()
+		self.assertEqual(body["code"], "flowchart TD\n  A --> B")
+		self.assertIn("지금 코드", call.call_args.kwargs["content"])
+
+	def test_ai_fix_and_bad_answer(self):
+		from unittest import mock
+		self.client.force_login(self.user)
+		with self.settings(ANTHROPIC_API_KEY="k"):
+			self.assertEqual(self.post({"mode": "fix", "code": ""}).status_code, 400)
+			with mock.patch("tools.ai.call", return_value={"code": "<script>x</script>", "explanation": ""}):
+				self.assertEqual(self.post({"mode": "fix", "code": "graph TD\nA-->", "error": "Parse error"}).status_code, 502)

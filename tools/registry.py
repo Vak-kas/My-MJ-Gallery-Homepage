@@ -115,6 +115,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "diagram",
+		"url_name": "tools:diagram",
+		"icon": "📊",
+		"title": "다이어그램 그리기",
+		"description": "글(Mermaid)로 흐름도·순서도(프로토콜 절차)·상태도·ER·간트·마인드맵을 바로 그려요. SVG·PNG 저장, 링크로 공유, ✨말로 그리기·오류 고치기(회원).",
+		"tags": ["그림", "Mermaid"],
+		"category": "docs",
+		"added": "2026-10-10T22:48",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "gpa",
 		"url_name": "tools:gpa",
 		"icon": "🎓",
