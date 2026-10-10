@@ -314,3 +314,47 @@ class Paste(models.Model):
 
 	def __str__(self):
 		return f"paste:{self.paste_id}"
+
+
+def _hook_id():
+	return secrets.token_urlsafe(12)
+
+
+class HookBin(models.Model):
+	"""웹훅·요청 확인기 주소 하나. /hook/<bin_id> 로 오는 요청을 모두 기록해 만든 사람에게 보여줌."""
+
+	RESPONSE_TYPES = [("json", "JSON"), ("text", "글")]
+
+	bin_id = models.CharField(max_length=32, unique=True, default=_hook_id)
+	owner = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="hook_bins")
+	name = models.CharField(max_length=60, blank=True)
+	response_status = models.PositiveSmallIntegerField(default=200)
+	response_type = models.CharField(max_length=10, choices=RESPONSE_TYPES, default="json")
+	response_body = models.TextField(blank=True, default='{"ok": true}')
+	request_count = models.PositiveIntegerField(default=0)  # 지금까지 받은 수 (지운 것 포함)
+	created_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField(db_index=True)
+
+	class Meta:
+		ordering = ["-created_at", "-id"]
+
+	def __str__(self):
+		return f"hook:{self.bin_id}"
+
+
+class HookRequest(models.Model):
+	bin = models.ForeignKey(HookBin, on_delete=models.CASCADE, related_name="requests")
+	method = models.CharField(max_length=12)
+	path = models.CharField(max_length=500, blank=True)  # /hook/<id> 뒤에 붙은 부분
+	query = models.TextField(blank=True)
+	headers = models.JSONField(default=list)  # [[이름, 값], ...] 받은 순서대로
+	body = models.TextField(blank=True)
+	body_base64 = models.BooleanField(default=False)  # 글자가 아니면 base64 로 저장
+	body_size = models.PositiveIntegerField(default=0)  # 실제 받은 크기
+	truncated = models.BooleanField(default=False)
+	content_type = models.CharField(max_length=200, blank=True)
+	ip = models.GenericIPAddressField(null=True, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+	class Meta:
+		ordering = ["-id"]

@@ -1549,3 +1549,90 @@ class PasteTests(TestCase):
 		self.client.force_login(self.member)
 		self.client.post(reverse("tools:paste_delete", args=[d["id"]]))
 		self.assertFalse(Paste.objects.filter(paste_id=d["id"]).exists())
+
+
+class WebhookTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		User = get_user_model()
+		self.member = User.objects.create_user("wm", "wm@example.com", "pw-for-tests-only")
+		self.other = User.objects.create_user("wo", "wo@example.com", "pw-for-tests-only")
+
+	def make_bin(self):
+		from tools.models import HookBin
+		self.client.force_login(self.member)
+		res = self.client.post(reverse("tools:webhook"), {"name": "깃허브", "ttl": "7"})
+		hook = HookBin.objects.get()
+		self.assertRedirects(res, reverse("tools:webhook_bin", args=[hook.bin_id]))
+		return hook
+
+	def test_receive_records_without_cookies(self):
+		import json
+		from django.test import Client
+		hook = self.make_bin()
+		sender = Client(enforce_csrf_checks=True)
+		sender.cookies["sessionid"] = "secret-session"
+		res = sender.post(f"/hook/{hook.bin_id}/github?x=1", json.dumps({"a": 1}), content_type="application/json",
+						  HTTP_X_GITHUB_EVENT="push", HTTP_X_REAL_IP="203.0.113.7")
+		self.assertEqual(res.status_code, 200)
+		self.assertEqual(res.json(), {"ok": True})
+		self.assertEqual(res["X-Content-Type-Options"], "nosniff")
+		self.assertIn("sandbox", res["Content-Security-Policy"])
+		r = hook.requests.get()
+		self.assertEqual((r.method, r.path, r.query, r.body, r.ip), ("POST", "/github", "x=1", '{"a": 1}', "203.0.113.7"))
+		names = [h[0] for h in r.headers]
+		self.assertIn("X-Github-Event", names)
+		self.assertNotIn("Cookie", names)  # 로그인 쿠키가 남지 않게
+		self.assertNotIn("X-Real-Ip", names)
+		# 끝에 / 없이, 다른 방식도
+		self.assertEqual(sender.put(f"/hook/{hook.bin_id}", b"\x00\xff", content_type="application/octet-stream").status_code, 200)
+		binary = hook.requests.first()
+		self.assertTrue(binary.body_base64)
+		hook.refresh_from_db()
+		self.assertEqual(hook.request_count, 2)
+		# 만든 사람 화면에서 목록·자세히
+		items = self.client.get(reverse("tools:webhook_requests", args=[hook.bin_id])).json()["items"]
+		self.assertEqual(len(items), 2)
+		detail = self.client.get(reverse("tools:webhook_request", args=[hook.bin_id, r.id])).json()
+		self.assertEqual(detail["body"], '{"a": 1}')
+		self.assertEqual(len(self.client.get(reverse("tools:webhook_requests", args=[hook.bin_id]) + f"?after={binary.id}").json()["items"]), 0)
+
+	def test_others_cannot_see_and_settings(self):
+		import json
+		hook = self.make_bin()
+		url = reverse("tools:webhook_settings", args=[hook.bin_id])
+		self.assertEqual(self.client.post(url, json.dumps({"status": 503, "type": "json", "body": "{bad"}), content_type="application/json").status_code, 400)
+		self.assertEqual(self.client.post(url, json.dumps({"status": 503, "type": "text", "body": "try later"}), content_type="application/json").status_code, 200)
+		res = self.client.get(f"/hook/{hook.bin_id}")
+		self.assertEqual((res.status_code, res.content, res["Content-Type"]), (503, b"try later", "text/plain; charset=utf-8"))
+		self.client.force_login(self.other)
+		self.assertEqual(self.client.get(reverse("tools:webhook_bin", args=[hook.bin_id])).status_code, 404)
+		self.assertEqual(self.client.get(reverse("tools:webhook_requests", args=[hook.bin_id])).status_code, 404)
+		self.assertEqual(self.client.post(reverse("tools:webhook_delete", args=[hook.bin_id])).status_code, 404)
+
+	def test_expired_rate_and_keep(self):
+		from datetime import timedelta
+		from unittest import mock
+		from django.utils import timezone
+		from tools import webhook_views
+		from tools.models import HookBin
+		hook = self.make_bin()
+		with mock.patch.dict(webhook_views.HOOK_LIMITS["member"], {"keep": 3}), mock.patch.object(webhook_views, "RATE_PER_MIN", 5):
+			codes = [self.client.post(f"/hook/{hook.bin_id}", f"n={i}", content_type="text/plain").status_code for i in range(6)]
+		self.assertEqual(codes, [200] * 5 + [429])
+		self.assertEqual(list(hook.requests.values_list("body", flat=True)), ["n=4", "n=3", "n=2"])  # 최근 3개만
+		HookBin.objects.filter(pk=hook.pk).update(expires_at=timezone.now() - timedelta(seconds=1))
+		self.assertEqual(self.client.post(f"/hook/{hook.bin_id}", "x", content_type="text/plain").status_code, 404)
+		self.assertEqual(self.client.get(reverse("tools:webhook_bin", args=[hook.bin_id])).status_code, 404)
+
+	def test_bin_limit(self):
+		from unittest import mock
+		from tools import webhook_views
+		from tools.models import HookBin
+		self.client.force_login(self.member)
+		with mock.patch.dict(webhook_views.HOOK_LIMITS["member"], {"bins": 1}):
+			self.client.post(reverse("tools:webhook"), {"ttl": "1"})
+			self.client.post(reverse("tools:webhook"), {"ttl": "1"})
+		self.assertEqual(HookBin.objects.count(), 1)

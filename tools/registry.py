@@ -346,6 +346,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "webhook",
+		"url_name": "tools:webhook",
+		"icon": "🪝",
+		"title": "웹훅 · 요청 확인기",
+		"description": "나만의 주소를 만들어 깃허브·결제·IoT 기기·내 코드가 보내는 요청(방식·헤더·본문)을 실시간으로 봐요. JSON 보기 좋게, curl 로 복사, 서명(HMAC) 확인, 돌려줄 답 정하기.",
+		"tags": ["개발", "API"],
+		"category": "dev",
+		"added": "2026-10-11T00:19",  # 처음 만든 때 (새로 나온 순)
+		"access": "member",
+	},
+	{
 		"slug": "regex",
 		"url_name": "tools:regex",
 		"icon": ".*",

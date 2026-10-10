@@ -21,7 +21,7 @@ BOT_RE = re.compile(
 SKIP_PREFIXES = ("/studio/", "/admin/", "/notifications/", "/static/", "/media/", "/relay/", "/accounts/",
                  "/tools/speedtest/", "/tools/netcheck/run", "/tools/clipboard/api", "/tools/myip/lookup",
                  "/tools/qrcode/ai-style", "/blog/api/", "/blog/feed/", "/sitemap.xml", "/robots.txt", "/favicon",
-                 "/sw.js", "/manifest.webmanifest", "/offline/")
+                 "/sw.js", "/manifest.webmanifest", "/offline/", "/hook/")
 SEARCH_HOSTS = ("google.", "naver.", "daum.net", "bing.", "duckduckgo.", "yahoo.", "zum.com", "ecosia.")
 SOCIAL_HOSTS = ("facebook.", "instagram.", "t.co", "twitter.", "x.com", "discord", "slack", "linkedin.", "reddit.",
                 "threads.", "youtube.", "telegram", "band.us", "everytime.")

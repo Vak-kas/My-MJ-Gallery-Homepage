@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}{{ hook.name|default:"웹훅 확인기" }} · 서민재 갤러리{% endblock %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .wh-input { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 9px 12px; font-size: 14px; outline: none; color: #1d1d1f; }
+    .wh-input:focus { border-color: #0066cc; }
+    .wh-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .wh-card { border-radius: 18px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; }
+    .wh-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); padding: 5px 12px; font-size: 12.5px; white-space: nowrap; color: inherit; }
+    .wh-btn:hover { background: #f5f5f7; }
+    .wh-item { display: block; width: 100%; text-align: left; padding: 10px 14px; border-bottom: 1px solid rgba(0, 0, 0, 0.06); }
+    .wh-item:hover { background: rgba(0, 102, 204, 0.04); }
+    .wh-item.on { background: rgba(0, 102, 204, 0.09); }
+    .wh-item.fresh { animation: wh-flash 1.6s ease-out; }
+    @keyframes wh-flash { from { background: rgba(255, 196, 0, 0.35); } }
+    .wh-m { display: inline-block; min-width: 52px; border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 700; text-align: center; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .wh-m.GET { background: #e3f2e6; color: #1b7a35; } .wh-m.POST { background: #e5effb; color: #0058b0; }
+    .wh-m.PUT, .wh-m.PATCH { background: #fff1d6; color: #9a5b00; } .wh-m.DELETE { background: #fde7e5; color: #b3261e; }
+    .wh-m.other { background: #ececf0; color: #555; }
+    .wh-pre { white-space: pre-wrap; word-break: break-all; font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.6; max-height: 520px; overflow: auto; border-radius: 12px; background: #f6f8fa; padding: 12px 14px; }
+    .wh-kv td { padding: 5px 8px; border-bottom: 1px solid rgba(0, 0, 0, 0.05); vertical-align: top; font-size: 12.5px; }
+    .wh-kv td:first-child { white-space: nowrap; color: #6e6e73; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .wh-kv td:last-child { word-break: break-all; font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    .wh-tab { border-radius: 999px; padding: 3px 10px; font-size: 12px; color: #6e6e73; }
+    .wh-tab.on { background: #1d1d1f; color: #fff; }
+    .wh-live { display: inline-block; width: 8px; height: 8px; border-radius: 999px; background: #34c759; box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.6); animation: wh-pulse 2s infinite; }
+    .wh-live.off { background: #a1a1a6; animation: none; }
+    @keyframes wh-pulse { 70% { box-shadow: 0 0 0 7px rgba(52, 199, 89, 0); } 100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); } }
+    .j-k { color: #0550ae; } .j-s { color: #0a3069; } .j-n { color: #953800; } .j-b { color: #8250df; }
+    html.theme-dark .wh-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .wh-card { background: #1c1c1f; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .wh-btn { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .wh-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .wh-item { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .wh-pre { background: #0d1117; color: #e6edf3; }
+    html.theme-dark .wh-kv td { border-color: rgba(255, 255, 255, 0.06); }
+    html.theme-dark .wh-tab.on { background: #e8e8ea; color: #1d1d1f; }
+    html.theme-dark .j-k { color: #79c0ff; } html.theme-dark .j-s { color: #a5d6ff; } html.theme-dark .j-n { color: #ffa657; } html.theme-dark .j-b { color: #d2a8ff; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-4 py-10 sm:px-6 lg:py-14">
+    <a href="{% url 'tools:webhook' %}" class="text-[13px] text-[#0066cc]">← 내 주소</a>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+        <h1 class="text-[26px] font-semibold tracking-[-0.03em] text-[#1d1d1f]" id="wh-title">{{ hook.name|default:"웹훅 확인기" }}</h1>
+        <span class="ml-1 flex items-center gap-1.5 text-[12px] text-[#6e6e73]"><span class="wh-live" id="wh-live"></span><span id="wh-live-text">기다리는 중</span></span>
+        <span class="ml-auto text-[12px] text-[#8e8e93]">{{ hook.expires_at|timeuntil }} 뒤 사라짐 · 최근 {{ keep }}개 보관</span>
+    </div>
+
+    <section class="wh-card mt-4 p-4">
+        <div class="flex flex-wrap items-center gap-2">
+            <code class="wh-mono min-w-0 flex-1 truncate rounded-lg bg-[#0066cc]/[0.06] px-3 py-2 text-[14px] text-[#0058b0]" id="wh-url">{{ hook_url }}</code>
+            <button type="button" class="wh-btn" data-copy="{{ hook_url }}">주소 복사</button>
+        </div>
+        <details class="mt-3">
+            <summary class="cursor-pointer text-[13px] text-[#0066cc]">시험 요청 보내는 법 · 돌려줄 답 정하기</summary>
+            <div class="mt-3 grid gap-4 lg:grid-cols-2">
+                <div class="space-y-2 text-[12.5px]">
+                    <p class="font-semibold">터미널에서</p>
+                    <pre class="wh-pre" id="wh-curl"></pre>
+                    <button type="button" class="wh-btn" id="wh-test">이 브라우저에서 시험 요청 보내기</button>
+                    <p class="text-[#8e8e93]">주소 뒤에 <code>/github</code> 처럼 아무 경로를 붙여도 같은 곳으로 와요. 끝에 <code>/</code> 가 없어도 돼요.</p>
+                </div>
+                <form id="wh-settings" class="space-y-2 text-[12.5px]">
+                    <p class="font-semibold">돌려줄 답</p>
+                    <div class="grid grid-cols-[minmax(0,1fr)_90px_100px] gap-2">
+                        <input class="wh-input" id="wh-name" maxlength="60" value="{{ hook.name }}" placeholder="이름">
+                        <input class="wh-input" id="wh-status" type="number" min="200" max="599" value="{{ hook.response_status }}" aria-label="응답 코드">
+                        <select class="wh-input" id="wh-type" aria-label="형식">
+                            <option value="json" {% if hook.response_type == "json" %}selected{% endif %}>JSON</option>
+                            <option value="text" {% if hook.response_type == "text" %}selected{% endif %}>글</option>
+                        </select>
+                    </div>
+                    <textarea class="wh-input wh-mono" id="wh-body" rows="4" maxlength="4000">{{ hook.response_body }}</textarea>
+                    <div class="flex items-center gap-2">
+                        <button class="wh-btn !border-[#0066cc] !bg-[#0066cc] !text-white">답 저장</button>
+                        <span class="text-[12px] text-[#8e8e93]" id="wh-settings-msg">재시도 시험은 500, 503 같은 코드로</span>
+                    </div>
+                </form>
+            </div>
+        </details>
+    </section>
+
+    <div class="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
+        <section class="wh-card min-w-0 overflow-hidden">
+            <div class="flex items-center gap-2 border-b border-black/[0.06] px-4 py-2.5">
+                <span class="text-[13px] font-semibold">받은 요청</span>
+                <span class="text-[12px] text-[#8e8e93]" id="wh-count"></span>
+                <button type="button" class="wh-btn ml-auto" id="wh-clear">모두 지우기</button>
+            </div>
+            <div id="wh-list" class="max-h-[70vh] overflow-auto"></div>
+        </section>
+
+        <section class="wh-card min-w-0 p-4" id="wh-detail">
+            <p class="py-10 text-center text-[14px] text-[#8e8e93]">위 주소로 요청을 보내면 여기에 바로 나와요.</p>
+        </section>
+    </div>
+
+    <form method="post" action="{% url 'tools:webhook_delete' hook.bin_id %}" class="mt-6" onsubmit="return confirm('이 주소와 받은 기록을 모두 지울까요?')">
+        {% csrf_token %}
+        <button class="text-[12px] text-[#c4271d]">이 주소 지우기</button>
+    </form>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const hookUrl = "{{ hook_url|escapejs }}";
+    const listUrl = "{% url 'tools:webhook_requests' hook.bin_id %}";
+    const detailBase = "{% url 'tools:webhook_requests' hook.bin_id %}";
+    const settingsUrl = "{% url 'tools:webhook_settings' hook.bin_id %}";
+    const clearUrl = "{% url 'tools:webhook_clear' hook.bin_id %}";
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const KNOWN = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    const sizeText = (n) => n < 1024 ? `${n}B` : n < 1048576 ? `${(n / 1024).toFixed(1)}KB` : `${(n / 1048576).toFixed(1)}MB`;
+    const timeText = (iso) => new Date(iso).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const shq = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+    $('wh-curl').textContent = `curl -X POST ${hookUrl} \\\n  -H 'Content-Type: application/json' \\\n  -d '{"event": "test", "value": 42}'`;
+
+    async function copy(text, btn) {
+        const label = btn.textContent;
+        try { await navigator.clipboard.writeText(text); btn.textContent = '✓ 복사됨'; } catch { btn.textContent = '복사 실패'; }
+        setTimeout(() => { btn.textContent = label; }, 1200);
+    }
+    document.addEventListener('click', (e) => { const b = e.target.closest('[data-copy]'); if (b) copy(b.dataset.copy, b); });
+
+    // ── 목록 (2초마다 새 것만)
+    let items = [], lastId = 0, selected = null, first = true;
+    function renderList(freshIds = new Set()) {
+        $('wh-list').innerHTML = items.length ? items.map((r) => `
+            <button type="button" class="wh-item ${r.id === selected ? 'on' : ''} ${freshIds.has(r.id) ? 'fresh' : ''}" data-id="${r.id}">
+                <div class="flex items-center gap-2">
+                    <span class="wh-m ${KNOWN.includes(r.method) ? r.method : 'other'}">${esc(r.method)}</span>
+                    <span class="wh-mono min-w-0 flex-1 truncate text-[12.5px]">${esc(r.path || '/')}${r.query ? '?' + esc(r.query) : ''}</span>
+                </div>
+                <div class="mt-1 flex gap-2 text-[11.5px] text-[#8e8e93]"><span>${timeText(r.at)}</span><span>${sizeText(r.size)}</span><span class="truncate">${esc(r.ip)}</span></div>
+            </button>`).join('') : '<p class="px-4 py-8 text-center text-[13px] text-[#8e8e93]">아직 받은 요청이 없어요.</p>';
+    }
+    async function poll() {
+        try {
+            const r = await fetch(`${listUrl}?after=${lastId}`, { cache: 'no-store' });
+            if (!r.ok) throw new Error();
+            const d = await r.json();
+            $('wh-live').classList.remove('off');
+            $('wh-live-text').textContent = '실시간으로 받는 중';
+            $('wh-count').textContent = d.count ? `총 ${d.count.toLocaleString()}번` : '';
+            if (d.items.length) {
+                const fresh = new Set(first ? [] : d.items.map((x) => x.id));
+                items = d.items.concat(items).slice(0, {{ keep }});
+                lastId = items[0].id;
+                renderList(fresh);
+                if (!selected || (!first && document.visibilityState === 'visible' && autoFollow)) select(items[0].id);
+            } else if (first) renderList();
+            first = false;
+        } catch {
+            $('wh-live').classList.add('off');
+            $('wh-live-text').textContent = '연결이 끊겼어요 — 다시 시도 중';
+        }
+    }
+    let autoFollow = true;  // 맨 위(최신)를 보고 있으면 새 요청이 오면 그걸로 넘어감
+    $('wh-list').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-id]');
+        if (!b) return;
+        const id = +b.dataset.id;
+        autoFollow = id === items[0]?.id;
+        select(id);
+    });
+    function loop() { if (document.visibilityState === 'visible') poll(); }
+    setInterval(loop, 2000);
+    document.addEventListener('visibilitychange', loop);
+    poll();
+
+    // ── 자세히
+    let current = null, bodyTab = 'pretty';
+    async function select(id) {
+        selected = id;
+        document.querySelectorAll('.wh-item').forEach((el) => el.classList.toggle('on', +el.dataset.id === id));
+        const r = await fetch(`${detailBase}${id}/`, { cache: 'no-store' });
+        if (!r.ok) { $('wh-detail').innerHTML = '<p class="py-10 text-center text-[14px] text-[#8e8e93]">지워진 요청이에요.</p>'; return; }
+        current = await r.json();
+        renderDetail();
+    }
+    function bodyBytes(d) {
+        if (d.body_base64) return Uint8Array.from(atob(d.body), (c) => c.charCodeAt(0));
+        return new TextEncoder().encode(d.body);
+    }
+    function jsonHtml(v, ind = '') {
+        const pad = ind + '  ';
+        if (v === null) return '<span class="j-b">null</span>';
+        if (typeof v === 'boolean') return `<span class="j-b">${v}</span>`;
+        if (typeof v === 'number') return `<span class="j-n">${v}</span>`;
+        if (typeof v === 'string') return `<span class="j-s">${esc(JSON.stringify(v))}</span>`;
+        if (Array.isArray(v)) return v.length ? '[\n' + v.map((x) => pad + jsonHtml(x, pad)).join(',\n') + '\n' + ind + ']' : '[]';
+        const keys = Object.keys(v);
+        return keys.length ? '{\n' + keys.map((k) => `${pad}<span class="j-k">${esc(JSON.stringify(k))}</span>: ${jsonHtml(v[k], pad)}`).join(',\n') + '\n' + ind + '}' : '{}';
+    }
+    function prettyBody(d) {
+        if (d.body_base64) return { label: '글자가 아닌 본문 (base64)', html: esc(d.body) };
+        if (!d.body) return { label: '본문 없음', html: '<span class="text-[#8e8e93]">(비어 있음)</span>' };
+        const ct = (d.content_type || '').toLowerCase();
+        try { return { label: 'JSON', html: jsonHtml(JSON.parse(d.body)) }; } catch {}
+        if (ct.includes('x-www-form-urlencoded')) {
+            const rows = [...new URLSearchParams(d.body)].map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('');
+            return { label: '폼', table: rows };
+        }
+        return { label: '글', html: esc(d.body) };
+    }
+    function curlOf(d) {
+        const url = hookUrl + (d.path || '') + (d.query ? '?' + d.query : '');
+        const skip = new Set(['host', 'content-length', 'connection', 'accept-encoding']);
+        const parts = [`curl -X ${d.method} ${shq(url)}`];
+        d.headers.forEach(([k, v]) => { if (!skip.has(k.toLowerCase())) parts.push(`-H ${shq(`${k}: ${v}`)}`); });
+        if (d.body && !d.body_base64) parts.push(`--data-raw ${shq(d.body)}`);
+        return parts.join(' \\\n  ');
+    }
+    function renderDetail() {
+        const d = current;
+        if (!d) return;
+        const pb = prettyBody(d);
+        const query = d.query ? [...new URLSearchParams(d.query)] : [];
+        const sigHeader = d.headers.find(([k]) => /signature|x-hub-signature|x-signature/i.test(k));
+        $('wh-detail').innerHTML = `
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="wh-m ${KNOWN.includes(d.method) ? d.method : 'other'}">${esc(d.method)}</span>
+                <span class="wh-mono min-w-0 flex-1 break-all text-[13px]">${esc('/hook/…' + (d.path || ''))}${d.query ? '?' + esc(d.query) : ''}</span>
+                <button type="button" class="wh-btn" id="wh-copy-curl">curl 로 복사</button>
+            </div>
+            <p class="mt-2 text-[12px] text-[#8e8e93]">${new Date(d.at).toLocaleString('ko-KR')} · ${esc(d.ip || 'IP 모름')} · 본문 ${sizeText(d.size)}${d.truncated ? ' (앞 {{ max_kb }}KB 만 저장)' : ''}</p>
+            ${query.length ? `<h3 class="mt-4 text-[13px] font-semibold">쿼리</h3><table class="wh-kv mt-1 w-full">${query.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>` : ''}
+            <div class="mt-4 flex items-center gap-2">
+                <h3 class="text-[13px] font-semibold">본문</h3>
+                <span class="text-[12px] text-[#8e8e93]">${esc(d.content_type || '')}</span>
+                <span class="ml-auto inline-flex gap-1">
+                    <button type="button" class="wh-tab ${bodyTab === 'pretty' ? 'on' : ''}" data-tab="pretty">${esc(pb.label)}</button>
+                    <button type="button" class="wh-tab ${bodyTab === 'raw' ? 'on' : ''}" data-tab="raw">원본</button>
+                    <button type="button" class="wh-btn" id="wh-copy-body">복사</button>
+                </span>
+            </div>
+            ${bodyTab === 'raw' ? `<pre class="wh-pre mt-2">${esc(d.body) || ' '}</pre>`
+                : pb.table !== undefined ? `<table class="wh-kv mt-2 w-full">${pb.table}</table>` : `<pre class="wh-pre mt-2">${pb.html}</pre>`}
+            <h3 class="mt-4 text-[13px] font-semibold">헤더 <span class="font-normal text-[#8e8e93]">${d.headers.length}개</span></h3>
+            <table class="wh-kv mt-1 w-full">${d.headers.map(([k, v]) => `<tr><td>${esc(k)}</td><td>${esc(v)}</td></tr>`).join('')}</table>
+            <details class="mt-4" ${sigHeader ? 'open' : ''}>
+                <summary class="cursor-pointer text-[13px] font-semibold">🔏 서명(HMAC) 확인 ${sigHeader ? `<span class="font-normal text-[#8e8e93]">— ${esc(sigHeader[0])} 헤더가 있어요</span>` : ''}</summary>
+                <div class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_120px_auto]">
+                    <input class="wh-input wh-mono" id="wh-secret" type="password" placeholder="웹훅 비밀값 (이 브라우저에서만 계산, 서버로 안 보냄)" autocomplete="off">
+                    <select class="wh-input" id="wh-algo"><option value="SHA-256">SHA-256</option><option value="SHA-1">SHA-1</option><option value="SHA-512">SHA-512</option></select>
+                    <button type="button" class="wh-btn" id="wh-sig-run">계산</button>
+                </div>
+                <div id="wh-sig-out" class="mt-2 text-[12.5px]"></div>
+                <p class="mt-1 text-[11.5px] text-[#8e8e93]">본문 전체로 계산해요. 깃허브는 X-Hub-Signature-256 (sha256=hex), 슬랙·스트라이프처럼 시각을 앞에 붙이는 방식은 맞지 않을 수 있어요.</p>
+            </details>`;
+        $('wh-copy-curl').addEventListener('click', (e) => copy(curlOf(d), e.currentTarget));
+        $('wh-copy-body').addEventListener('click', (e) => copy(d.body, e.currentTarget));
+        $('wh-detail').querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => { bodyTab = b.dataset.tab; renderDetail(); }));
+        $('wh-sig-run').addEventListener('click', checkSig);
+        $('wh-secret').addEventListener('keydown', (e) => { if (e.key === 'Enter') checkSig(); });
+    }
+    async function checkSig() {
+        const d = current, secret = $('wh-secret').value;
+        if (!secret) { $('wh-sig-out').textContent = '비밀값을 넣어 주세요.'; return; }
+        const algo = $('wh-algo').value;
+        const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: algo }, false, ['sign']);
+        const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, bodyBytes(d)));
+        const hex = [...mac].map((b) => b.toString(16).padStart(2, '0')).join('');
+        const b64 = btoa(String.fromCharCode(...mac));
+        const values = d.headers.map(([, v]) => v);
+        const hit = d.headers.find(([, v]) => v.includes(hex) || v.includes(b64));
+        $('wh-sig-out').innerHTML = `
+            <table class="wh-kv w-full"><tr><td>hex</td><td>${hex}</td></tr><tr><td>base64</td><td>${b64}</td></tr></table>
+            <p class="mt-2 font-semibold ${hit ? 'text-[#1b7a35]' : 'text-[#c4271d]'}">${hit ? `✅ ${esc(hit[0])} 헤더와 맞아요` : (values.length ? '❌ 맞는 헤더가 없어요 — 비밀값·방식을 확인해 주세요' : '')}</p>
+            ${d.truncated ? '<p class="text-[#b26a00]">본문이 잘려 저장돼서 서명이 다르게 나올 수 있어요.</p>' : ''}`;
+    }
+
+    // ── 시험 요청 · 답 저장 · 지우기
+    $('wh-test').addEventListener('click', async (e) => {
+        const b = e.currentTarget;
+        b.disabled = true;
+        try {
+            const r = await fetch(hookUrl + '/test?from=browser', { method: 'POST', credentials: 'omit', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event: 'test', sent_at: new Date().toISOString(), value: 42 }) });
+            b.textContent = `보냄 → 답 ${r.status}`;
+            autoFollow = true;
+            poll();
+        } catch { b.textContent = '보내지 못했어요'; }
+        setTimeout(() => { b.textContent = '이 브라우저에서 시험 요청 보내기'; b.disabled = false; }, 2000);
+    });
+    $('wh-settings').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const r = await fetch(settingsUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify({ name: $('wh-name').value, status: $('wh-status').value, type: $('wh-type').value, body: $('wh-body').value }) });
+        const d = await r.json().catch(() => ({ error: '저장하지 못했어요.' }));
+        $('wh-settings-msg').textContent = r.ok ? '✓ 저장했어요. 다음 요청부터 이 답을 돌려줘요.' : d.error;
+        $('wh-settings-msg').style.color = r.ok ? '#1b7a35' : '#c4271d';
+        if (r.ok) $('wh-title').textContent = $('wh-name').value.trim() || '웹훅 확인기';
+    });
+    $('wh-clear').addEventListener('click', async () => {
+        if (!confirm('받은 요청 기록을 모두 지울까요?')) return;
+        await fetch(clearUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf() } });
+        items = []; selected = null; current = null;
+        renderList();
+        $('wh-detail').innerHTML = '<p class="py-10 text-center text-[14px] text-[#8e8e93]">위 주소로 요청을 보내면 여기에 바로 나와요.</p>';
+    });
+})();
+</script>
+{% endblock %}
