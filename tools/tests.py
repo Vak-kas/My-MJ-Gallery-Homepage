@@ -1418,3 +1418,32 @@ class GithubFindTests(TestCase):
 			j = post({"mode": "judge", "idea": "3GPP 인용", "repos": [{"name": "martisak/3gpp-citations", "desc": "bib", "stars": 79}]}).json()
 		self.assertEqual([(r["name"], r["score"]) for r in j["repos"]], [("martisak/3gpp-citations", 5)])  # 점수는 0~5, 후보 아닌 건 버림
 		self.assertEqual(j["pick"], "martisak/3gpp-citations")
+
+
+class ToolViewsTests(TestCase):
+	def test_popularity_and_new_badge(self):
+		from django.core.cache import cache
+		from django.utils import timezone
+		from analytics.models import PageView
+		cache.clear()
+		today = timezone.localdate()
+		for v in ("a", "b", "c"):
+			PageView.objects.create(day=today, path="/tools/wifi/", section="tool", visitor=v, source="direct", device="desktop")
+		PageView.objects.create(day=today, path="/tools/wifi/", section="tool", visitor="a", source="direct", device="desktop")  # 같은 사람은 한 번
+		PageView.objects.create(day=today - timezone.timedelta(days=40), path="/tools/time/", section="tool", visitor="z", source="direct", device="desktop")  # 30일 지난 건 안 셈
+		res = self.client.get(reverse("tools:index"))
+		self.assertContains(res, 'data-pop="3"')
+		self.assertContains(res, 'data-view="pop"')
+		html = res.content.decode()
+		i = html.index('href="/tools/time/"')
+		self.assertIn('data-pop="0"', html[i:i + 600])
+		self.assertIn('data-added="', html[i:i + 600])
+
+	def test_only_newest_six_are_new(self):
+		res = self.client.get(reverse("tools:index"))
+		self.assertLessEqual(res.content.decode().count(">NEW</span>"), 6)
+
+	def test_every_tool_has_added(self):
+		from .registry import TOOLS
+		for t in TOOLS:
+			self.assertRegex(t.get("added", ""), r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$", t["slug"])
