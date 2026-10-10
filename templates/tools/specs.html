@@ -18,6 +18,17 @@
     .sp-btn.primary { background: #0066cc; border-color: #0066cc; color: #fff; }
     .sp-rel { display: inline-flex; gap: 4px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 2px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
     .sp-rel:hover { border-color: #0066cc; color: #0066cc; }
+    .sp-tab { border-radius: 999px; padding: 8px 16px; font-size: 14px; font-weight: 600; color: #6e6e73; white-space: nowrap; }
+    .sp-tab.on { background: #1d1d1f; color: #fff; }
+    .tx-full { white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.75; max-height: 70vh; overflow: auto; border-radius: 12px; background: #f6f8fa; padding: 12px 14px; }
+    .tx-full.asn1 { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; white-space: pre; }
+    .tx-snip { font-size: 13.5px; line-height: 1.7; color: #424245; }
+    .tx-snip mark, .tx-full mark { background: rgba(255, 196, 0, 0.35); color: inherit; border-radius: 3px; padding: 0 1px; }
+    .tx-kind { border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 600; background: #ececf0; color: #555; }
+    html.theme-dark .sp-tab.on { background: #e8e8ea; color: #1d1d1f; }
+    html.theme-dark .tx-full { background: #0d1117; color: #e6edf3; }
+    html.theme-dark .tx-snip { color: #c7c7cc; }
+    html.theme-dark .tx-kind { background: #2c2c30; color: #c7c7cc; }
     .sp-tbl td { padding: 4px 10px 4px 0; font-size: 13px; vertical-align: top; }
     html.theme-dark .sp-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
     html.theme-dark .sp-chip, html.theme-dark .sp-btn, html.theme-dark .sp-rel { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
@@ -33,13 +44,20 @@
     <div class="mt-4">
         <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DOCS · 3GPP</p>
         <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">3GPP Specs.</h1>
-        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">TS·TR 규격을 번호(38.331)나 제목 낱말(NTN, positioning, 위성)로 찾아요. 릴리스마다 최신 버전, 담당 작업반, 공식 문서 받기, 바로 인용까지. 목록은 3GPP 규격 현황표를 하루에 한 번 받아 와요.</p>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">TS·TR 규격을 번호(38.331)나 제목 낱말(NTN, positioning, 위성)로 찾아요. 릴리스마다 최신 버전, 담당 작업반, 공식 문서 받기, 바로 인용까지. 목록은 3GPP 규격 현황표를 하루에 한 번 받아 와요. <b class="text-[#1d1d1f]">본문 검색</b>은 NR 주요 규격 안의 글·표·ASN.1 을 절 단위로 찾아요.</p>
     </div>
+
+    <nav class="mt-6 flex gap-1" role="tablist">
+        <button type="button" class="sp-tab on" data-mode="find">📘 규격 찾기</button>
+        <button type="button" class="sp-tab" data-mode="text">🔎 본문 검색</button>
+    </nav>
+
+    <div id="mode-find">
 
     <section class="sp-card mt-6 !p-5">
         <form id="sp-form" class="flex gap-2">
             <input id="sp-q" class="sp-input" type="search" maxlength="100" placeholder="38.331 · NTN · positioning · channel model · 위성 · 측위" autocomplete="off" autofocus>
-            <button class="rounded-xl bg-[#0066cc] px-5 text-[14px] font-semibold text-white">찾기</button>
+            <button class="shrink-0 whitespace-nowrap rounded-xl bg-[#0066cc] px-5 text-[14px] font-semibold text-white">찾기</button>
         </form>
         <div class="mt-3 flex flex-wrap gap-1.5" id="sp-chips">
             <span class="mr-1 self-center text-[12px] text-[#8e8e93]">자주 찾는</span>
@@ -55,6 +73,41 @@
 
     <p class="mt-4 min-h-[20px] text-[13px] text-[#6e6e73]" id="sp-msg"></p>
     <div id="sp-list" class="mt-2 space-y-3"></div>
+    </div>
+
+    <div id="mode-text" class="hidden">
+        <section class="sp-card mt-4 !p-5">
+            <form id="tx-form" class="flex gap-2">
+                <input id="tx-q" class="sp-input" type="search" maxlength="200" placeholder="ta-Common · K_offset · HARQ feedback disabled · 6.3.2 · 펑처링" autocomplete="off">
+                <button class="shrink-0 whitespace-nowrap rounded-xl bg-[#0066cc] px-5 text-[14px] font-semibold text-white">찾기</button>
+            </form>
+            <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+                <select id="tx-doc" class="sp-input !py-2 !text-[13px]" aria-label="규격"><option value="">들어 있는 모든 규격</option></select>
+                <select id="tx-kind" class="sp-input !py-2 !text-[13px]" aria-label="종류">
+                    <option value="">본문 · 표 · ASN.1 모두</option><option value="clause">본문만</option><option value="table">표만 (필드 설명 등)</option><option value="asn1">ASN.1 만</option>
+                </select>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-1.5" id="tx-chips"><span class="mr-1 self-center text-[12px] text-[#8e8e93]">예시</span></div>
+            <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">절 번호(6.3.2)는 규격을 고른 뒤 넣으면 그 절로 바로 가요. 검색 결과는 누구나 미리보기로, <b>절 전체 글은 로그인한 회원</b>만 볼 수 있어요(원문은 3GPP 공식 문서로).</p>
+        </section>
+        <p class="mt-4 min-h-[20px] text-[13px] text-[#6e6e73]" id="tx-msg"></p>
+        <div id="tx-list" class="mt-2 space-y-3"></div>
+
+        <details class="sp-card mt-8" id="tx-docs-box">
+            <summary class="cursor-pointer text-[14px] font-semibold">📚 들어 있는 규격 <span class="font-normal text-[#8e8e93]" id="tx-docs-count"></span></summary>
+            <div id="tx-admin" class="mt-3 hidden rounded-[14px] bg-[#0066cc]/[0.05] p-3">
+                <p class="text-[12.5px] font-semibold">관리자</p>
+                <div class="mt-2 flex flex-wrap gap-2">
+                    <input id="tx-add" class="sp-input !w-auto flex-1 !py-1.5 !text-[13px]" placeholder="넣을 번호: 38.133 38.473">
+                    <button type="button" class="sp-btn" data-admin="add">넣기</button>
+                    <button type="button" class="sp-btn" data-admin="default">기본 규격 받기</button>
+                    <button type="button" class="sp-btn" data-admin="update">새 버전·실패한 것 다시 받기</button>
+                </div>
+                <p class="mt-2 text-[11.5px] text-[#8e8e93]">따로 뜬 프로세스가 하나씩 받아요. 3GPP 서버가 느려서 규격 하나에 수십 초~몇 분 걸려요. 서버에서 직접: <code>python manage.py spec_index --default</code></p>
+            </div>
+            <div id="tx-docs" class="mt-3 overflow-x-auto"></div>
+        </details>
+    </div>
 
     <details class="sp-card mt-8">
         <summary class="cursor-pointer text-[14px] font-semibold">📚 번호 읽는 법 · 시리즈 · 작업반</summary>
@@ -138,7 +191,150 @@
     $('sp-q').value = init.get('q') || '';
     for (const [id, key] of [['sp-type', 'type'], ['sp-series', 'series'], ['sp-wg', 'wg'], ['sp-rel', 'rel']]) if (init.get(key)) $(id).value = init.get(key);
     $('sp-dead').checked = init.get('dead') === '1';
-    if ([...init.keys()].length) run();
+    if (init.get('mode') !== 'text' && ['q', 'series', 'wg', 'rel'].some((k) => init.get(k))) run();
+})();
+</script>
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const URLS = { text: "{% url 'tools:specs_text' %}", docs: "{% url 'tools:specs_text_docs' %}", admin: "{% url 'tools:specs_text_admin' %}", chunk: "{% url 'tools:specs_text_chunk' 0 %}".replace(/0\/$/, '') };
+    const LOGIN = "{% url 'accounts:login' %}?next={{ request.path|urlencode }}%3Fmode%3Dtext";
+    const authed = {{ user.is_authenticated|yesno:"true,false" }};
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const KIND = { clause: '본문', table: '표', asn1: 'ASN.1' };
+
+    // ── 탭
+    function mode(m) {
+        $('mode-find').classList.toggle('hidden', m !== 'find');
+        $('mode-text').classList.toggle('hidden', m !== 'text');
+        document.querySelectorAll('.sp-tab').forEach((b) => b.classList.toggle('on', b.dataset.mode === m));
+        if (m === 'text') { loadDocs(); $('tx-q').focus(); }
+    }
+    document.querySelectorAll('.sp-tab').forEach((b) => b.addEventListener('click', () => {
+        const u = new URL(location.href);
+        if (b.dataset.mode === 'text') u.searchParams.set('mode', 'text'); else u.searchParams.delete('mode');
+        history.replaceState(null, '', u);
+        mode(b.dataset.mode);
+    }));
+
+    // ── 들어 있는 규격
+    let docsTimer = null;
+    async function loadDocs() {
+        const d = await fetch(URLS.docs, { cache: 'no-store' }).then((r) => r.json()).catch(() => null);
+        if (!d) return;
+        renderDocs(d);
+    }
+    function renderDocs(d) {
+        const ready = d.docs.filter((x) => x.chunks > 0);
+        const sel = $('tx-doc'), cur = sel.value;
+        sel.innerHTML = `<option value="">들어 있는 모든 규격 (${ready.length}개)</option>` + ready.map((x) => `<option value="${x.id}">${esc(x.kind)} ${esc(x.number)} — ${esc(x.title.slice(0, 50))}</option>`).join('');
+        sel.value = cur;
+        $('tx-docs-count').textContent = `${ready.length}개${d.running ? ' · 받는 중…' : ''}`;
+        $('tx-admin').classList.toggle('hidden', !d.admin);
+        const label = { pending: '기다리는 중', processing: '받는 중', ready: '준비됨', error: '실패' };
+        $('tx-docs').innerHTML = d.docs.length ? `<table class="sp-tbl w-full">${d.docs.map((x) => `<tr>
+            <td class="sp-num !text-[13px]">${esc(x.number)}</td>
+            <td>${esc(x.title || '')}</td>
+            <td class="whitespace-nowrap">${x.version ? 'v' + esc(x.version) : ''}${x.outdated ? ` <span class="text-[#b26a00]">→ v${esc(x.latest)} 있음</span>` : ''}</td>
+            <td class="whitespace-nowrap">${label[x.status] || x.status}${x.status === 'processing' ? ` ${x.progress}%` : ''}${x.chunks ? ` · ${x.chunks.toLocaleString()}조각` : ''}</td>
+            <td class="text-[#c4271d]">${esc(x.error || '')}</td>
+            ${d.admin ? `<td><button type="button" class="text-[12px] text-[#c4271d]" data-remove="${esc(x.number)}">빼기</button></td>` : ''}
+        </tr>`).join('')}</table>` : '<p class="text-[13px] text-[#8e8e93]">아직 들어 있는 규격이 없어요.</p>';
+        clearTimeout(docsTimer);
+        if (d.running || d.docs.some((x) => x.status === 'pending' || x.status === 'processing')) docsTimer = setTimeout(loadDocs, 5000);
+    }
+    async function admin(body) {
+        const f = new FormData();
+        Object.entries(body).forEach(([k, v]) => f.append(k, v));
+        const r = await fetch(URLS.admin, { method: 'POST', headers: { 'X-CSRFToken': csrf() }, body: f });
+        const d = await r.json().catch(() => ({ error: '요청을 처리하지 못했어요.' }));
+        if (!r.ok) { alert(d.error); return; }
+        renderDocs(d);
+    }
+    $('tx-admin').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-admin]');
+        if (b) admin({ action: b.dataset.admin, numbers: $('tx-add').value });
+    });
+    $('tx-docs').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-remove]');
+        if (b && confirm(`${b.dataset.remove} 을(를) 본문 검색에서 뺄까요?`)) admin({ action: 'remove', number: b.dataset.remove });
+    });
+
+    // ── 찾기
+    const EX = ['ta-Common', 'K_offset', 'HARQ feedback disabled', 'NTN-Config', 'SIB19', 'cellSpecificKoffset', 'random access response window', 'Doppler pre-compensation', 'drx-InactivityTimer', 'timing advance'];
+    $('tx-chips').insertAdjacentHTML('beforeend', EX.map((x) => `<button type="button" class="sp-chip" data-q="${esc(x)}">${esc(x)}</button>`).join(''));
+    $('tx-chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { $('tx-q').value = b.dataset.q; run(); } });
+    let seq = 0;
+    async function run() {
+        const q = $('tx-q').value.trim();
+        if (q.length < 2) return;
+        const p = new URLSearchParams({ q });
+        if ($('tx-doc').value) p.set('doc', $('tx-doc').value);
+        if ($('tx-kind').value) p.set('kind', $('tx-kind').value);
+        const u = new URL(location.href);
+        u.searchParams.set('mode', 'text'); u.searchParams.set('tq', q);
+        history.replaceState(null, '', u);
+        const my = ++seq;
+        $('tx-msg').textContent = '찾는 중…';
+        try {
+            const r = await fetch(`${URLS.text}?${p}`);
+            const d = await r.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+            if (my !== seq) return;
+            if (!r.ok) throw new Error(d.error);
+            $('tx-msg').textContent = d.items.length ? `${d.items.length}개 (관련 높은 순)${d.query !== q ? ` · '${d.query}' 로 찾음` : ''}` : '찾는 내용이 없어요. 다른 낱말이나 영어 용어로 해 보세요.';
+            $('tx-list').innerHTML = d.items.map(card).join('');
+        } catch (e) { if (my === seq) { $('tx-msg').textContent = e.message; $('tx-list').innerHTML = ''; } }
+    }
+    function card(c) {
+        return `<article class="sp-card" data-id="${c.id}">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="sp-num !text-[13.5px]">${esc(c.doc_label)}</span>
+                ${c.clause ? `<span class="sp-wg">§${esc(c.clause)}</span>` : ''}
+                <span class="tx-kind">${KIND[c.kind] || c.kind}</span>
+                <b class="min-w-0 text-[14px]">${esc(c.title)}</b>
+            </div>
+            <p class="tx-snip mt-1.5">${c.snippet}</p>
+            <div class="mt-2 flex flex-wrap gap-1.5">
+                <button type="button" class="sp-btn" data-full="${c.id}">${authed ? '절 전체 보기' : '🔒 절 전체 보기 (로그인)'}</button>
+                <button type="button" class="sp-btn" data-cite="${esc(`3GPP ${c.doc_label.replace(' v', ' V')}${c.clause ? `, clause ${c.clause}` : ''}`)}">출처 복사</button>
+                ${c.zip ? `<a class="sp-btn" href="${esc(c.zip)}" rel="noopener">⬇ 공식 문서</a>` : ''}
+            </div>
+            <div class="tx-full-box mt-2 hidden"></div>
+        </article>`;
+    }
+    $('tx-list').addEventListener('click', async (e) => {
+        const cite = e.target.closest('[data-cite]');
+        if (cite) {
+            try { await navigator.clipboard.writeText(cite.dataset.cite); cite.textContent = '✓ 복사됨'; } catch { cite.textContent = cite.dataset.cite; }
+            setTimeout(() => { cite.textContent = '출처 복사'; }, 1500);
+            return;
+        }
+        const b = e.target.closest('[data-full]');
+        if (!b) return;
+        if (!authed) { location.href = LOGIN; return; }
+        const box = b.closest('article').querySelector('.tx-full-box');
+        if (!box.classList.contains('hidden')) { box.classList.add('hidden'); b.textContent = '절 전체 보기'; return; }
+        b.disabled = true;
+        const r = await fetch(URLS.chunk + b.dataset.full + '/');
+        const d = await r.json().catch(() => ({ error: '불러오지 못했어요.' }));
+        b.disabled = false;
+        if (!r.ok) { box.innerHTML = `<p class="text-[13px] text-[#c4271d]">${esc(d.error)}</p>`; box.classList.remove('hidden'); return; }
+        const terms = $('tx-q').value.trim().split(/\s+/).filter((t) => t.length > 1).map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+        let html = esc(d.text);
+        if (terms.length) html = html.replace(new RegExp(`(${terms.join('|')})`, 'gi'), '<mark>$1</mark>');
+        box.innerHTML = `<div class="tx-full ${d.kind === 'asn1' ? 'asn1' : ''}">${html}</div><p class="mt-1 text-[11.5px] text-[#8e8e93]">${esc(d.cite)} · 3GPP 원문에서 뽑은 글이에요. 그림·수식은 공식 문서에서 봐 주세요.</p>`;
+        box.classList.remove('hidden');
+        b.textContent = '접기';
+    });
+    $('tx-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    ['tx-doc', 'tx-kind'].forEach((id) => $(id).addEventListener('change', run));
+
+    const init = new URLSearchParams(location.search);
+    if (init.get('mode') === 'text') {
+        mode('text');
+        if (init.get('tq')) { $('tx-q').value = init.get('tq'); run(); }
+    }
 })();
 </script>
 {% endblock %}
