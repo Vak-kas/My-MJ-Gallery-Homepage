@@ -43,6 +43,10 @@
     .rd-role { display: inline-block; margin-right: 6px; border-radius: 6px; padding: 0 6px; font-size: 11px; font-weight: 700; vertical-align: 2px; }
     .rd-role.background { background: #f5f5f7; color: #6e6e73; } .rd-role.prior { background: #e8f1fb; color: #0066cc; }
     .rd-role.gap { background: #fff1f0; color: #c4271d; } .rd-role.this { background: #ecfdf5; color: #0f9f6e; } .rd-role.organization { background: #f3e8ff; color: #7e22ce; }
+    .rd-tr { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; border-radius: 14px; background: #f5f5f7; padding: 8px 12px; font-size: 13px; }
+    .rd-orig { display: block; margin-top: 4px; font-size: 13px; line-height: 1.6; color: #8e8e93; }
+    .rd-ko-t { display: block; font-size: 14px; font-weight: 600; color: #6e56cf; }
+    html.theme-dark .rd-tr { background: #1c1f26; }
     .pp-cite { color: #0066cc; cursor: pointer; border-radius: 4px; padding: 0 1px; white-space: nowrap; }
     .pp-cite:hover { background: #e8f1fb; }
     .rd-pop { position: absolute; z-index: 70; width: min(92vw, 460px); border-radius: 14px; background: #fff; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2); border: 1px solid rgba(0, 0, 0, 0.08); padding: 12px 14px; font-size: 13px; line-height: 1.55; }
@@ -194,6 +198,8 @@
     const secCache = new Map();  // 논문 → 섹션 결과
     const aiSummary = new Map();  // 논문 → AI 구조 정리
     const aiIntro = new Map();  // 논문 → AI 서론 흐름
+    const trMap = new Map();  // '논문|섹션종류' → { ko: Map(id → 번역 HTML), by: 'ai'|'chrome' }
+    let showOrig = true;
 
     // ── 필터 화면 ──
     $('pp-venues').insertAdjacentHTML('beforeend', VENUE_ORDER.map((k) => `<button type="button" class="pp-chip" data-venue="${k}">${VENUE_LABEL[k]}</button>`).join('') + '<button type="button" class="pp-chip !border-dashed" id="pp-venue-clear">모두 끄기</button>');
@@ -479,19 +485,22 @@
     }
     const sectionsOf = (data, kind) => kind === 'all' ? data.sections : data.sections.filter((s) => s.kind === kind);
     const contribOf = (data) => (data.sections.find((s) => s.kind === 'introduction') || {}).contributions || [];
-    function blocksHTML(blocks, withRoles, flow) {
+    // 번역이 있으면 한국어를 크게, 원문은 아래에 작게
+    const withKo = (orig, ko) => (ko ? `${ko}${showOrig ? `<span class="rd-orig">${orig}</span>` : ''}` : orig);
+    function blocksHTML(blocks, withRoles, flow, tr, si) {
         let pi = 0;
-        return blocks.map((b) => {
+        const ko = (id) => (tr ? tr.get(`${si}:${id}`) : null);
+        return blocks.map((b, bi) => {
             if (b.t === 'p') {
                 const a = withRoles && flow ? flow.paragraphs.find((x) => x.n === pi + 1) : null;
                 pi++;
                 const role = a ? a.role : b.role;
-                return `<p class="rd-p">${withRoles && role ? `<span class="rd-role ${role}">${a ? '✨ ' : ''}${ROLE_LABEL[role]}</span>` : ''}${b.html}${a?.gist ? `<span class="ai-gist">→ ${esc(a.gist)}</span>` : ''}</p>`;
+                return `<p class="rd-p">${withRoles && role ? `<span class="rd-role ${role}">${a ? '✨ ' : ''}${ROLE_LABEL[role]}</span>` : ''}${withKo(b.html, ko(bi))}${a?.gist ? `<span class="ai-gist">→ ${esc(a.gist)}</span>` : ''}</p>`;
             }
-            if (b.t === 'h') return `<h4>${b.html}</h4>`;
+            if (b.t === 'h') return `<h4>${withKo(b.html, ko(bi))}</h4>`;
             if (b.t === 'eq') return b.rows.map((r) => `<div class="rd-eq"><span class="mj-katex" data-display="1" data-latex="${esc(r.latex)}"></span>${r.no ? `<span class="rd-eqno">${esc(r.no)}</span>` : ''}</div>`).join('');
-            if (b.t === 'list') return `<${b.ordered ? 'ol' : 'ul'}>${b.items.map((it) => `<li>${it.html}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
-            if (b.t === 'fig') return `<p class="rd-fig">🖼 ${b.html}</p>`;
+            if (b.t === 'list') return `<${b.ordered ? 'ol' : 'ul'}>${b.items.map((it, li) => `<li>${withKo(it.html, ko(`${bi}:${li}`))}</li>`).join('')}</${b.ordered ? 'ol' : 'ul'}>`;
+            if (b.t === 'fig') return `<p class="rd-fig">🖼 ${withKo(b.html, ko(bi))}</p>`;
             return '';
         }).join('');
     }
@@ -502,9 +511,11 @@
         }
         const secs = sectionsOf(data, kind);
         if (!secs.length) return `<p class="text-[13px] text-[#8e8e93]">이 논문에는 '${KIND_LABEL[kind]}'로 보이는 섹션이 없어요. 전체 목차에서 찾아보세요.</p>`;
-        return secs.map((s) => {
+        const tr = opts.paper && !opts.compact ? trMap.get(`${shelfKey(opts.paper)}|${kind}`)?.ko : null;
+        return secs.map((s, si) => {
             const flow = s.kind === 'introduction' && opts.paper ? aiIntro.get(shelfKey(opts.paper)) : null;
-            let h = `${opts.noTitle && secs.length === 1 ? '' : `<h3>${esc(s.title)}</h3>`}${blocksHTML(s.blocks, s.kind === 'introduction', flow)}`;
+            const tko = tr?.get(`${si}:t`);
+            let h = `${opts.noTitle && secs.length === 1 ? '' : `<h3>${esc(s.title)}${tko ? `<span class="rd-ko-t">${tko}</span>` : ''}</h3>`}${blocksHTML(s.blocks, s.kind === 'introduction', flow, tr, si)}`;
             if (s.kind === 'introduction' && !opts.compact) {
                 if (s.contributions?.length) h += `<div class="mt-4 rounded-2xl bg-[#ecfdf5] p-4 dark:bg-[#14432d]"><p class="text-[13px] font-semibold text-[#0f9f6e]">✅ 기여 (Contributions)</p><ol class="mt-1 text-[14px]">${s.contributions.map((x) => `<li>${x}</li>`).join('')}</ol></div>`;
                 if (s.cited?.length) h += `<div class="mt-4 rounded-2xl bg-[#f5f5f7] p-4 dark:bg-[#1c1f26]"><p class="text-[13px] font-semibold">📚 서론에서 인용한 논문 ${s.cited.length}편 <span class="font-normal text-[#8e8e93]">— 그 분야 핵심 선행 연구 목록이에요. 눌러서 찾기</span></p><ol class="mt-2 space-y-1 text-[13px] leading-5">${s.cited.map((k) => { const r = data.refs[k]; return r ? `<li><span class="pp-cite" data-refs="${esc(k)}">${esc(r.label)}</span> ${esc(r.text)}</li>` : ''; }).join('')}</ol></div>`;
@@ -529,8 +540,9 @@
         const has = (k) => k === 'all' || k === 'ai' || (k === 'contrib' ? contribOf(data).length : data.sections.some((s) => s.kind === k));
         return [...KIND_ORDER, 'all', 'ai'].map((k) => `<button type="button" class="rd-tab ${k === kind ? 'is-on' : ''}" data-kind="${k}" ${has(k) ? '' : 'disabled'}>${KIND_LABEL[k]}</button>`).join('');
     }
-    function renderReader() {
+    function renderReader(keepScroll) {
         const r = reader; if (!r) return;
+        const top = $('rd-panel').scrollTop;
         $('rd-panel').classList.toggle('wide', !!r.compare);
         if (r.compare) {
             $('rd-src').textContent = '나란히 보기 — 같은 섹션을 논문별로 이어서 읽어요';
@@ -558,11 +570,12 @@
             const toc = r.kind === 'all' ? `<ol class="mb-6 text-[14px]">${d.sections.map((s) => `<li><a class="text-[#0066cc] hover:underline" href="#" data-goto="${s.kind}">${esc(s.title)}</a> <span class="text-[11px] text-[#8e8e93]">${KIND_LABEL[s.kind] || ''}</span></li>`).join('')}</ol>` : '';
             const note = r.kind === 'introduction' ? `<p class="mb-4 text-[12px] leading-5 text-[#8e8e93]">문단 앞 표시는 표지어("However", "In this paper"…)로 자동 추정한 역할이에요. ✍️ 서론 흐름 참고용 — 문장을 그대로 옮기면 표절이 돼요.</p>` : '';
             const paperRef = r.paper || { title: d.title };
-            $('rd-body').innerHTML = r.kind === 'ai' ? summaryHTML(r.paper || { title: d.title }, d) : toc + note + (r.kind === 'introduction' ? introAIHTML(paperRef) : '') + sectionHTML(d, r.kind, { paper: paperRef });
+            $('rd-body').innerHTML = r.kind === 'ai' ? summaryHTML(r.paper || { title: d.title }, d) : toc + note + (TR_KINDS.has(r.kind) ? trBarHTML(paperRef, r.kind) : '') + (r.kind === 'introduction' ? introAIHTML(paperRef) : '') + sectionHTML(d, r.kind, { paper: paperRef });
         }
+        $('rd-body').querySelectorAll('.mj-katex, .pp-cite, .rd-eq, .rd-eqno').forEach((el) => el.setAttribute('translate', 'no'));
         renderMath($('rd-body'));
         if (P.login && $('rd-body').querySelector('[data-ai-quota]')) fetch(P.aiStatus, { cache: 'no-store' }).then((x) => x.json()).then(window.mjAI.setQuota).catch(() => {});
-        $('rd-body').scrollTop = 0; $('rd-panel').scrollTop = 0;
+        $('rd-panel').scrollTop = keepScroll ? top : 0;
     }
     async function openReader(p) {
         reader = { paper: p, data: null, kind: 'introduction' };
@@ -767,6 +780,93 @@
             navigator.clipboard.writeText(t.dataset.copyphrase).then(() => { const o = t.textContent; t.textContent = '✓ 복사됨'; setTimeout(() => { t.textContent = o; }, 900); });
         }
     });
+
+
+    // ── 🇰🇷 번역 ──
+    const TR_KINDS = new Set(['abstract', 'introduction', 'related', 'system', 'problem', 'proposed', 'analysis', 'simulation', 'conclusion']);
+    const hasChromeTr = 'Translator' in self;
+    function trItems(data, kind) {
+        const out = [];
+        sectionsOf(data, kind).forEach((s, si) => {
+            out.push({ id: `${si}:t`, html: esc(s.title) });
+            s.blocks.forEach((b, bi) => {
+                if (b.t === 'p' || b.t === 'h' || b.t === 'fig') out.push({ id: `${si}:${bi}`, html: b.html });
+                else if (b.t === 'list') b.items.forEach((it, li) => out.push({ id: `${si}:${bi}:${li}`, html: it.html }));
+            });
+        });
+        return out;
+    }
+    // 수식·인용을 ⟦m0⟧ 같은 자리표시로 바꿔서 글자만 번역하고, 끝나면 다시 끼움
+    function tokenize(html) {
+        const box = document.createElement('div'); box.innerHTML = html;
+        const parts = [];
+        box.querySelectorAll('.mj-katex, .pp-cite').forEach((el) => {
+            const tag = `⟦${el.classList.contains('pp-cite') ? 'c' : 'm'}${parts.length}⟧`;
+            parts.push(el.outerHTML);
+            el.replaceWith(document.createTextNode(tag));
+        });
+        return { text: box.textContent.replace(/\s+/g, ' ').trim(), parts };
+    }
+    const detokenize = (ko, parts) => esc(ko).replace(/⟦[mc](\d+)⟧/g, (m, i) => parts[+i] ?? m);
+    function trBarHTML(p, kind) {
+        const t = trMap.get(`${shelfKey(p)}|${kind}`);
+        const n = trItems(reader.data, kind).reduce((a, x) => a + tokenize(x.html).text.length, 0);
+        return `<div class="rd-tr"><span>🇰🇷 <b>한국어로</b> <span class="text-[#8e8e93]">(${fmtN(n)}자)</span></span>
+            ${t ? `<span class="text-[#0f9f6e]">✓ ${t.by === 'ai' ? '✨ AI' : '크롬 내장'} 번역됨</span><label class="flex items-center gap-1"><input type="checkbox" id="tr-orig" ${showOrig ? 'checked' : ''}> 원문 같이 보기</label><button type="button" class="pp-btn" id="tr-off">원문만</button>` : ''}
+            ${!t || t.by !== 'ai' ? `<button type="button" class="ai-btn !py-1" id="tr-ai">✨ AI 번역</button>` : ''}
+            ${hasChromeTr && !t ? `<button type="button" class="pp-btn" id="tr-chrome" title="이 컴퓨터 안에서 번역해요 (무료, 크롬 최신판)">🆓 크롬 내장 번역</button>` : ''}
+            <span class="ai-quota" data-ai-quota></span>
+            <span class="w-full text-[12px] text-[#8e8e93]" id="tr-msg">${t ? '' : `AI 번역은 전문 용어를 살려 자연스럽게 옮겨요 (약 ${Math.max(1, Math.ceil(n / 3500))}번 사용, 이미 누가 번역한 섹션이면 0번). 무료로는 브라우저 메뉴의 '한국어로 번역'도 돼요 — 수식·인용은 안 깨지게 해 뒀어요.`}</span></div>`;
+    }
+    async function translateAI(btn) {
+        const r = reader, key = `${shelfKey(r.paper)}|${r.kind}`;
+        const items = trItems(r.data, r.kind).map((x) => ({ ...x, ...tokenize(x.html) })).filter((x) => x.text);
+        let max = 3800;
+        try { const q = await (await fetch(P.aiStatus, { cache: 'no-store' })).json(); if (q.max_chars) max = q.max_chars - 300; } catch (e) { /* 기본값 */ }
+        const chunks = []; let cur = [], len = 0;
+        items.forEach((x, i) => {
+            const piece = x.text.slice(0, max - 50);
+            if (cur.length && len + piece.length + 8 > max) { chunks.push(cur); cur = []; len = 0; }
+            cur.push({ i, text: piece }); len += piece.length + 8;
+        });
+        if (cur.length) chunks.push(cur);
+        const ko = new Map(trMap.get(key)?.by === 'ai' ? trMap.get(key).ko : []);
+        for (let c = 0; c < chunks.length; c++) {
+            if (reader !== r) return;
+            const msg = $('tr-msg'); if (msg) msg.textContent = `번역 중… ${c + 1}/${chunks.length}`;
+            const res = await window.mjAI.post(P.ai, { mode: 'translate', title: r.data.title || r.paper.title, items: chunks[c] }, btn);
+            for (const t of res.items) { const x = items[t.i]; if (x) ko.set(x.id, detokenize(t.ko, x.parts)); }
+            trMap.set(key, { ko, by: 'ai' });
+            renderReader(true);
+            btn = $('tr-ai');
+        }
+    }
+    async function translateChrome(btn) {
+        const r = reader, key = `${shelfKey(r.paper)}|${r.kind}`;
+        const msg = (t) => { const el = $('tr-msg'); if (el) el.textContent = t; };
+        let tr;
+        try {
+            const avail = await Translator.availability({ sourceLanguage: 'en', targetLanguage: 'ko' });
+            if (avail === 'unavailable') { msg('이 브라우저에선 영어→한국어 내장 번역을 쓸 수 없어요. AI 번역이나 브라우저 메뉴의 번역을 써 보세요.'); return; }
+            btn.disabled = true;
+            tr = await Translator.create({ sourceLanguage: 'en', targetLanguage: 'ko', monitor(m) { m.addEventListener('downloadprogress', (e) => msg(`번역 모델 내려받는 중… ${Math.round(e.loaded * 100)}% (처음 한 번만)`)); } });
+        } catch (e) { msg('내장 번역을 시작하지 못했어요. AI 번역을 써 보세요.'); btn.disabled = false; return; }
+        const items = trItems(r.data, r.kind).map((x) => ({ ...x, ...tokenize(x.html) })).filter((x) => x.text);
+        const ko = new Map();
+        for (let i = 0; i < items.length; i++) {
+            if (reader !== r) return;
+            msg(`번역 중… ${i + 1}/${items.length}`);
+            try { ko.set(items[i].id, detokenize(await tr.translate(items[i].text), items[i].parts)); } catch (e) { /* 그 문단은 원문 */ }
+            if (i % 6 === 5 || i === items.length - 1) { trMap.set(key, { ko, by: 'chrome' }); renderReader(true); }
+        }
+    }
+    $('rd-body').addEventListener('click', async (e) => {
+        const t = e.target.closest('button'); if (!t || !reader || reader.compare) return;
+        if (t.id === 'tr-ai') { if (!window.mjAI.guard(t)) return; try { await translateAI(t); } catch (err) { const m = $('tr-msg'); if (m) m.textContent = err.message; } }
+        else if (t.id === 'tr-chrome') translateChrome(t);
+        else if (t.id === 'tr-off') { trMap.delete(`${shelfKey(reader.paper)}|${reader.kind}`); renderReader(); }
+    });
+    $('rd-body').addEventListener('change', (e) => { if (e.target.id === 'tr-orig') { showOrig = e.target.checked; renderReader(true); } });
 
     // ── 나란히 보기 ──
     function renderPicked() {

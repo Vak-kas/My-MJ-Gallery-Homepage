@@ -78,6 +78,24 @@ INTRO_TOOL = {
 	},
 }
 
+TRANSLATE_SYSTEM = (
+	"너는 무선통신·네트워크 분야 논문을 한국어로 옮기는 번역가야. 주어진 영어 문단들을 자연스러운 한국어 학술 문체(~다)로 번역해. "
+	"규칙: (1) ⟦m3⟧, ⟦c1⟧ 같은 표시는 수식·인용 자리라서 글자 하나 바꾸지 말고 같은 자리에 그대로 둬. "
+	"(2) 널리 쓰는 전문 용어·약어(LEO, NTN, Rician fading, beamforming, SINR, outage probability, Lagrangian 등)는 영어 그대로 두거나 '빔포밍(beamforming)'처럼 처음에만 괄호로 병기해. "
+	"(3) 내용을 더하거나 빼거나 요약하지 마. (4) 한자(漢字)는 쓰지 말고 한글로 써. (5) 문단마다 i 번호를 그대로 돌려줘."
+)
+TRANSLATE_TOOL = {
+	"name": "translations",
+	"description": "문단별 한국어 번역",
+	"input_schema": {
+		"type": "object",
+		"properties": {"items": {"type": "array", "items": {"type": "object", "properties": {
+			"i": {"type": "integer"}, "ko": {"type": "string"},
+		}, "required": ["i", "ko"]}}},
+		"required": ["items"],
+	},
+}
+
 GROUP_SYSTEM = (
 	"너는 무선통신 분야 연구 지도교수야. 여러 논문의 구조 정리(JSON)를 보고 관련 연구(literature review)를 쓰기 좋게 묶어 줘. "
 	"비슷한 접근끼리 묶음을 만들고(논문 번호로), 묶음마다 공통점과 서로 다른 점을 한국어로 짧게. "
@@ -228,6 +246,24 @@ def paper_ai(request):
 				gaps = [{"gap": _text(g.get("gap"), 200), "why": _text(g.get("why"), 300)} for g in (raw.get("gaps") or [])[:5] if isinstance(g, dict) and g.get("gap")]
 				return {"groups": groups, "gaps": gaps, "overview": _text(raw.get("overview"), 500)}
 			return _cached("group", compact, request.user, len(content), call)
+
+		if mode == "translate":
+			items = [x for x in (data.get("items") or [])[:80] if isinstance(x, dict) and isinstance(x.get("i"), int) and str(x.get("text") or "").strip()]
+			if not items:
+				raise ai.AIError("번역할 글이 없어요.")
+			items = [{"i": x["i"], "text": str(x["text"])[:6000]} for x in items]
+			content = "\n\n".join(f"[{x['i']}] {x['text']}" for x in items)
+			if len(content) > _max_chars(request.user):
+				raise ai.AIError(f"한 번에 {_max_chars(request.user):,}자까지 번역할 수 있어요. 나눠서 보내 주세요.", 400)
+
+			def call():
+				raw = ai.call(request.user, "paper", system=TRANSLATE_SYSTEM, tool=TRANSLATE_TOOL, content=content, max_tokens=min(8000, 600 + len(content) * 2))
+				ids = {x["i"] for x in items}
+				out = [{"i": t["i"], "ko": str(t.get("ko") or "").strip()[:12000]} for t in _as_list(raw.get("items")) if isinstance(t, dict) and t.get("i") in ids]
+				if not out:
+					raise ai.AIError("번역 결과가 비어 있어요. 다시 시도해 주세요.", 502)
+				return {"items": out}
+			return _cached("translate", items, request.user, len(content), call)
 
 		raise ai.AIError("알 수 없는 요청이에요.")
 	return _respond(request, run)
