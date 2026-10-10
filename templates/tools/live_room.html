@@ -30,7 +30,7 @@
         {% if role == 'viewer' %}<span class="text-[13px] text-[#8e8e93]">· {{ room.owner }}</span>{% endif %}
     </div>
 
-    <div class="mt-5 grid gap-5 {% if room.chat %}lg:grid-cols-[minmax(0,1fr)_340px]{% endif %}">
+    <div class="mt-5 grid grid-cols-1 gap-5 {% if room.chat %}lg:grid-cols-[minmax(0,1fr)_340px]{% endif %}">
         <div class="min-w-0">
             <div class="lv-stage" id="lv-stage">
                 <video id="lv-main" class="main" autoplay playsinline {% if role == 'host' %}muted{% endif %}></video>

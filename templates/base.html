@@ -117,6 +117,10 @@
             height: calc(100vh - 62px);
         }
 
+        /* 그리드 칸은 내용(줄바꿈 안 되는 긴 제목·수식 등)보다 좁아질 수 있게 — 모바일에서 옆으로 넘치지 않도록 */
+        .grid > * { min-width: 0; }
+        .break-anywhere { overflow-wrap: anywhere; }
+
         /* Studio 메뉴: 스크롤바는 얇게 (설명 말풍선은 화면 위에 따로 띄움) */
         #studio-sidebar { scrollbar-width: thin; }
 
