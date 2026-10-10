@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -88,6 +88,13 @@ urlpatterns = [
     path("paste/<str:paste_id>/", paste_views.paste_view, name="paste_view"),
     path("paste/<str:paste_id>/raw/", paste_views.paste_raw, name="paste_raw"),
     path("paste/<str:paste_id>/delete/", paste_views.paste_delete, name="paste_delete"),
+    path("webhook/", webhook_views.webhook_page, name="webhook"),
+    path("webhook/<str:bin_id>/", webhook_views.webhook_bin, name="webhook_bin"),
+    path("webhook/<str:bin_id>/requests/", webhook_views.webhook_requests, name="webhook_requests"),
+    path("webhook/<str:bin_id>/requests/<int:req_id>/", webhook_views.webhook_request_detail, name="webhook_request"),
+    path("webhook/<str:bin_id>/settings/", webhook_views.webhook_settings, name="webhook_settings"),
+    path("webhook/<str:bin_id>/clear/", webhook_views.webhook_clear, name="webhook_clear"),
+    path("webhook/<str:bin_id>/delete/", webhook_views.webhook_delete, name="webhook_delete"),
     path("share/", share_views.share_page, name="share"),
     path("share/new/", share_views.share_create, name="share_create"),
     path("share/<str:token>/", share_views.share_download_page, name="share_download_page"),

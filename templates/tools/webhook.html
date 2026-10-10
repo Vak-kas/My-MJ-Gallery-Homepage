@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .wh-input { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 11px 14px; font-size: 15px; outline: none; color: #1d1d1f; }
+    .wh-input:focus { border-color: #0066cc; }
+    .wh-mono { font-family: SFMono-Regular, Menlo, Consolas, monospace; }
+    html.theme-dark .wh-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[900px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DEV · WEBHOOK</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">Webhook.</h1>
+        <p class="mt-3 text-[15px] leading-relaxed text-[#6e6e73]">
+            나만의 주소를 만들고 깃허브·결제·IoT 기기·내 코드가 그 주소로 요청을 보내게 하면, <b class="text-[#1d1d1f]">무엇이 왔는지(방식·헤더·본문)</b> 바로 보여 줘요.
+            "웹훅이 오긴 하나?", "본문이 어떻게 생겼지?", "서명이 맞나?"를 확인할 때 써요.
+        </p>
+    </div>
+
+    {% for message in messages %}
+    <div class="mt-6 rounded-xl border border-black/[0.08] bg-white px-4 py-3 text-[13px]">{{ message }}</div>
+    {% endfor %}
+
+    <section class="mt-6 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <form method="post" class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_170px_auto]">
+            {% csrf_token %}
+            <input name="name" class="wh-input" maxlength="60" placeholder="이름 (선택, 예: 깃허브 푸시 시험)" autocomplete="off">
+            <select name="ttl" class="wh-input" aria-label="유효 기간">
+                <option value="1">1일 동안</option>
+                <option value="7" selected>7일 동안</option>
+                <option value="30">30일 동안</option>
+            </select>
+            <button class="rounded-xl bg-[#0066cc] px-6 py-3 text-[14px] font-semibold text-white">주소 만들기</button>
+        </form>
+        <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]">
+            주소마다 최근 {{ keep }}개까지 남기고, 1분에 120번까지 받아요. 본문은 앞 256KB 까지 저장해요.
+            요청을 보낸 쪽의 IP 가 기록돼요. 쿠키는 기록하지 않아요. 기간이 지나면 주소와 기록이 모두 지워져요.
+        </p>
+    </section>
+
+    <section class="mt-8">
+        <div class="flex items-baseline gap-2">
+            <h2 class="text-[18px] font-semibold text-[#1d1d1f]">내 주소</h2>
+            <span class="text-[12px] text-[#8e8e93]">{{ rows|length }}{% if max_bins %} / {{ max_bins }}개{% else %}개{% endif %}</span>
+        </div>
+        {% if rows %}
+        <ul class="mt-3 divide-y divide-black/[0.06] rounded-[18px] border border-black/[0.08] bg-white">
+            {% for row in rows %}
+            <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3">
+                <div class="min-w-0 flex-1">
+                    <a href="{% url 'tools:webhook_bin' row.obj.bin_id %}" class="text-[14px] font-medium text-[#0066cc]">{{ row.obj.name|default:"(이름 없음)" }}</a>
+                    <p class="wh-mono truncate text-[12px] text-[#8e8e93]">{{ row.url }}</p>
+                </div>
+                <span class="text-[12px] text-[#8e8e93]">📨 {{ row.obj.request_count }} · {{ row.obj.expires_at|timeuntil }} 남음</span>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="mt-3 text-[14px] text-[#8e8e93]">아직 없어요.</p>
+        {% endif %}
+    </section>
+</main>
+{% endblock %}
