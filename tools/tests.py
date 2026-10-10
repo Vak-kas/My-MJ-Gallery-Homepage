@@ -1683,3 +1683,57 @@ class SatelliteTests(TestCase):
 		with mock.patch("tools.satellite._fetch", return_value=self.TLE), mock.patch.object(satellite, "SEARCH_PER_MIN", 2):
 			codes = [self.client.get(url, {"name": f"SAT{i}"}).status_code for i in range(3)]
 		self.assertEqual(codes, [200, 200, 429])
+
+
+class SpecsTests(TestCase):
+	STATUS = """
+	<table id="a3dyntab-activeRel-19" class="x"><thead><tr><th>type</th></tr></thead><tbody>
+	<tr class="odd"><td>TS</td><td><a href="/DynaReport/38331.htm">38.331</a></td><td>NR; Radio Resource Control (RRC); Protocol specification</td><td>19.4.0</td><td>R2</td></tr>
+	<tr class="even"><td>TS</td><td><a>38.101-5</a></td><td>NR; User Equipment (UE) radio transmission and reception; Part 5: Satellite access Radio Frequency (RF) and performance requirements</td><td>19.2.0</td><td>R4</td></tr>
+	<tr class="odd"><td>TS</td><td><a>38.321</a></td><td>NR; Medium Access Control (MAC) protocol specification</td><td>19.4.0</td><td>R2</td></tr>
+	</tbody></table>
+	<table id="a3dyntab-activeRel-17"><tbody>
+	<tr><td>TS</td><td><a>38.331</a></td><td>NR; Radio Resource Control (RRC); Protocol specification</td><td>17.18.0</td><td>R2</td></tr>
+	<tr><td>TR</td><td><a>38.821</a></td><td>Solutions for NR to support non-terrestrial networks (NTN)</td><td>16.2.0</td><td>RP</td></tr>
+	</tbody></table>
+	<table id="a3dyntab-deadRel-8"><tbody><tr><td>TS</td><td><a>25.999</a></td><td>Old machine thing</td><td>8.0.0</td><td>R2</td></tr></tbody></table>
+	"""
+
+	def setUp(self):
+		from django.core.cache import cache
+		cache.clear()
+
+	def test_parse_search_and_links(self):
+		from tools import specs
+		S = specs.parse_status(self.STATUS)
+		self.assertEqual(S["38.331"]["rels"], {"19": "19.4.0", "17": "17.18.0"})
+		self.assertTrue(S["25.999"]["dead"])
+		self.assertEqual(specs.ver_code("18.11.0"), "ib0")
+		j = specs.to_json(S["38.331"])
+		self.assertEqual(j["latest"]["zip"], "https://www.3gpp.org/ftp/Specs/archive/38_series/38.331/38331-j40.zip")
+		self.assertEqual([s["number"] for s in specs.search(S, "TS 38.331")[0]], ["38.331"])
+		self.assertEqual([s["number"] for s in specs.search(S, "위성")[0]], ["38.101-5", "38.821"])
+		self.assertEqual([s["number"] for s in specs.search(S, "MAC")[0]], ["38.321"])  # machine 안의 mac 은 안 맞음 (폐지 문서도 빠짐)
+		self.assertEqual(specs.search(S, "", rel="17")[1], 2)
+
+	def test_view_uses_snapshot_then_refreshes(self):
+		from unittest import mock
+		from django.core.cache import cache
+		from tools import specs
+		url = reverse("tools:specs_search")
+		self.assertEqual(self.client.get(reverse("tools:specs")).status_code, 200)
+		with mock.patch("tools.specs._refresh_later") as later:
+			self.assertEqual(self.client.get(url).status_code, 400)  # 빈 검색은 목록도 안 읽음
+			later.assert_not_called()
+			d = self.client.get(url, {"q": "38.331"}).json()  # 코드에 넣어 둔 목록으로 바로
+			self.assertEqual(d["items"][0]["number"], "38.331")
+			later.assert_called_once()
+		big = self.STATUS + "".join(f'<table id="a3dyntab-activeRel-15"><tbody><tr><td>TS</td><td>36.{i:03d}</td><td>T{i}</td><td>15.0.0</td><td>R1</td></tr></tbody></table>' for i in range(600))
+		with mock.patch("tools.specs._fetch_status", return_value=big):
+			self.assertTrue(specs.refresh_index())
+		self.assertEqual(self.client.get(url, {"q": "RRC"}).json()["count"], 605)  # 새 목록
+		cache.delete(specs.INDEX_KEY)
+		with mock.patch("tools.specs._fetch_status", side_effect=OSError("down")):
+			self.assertFalse(specs.refresh_index())
+		with mock.patch("tools.specs._refresh_later"):
+			self.assertEqual(self.client.get(url, {"q": "RRC"}).json()["count"], 605)  # 예비 사본

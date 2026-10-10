@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .sp-input { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f9f9fb; padding: 10px 13px; font-size: 15px; outline: none; color: #1d1d1f; }
+    .sp-input:focus { border-color: #0066cc; }
+    .sp-chip { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); padding: 4px 11px; font-size: 12.5px; white-space: nowrap; }
+    .sp-chip:hover { background: #f5f5f7; }
+    .sp-card { border-radius: 18px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 14px 16px; }
+    .sp-num { font-family: SFMono-Regular, Menlo, Consolas, monospace; font-weight: 700; font-size: 15px; }
+    .sp-badge { border-radius: 6px; padding: 1px 7px; font-size: 11px; font-weight: 700; }
+    .sp-badge.TS { background: #e5effb; color: #0058b0; } .sp-badge.TR { background: #f1e8fb; color: #6e3fb0; }
+    .sp-wg { border-radius: 999px; background: #f2f2f5; padding: 1px 8px; font-size: 11.5px; color: #6e6e73; }
+    .sp-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); padding: 4px 11px; font-size: 12.5px; white-space: nowrap; color: inherit; }
+    .sp-btn:hover { background: #f5f5f7; }
+    .sp-btn.primary { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .sp-rel { display: inline-flex; gap: 4px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 2px 8px; font-size: 12px; font-variant-numeric: tabular-nums; }
+    .sp-rel:hover { border-color: #0066cc; color: #0066cc; }
+    .sp-tbl td { padding: 4px 10px 4px 0; font-size: 13px; vertical-align: top; }
+    html.theme-dark .sp-input { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .sp-chip, html.theme-dark .sp-btn, html.theme-dark .sp-rel { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .sp-chip:hover, html.theme-dark .sp-btn:hover { background: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .sp-btn.primary { color: #fff; }
+    html.theme-dark .sp-card { background: #1c1c1f; border-color: rgba(255, 255, 255, 0.1); }
+    html.theme-dark .sp-wg { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .sp-badge.TS { background: #13304f; color: #8cc2ff; } html.theme-dark .sp-badge.TR { background: #2e1f45; color: #c9a8ff; }
+</style>
+
+<main class="mx-auto max-w-[1100px] px-4 py-10 sm:px-6 lg:py-14">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DOCS · 3GPP</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">3GPP Specs.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">TS·TR 규격을 번호(38.331)나 제목 낱말(NTN, positioning, 위성)로 찾아요. 릴리스마다 최신 버전, 담당 작업반, 공식 문서 받기, 바로 인용까지. 목록은 3GPP 규격 현황표를 하루에 한 번 받아 와요.</p>
+    </div>
+
+    <section class="sp-card mt-6 !p-5">
+        <form id="sp-form" class="flex gap-2">
+            <input id="sp-q" class="sp-input" type="search" maxlength="100" placeholder="38.331 · NTN · positioning · channel model · 위성 · 측위" autocomplete="off" autofocus>
+            <button class="rounded-xl bg-[#0066cc] px-5 text-[14px] font-semibold text-white">찾기</button>
+        </form>
+        <div class="mt-3 flex flex-wrap gap-1.5" id="sp-chips">
+            <span class="mr-1 self-center text-[12px] text-[#8e8e93]">자주 찾는</span>
+        </div>
+        <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            <select id="sp-type" class="sp-input !py-2 !text-[13px]" aria-label="종류"><option value="">TS · TR 모두</option><option value="TS">TS (규격)</option><option value="TR">TR (보고서)</option></select>
+            <select id="sp-series" class="sp-input !py-2 !text-[13px]" aria-label="시리즈"><option value="">모든 시리즈</option>{% for n, name in series %}<option value="{{ n }}">{{ n }} · {{ name }}</option>{% endfor %}</select>
+            <select id="sp-wg" class="sp-input !py-2 !text-[13px]" aria-label="작업반"><option value="">모든 작업반</option>{% for code, name in wgs %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</select>
+            <select id="sp-rel" class="sp-input !py-2 !text-[13px]" aria-label="릴리스"><option value="">모든 릴리스</option>{% for r in releases %}<option value="{{ r }}">Rel-{{ r }} 에 있는 것</option>{% endfor %}</select>
+            <label class="flex items-center gap-1.5 text-[12.5px] text-[#6e6e73]"><input type="checkbox" id="sp-dead" class="h-4 w-4"> 폐지된 것도</label>
+        </div>
+    </section>
+
+    <p class="mt-4 min-h-[20px] text-[13px] text-[#6e6e73]" id="sp-msg"></p>
+    <div id="sp-list" class="mt-2 space-y-3"></div>
+
+    <details class="sp-card mt-8">
+        <summary class="cursor-pointer text-[14px] font-semibold">📚 번호 읽는 법 · 시리즈 · 작업반</summary>
+        <div class="mt-3 grid gap-6 md:grid-cols-2">
+            <div>
+                <p class="text-[13px] leading-6 text-[#6e6e73]"><b>TS</b> 는 지켜야 하는 규격, <b>TR</b> 은 연구·검토 보고서예요. <code>38.331</code> 에서 앞 두 자리는 시리즈(38 = 5G NR), 뒤 세 자리가 문서 번호예요. 8xx·9xx 는 대부분 TR 이에요.<br>버전 <code>19.4.0</code> 은 '릴리스 19, 네 번째 고침'. 파일 이름에서는 10 이상을 글자로 써서 <code>38331-j40.zip</code> (j = 19) 이 돼요.</p>
+                <table class="sp-tbl mt-3">{% for n, name in series %}<tr><td class="sp-num !text-[13px]">{{ n }}</td><td>{{ name }}</td></tr>{% endfor %}</table>
+            </div>
+            <div>
+                <table class="sp-tbl">{% for code, name in wgs %}<tr><td class="sp-num !text-[13px]">{{ code }}</td><td>{{ name }}</td></tr>{% endfor %}</table>
+                <p class="mt-3 text-[12.5px] leading-6 text-[#8e8e93]">찾은 문서를 <a href="{% url 'tools:stdlib' %}" class="text-[#0066cc]">📖 표준 서재</a>(VIP)에 올리면 본문을 절 단위로 찾고 ✨AI 에게 물어볼 수 있어요.</p>
+            </div>
+        </div>
+    </details>
+</main>
+
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const SEARCH = "{% url 'tools:specs_search' %}";
+    const CITE = "{% url 'tools:cite' %}";
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const CHIPS = ['NTN', 'RRC', 'MAC', 'physical layer procedures', 'positioning', 'AI/ML', 'RedCap', 'sidelink', 'channel model', 'ISAC', '6G', 'security'];
+    $('sp-chips').insertAdjacentHTML('beforeend', CHIPS.map((c) => `<button type="button" class="sp-chip" data-q="${esc(c)}">${esc(c)}</button>`).join(''));
+    $('sp-chips').addEventListener('click', (e) => { const b = e.target.closest('[data-q]'); if (b) { $('sp-q').value = b.dataset.q; run(); } });
+
+    function params() {
+        const p = new URLSearchParams();
+        const q = $('sp-q').value.trim();
+        if (q) p.set('q', q);
+        for (const [id, key] of [['sp-type', 'type'], ['sp-series', 'series'], ['sp-wg', 'wg'], ['sp-rel', 'rel']]) if ($(id).value) p.set(key, $(id).value);
+        if ($('sp-dead').checked) p.set('dead', '1');
+        return p;
+    }
+    let seq = 0;
+    async function run() {
+        const p = params();
+        history.replaceState(null, '', p.toString() ? '?' + p : location.pathname);
+        if (![...p.keys()].some((k) => k !== 'type' && k !== 'dead')) { $('sp-list').innerHTML = ''; $('sp-msg').textContent = ''; return; }
+        const my = ++seq;
+        $('sp-msg').textContent = '찾는 중… (하루 첫 검색은 3GPP 목록을 받느라 몇 초 걸려요)';
+        try {
+            const r = await fetch(`${SEARCH}?${p}`);
+            const d = await r.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+            if (my !== seq) return;
+            if (!r.ok) throw new Error(d.error);
+            const when = new Date(d.fetched).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            $('sp-msg').textContent = d.total ? `${d.total.toLocaleString()}개 찾음${d.total > d.items.length ? ` · 위 ${d.items.length}개만 보여요` : ''} · 3GPP 규격 ${d.count.toLocaleString()}개 중 (${when} 목록)` : '찾는 규격이 없어요. 다른 낱말로 해 보세요.';
+            $('sp-list').innerHTML = d.items.map(card).join('');
+        } catch (e) {
+            if (my === seq) { $('sp-msg').textContent = e.message; $('sp-list').innerHTML = ''; }
+        }
+    }
+    function card(s) {
+        const l = s.latest;
+        const citeQ = `${s.type} ${s.number} v${l.ver}`;
+        const rels = s.releases.map((r) => r.zip ? `<a class="sp-rel" href="${esc(r.zip)}" rel="noopener" title="Rel-${esc(r.rel)} 최신판 받기"><b>Rel-${esc(r.rel === '99' ? 'R99' : r.rel)}</b>${esc(r.ver)}</a>` : `<span class="sp-rel"><b>Rel-${esc(r.rel)}</b>${esc(r.ver)}</span>`).join('');
+        return `<article class="sp-card">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="sp-badge ${esc(s.type)}">${esc(s.type)}</span>
+                <span class="sp-num">${esc(s.number)}</span>
+                <span class="sp-wg">${esc(s.wg_name)}</span>
+                ${s.withdrawn ? '<span class="sp-wg !bg-[#fde7e5] !text-[#b3261e]">폐지됨</span>' : ''}
+                <span class="ml-auto text-[12px] text-[#8e8e93]">최신 Rel-${esc(l.rel)} · v${esc(l.ver)}</span>
+            </div>
+            <p class="mt-1.5 text-[14.5px] leading-6 text-[#1d1d1f] dark:text-[#e8e8ea]">${esc(s.title)}</p>
+            <div class="mt-2.5 flex flex-wrap gap-1.5">
+                ${l.zip ? `<a class="sp-btn primary" href="${esc(l.zip)}" rel="noopener">⬇ 최신판 받기 (.zip)</a>` : ''}
+                <a class="sp-btn" href="${esc(l.page)}" target="_blank" rel="noopener">3GPP 정보 페이지</a>
+                <a class="sp-btn" href="${esc(l.folder)}" target="_blank" rel="noopener">모든 버전 폴더</a>
+                <a class="sp-btn" href="${CITE}?q=${encodeURIComponent(citeQ)}">📚 인용</a>
+            </div>
+            <details class="mt-2"><summary class="cursor-pointer text-[12.5px] text-[#0066cc]">릴리스별 버전 ${s.releases.length}개</summary><div class="mt-2 flex flex-wrap gap-1.5">${rels}</div></details>
+        </article>`;
+    }
+    $('sp-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    ['sp-type', 'sp-series', 'sp-wg', 'sp-rel', 'sp-dead'].forEach((id) => $(id).addEventListener('change', run));
+
+    // 주소로 들어온 검색 다시 하기 (?q=NTN&series=38)
+    const init = new URLSearchParams(location.search);
+    $('sp-q').value = init.get('q') || '';
+    for (const [id, key] of [['sp-type', 'type'], ['sp-series', 'series'], ['sp-wg', 'wg'], ['sp-rel', 'rel']]) if (init.get(key)) $(id).value = init.get(key);
+    $('sp-dead').checked = init.get('dead') === '1';
+    if ([...init.keys()].length) run();
+})();
+</script>
+{% endblock %}

@@ -104,6 +104,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "specs",
+		"url_name": "tools:specs",
+		"icon": "📘",
+		"title": "3GPP TS/TR 찾기",
+		"description": "3GPP 규격 3,600여 개를 번호(38.331)나 낱말(NTN·positioning·위성)로 찾아요. 릴리스별 최신 버전, 담당 작업반, 공식 문서 바로 받기, 바로 인용. 시리즈·작업반·릴리스로 거르기.",
+		"tags": ["3GPP", "표준"],
+		"category": "docs",
+		"added": "2026-10-11T01:15",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "cite",
 		"url_name": "tools:cite",
 		"icon": "📚",

@@ -202,6 +202,9 @@
     }
 
     $('ct-form').addEventListener('submit', (e) => { e.preventDefault(); run(); });
+    // 다른 도구에서 ?q=TS 38.331 로 넘어오면 바로 찾기
+    const fromUrl = new URLSearchParams(location.search).get('q');
+    if (fromUrl) { $('ct-q').value = fromUrl.slice(0, 2000); run(); }
     $('ct-q').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); run(); } });
     $('ct-examples').addEventListener('click', (e) => { const b = e.target.closest('.ct-ex'); if (!b) return; $('ct-q').value = b.textContent; run(); });
     $('ct-mode').addEventListener('click', (e) => {
