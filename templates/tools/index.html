@@ -42,6 +42,17 @@
         </label>
     </div>
 
+    <div class="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
+        <span class="text-[#8e8e93]">보는 기준</span>
+        <span id="tool-views" class="inline-flex flex-wrap rounded-full bg-[#f5f5f7] p-[3px]">
+            <button type="button" data-view="cat" class="tool-view rounded-full px-3 py-1">분류별</button>
+            <button type="button" data-view="tier" class="tool-view rounded-full px-3 py-1">등급별</button>
+            <button type="button" data-view="pop" class="tool-view rounded-full px-3 py-1">🔥 인기순</button>
+            <button type="button" data-view="new" class="tool-view rounded-full px-3 py-1">🆕 새로 나온 순</button>
+            <button type="button" data-view="abc" class="tool-view rounded-full px-3 py-1">가나다순</button>
+        </span>
+    </div>
+
     {% if has_member_tools %}
     <p class="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-[#8e8e93]">
         <span><span class="badge-member rounded-full px-2 py-0.5 text-[11px] font-semibold">🔒 회원</span> 금색 테두리는 로그인한 회원 전용</span>
@@ -61,14 +72,19 @@
         <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {% for tool in section.tools %}
             <a href="{{ tool.url }}" data-search="{{ tool.title|lower }} {{ tool.description|lower }} {{ tool.tags|join:' '|lower }} {{ tool.slug }}"
+               data-cat="{{ section.key }}" data-access="{{ tool.access|default:'public' }}" data-pop="{{ tool.popular }}" data-added="{{ tool.added|default:'' }}" data-title="{{ tool.title }}"
                class="tool-card group flex flex-col rounded-[22px] border {% if tool.access == 'member' %}tier-member{% elif tool.access == 'vip' %}tier-vip{% elif section.key == 'admin' %}border-[#b26a00]/25{% else %}border-black/[0.08] hover:border-[#0066cc]/40{% endif %} bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-md">
                 <div class="flex items-start justify-between gap-3">
                     <div class="flex h-12 w-12 items-center justify-center rounded-2xl {% if section.key == 'admin' %}bg-[#fff6e8] text-[#b26a00]{% else %}bg-[#f0f7ff] text-[#0066cc]{% endif %} text-[22px]">{{ tool.icon }}</div>
+                    <span class="ml-auto flex flex-wrap items-center justify-end gap-1">
+                    {% if tool.is_new %}<span class="rounded-full bg-[#ff3b30] px-2 py-0.5 text-[10px] font-bold text-white" title="가장 최근에 새로 생긴 도구예요">NEW</span>{% endif %}
+                    <span class="tool-pop hidden rounded-full bg-[#fff1e6] px-2 py-0.5 text-[11px] text-[#c2410c]" title="최근 30일 동안 연 사람 수">👀 {{ tool.popular }}명</span>
                     {% if tool.access == 'member' %}
                     <span class="badge-member rounded-full px-2.5 py-1 text-[11px] font-semibold" title="로그인한 회원만 쓸 수 있어요">🔒 회원</span>
                     {% elif tool.access == 'vip' %}
                     <span class="badge-vip rounded-full px-2.5 py-1 text-[11px] font-semibold" title="VIP 회원만 쓸 수 있어요">💎 VIP</span>
                     {% endif %}
+                    </span>
                 </div>
                 <h3 class="mt-5 text-[18px] font-semibold tracking-[-0.01em] text-[#1d1d1f]">{{ tool.title }}</h3>
                 <p class="mt-2 flex-1 text-[14px] leading-relaxed text-[#6e6e73]">{{ tool.description }}</p>
@@ -86,6 +102,8 @@
     <p class="mt-8 rounded-[22px] border border-dashed border-black/[0.12] p-8 text-[14px] text-[#8e8e93]">아직 등록된 도구가 없습니다.</p>
     {% endfor %}
 
+    <div id="tool-alt" class="hidden"></div>
+
     <p id="tool-none" class="mt-12 hidden rounded-[22px] border border-dashed border-black/[0.12] p-8 text-center text-[14px] text-[#8e8e93]">맞는 도구가 없어요. 다른 말로 찾아보세요.</p>
 
     <p class="mt-12 text-[13px] text-[#8e8e93]">＋ 새 도구가 계속 추가될 예정입니다.</p>
@@ -99,39 +117,87 @@
     html.theme-dark .tool-chip:hover { background: #22262e; }
     html.theme-dark .tool-chip.is-on { border-color: #e8e8ed; background: #e8e8ed; color: #111; }
 </style>
+<style>
+    .tool-view { color: #6e6e73; }
+    .tool-view.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    html.theme-dark #tool-views { background: #111318; }
+    html.theme-dark .tool-view.is-on { background: #2a2a2e; color: #f3f4f6; }
+</style>
 <script>
 (() => {
-    // 분류 칩 + 검색: 고른 분류만 보이고, 검색어가 있으면 이름·설명·태그로 걸러냄. 주소 #docs 처럼 공유 가능
+    // 보는 기준(분류별·등급별·인기순·새로 나온 순·가나다순) + 분류 칩 + 검색. 분류는 주소 #docs 처럼 공유 가능
     const chips = [...document.querySelectorAll('.tool-chip')];
     const sections = [...document.querySelectorAll('.tool-section')];
+    const alt = document.getElementById('tool-alt');
     const search = document.getElementById('tool-search');
     const none = document.getElementById('tool-none');
     if (!chips.length) return;
     const keys = new Set(sections.map((s) => s.dataset.cat));
     let cat = keys.has(location.hash.slice(1)) ? location.hash.slice(1) : '';
+    let view = 'cat';
+    try { view = localStorage.getItem('mj.tools.view') || 'cat'; } catch (e) { /* 무시 */ }
+    const cards = [...document.querySelectorAll('.tool-section .tool-card')];
+
+    const groupHTML = (key, title, note) => `<section class="tool-group mt-12" data-group="${key}"><div class="flex flex-wrap items-baseline gap-x-3 gap-y-1"><h2 class="text-[22px] font-semibold tracking-[-0.02em] text-[#1d1d1f]">${title}</h2><p class="text-[14px] text-[#8e8e93]">${note}</p></div><div class="tool-grid mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></div></section>`;
+    function buildAlt() {
+        alt.innerHTML = '';
+        if (view === 'cat') return;
+        let groups;
+        if (view === 'tier') {
+            groups = [['public', '🌐 누구나', '로그인 없이 바로 써요'], ['member', '🔒 회원', '로그인한 회원 전용 — 금색 테두리'], ['vip', '💎 VIP 회원', 'VIP 회원 전용 — 무지개 테두리'], ['admin', '🛡 관리자 전용', '사이트 관리자만 보여요']];
+        } else {
+            groups = [[view, { pop: '🔥 많이 쓰는 도구', new: '🆕 새로 나온 도구', abc: '가나다순' }[view], { pop: '최근 30일 동안 연 사람 수로 줄 세웠어요', new: '최근에 만든 것부터', abc: '' }[view]]];
+        }
+        alt.innerHTML = groups.map((g) => groupHTML(...g)).join('');
+        let list = [...cards];
+        if (view === 'pop') list.sort((a, b) => (+b.dataset.pop - +a.dataset.pop) || a.dataset.title.localeCompare(b.dataset.title, 'ko'));
+        if (view === 'new') list.sort((a, b) => b.dataset.added.localeCompare(a.dataset.added));
+        if (view === 'abc' || view === 'tier') list.sort((a, b) => a.dataset.title.localeCompare(b.dataset.title, 'ko'));
+        list.forEach((card, i) => {
+            const c = card.cloneNode(true);
+            if (view === 'pop') {
+                if (+card.dataset.pop > 0) c.querySelector('.tool-pop')?.classList.remove('hidden');
+                if (+card.dataset.pop > 0 && i < 3) c.querySelector('h3').insertAdjacentHTML('afterbegin', `<span class="mr-1">${['🥇', '🥈', '🥉'][i]}</span>`);
+            }
+            const key = view === 'tier' ? (card.dataset.access || 'public') : view;
+            alt.querySelector(`[data-group="${key}"] .tool-grid`)?.appendChild(c);
+        });
+        alt.querySelectorAll('.tool-group').forEach((g) => { if (!g.querySelector('.tool-card')) g.remove(); });
+    }
 
     const apply = () => {
         const words = (search.value || '').toLowerCase().split(/\s+/).filter(Boolean);
+        const inAlt = view !== 'cat';
+        alt.classList.toggle('hidden', !inAlt);
         let shown = 0;
-        sections.forEach((sec) => {
-            let n = 0;
-            sec.querySelectorAll('.tool-card').forEach((card) => {
-                const ok = words.every((w) => card.dataset.search.includes(w));
-                card.style.display = ok ? '' : 'none';
-                if (ok) n += 1;
+        const match = (card) => words.every((w) => card.dataset.search.includes(w)) && (!cat || card.dataset.cat === cat);
+        if (inAlt) {
+            sections.forEach((sec) => { sec.style.display = 'none'; });
+            alt.querySelectorAll('.tool-group').forEach((g) => {
+                let n = 0;
+                g.querySelectorAll('.tool-card').forEach((card) => { const ok = match(card); card.style.display = ok ? '' : 'none'; if (ok) n += 1; });
+                g.style.display = n ? '' : 'none';
+                shown += n;
             });
-            const visible = n > 0 && (!cat || sec.dataset.cat === cat);
-            sec.style.display = visible ? '' : 'none';
-            if (visible) shown += n;
-        });
-        chips.forEach((c) => {
-            const on = c.dataset.cat === cat;
-            c.classList.toggle('is-on', on);
-            c.setAttribute('aria-selected', on ? 'true' : 'false');
-        });
+        } else {
+            sections.forEach((sec) => {
+                let n = 0;
+                sec.querySelectorAll('.tool-card').forEach((card) => { const ok = words.every((w) => card.dataset.search.includes(w)); card.style.display = ok ? '' : 'none'; if (ok) n += 1; });
+                const visible = n > 0 && (!cat || sec.dataset.cat === cat);
+                sec.style.display = visible ? '' : 'none';
+                if (visible) shown += n;
+            });
+        }
+        chips.forEach((c) => { const on = c.dataset.cat === cat; c.classList.toggle('is-on', on); c.setAttribute('aria-selected', on ? 'true' : 'false'); });
+        document.querySelectorAll('.tool-view').forEach((b) => b.classList.toggle('is-on', b.dataset.view === view));
         none.classList.toggle('hidden', shown > 0);
     };
 
+    document.querySelectorAll('.tool-view').forEach((b) => b.addEventListener('click', () => {
+        view = b.dataset.view;
+        try { localStorage.setItem('mj.tools.view', view); } catch (e) { /* 무시 */ }
+        buildAlt(); apply();
+    }));
     chips.forEach((c) => c.addEventListener('click', () => {
         cat = c.dataset.cat;
         history.replaceState(null, '', cat ? `#${cat}` : location.pathname + location.search);
@@ -146,7 +212,7 @@
         }
     });
     window.addEventListener('hashchange', () => { cat = keys.has(location.hash.slice(1)) ? location.hash.slice(1) : ''; apply(); });
-    apply();
+    buildAlt(); apply();
 })();
 </script>
 {% endblock %}

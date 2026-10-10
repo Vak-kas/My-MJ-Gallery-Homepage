@@ -1,4 +1,5 @@
 import hmac
+from datetime import timedelta
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -19,9 +20,35 @@ from .registry import CATEGORIES, TOOLS
 from .speedtest import _client_ip
 
 
+POPULAR_DAYS = 30
+
+
+def tool_popularity(paths):
+	"""도구 첫 화면을 최근 30일 동안 연 사람 수 (날짜별 방문자 해시로 셈). 1시간 캐시."""
+	key = "tools:popularity"
+	hit = cache.get(key)
+	if hit is None:
+		from django.db.models import Count
+
+		from analytics.models import PageView
+
+		since = timezone.localdate() - timedelta(days=POPULAR_DAYS)
+		rows = PageView.objects.filter(day__gte=since, path__in=list(paths)).values("path").annotate(n=Count("visitor", distinct=True))
+		hit = {r["path"]: r["n"] for r in rows}
+		cache.set(key, hit, 60 * 60)
+	return hit
+
+
 def index(request):
 	user = request.user
 	tools = [{**t, "url": reverse(t["url_name"])} for t in TOOLS]
+	pop = tool_popularity(t["url"] for t in tools)
+	# NEW: 2주 안에 만든 것 중 가장 최근 6개만 (사이트가 새것일 때 전부 NEW 가 되지 않게)
+	new_since = (timezone.localtime() - timedelta(days=14)).strftime("%Y-%m-%dT%H:%M")
+	newest = {t["slug"] for t in sorted(tools, key=lambda t: t.get("added", ""), reverse=True)[:6] if t.get("added", "") >= new_since}
+	for t in tools:
+		t["popular"] = pop.get(t["url"], 0)
+		t["is_new"] = t["slug"] in newest
 	sections = []
 	for key, icon, title, note in CATEGORIES:
 		items = [t for t in tools if t.get("category") == key and t.get("access", "public") != "admin"]
