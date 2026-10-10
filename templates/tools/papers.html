@@ -175,7 +175,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 
 {% include "tools/_ai_assist.html" %}
-<script>window.PAPERS = { search: '{% url "tools:papers_search" %}', shelf: '{% url "tools:papers_shelf" %}', save: '{% url "tools:papers_shelf_save" %}', update: '{% url "tools:papers_shelf" %}', cite: '{% url "tools:cite" %}', sections: '{% url "tools:papers_sections" %}', sectionsPdf: '{% url "tools:papers_sections_pdf" %}', ai: '{% url "tools:papers_ai" %}', aiStatus: '{% url "tools:ai_status" %}', login: {{ user.is_authenticated|yesno:"true,false" }}, loginUrl: '{% url "accounts:login" %}?next={{ request.path|urlencode }}' };</script>
+<script>window.PAPERS = { search: '{% url "tools:papers_search" %}', shelf: '{% url "tools:papers_shelf" %}', save: '{% url "tools:papers_shelf_save" %}', update: '{% url "tools:papers_shelf" %}', cite: '{% url "tools:cite" %}', github: '{% url "tools:github" %}', sections: '{% url "tools:papers_sections" %}', sectionsPdf: '{% url "tools:papers_sections_pdf" %}', ai: '{% url "tools:papers_ai" %}', aiStatus: '{% url "tools:ai_status" %}', login: {{ user.is_authenticated|yesno:"true,false" }}, loginUrl: '{% url "accounts:login" %}?next={{ request.path|urlencode }}' };</script>
 <script src="{% static 'js/mj-cite.js' %}?v=1"></script>
 {% verbatim %}
 <script>
@@ -337,6 +337,7 @@
                 <button type="button" class="pp-btn" data-act="ieee">IEEE 복사</button>
                 <button type="button" class="pp-btn" data-act="cite" ${cited ? 'disabled' : ''}>${cited ? '✓ 참고문헌에 있음' : '＋ 내 참고문헌'}</button>
                 ${p.pdf ? `<a class="pp-btn" href="${esc(p.pdf)}" target="_blank" rel="noopener">📄 PDF</a>` : ''}
+                <a class="pp-btn" href="${P.github}?${new URLSearchParams({ arxiv: p.arxiv || '', title: p.title }).toString()}" target="_blank" rel="noopener" title="이 논문 코드(공식·재구현)를 깃허브에서 찾기">💻 코드</a>
                 <button type="button" class="pp-btn" data-act="read" title="${p.arxiv ? 'arXiv 원문을 섹션별로' : 'arXiv 에서 같은 논문을 찾아 섹션별로 (없으면 PDF 올리기)'}">📖 섹션 보기</button>
                 <button type="button" class="pp-btn ${picked.has(shelfKey(p)) ? 'picked' : ''}" data-act="pick">${picked.has(shelfKey(p)) ? '✓ 비교' : '＋ 비교'}</button>
                 ${p.id ? `<span class="ml-auto flex gap-1.5">

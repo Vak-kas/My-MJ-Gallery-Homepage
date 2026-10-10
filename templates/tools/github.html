@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .gh-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px 20px; }
+    .gh-in { width: 100%; border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 10px 14px; font-size: 15px; color: #1d1d1f; outline: none; }
+    .gh-in:focus { border-color: #24292f; box-shadow: 0 0 0 3px rgba(36, 41, 47, 0.1); }
+    .gh-sel { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 5px 10px; font-size: 13px; }
+    .gh-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .gh-seg button { border-radius: 999px; padding: 6px 14px; font-size: 14px; color: #6e6e73; }
+    .gh-seg button.is-on { background: #24292f; color: #fff; }
+    .gh-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 4px 11px; font-size: 12px; color: #1d1d1f; white-space: nowrap; }
+    .gh-btn:hover { background: #f5f5f7; }
+    .gh-chip { border-radius: 999px; background: #f5f5f7; padding: 2px 9px; font-size: 12px; color: #424245; }
+    .gh-q { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.12); padding: 3px 10px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; }
+    .gh-q:hover { background: #f5f5f7; }
+    .gh-lic { border-radius: 6px; padding: 1px 6px; font-size: 11px; font-weight: 600; }
+    .gh-readme { margin-top: 10px; max-height: 360px; overflow: auto; border-radius: 12px; background: #f6f8fa; padding: 12px 14px; font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; color: #24292f; }
+    .gh-score { border-radius: 10px; padding: 8px 12px; font-size: 13px; margin-top: 10px; }
+    html.theme-dark .gh-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gh-in, html.theme-dark .gh-sel { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gh-seg { background: #111318; } html.theme-dark .gh-seg button.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .gh-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gh-chip { background: #23262d; color: #c7c7cc; }
+    html.theme-dark .gh-readme { background: #0d1117; color: #c9d1d9; }
+</style>
+
+<main class="mx-auto max-w-[1180px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#24292f] dark:text-[#c7c7cc]">GITHUB · FINDER</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">깃허브 코드 찾기.</h1>
+        <p class="mt-3 max-w-[780px] text-[15px] leading-relaxed text-[#6e6e73]">"이런 거 누가 만들어 놨을 텐데…" 싶을 때. 아이디어를 한국어로 쓰면 ✨AI 가 깃허브 검색어로 바꿔서 찾고, 별·언어·<b>라이선스(가져다 써도 되는지)</b>·README 를 보여 주고, 내 아이디어와 맞는지 평가해요.</p>
+    </div>
+
+    <section class="gh-card mt-6">
+        <span class="gh-seg" id="gh-mode"><button type="button" class="is-on" data-v="idea">💡 아이디어로 (✨AI)</button><button type="button" data-v="kw">🔎 키워드로</button><button type="button" data-v="paper">📑 논문 코드</button></span>
+        <form id="gh-form" class="mt-3">
+            <div data-mode="idea"><textarea id="gh-idea" class="gh-in" rows="2" placeholder="예) 3GPP 규격 번호 넣으면 BibTeX 만들어주는 파이썬 코드 / LEO 위성 링크 버짓 계산 MATLAB / 논문 PDF 에서 그래프 데이터 뽑기"></textarea></div>
+            <div data-mode="kw" class="hidden"><input id="gh-kw" class="gh-in" placeholder="예) 3gpp bibtex · ns-3 leo satellite · pdf plot digitizer" autocomplete="off"></div>
+            <div data-mode="paper" class="hidden grid grid-cols-1 gap-2 sm:grid-cols-[200px_minmax(0,1fr)]"><input id="gh-arxiv" class="gh-in" placeholder="arXiv 번호 (선택)"><input id="gh-title" class="gh-in" placeholder="논문 제목"></div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <select class="gh-sel" id="gh-lang"><option value="">모든 언어</option></select>
+                <select class="gh-sel" id="gh-stars"><option value="0">별 상관없이</option><option value="10">⭐ 10+</option><option value="100">⭐ 100+</option><option value="1000">⭐ 1000+</option></select>
+                <select class="gh-sel" id="gh-since"><option value="">언제 고친 것이든</option><option value="1">1년 안에 고친 것</option><option value="3">3년 안에 고친 것</option></select>
+                <select class="gh-sel" id="gh-sort"><option value="best">관련도순</option><option value="stars">별 많은 순</option><option value="updated">최근 고친 순</option></select>
+                <span class="ai-quota ml-auto" data-ai-quota></span>
+                <button class="shrink-0 rounded-full bg-[#24292f] px-6 py-2 text-[15px] font-semibold text-white" id="gh-go">찾기</button>
+            </div>
+        </form>
+    </section>
+
+    <div class="mt-4 hidden" id="gh-intent"></div>
+    <div class="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-[#6e6e73]" id="gh-head"></div>
+    <div class="mt-3 hidden" id="gh-judge-box"></div>
+    <div class="mt-3 space-y-3" id="gh-results"></div>
+</main>
+
+{% include "tools/_ai_assist.html" %}
+<script>window.GH = { search: '{% url "tools:github_search" %}', readme: '{% url "tools:github_readme" %}', ai: '{% url "tools:github_ai" %}' };</script>
+{% verbatim %}
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const G = window.GH;
+    const LANGS = ['Python', 'MATLAB', 'Jupyter Notebook', 'C++', 'C', 'JavaScript', 'TypeScript', 'Java', 'Go', 'Rust', 'Julia', 'R', 'Shell'];
+    $('gh-lang').insertAdjacentHTML('beforeend', LANGS.map((l) => `<option value="${esc(l)}">${esc(l)}</option>`).join(''));
+    let mode = 'idea', items = [], queries = [], idea = '', judge = null;
+
+    function setMode(m) {
+        mode = m;
+        $('gh-mode').querySelectorAll('[data-v]').forEach((b) => b.classList.toggle('is-on', b.dataset.v === m));
+        document.querySelectorAll('#gh-form [data-mode]').forEach((el) => { el.classList.toggle('hidden', el.dataset.mode !== m); });
+        $('gh-go').textContent = m === 'idea' ? '✨ 찾기' : '찾기';
+    }
+    $('gh-mode').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (b) setMode(b.dataset.v); });
+
+    const ago = (d) => { if (!d) return ''; const days = Math.round((Date.now() - new Date(d)) / 864e5); return days < 1 ? '오늘' : days < 31 ? `${days}일 전` : days < 365 ? `${Math.round(days / 30)}개월 전` : `${(days / 365).toFixed(1)}년 전`; };
+    const licColor = (r) => (!r.license ? ['#fff1f0', '#c4271d'] : /GPL/.test(r.license) ? ['#fff8e6', '#8a5300'] : /MIT|Apache|BSD|ISC|Unlicense|CC0/.test(r.license) ? ['#ecfdf5', '#0f9f6e'] : ['#f5f5f7', '#424245']);
+
+    async function getJSON(url) {
+        const r = await fetch(url, { headers: { Accept: 'application/json' } });
+        const d = await r.json().catch(() => ({ error: '응답을 읽지 못했어요.' }));
+        if (!r.ok) throw new Error(d.error || '실패했어요.');
+        return d;
+    }
+    function params(qs) {
+        const p = new URLSearchParams();
+        qs.forEach((q) => p.append('q', q));
+        p.set('sort', $('gh-sort').value); p.set('stars', $('gh-stars').value); p.set('lang', $('gh-lang').value);
+        const y = $('gh-since').value; if (y) { const d = new Date(); d.setFullYear(d.getFullYear() - +y); p.set('since', d.toISOString().slice(0, 10)); }
+        return p;
+    }
+    async function runQueries(qs) {
+        queries = qs; judge = null; $('gh-judge-box').classList.add('hidden');
+        $('gh-results').innerHTML = '<div class="gh-card text-[14px] text-[#8e8e93]">⏳ 깃허브에서 찾는 중…</div>';
+        try {
+            const d = await getJSON(`${G.search}?${params(qs)}`);
+            items = d.items;
+            renderHead(d.warning);
+            render();
+        } catch (err) { $('gh-results').innerHTML = `<div class="gh-card text-[14px] text-[#c4271d]">${esc(err.message)}</div>`; $('gh-head').innerHTML = ''; }
+    }
+    function renderHead(warn) {
+        $('gh-head').innerHTML = `<span><b class="text-[#1d1d1f] dark:text-[#e8e8ea]">${items.length}</b>개 저장소</span>`
+            + (queries.length ? `<span class="ml-2">검색어:</span>${queries.map((q) => `<button type="button" class="gh-q" data-q="${esc(q)}" title="이 검색어만 다시">${esc(q)}</button>`).join('')}` : '')
+            + (mode === 'idea' && items.length ? `<button type="button" class="ai-btn ml-auto !py-1" id="gh-judge">✨ 내 아이디어와 맞는지 평가 (상위 6개)</button>` : '')
+            + (warn ? `<span class="w-full text-[12px] text-[#b26a00]">⚠️ ${esc(warn)}</span>` : '');
+    }
+    function card(r, i) {
+        const [lb, lf] = licColor(r);
+        const j = judge?.repos.find((x) => x.name === r.name);
+        const pick = judge?.pick === r.name;
+        return `<article class="gh-card ${pick ? 'ring-2 ring-[#7c3aed]' : ''}" data-i="${i}">
+            <div class="flex items-start gap-3">
+                ${r.avatar ? `<img src="${esc(r.avatar)}&s=64" alt="" class="h-9 w-9 rounded-full" loading="lazy">` : ''}
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="${esc(r.url)}" target="_blank" rel="noopener" class="break-all text-[16px] font-semibold hover:underline">${esc(r.name)}</a>
+                        ${pick ? '<span class="gh-lic" style="background:#f5f3ff;color:#7c3aed">✨ 추천</span>' : ''}
+                        ${r.archived ? '<span class="gh-lic" style="background:#f5f5f7;color:#6e6e73">보관됨(멈춤)</span>' : ''}
+                        ${r.fork ? '<span class="gh-lic" style="background:#f5f5f7;color:#6e6e73">포크</span>' : ''}
+                    </div>
+                    <p class="mt-1 text-[14px] text-[#424245] dark:text-[#c7c7cc]">${esc(r.desc) || '<span class="text-[#8e8e93]">설명 없음</span>'}</p>
+                    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-[#6e6e73]">
+                        <span>⭐ <b class="text-[#1d1d1f] dark:text-[#e8e8ea]">${r.stars.toLocaleString()}</b></span>
+                        <span>🍴 ${r.forks.toLocaleString()}</span>
+                        ${r.lang ? `<span>● ${esc(r.lang)}</span>` : ''}
+                        <span>🕒 ${ago(r.pushed)} 고침</span>
+                        <span class="gh-lic" style="background:${lb};color:${lf}" title="${esc(r.license_note)}">⚖️ ${esc(r.license || '라이선스 없음')} · ${esc(r.license_note)}</span>
+                    </div>
+                    ${r.topics.length ? `<div class="mt-2 flex flex-wrap gap-1">${r.topics.map((t) => `<span class="gh-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+                    ${j ? `<div class="gh-score" style="background:${j.score >= 4 ? '#ecfdf5' : j.score >= 2 ? '#fff8e6' : '#f5f5f7'}"><b>${'★'.repeat(j.score)}${'☆'.repeat(5 - j.score)} ${esc(j.use)}</b> — ${esc(j.reason)}</div>` : ''}
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        <button type="button" class="gh-btn" data-act="readme">📄 README 보기</button>
+                        <button type="button" class="gh-btn" data-act="clone">git clone 복사</button>
+                        ${r.homepage ? `<a class="gh-btn" href="${esc(r.homepage)}" target="_blank" rel="noopener">🌐 홈페이지</a>` : ''}
+                    </div>
+                    <div class="gh-readme hidden"></div>
+                </div>
+            </div></article>`;
+    }
+    function render() {
+        let list = items;
+        if (judge) list = [...items].sort((a, b) => ((judge.repos.find((x) => x.name === b.name)?.score ?? -1) - (judge.repos.find((x) => x.name === a.name)?.score ?? -1)));
+        $('gh-results').innerHTML = list.map((r) => card(r, items.indexOf(r))).join('') || '<div class="gh-card text-[14px] text-[#8e8e93]">찾은 저장소가 없어요. 단어를 줄이거나 다른 말로 찾아보세요.</div>';
+    }
+
+    $('gh-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (mode === 'kw') { const q = $('gh-kw').value.trim(); if (q) runQueries([q]); return; }
+        if (mode === 'paper') {
+            const id = $('gh-arxiv').value.trim().replace(/^arxiv:/i, '').replace(/v\d+$/, ''), title = $('gh-title').value.trim();
+            const qs = [];
+            if (id) qs.push(`"${id}" in:readme`);
+            if (title) { qs.push(`"${title.slice(0, 100)}" in:readme,description`); qs.push(title.split(/\s+/).filter((w) => w.length > 3).slice(0, 6).join(' ')); }
+            if (qs.length) runQueries(qs);
+            return;
+        }
+        idea = $('gh-idea').value.trim(); if (idea.length < 4) return;
+        if (!window.mjAI.guard($('gh-go'))) return;
+        $('gh-intent').classList.add('hidden');
+        try {
+            const d = await window.mjAI.post(G.ai, { mode: 'queries', idea }, $('gh-go'));
+            $('gh-intent').classList.remove('hidden');
+            $('gh-intent').innerHTML = `<div class="ai-panel !py-3 text-[14px]">✨ <b>${esc(d.intent)}</b></div>`;
+            runQueries(d.queries);
+        } catch (err) { $('gh-results').innerHTML = `<div class="gh-card text-[14px] text-[#c4271d]">${esc(err.message)}</div>`; }
+    });
+    $('gh-head').addEventListener('click', async (e) => {
+        const q = e.target.closest('[data-q]'); if (q) { runQueries([q.dataset.q]); return; }
+        const j = e.target.closest('#gh-judge'); if (!j) return;
+        if (!window.mjAI.guard(j)) return;
+        try {
+            judge = await window.mjAI.post(G.ai, { mode: 'judge', idea, repos: items.slice(0, 6) }, j);
+            $('gh-judge-box').classList.remove('hidden');
+            $('gh-judge-box').innerHTML = `<div class="ai-panel text-[14px] leading-6">${judge.pick ? `✨ 추천: <b>${esc(judge.pick)}</b><br>` : ''}${esc(judge.advice)}</div>`;
+            render();
+        } catch (err) { $('gh-judge-box').classList.remove('hidden'); $('gh-judge-box').innerHTML = `<p class="text-[13px] text-[#c4271d]">${esc(err.message)}</p>`; }
+    });
+    $('gh-results').addEventListener('click', async (e) => {
+        const b = e.target.closest('[data-act]'); if (!b) return;
+        const art = b.closest('[data-i]'), r = items[+art.dataset.i];
+        if (b.dataset.act === 'clone') navigator.clipboard.writeText(`git clone https://github.com/${r.name}.git`).then(() => { b.textContent = '✓ 복사됨'; });
+        if (b.dataset.act === 'readme') {
+            const box = art.querySelector('.gh-readme');
+            if (!box.classList.contains('hidden')) { box.classList.add('hidden'); return; }
+            box.classList.remove('hidden'); box.textContent = '⏳';
+            try { const d = await getJSON(`${G.readme}?name=${encodeURIComponent(r.name)}`); box.textContent = d.text || 'README 가 없어요.'; }
+            catch (err) { box.textContent = err.message; }
+        }
+    });
+
+    // 논문 찾기에서 넘어온 경우 (?arxiv=…&title=…) 또는 ?q=
+    const sp = new URLSearchParams(location.search);
+    if (sp.get('title') || sp.get('arxiv')) { setMode('paper'); $('gh-arxiv').value = sp.get('arxiv') || ''; $('gh-title').value = sp.get('title') || ''; $('gh-form').requestSubmit(); }
+    else if (sp.get('q')) { setMode('kw'); $('gh-kw').value = sp.get('q'); $('gh-form').requestSubmit(); }
+    window.__gh = { runQueries, items: () => items };
+})();
+</script>
+{% endverbatim %}
+{% endblock %}

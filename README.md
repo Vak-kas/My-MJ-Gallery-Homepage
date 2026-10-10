@@ -95,6 +95,7 @@
 |---|---|---|
 | { } JSON 정리 | 정리·한 줄로·키 정렬, 느슨한 입력(주석·끝 쉼표), 오류 줄·칸 표시, 접는 트리·경로 복사, 문자열 JSON 풀기, CSV 변환 | 누구나 |
 | .* 정규식 테스트 | 실시간 하이라이트, 그룹·이름 그룹 표, 바꾸기, 패턴 풀이, 자주 쓰는 패턴, 1초 넘는 패턴 자동 중단(Web Worker), ✨ **말로 만들기**("휴대폰 번호 찾기" → 패턴·설명·주의점·예시 글, 회원) | 누구나 |
+| 💻 깃허브 코드 찾기 | 💡 아이디어(한국어) → ✨AI 가 깃허브 검색어 3~4개로 바꿔 찾아 합침(여러 검색어에 같이 나온 것 먼저) / 🔎 키워드 / 📑 논문 코드(arXiv 번호·제목이 README·설명에 든 저장소, 논문 찾기 카드의 💻 코드 버튼). 언어·별·최근 수정·정렬, 별·포크·언어·마지막 수정·토픽, **라이선스 안내**(MIT 등 자유 / GPL 주의 / 없음 = 원칙상 사용 불가), README 보기, git clone 복사, ✨ 내 아이디어와 맞는지 0~5점·바로 사용/참고만·추천·직접 만들 때 팁. GitHub REST 검색(선택 `GITHUB_TOKEN`), 검색 6시간·README 하루 캐시, 10분 횟수 제한(회원 40번) | 회원 |
 | 🧮 인코딩 · 해시 | Base64·URL·Hex·HTML·유니코드 변환, MD5·SHA·HMAC·파일 해시, JWT 보기 (브라우저 안에서만) | 누구나 |
 | 📶 Wi‑Fi 계산기 | ⚡ 속도: Wi‑Fi 4·5·6/6E·7(802.11n/ac/ax/be) × 대역폭 20~320 MHz × 공간 스트림 × GI → MCS 별 PHY 속도 표(변조·부호율·최소 수신 감도), 실제 기대 속도(효율 %)·1 GB 받는 시간, 802.11ac 정의 안 된 조합 경고. 📍 신호 세기: 대역·거리·출력·안테나·공간(거리 지수 n)·벽 종류별 개수 → RSSI·이 자리 최대 MCS·예상 속도, 거리별 그래프. 🗂 채널: 2.4·5·6 GHz 채널과 40·80·160·320 MHz 묶음 경계, DFS 구역, 주변 공유기 겹침 확인·2.4 GHz 추천 채널. 브라우저 안에서만 | 누구나 |
 | 📡 링크 버짓 계산기 (위성·NTN) | 궤도 고도·앙각으로 거리(slant range)·자유공간 경로 손실, EIRP(밀도 또는 전력+이득)·G/T(직접 또는 이득+NF+안테나 온도)·대기·그림자·섬광·편파 손실로 C/N₀·SNR·여유·섀넌 용량, 수신·잡음 전력, 지연(편도·왕복), 도플러, 위성 속도·주기·보이는 시간. 3GPP TR 38.821 Set-1/2 × GEO·LEO-1200·LEO-600 × S 대역 휴대폰·Ka VSAT × 하향·상향 프리셋(표 6.1.3.3-1 의 24개 결과와 ±0.1 dB 안에서 같음), 앙각 5~90° 그래프(SNR·경로 손실·거리·도플러·지연), 버짓 표 마크다운·CSV 복사, 지상 링크(거리 직접·log-distance). 브라우저 안에서만 | 누구나 |
@@ -279,6 +280,8 @@ ALLOWED_HOSTS=127.0.0.1,localhost
 
 # 선택: 논문 인용 도구가 Crossref 에 알려 줄 연락처 (넣으면 더 안정적인 polite pool)
 # CROSSREF_MAILTO=you@example.com
+# 선택: 깃허브 코드 찾기 — github.com/settings/tokens 에서 권한 없는 fine-grained 토큰 (없으면 검색 분당 10번·README 시간당 60번)
+# GITHUB_TOKEN=...
 # 선택: 논문 찾기 — OpenAlex 무료 키 (openalex.org 가입, 없으면 서버 전체 하루 검색 약 100번 → 키 있으면 약 1000번)
 # OPENALEX_API_KEY=...
 # 선택: Studio 보안 IP 조회에 AbuseIPDB 신고 점수 (abuseipdb.com 무료 키)
@@ -339,7 +342,7 @@ python -m unittest discover -s relay/tests -t .
 | `/s/<코드>` | 단축 URL |
 | `/photos/` | Gallery |
 | `/games/` | Game 메뉴 (`ladder/`, `roulette/`, `seconds/`, `reaction/`, `bomb/`, `updown/`, `cards/`, `2048/`, `typing/`, `omok/`, `othello/`, `catchmind/`, `scores/<랭킹>/`) |
-| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `wifi/`, `linkbudget/`, `time/`, `units/`, `cite/`, `papers/`, `stdlib/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
+| `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `wifi/`, `linkbudget/`, `time/`, `units/`, `cite/`, `papers/`, `stdlib/`, `github/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |

@@ -1361,3 +1361,60 @@ class PaperTranslateTests(TestCase):
 		too_long = [{"i": 0, "text": "x" * 5000}]
 		with self.settings(ANTHROPIC_API_KEY="k"):
 			self.assertEqual(post({"mode": "translate", "items": too_long}).status_code, 400)  # 회원 4000자 넘으면 나눠 보내라고
+
+
+class GithubFindTests(TestCase):
+	REPO = {"full_name": "martisak/3gpp-citations", "html_url": "https://github.com/martisak/3gpp-citations", "description": "Generate .bib-file for 3GPP specifications",
+			"stargazers_count": 79, "forks_count": 20, "language": "Python", "license": {"spdx_id": "MIT"}, "pushed_at": "2023-11-01T00:00:00Z",
+			"created_at": "2018-01-01T00:00:00Z", "topics": ["3gpp", "bibtex"], "archived": False, "fork": False, "owner": {"avatar_url": "https://a"}}
+
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.core.cache import cache
+		cache.clear()
+		self.member = get_user_model().objects.create_user("gm", "gm@example.com", "pw")
+
+	def test_member_only(self):
+		self.assertEqual(self.client.get("/tools/github/").status_code, 302)
+		self.assertEqual(self.client.get("/tools/github/search/", {"q": "x"}).status_code, 302)
+		self.assertEqual(self.client.get("/tools/github/readme/", {"name": "a/b"}).status_code, 302)
+
+	def test_search_merge_and_cache(self):
+		self.client.force_login(self.member)
+		import json
+		from unittest import mock
+		other = {**self.REPO, "full_name": "x/y", "html_url": "https://github.com/x/y", "license": None, "stargazers_count": 999}
+		responses = [json.dumps({"total_count": 2, "items": [other, self.REPO]}).encode(), json.dumps({"total_count": 1, "items": [self.REPO]}).encode()]
+		with mock.patch("tools.ghfind._get", side_effect=responses) as get:
+			d = self.client.get("/tools/github/search/", {"q": ["3gpp bibtex", "3gpp citation"], "lang": "Python", "stars": "10"}).json()
+			self.client.get("/tools/github/search/", {"q": ["3gpp bibtex", "3gpp citation"], "lang": "Python", "stars": "10"})
+		self.assertEqual(get.call_count, 2)  # 두 번째는 캐시
+		self.assertIn("language%3APython", get.call_args_list[0].args[0])
+		self.assertEqual(d["items"][0]["name"], "martisak/3gpp-citations")  # 두 검색어 모두에서 나온 게 먼저
+		self.assertEqual(d["items"][0]["license_note"], "자유롭게 (출처 표시)")
+		self.assertIn("라이선스 없음", d["items"][1]["license_note"])
+
+	def test_readme_and_ai(self):
+		import base64
+		import json
+		from unittest import mock
+		from django.contrib.auth import get_user_model
+		self.client.force_login(self.member)
+		md = base64.b64encode("# 3GPP\n![badge](x.svg)\n<img src=a>Generate bib".encode()).decode()
+		with mock.patch("tools.ghfind._get", return_value=json.dumps({"content": md}).encode()):
+			text = self.client.get("/tools/github/readme/", {"name": "martisak/3gpp-citations"}).json()["text"]
+		self.assertEqual(text, "# 3GPP\n\nGenerate bib")
+		self.assertEqual(self.client.get("/tools/github/readme/", {"name": "../etc"}).status_code, 400)
+		post = lambda body: self.client.post("/tools/github/ai/", json.dumps(body), content_type="application/json")
+		self.client.logout()
+		self.assertEqual(post({"mode": "queries", "idea": "3GPP 인용 만들기"}).status_code, 401)  # AI 는 회원
+		self.client.force_login(self.member)
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value={"queries": ["3gpp bibtex", " "], "intent": "3GPP BibTeX"}) as call:
+			d = post({"mode": "queries", "idea": "3GPP 규격 BibTeX 파이썬"}).json()
+			post({"mode": "queries", "idea": "3GPP 규격 BibTeX 파이썬"})
+		self.assertEqual((d["queries"], call.call_count), (["3gpp bibtex"], 1))
+		judge = {"repos": [{"name": "martisak/3gpp-citations", "score": 9, "reason": "딱 맞음", "use": "바로 사용"}, {"name": "evil/x", "score": 5, "reason": "", "use": "참고만"}], "pick": "martisak/3gpp-citations", "advice": "써라"}
+		with self.settings(ANTHROPIC_API_KEY="k"), mock.patch("tools.ai.call", return_value=judge), mock.patch("tools.ghfind.readme", return_value=("readme", True)):
+			j = post({"mode": "judge", "idea": "3GPP 인용", "repos": [{"name": "martisak/3gpp-citations", "desc": "bib", "stars": 79}]}).json()
+		self.assertEqual([(r["name"], r["score"]) for r in j["repos"]], [("martisak/3gpp-citations", 5)])  # 점수는 0~5, 후보 아닌 건 버림
+		self.assertEqual(j["pick"], "martisak/3gpp-citations")

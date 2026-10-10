@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -31,6 +31,10 @@ urlpatterns = [
     path("papers/sections/pdf/", paper_sections.sections_pdf, name="papers_sections_pdf"),
     path("papers/ai/", paper_ai.paper_ai, name="papers_ai"),
     path("papers/shelf/", papers.shelf_list, name="papers_shelf"),
+    path("github/", ghfind.page, name="github"),
+    path("github/search/", ghfind.search_view, name="github_search"),
+    path("github/readme/", ghfind.readme_view, name="github_readme"),
+    path("github/ai/", ghfind.ai_view, name="github_ai"),
     path("stdlib/", stdlib.page, name="stdlib"),
     path("stdlib/docs/", stdlib.docs, name="stdlib_docs"),
     path("stdlib/upload/", stdlib.upload, name="stdlib_upload"),
