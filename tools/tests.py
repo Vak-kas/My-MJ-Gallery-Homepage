@@ -1837,3 +1837,47 @@ class SpecDocsTests(TestCase):
 		doc.refresh_from_db()
 		self.assertEqual((doc.status, doc.version), ("ready", "18.0.0"))  # 예전 버전 그대로 쓰고 이유만 남김
 		self.assertTrue(doc.error)
+
+
+class SpecDocConvertTests(TestCase):
+	def test_doc_needs_libreoffice_and_converts(self):
+		import os, tempfile, zipfile
+		from unittest import mock
+		from tools import specdocs
+		from tools.models import SpecDoc
+		tmp = tempfile.mkdtemp()
+		docx = os.path.join(tmp, "src.docx")
+		SpecDocsTests.make_docx(None, docx)
+
+		def fake_download(url, dest):
+			with zipfile.ZipFile(dest, "w") as z:
+				z.writestr("38821-g20.doc", b"old word")
+		info = {"type": "TR", "number": "38.821", "title": "NTN solutions", "wg": "RP", "rels": {"16": "16.2.0"}, "dead": False, "top": 16}
+		patches = [mock.patch("tools.specs.load_index", return_value={"specs": {"38.821": info}, "fetched": ""}),
+				   mock.patch("tools.specdocs._download", side_effect=fake_download), mock.patch("tools.specdocs.PAUSE", 0)]
+		for p in patches:
+			p.start()
+		self.addCleanup(mock.patch.stopall)
+		with mock.patch("tools.specdocs.shutil.which", return_value=None):
+			specdocs.queue(["38.821"])
+			specdocs.run_pending()
+		doc = SpecDoc.objects.get()
+		self.assertEqual(doc.status, "error")
+		self.assertIn("LibreOffice", doc.error)
+
+		def fake_run(cmd, **kw):  # soffice 가 .docx 를 만든 것처럼
+			out = cmd[cmd.index("--outdir") + 1]
+			import shutil
+			shutil.copy(docx, os.path.join(out, os.path.splitext(os.path.basename(cmd[-1]))[0] + ".docx"))
+		with mock.patch("tools.specdocs.shutil.which", return_value="/usr/bin/soffice"), mock.patch("tools.specdocs.subprocess.run", side_effect=fake_run) as run:
+			specdocs.queue(["38.821"])
+			specdocs.run_pending()
+		doc.refresh_from_db()
+		self.assertEqual((doc.status, doc.version), ("ready", "16.2.0"))
+		self.assertIn("--headless", run.call_args.args[0])
+
+	def test_style_names(self):
+		from tools import specdocs
+		self.assertEqual(specdocs._canon("X1", {"X1": "heading 3"}), "Heading3")
+		self.assertEqual(specdocs._canon("X2", {"X2": "toc 2"}), "TOC2")
+		self.assertEqual(specdocs._canon("Normal", {}), "Normal")

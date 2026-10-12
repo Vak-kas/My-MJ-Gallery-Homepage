@@ -9,6 +9,7 @@
 
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
-from xml.etree.ElementTree import iterparse
+from xml.etree.ElementTree import fromstring, iterparse
 
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
@@ -85,6 +86,33 @@ def _asn1_title(code, fallback):
 	return m.group(1) if m else fallback
 
 
+def _style_names(z):
+	"""스타일 id → 이름 ('Heading1' → 'heading 1'). 바꾼 문서는 id 가 'Heading1' 이 아닐 수 있어서 이름으로도 봄."""
+	try:
+		root = fromstring(z.read("word/styles.xml"))
+	except (KeyError, ValueError, SyntaxError):
+		return {}
+	out = {}
+	for st in root.iter(W + "style"):
+		name = st.find(W + "name")
+		if name is not None:
+			out[st.get(W + "styleId")] = (name.get(W + "val") or "").lower()
+	return out
+
+
+def _canon(style, names):
+	"""여러 가지 스타일 id 를 3GPP 원래 이름으로 맞춤."""
+	name = names.get(style, "")
+	m = re.fullmatch(r"heading (\d)", name)
+	if m:
+		return f"Heading{m.group(1)}"
+	if name.upper() in ("TH", "TF", "PL", "NO", "TAL", "TAC", "TAH") or re.fullmatch(r"b\d", name):
+		return name.upper()
+	if name.startswith("toc ") or name.startswith("toc"):
+		return "TOC" + name[3:].strip()
+	return style
+
+
 def parse_docx(path, progress=None):
 	"""docx → [{kind, clause, title, text}]. 큰 문서(수백 MB XML)도 메모리를 적게 쓰게 iterparse."""
 	chunks = []
@@ -113,6 +141,7 @@ def parse_docx(path, progress=None):
 				chunks.append({"kind": SpecChunk.KIND_ASN1, "clause": state["clause"], "title": _asn1_title(code[k:k + 12000], state["title"])[:300], "text": code[k:k + 12000]})
 
 	with zipfile.ZipFile(path) as z:
+		names = _style_names(z)
 		size = z.getinfo("word/document.xml").file_size or 1
 		with z.open("word/document.xml") as f:
 			depth = 0  # 표 안이면 1 이상
@@ -147,7 +176,7 @@ def parse_docx(path, progress=None):
 					continue
 				if event != "end" or el.tag != W + "p" or depth:
 					continue
-				st = _style(el)
+				st = _canon(_style(el), names)
 				text = _ptext(el)
 				el.clear()
 				if st.startswith("TOC") or st in ("ZA", "ZB", "ZT", "ZU", "ZV", "ZH"):
@@ -190,6 +219,27 @@ def parse_docx(path, progress=None):
 
 # ── 받기·나누기 ──
 
+def convert_doc(path, outdir):
+	"""옛 워드(.doc) → .docx. 서버에 LibreOffice(libreoffice-writer-nogui)가 있어야 함."""
+	soffice = shutil.which("soffice") or shutil.which("libreoffice")
+	if not soffice:
+		raise ValueError("옛 워드(.doc) 형식이에요 — 서버에 LibreOffice(libreoffice-writer-nogui)를 깔면 읽을 수 있어요")
+	out = os.path.join(outdir, "converted")
+	os.makedirs(out, exist_ok=True)
+	env = {**os.environ, "HOME": outdir}  # 웹 서버 사용자는 홈 폴더에 쓸 수 없을 수 있어서 설정 폴더를 임시 폴더에
+	try:
+		subprocess.run(
+			[soffice, "--headless", "--norestore", f"-env:UserInstallation=file://{outdir}/lo-profile", "--convert-to", "docx", "--outdir", out, path],
+			env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600, check=True,
+		)
+	except (subprocess.TimeoutExpired, subprocess.CalledProcessError, OSError):
+		raise ValueError("옛 워드(.doc)를 .docx 로 바꾸지 못했어요")
+	result = os.path.join(out, Path(path).stem + ".docx")
+	if not os.path.exists(result):
+		raise ValueError("옛 워드(.doc)를 .docx 로 바꾸지 못했어요")
+	return result
+
+
 def _download(url, dest):
 	req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
 	size = 0
@@ -228,11 +278,14 @@ def index_spec(doc):
 		_download(j["latest"]["zip"], zpath)
 		SpecDoc.objects.filter(pk=doc.pk).update(progress=30)
 		with zipfile.ZipFile(zpath) as z:
-			docs = sorted((i for i in z.infolist() if i.filename.lower().endswith(".docx")), key=lambda i: -i.file_size)
-			if not docs:
-				olds = [i for i in z.infolist() if i.filename.lower().endswith(".doc")]
-				raise ValueError("옛 워드(.doc) 형식이라 읽지 못했어요" if olds else "zip 안에 워드 문서가 없어요")
-			dpath = z.extract(docs[0], tmp)
+			pick = lambda ext: sorted((i for i in z.infolist() if i.filename.lower().endswith(ext)), key=lambda i: -i.file_size)
+			docs, olds = pick(".docx"), pick(".doc")
+			if docs:
+				dpath = z.extract(docs[0], tmp)
+			elif olds:  # 옛 워드(.doc) → LibreOffice 로 .docx 로 바꿔서 같은 방법으로 나눔
+				dpath = convert_doc(z.extract(olds[0], tmp), tmp)
+			else:
+				raise ValueError("zip 안에 워드 문서가 없어요")
 		os.remove(zpath)
 
 		def progress(p):
