@@ -358,3 +358,51 @@ class HookRequest(models.Model):
 
 	class Meta:
 		ordering = ["-id"]
+
+
+class SpecDoc(models.Model):
+	"""3GPP 본문 검색용 규격 한 개 (공식 zip 을 받아 절 단위로 나눠 둠). 문서 파일은 저장하지 않음."""
+
+	STATUS_PENDING = "pending"
+	STATUS_PROCESSING = "processing"
+	STATUS_READY = "ready"
+	STATUS_ERROR = "error"
+	STATUS_CHOICES = [(STATUS_PENDING, "기다리는 중"), (STATUS_PROCESSING, "받는 중"), (STATUS_READY, "준비됨"), (STATUS_ERROR, "실패")]
+
+	number = models.CharField(max_length=16, unique=True)  # 38.331 / 38.101-5
+	kind = models.CharField(max_length=2, default="TS")
+	title = models.CharField(max_length=300, blank=True)
+	version = models.CharField(max_length=16, blank=True)  # 나눠 둔 버전
+	release = models.CharField(max_length=4, blank=True)
+	zip_url = models.URLField(max_length=300, blank=True)
+	status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_PENDING)
+	progress = models.PositiveSmallIntegerField(default=0)
+	chunks = models.PositiveIntegerField(default=0)
+	error = models.CharField(max_length=300, blank=True)
+	indexed_at = models.DateTimeField(null=True, blank=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		ordering = ["number"]
+
+	def __str__(self):
+		return f"{self.kind} {self.number} {self.version}"
+
+
+class SpecChunk(models.Model):
+	"""규격의 한 조각 — 절 본문(긴 절은 여러 조각), 표, ASN.1 블록, 그림 제목."""
+
+	KIND_CLAUSE = "clause"
+	KIND_TABLE = "table"
+	KIND_ASN1 = "asn1"
+
+	doc = models.ForeignKey(SpecDoc, on_delete=models.CASCADE, related_name="parts")
+	order = models.PositiveIntegerField()
+	kind = models.CharField(max_length=8, default=KIND_CLAUSE)
+	clause = models.CharField(max_length=40, blank=True)  # 절 번호 6.3.2 / A.1
+	title = models.CharField(max_length=300, blank=True)  # 절 제목 또는 표 제목
+	text = models.TextField()
+
+	class Meta:
+		ordering = ["doc_id", "order"]
+		indexes = [models.Index(fields=["doc", "clause"])]
