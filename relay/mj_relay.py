@@ -51,6 +51,7 @@ SNAPSHOT_SAMPLES = 1024
 STATS_INTERVAL = 0.25
 SNAPSHOT_INTERVAL = 0.125
 MAX_VIEWERS_PER_ROOM = 5
+HANDSHAKE_GRACE = 1.5  # 접속 뒤 이 시간 안에 인사가 안 끝나면 '짝 안 맞음'
 JOIN_TTL = 15 * 60  # 링크로 입장한 IP 등록 유지 시간 (페이지가 열려 있으면 계속 갱신)
 ROLES = ("sender", "receiver")
 
@@ -151,6 +152,9 @@ class Room:
 	file_info: dict = field(default_factory=dict)
 	snapshot: bytes = b""
 	joined: dict = field(default_factory=lambda: {"sender": {}, "receiver": {}})  # 역할 → {ip: 마지막 갱신 시각}
+	# 연결 점검: 역할 → {attempts: 접속 시도 수, ok_at: 마지막 성공, fail: {at, kind, ip}} — 방 화면이 '왜 안 붙는지' 알려 줌
+	diag: dict = field(default_factory=lambda: {"sender": {"attempts": 0, "ok_at": 0.0, "fail": None}, "receiver": {"attempts": 0, "ok_at": 0.0, "fail": None}})
+	misaligned: int = 0  # IQ 샘플 크기로 나눠떨어지지 않는 메시지 수 (형식이 다를 때)
 	viewers: set = field(default_factory=set)
 	web_receivers: set = field(default_factory=set)  # 브라우저로 파일을 받는 쪽 WebSocket
 	web_sending: bool = False  # 브라우저에서 파일을 보내는 중
@@ -218,7 +222,25 @@ class Room:
 			"idle_seconds": round(time.time() - self.last_rx, 1) if self.last_rx else None,
 			"file": self.file_info or None,
 			"closed": self.closed_reason or None,
+			"diag": self.diag_public(),
 		}
+
+	def diag_public(self):
+		now = time.time()
+		out = {}
+		for role, d in self.diag.items():
+			fail = d.get("fail")
+			out[role] = {
+				"attempts": d["attempts"],
+				"ok_ago": round(now - d["ok_at"], 1) if d["ok_at"] else None,
+				"fail": {**fail, "ago": round(now - fail["at"], 1)} if fail else None,
+			}
+		if self.kind == "iq":
+			bps = IQ_FORMATS.get(self.meta.get("format"), 8)
+			sr = self.meta.get("sample_rate") or 0
+			out["expected_bps"] = sr * bps if sr else None  # 방에 적은 샘플레이트·형식이면 초당 들어와야 할 바이트
+			out["misaligned"] = self.misaligned
+		return out
 
 
 def _clamp(value, default, low, high):
@@ -292,6 +314,8 @@ class Relay:
 				status, text = b"300", b"not joined yet"
 			if status != b"200":
 				log.info("ZAP 거부(%s): room=%s ip=%s", status.decode(), domain, address)
+				if room is not None:
+					room.diag[role]["fail"] = {"at": time.time(), "kind": "not_joined", "ip": address.decode(errors="ignore")}
 			await self._zap.send_multipart([version, request_id, status, text, b"", b""])
 
 	# ── 방 만들기 / 닫기 ─────────────────────────
@@ -366,7 +390,7 @@ class Relay:
 		room.file_bucket = TokenBucket(room.rate_limit)
 		self.rooms[room_id] = room
 		# 감시는 지금 바로 켬: 태스크가 돌기 전에 들어온 연결도 놓치지 않도록
-		events = zmq.EVENT_HANDSHAKE_SUCCEEDED | zmq.EVENT_DISCONNECTED
+		events = zmq.EVENT_HANDSHAKE_SUCCEEDED | zmq.EVENT_DISCONNECTED | zmq.EVENT_ACCEPTED
 		in_mon = pull.get_monitor_socket(events)
 		out_mon = out.get_monitor_socket(events)
 		room.tasks = [
@@ -460,6 +484,8 @@ class Relay:
 				except zmq.Again:
 					room.bytes_dropped += size
 				if room.kind == "iq":
+					if size % bytes_per_sample:
+						room.misaligned += 1
 					last = frames[-1]
 					room.snapshot = last[-snap_len:] if len(last) >= snap_len else (room.snapshot + last)[-snap_len:]
 
@@ -503,16 +529,34 @@ class Relay:
 			except Exception:  # noqa: BLE001 - 끊긴 수신자는 빼고 계속
 				room.web_receivers.discard(ws)
 
+	def _check_handshake(self, diag, accepted_at):
+		"""접속(TCP)은 왔는데 1.5초 안에 인사(handshake)도 성공 못 하고 등록 안 됨(ZAP) 거절도 아니면
+		소켓 종류가 짝이 안 맞는 것 (예: 받는 쪽이 ZMQ SUB Source 대신 PULL Source).
+		ZAP 이 켜진 소켓은 이때 '인사 실패' 이벤트를 따로 주지 않아서 시간으로 판단함."""
+		async def later():
+			await asyncio.sleep(HANDSHAKE_GRACE)
+			fail = diag.get("fail")
+			zap_denied = fail and fail["kind"] == "not_joined" and fail["at"] >= accepted_at - 0.1
+			if diag["ok_at"] < accepted_at and not zap_denied:
+				diag["fail"] = {"at": time.time(), "kind": "socket_type"}
+		asyncio.create_task(later())
+
 	async def _monitor(self, room, mon, attr):
 		"""인증(ZAP)까지 통과한 연결만 송신자·수신자 수로 셈 (거절돼 재시도 중인 연결은 제외)."""
 		live = set()  # 연결별 fd
+		diag = room.diag["sender" if attr == "senders" else "receiver"]
 		try:
 			while True:
 				event = parse_monitor_message(await mon.recv_multipart())
-				if event["event"] == zmq.EVENT_HANDSHAKE_SUCCEEDED:
+				ev = event["event"]
+				if ev == zmq.EVENT_HANDSHAKE_SUCCEEDED:
 					live.add(event["value"])
-				elif event["event"] == zmq.EVENT_DISCONNECTED:
+					diag["ok_at"] = time.time()
+				elif ev == zmq.EVENT_DISCONNECTED:
 					live.discard(event["value"])
+				elif ev == zmq.EVENT_ACCEPTED:
+					diag["attempts"] += 1
+					self._check_handshake(diag, time.time())
 				setattr(room, attr, len(live))
 		finally:
 			mon.close(0)

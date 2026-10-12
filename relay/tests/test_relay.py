@@ -159,6 +159,41 @@ class RoomRelayTests(RelayTestCase):
 		await tx.send(b"after join")
 		self.assertEqual(await self.recv(rx), [b"after join"])
 
+	async def test_diag_wrong_socket_type_and_not_joined(self):
+		"""받는 쪽이 SUB 대신 PULL, 보내는 쪽이 PUSH 대신 PUB 로 붙으면 '짝이 안 맞음', 입장 전이면 '등록 안 됨'."""
+		room = await self.open_room({"kind": "iq", "meta": {"format": "fc32", "sample_rate": 2e5}})
+		self.receiver(room, kind=zmq.PULL)  # GNU Radio ZMQ PULL Source 로 잘못 붙은 경우
+		wrong_tx = self.client_ctx.socket(zmq.PUB)
+		self.client_socks.append(wrong_tx)
+		wrong_tx.connect(f"tcp://127.0.0.1:{room.in_port}")
+		await asyncio.sleep(mj_relay.HANDSHAKE_GRACE + 0.6)
+		diag = room.stats()["diag"]
+		self.assertEqual(diag["receiver"]["fail"]["kind"], "socket_type")
+		self.assertGreaterEqual(diag["receiver"]["attempts"], 1)
+		self.assertIsNone(diag["receiver"]["ok_ago"])
+		self.assertEqual(diag["sender"]["fail"]["kind"], "socket_type")
+		self.assertEqual(diag["expected_bps"], 2e5 * 8)
+		self.assertEqual((room.senders, room.receivers), (0, 0))
+
+		other = await self.relay.create_room({"kind": "raw"})  # 아무도 입장 안 한 방
+		self.receiver(other)
+		await asyncio.sleep(mj_relay.HANDSHAKE_GRACE + 0.6)
+		fail = other.stats()["diag"]["receiver"]["fail"]
+		self.assertEqual((fail["kind"], fail["ip"]), ("not_joined", "127.0.0.1"))
+
+	async def test_diag_ok_and_misaligned_format(self):
+		room = await self.open_room({"kind": "iq", "meta": {"format": "fc32", "sample_rate": 2e5}})
+		rx = self.receiver(room)
+		tx = self.sender(room)
+		await asyncio.sleep(0.3)
+		await tx.send(b"x" * 12)  # fc32(8바이트)로 안 나눠떨어짐 → 형식이 다를 수 있음
+		await self.recv(rx)
+		diag = room.stats()["diag"]
+		self.assertIsNotNone(diag["sender"]["ok_ago"])
+		self.assertIsNotNone(diag["receiver"]["ok_ago"])
+		self.assertIsNone(diag["receiver"]["fail"])
+		self.assertEqual(diag["misaligned"], 1)
+
 	async def test_join_sender_only_still_blocks_receiver(self):
 		room = await self.open_room({"kind": "raw"}, join=("sender",))
 		rx = self.receiver(room)
