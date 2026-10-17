@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #3b82f6; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #3b82f6; border-color: #3b82f6; color: #fff; font-weight: 600; }
+    .db-wrap { position: relative; width: min(100%, 620px); aspect-ratio: 1; margin: 0 auto; }
+    #db-board { width: 100%; height: 100%; display: block; border-radius: 18px; cursor: pointer; touch-action: manipulation; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 9px 12px; }
+    .seat.turn { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, #fff); }
+    .chip { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .tag { border-radius: 6px; background: #ececf0; padding: 0 6px; font-size: 11px; color: #6e6e73; }
+    #db-chat { height: 200px; overflow-y: auto; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go { background: #3b82f6; color: #fff; }
+    html.theme-dark .seat { background: #111318; }
+    html.theme-dark .seat.turn { background: color-mix(in srgb, var(--c) 18%, #111318); }
+    html.theme-dark .tag { background: #2c2c30; color: #a1a1a6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:dots' %}" class="text-[13px] text-[#3b82f6]">← 점 잇기 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🟦 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 2~4명 · 네모의 마지막 변을 닫으면 그 칸을 먹고 한 번 더</p>
+        </div>
+        <button type="button" class="gm-btn" id="db-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="db-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:dots_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <!-- 닉네임 -->
+    <section id="db-name-box" class="gm-card mt-5 hidden">
+        <form id="db-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="db-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#3b82f6] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <p id="db-status" class="mb-3 text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="db-wrap"><canvas id="db-board" width="1200" height="1200"></canvas></div>
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <select id="db-size" class="gm-btn" aria-label="판 크기">
+                    <option value="3">3×3 칸 (빠른 판)</option>
+                    <option value="5">5×5 칸</option>
+                    <option value="7">7×7 칸 (긴 판)</option>
+                </select>
+                <button type="button" class="gm-btn" id="db-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="db-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="db-resign">🏳 컴퓨터에게 맡기기</button>
+                <button type="button" class="gm-btn" id="db-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="db-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+            <p class="mt-3 text-center text-[12px] text-[#8e8e93]">두 점 사이 아무 데나 누르면 가장 가까운 선이 그어져요. 세 변이 그어진 칸을 남기면 다음 사람이 먹어요!</p>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="db-seats"></section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="db-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="db-chat-form" class="mt-2 flex gap-2"><input id="db-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const SEATS = ['p1', 'p2', 'p3', 'p4'];
+    const COLORS = ['#3b82f6', '#ef4444', '#10b981', '#f59e0b'];  // 서버 자리 순서와 같게
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+    const isDark = () => document.documentElement.classList.contains('theme-dark');
+
+    let pid = store.get(`mj-dots-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-dots-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, hover = null, pop = null;
+    const canvas = $('db-board'), ctx = canvas.getContext('2d');
+
+    // ── 판 ── 점 (n+1)×(n+1), 가로선 h[y*n+x], 세로선 v[y*(n+1)+x], 칸 boxes[y*n+x]
+    function geom() { const W = canvas.width, n = S ? S.size : 5, pad = W * 0.08; return { W, n, pad, cell: (W - pad * 2) / n }; }
+    const P = (x, y) => { const { pad, cell } = geom(); return [pad + x * cell, pad + y * cell]; };
+    function seg(kind, x, y) { const a = P(x, y), b = kind === 'h' ? P(x + 1, y) : P(x, y + 1); return [a, b]; }
+    function owner(kind, x, y) { const n = S.size; return kind === 'h' ? S.h[y * n + x] : S.v[y * (n + 1) + x]; }
+    function draw(now) {
+        const { W, n, cell } = geom();
+        const dark = isDark();
+        ctx.clearRect(0, 0, W, W);
+        ctx.fillStyle = dark ? '#0f1218' : '#fbfbfd'; ctx.fillRect(0, 0, W, W);
+        if (!S) return;
+        const t = pop ? Math.min(1, ((now || performance.now()) - pop.start) / 420) : 1;
+        // 먹은 칸
+        for (let i = 0; i < S.boxes.length; i++) {
+            const o = S.boxes[i]; if (o < 0) continue;
+            const x = i % n, y = Math.floor(i / n), [px, py] = P(x, y);
+            const fresh = pop && pop.cells.has(`${x},${y}`) && t < 1;
+            const k = fresh ? 0.6 + 0.4 * Math.sin(t * Math.PI / 2) : 1;
+            const inset = cell * (1 - k) / 2 + cell * 0.06;
+            ctx.fillStyle = COLORS[o] + (dark ? '55' : '33');
+            ctx.fillRect(px + inset, py + inset, cell - inset * 2, cell - inset * 2);
+            const nm = S.seats[SEATS[o]]?.name || '';
+            const bn = nm.match(/컴퓨터 (\d)$/);  // 컴퓨터는 번호로, 사람은 이름 첫 글자
+            ctx.fillStyle = COLORS[o]; ctx.font = `700 ${Math.round(cell * 0.36 * k)}px -apple-system, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(bn ? bn[1] : (nm.replace('🤖 ', '').slice(0, 1) || '★'), px + cell / 2, py + cell / 2 + cell * 0.02);
+        }
+        // 선 (안 그은 선은 옅은 점선)
+        const lw = Math.max(6, cell * 0.075);
+        const line = (kind, x, y, color, width, dash) => {
+            const [[ax, ay], [bx, by]] = seg(kind, x, y);
+            ctx.save(); ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round';
+            if (dash) ctx.setLineDash(dash);
+            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke(); ctx.restore();
+        };
+        for (const kind of ['h', 'v']) {
+            const arr = S[kind], cols = kind === 'h' ? n : n + 1;
+            arr.forEach((o, i) => {
+                const x = i % cols, y = Math.floor(i / cols);
+                if (o < 0) line(kind, x, y, dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)', lw * 0.5, [lw * 0.6, lw * 0.9]);
+                else line(kind, x, y, COLORS[o], lw);
+            });
+        }
+        // 방금 그은 선 강조
+        if (S.last) { const [k, x, y] = S.last; line(k, x, y, 'rgba(250,204,21,0.55)', lw * 2.1); line(k, x, y, COLORS[owner(k, x, y)], lw); }
+        // 내 차례면 누를 선 미리 보기
+        if (myTurn() && hover) line(hover[0], hover[1], hover[2], COLORS[SEATS.indexOf(mySeat)] + '99', lw * 1.1);
+        // 점
+        for (let y = 0; y <= n; y++) for (let x = 0; x <= n; x++) {
+            const [px, py] = P(x, y);
+            ctx.fillStyle = dark ? '#e8e8ea' : '#1d1d1f';
+            ctx.beginPath(); ctx.arc(px, py, Math.max(7, cell * 0.075), 0, Math.PI * 2); ctx.fill();
+        }
+        if (pop && t < 1) requestAnimationFrame(draw); else pop = null;
+    }
+    // 누른 곳에서 가장 가까운 안 그은 선
+    function lineAt(e) {
+        if (!S) return null;
+        const rect = canvas.getBoundingClientRect(), { n, pad, cell, W } = geom();
+        const fx = ((e.clientX - rect.left) * (W / rect.width) - pad) / cell, fy = ((e.clientY - rect.top) * (W / rect.height) - pad) / cell;
+        const cands = [];
+        const hy = Math.round(fy), hx = Math.floor(fx);
+        if (hy >= 0 && hy <= n && hx >= 0 && hx < n) cands.push([Math.abs(fy - hy), 'h', hx, hy]);
+        const vx = Math.round(fx), vy = Math.floor(fy);
+        if (vx >= 0 && vx <= n && vy >= 0 && vy < n) cands.push([Math.abs(fx - vx), 'v', vx, vy]);
+        cands.sort((a, b) => a[0] - b[0]);
+        const c = cands.find((c) => c[0] < 0.42 && owner(c[1], c[2], c[3]) < 0);
+        return c ? [c[1], c[2], c[3]] : null;
+    }
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat;
+    canvas.addEventListener('pointermove', (e) => { const l = lineAt(e); if (String(l) !== String(hover)) { hover = l; draw(); } });
+    canvas.addEventListener('pointerleave', () => { hover = null; draw(); });
+    canvas.addEventListener('click', (e) => {
+        if (!S) return;
+        if (!mySeat) { toast(S.status === 'playing' ? '구경 중이에요. 판이 끝나면 앉을 수 있어요.' : '먼저 오른쪽에서 빈 자리에 앉으세요.'); return; }
+        if (S.status !== 'playing') { toast('▶ 시작을 누르면 시작해요.'); return; }
+        if (!myTurn()) { toast('내 차례가 아니에요.'); return; }
+        const l = lineAt(e);
+        if (l) send({ type: 'move', line: l });
+    });
+
+    // ── 자리·상태 ──
+    function seatsHTML() {
+        return SEATS.map((s, i) => {
+            const p = S?.seats?.[s], c = COLORS[i];
+            const turn = S?.status === 'playing' && S.turn === s;
+            const win = S?.status === 'over' && (S.winners || []).includes(s);
+            if (!p) return `<div class="seat flex items-center gap-2" style="--c:${c}"><span class="chip" style="background:${c}"></span><span class="text-[13px] text-[#8e8e93]">${i + 1}번 빈 자리</span>${!mySeat && S?.status !== 'playing' ? `<button type="button" class="gm-btn ml-auto" data-sit="${s}">여기 앉기</button>` : ''}</div>`;
+            return `<div class="seat flex items-center gap-2 ${turn ? 'turn' : ''}" style="--c:${c}">
+                <span class="chip" style="background:${c}"></span>
+                <b class="min-w-0 truncate text-[14px]">${win ? '🏆 ' : ''}${esc(p.name)}${mySeat === s ? ' (나)' : ''}</b>
+                ${p.bot ? '<span class="tag">컴퓨터</span>' : `<span class="dot" style="background:${p.online ? '#10b981' : '#c7c7cc'}" title="${p.online ? '접속 중' : '잠깐 나감'}"></span>`}
+                ${p.bot && mySeat && S.status !== 'playing' ? `<button type="button" class="text-[12px] text-[#c4271d]" data-unbot="${s}">빼기</button>` : ''}
+                <span class="ml-auto text-[18px] font-bold tabular-nums" style="color:${c}">${p.score}</span>
+                <span class="w-8 text-right text-[12px] text-[#6e6e73]">${p.wins}승</span>
+            </div>`;
+        }).join('') + `<p id="db-spec" class="pt-1 text-[12px] text-[#8e8e93]"></p>`;
+    }
+    function render(spectators) {
+        $('db-seats').innerHTML = seatsHTML();
+        $('db-spec').textContent = spectators?.length ? `구경 ${spectators.length}명: ${spectators.join(', ')}` : '';
+        const seated = S ? SEATS.filter((s) => S.seats[s]).length : 0;
+        let status = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'playing') {
+            const who = S.seats[S.turn]?.name || '';
+            const again = S.last_boxes?.length && S.move_count ? `${S.last_boxes.length}칸 먹고 한 번 더! · ` : '';
+            status = again + (myTurn() ? '🟢 내 차례예요! 선을 하나 그으세요' : `${who} 차례`);
+        } else if (S.status === 'over') status = `🏁 ${S.reason}`;
+        else status = !mySeat ? '빈 자리에 앉아요 (2~4명)' : seated < 2 ? '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작' : `${seated}명 모였어요! ▶ 시작을 누르세요`;
+        $('db-status').textContent = status;
+        const idle = S && S.status !== 'playing';
+        $('db-size').value = String(S?.size || 5);
+        $('db-size').disabled = !(idle && mySeat);
+        $('db-bot').disabled = !(idle && mySeat && seated < 4);
+        $('db-start').disabled = !(idle && mySeat && seated >= 2);
+        $('db-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('db-resign').classList.toggle('hidden', !(S?.status === 'playing' && mySeat));
+        $('db-stand').disabled = !(mySeat && idle);
+        document.title = myTurn() ? `🟢 내 차례 · {{ room.title|escapejs }}` : `🟦 {{ room.title|escapejs }} · 점 잇기`;
+        draw();
+    }
+    $('db-seats').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit });
+        const u = e.target.closest('[data-unbot]'); if (u) send({ type: 'remove-bot', seat: u.dataset.unbot });
+    });
+    $('db-size').addEventListener('change', () => send({ type: 'size', size: +$('db-size').value }));
+    $('db-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('db-start').addEventListener('click', () => send({ type: S?.status === 'over' ? 'rematch' : 'start' }));
+    $('db-resign').addEventListener('click', () => { if (confirm('그만두고 컴퓨터에게 맡길까요? 내 자리는 컴퓨터가 이어서 둬요.')) send({ type: 'resign' }); });
+    $('db-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('db-chat'), div = document.createElement('div');
+        if (m.system) div.innerHTML = `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>`;
+        else div.innerHTML = `${m.seat ? `<span class="chip" style="width:10px;height:10px;vertical-align:0;background:${COLORS[SEATS.indexOf(m.seat)]}"></span> ` : ''}<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+    $('db-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('db-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('db-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+
+    // ── 소리: 선 '틱', 칸 먹으면 '띵' ──
+    let audio = null;
+    function beep(freq, len, type = 'triangle', vol = 0.15) {
+        if (!$('db-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.setValueAtTime(vol, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + len);
+            o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + len + 0.02);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('db-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+            else if (m.type === 'state') {
+                const before = S?.move_count;
+                S = m.state;
+                mySeat = m.you || null;
+                if (before !== undefined && S.move_count > before) {
+                    if (S.last_boxes?.length) { pop = { cells: new Set(S.last_boxes.map(([x, y]) => `${x},${y}`)), start: performance.now() }; beep(880, 0.18); setTimeout(() => beep(1320, 0.2), 90); }
+                    else beep(420, 0.05, 'square', 0.08);
+                    if (myTurn()) setTimeout(() => beep(660, 0.12), 150);
+                }
+                render(m.peers.filter((p) => !p.seat).map((p) => p.name));
+            } else if (m.type === 'chat') chatLine(m);
+            else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+            else if (m.type === 'end') { ended = true; $('db-status').textContent = `🚪 ${m.reason}`; }
+        };
+        ws.onclose = () => {
+            if (ended) return;
+            $('db-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) {
+        store.set('mj-game-name', name);
+        $('db-name-box').classList.add('hidden');
+        connect(name);
+    }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved);
+    else { $('db-name-box').classList.remove('hidden'); $('db-name').focus(); }
+    $('db-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('db-name').value.trim()); });
+
+    $('db-copy').addEventListener('click', async () => {
+        const url = $('db-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('db-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('db-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('db-kakao').addEventListener('click', () => mjShare({ title: `🟦 점 잇기 땅따먹기 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('db-copy').dataset.url, button: '땅따먹기 하러 가기' }));
+    new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    render();
+    window.__dots = { state: () => S, seat: () => mySeat, send };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}
