@@ -320,3 +320,97 @@ class OthelloTestCase(unittest.TestCase):
 		logic.on_message(room, b, {"type": "rematch"})
 		st = logic.snapshot(room)
 		self.assertEqual((st["status"], st["counts"], st["seats"]["black"]["name"]), ("playing", {"black": 2, "white": 2}, "백돌"))
+
+
+class DotsTestCase(unittest.TestCase):
+	def setup(self, size=3):
+		import random
+		logic, room = mj_game.DotsLogic(rng=random.Random(0)), _Room()
+		a, b = _Peer("a", "가"), _Peer("b", "나")
+		logic.on_message(room, a, {"type": "sit"})
+		logic.on_message(room, b, {"type": "sit"})
+		logic.on_message(room, a, {"type": "size", "size": size})
+		return logic, room, a, b
+
+	def move(self, logic, room, peer, line):
+		return logic.on_message(room, peer, {"type": "move", "line": line})
+
+	def test_needs_two_and_turns(self):
+		import random
+		logic, room = mj_game.DotsLogic(rng=random.Random(0)), _Room()
+		a = _Peer("a", "가")
+		logic.on_message(room, a, {"type": "sit"})
+		self.assertIn("두 명", logic.on_message(room, a, {"type": "start"})[1])
+		logic, room, a, b = self.setup()
+		logic.on_message(room, a, {"type": "start"})
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["turn"], st["size"]), ("playing", "p1", 3))
+		self.assertEqual((len(st["h"]), len(st["v"])), (12, 12))  # 3×3 칸 → 가로 4줄×3, 세로 3줄×4
+		self.assertIn("내 차례", self.move(logic, room, b, ["h", 0, 0])[1])
+		self.assertEqual(self.move(logic, room, a, ["h", 0, 0]), (True, None))
+		self.assertIn("이미 그은", self.move(logic, room, b, ["h", 0, 0])[1])
+		self.assertIn("이미 그은", self.move(logic, room, b, ["h", 5, 0])[1])  # 판 밖
+		self.assertEqual(logic.snapshot(room)["turn"], "p2")
+		self.assertIn("진행 중", logic.on_message(room, _Peer("c", "다"), {"type": "sit"})[1])  # 진행 중엔 못 앉음
+
+	def test_closing_box_gives_point_and_extra_turn(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, a, {"type": "start"})
+		self.move(logic, room, a, ["h", 0, 0])  # 칸 (0,0) 위
+		self.move(logic, room, b, ["v", 0, 0])  # 왼쪽
+		self.move(logic, room, a, ["h", 0, 1])  # 아래 → 세 변
+		self.move(logic, room, b, ["v", 1, 0])  # 오른쪽 → 나가 닫음
+		st = logic.snapshot(room)
+		self.assertEqual(st["boxes"][0], 1)
+		self.assertEqual(st["last_boxes"], [[0, 0]])
+		self.assertEqual((st["turn"], st["seats"]["p2"]["score"]), ("p2", 1))  # 닫으면 한 번 더
+
+	def test_double_box_and_finish(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, a, {"type": "start"})
+		# 선을 다 그어 끝까지: 차례인 사람이 아무 선이나
+		while logic.status == "playing":
+			peer = a if logic.turn == "p1" else b
+			self.move(logic, room, peer, list(logic._free_lines()[0]))
+		st = logic.snapshot(room)
+		self.assertEqual(st["status"], "over")
+		sc = (st["seats"]["p1"]["score"], st["seats"]["p2"]["score"])
+		self.assertEqual(sum(sc), 9)
+		self.assertTrue(st["winners"])
+		self.assertIn("🏁", room.notices[-1])
+		# 다시 하기 → 다음 사람부터 새 판
+		logic.on_message(room, b, {"type": "rematch"})
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["turn"], st["move_count"]), ("playing", "p2", 0))
+
+	def test_bot_takes_box_avoids_third_side_and_plays_on_tick(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, b, {"type": "stand"})
+		logic.on_message(room, a, {"type": "add-bot"})
+		self.assertEqual(logic.snapshot(room)["seats"]["p2"]["name"], "🤖 컴퓨터 1")
+		logic.on_message(room, a, {"type": "start"})
+		# 칸 (1,1) 에 세 변을 만들어 둠 → 컴퓨터는 그 칸을 먹어야 함
+		for ln in (("h", 1, 1), ("h", 1, 2), ("v", 1, 1)):
+			logic._set(logic.h, logic.v, *ln, 0)
+		self.assertEqual(logic.bot_line(), ("v", 2, 1))
+		# 세 변짜리가 없으면 어느 칸에도 세 번째 변을 만들지 않는 선
+		logic._set(logic.h, logic.v, "v", 2, 1, 0)
+		logic.boxes[1 * 3 + 1] = 0
+		line = logic.bot_line()
+		self.assertTrue(all(logic._sides(logic.h, logic.v, bx, by) < 2 for bx, by in logic._adjacent(*line)))
+		# 사람이 두면 컴퓨터 차례 → tick 이 두어 줌 (BOT_DELAY 뒤)
+		self.move(logic, room, a, list(logic._free_lines()[0]))
+		self.assertEqual(logic.turn, "p2")
+		self.assertFalse(logic.tick(room, logic.bot_due - 0.1))
+		self.assertTrue(logic.tick(room, logic.bot_due + 0.1))
+		self.assertEqual(logic.moves, 2)
+
+	def test_leaving_player_is_replaced_by_bot(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, a, {"type": "start"})
+		self.assertIsNone(logic.on_leave(room, "b"))
+		self.assertIn("컴퓨터가 대신", room.notices[-1])
+		st = logic.snapshot(room)
+		self.assertTrue(st["seats"]["p2"]["bot"])
+		self.assertIsNone(logic.seat_of("b"))
+		self.assertEqual(logic.on_message(room, b, {"type": "resign"}), (False, None))  # 이미 자리가 없음

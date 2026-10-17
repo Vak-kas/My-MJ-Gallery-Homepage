@@ -111,6 +111,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "dots",
+		"url_name": "games:dots",
+		"icon": "🟦",
+		"title": "점 잇기 땅따먹기",
+		"description": "차례에 선 하나씩, 네모의 마지막 변을 닫으면 그 칸을 먹고 한 번 더! 3×3·5×5·7×7, 2~4명, 혼자면 컴퓨터와. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["여럿이", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
