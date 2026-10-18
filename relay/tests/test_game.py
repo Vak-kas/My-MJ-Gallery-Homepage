@@ -523,3 +523,146 @@ class AlkkagiTestCase(unittest.TestCase):
 		self.assertTrue(logic.tick(room, logic.bot_due + 0.1))
 		self.assertEqual(logic.shots, 1)
 		self.assertEqual(room.events[-1]["type"], "shot")
+
+
+class AugOmokTestCase(unittest.TestCase):
+	def setup(self):
+		import random
+		from relay import mj_augomok as A
+		self.A = A
+		logic, room = A.AugOmokLogic(rng=random.Random(0)), _EmitRoom()
+		a, b = _Peer("a", "흑"), _Peer("b", "백")
+		logic.on_message(room, a, {"type": "sit", "seat": "black"})
+		logic.on_message(room, b, {"type": "sit", "seat": "white"})
+		logic.on_message(room, a, {"type": "start"})
+		return logic, room, a, b
+
+	def mv(self, logic, room, peer, x, y):
+		return logic.on_message(room, peer, {"type": "move", "x": x, "y": y})
+
+	def test_points_fast_bonus_and_stones_fade(self):
+		logic, room, a, b = self.setup()
+		self.assertEqual(self.mv(logic, room, a, 7, 7), (True, None))
+		self.assertEqual(logic.points["black"], 2 + 2)  # 시작 2 + 빠르게 둬서 2
+		logic.turn_started -= 10  # 백은 천천히
+		self.mv(logic, room, b, 0, 0)
+		self.assertEqual(logic.points["white"], 2 + 1)
+		self.assertEqual(logic.at(7, 7)["ttl"], 4)  # 흑 턴이 한 번 끝남
+		# 흑 돌은 흑 턴 5번 뒤 사라짐 (중간에 판 끝나지 않게 떨어뜨려 둠)
+		spots = [(1, 13), (13, 1), (4, 10), (10, 4)]
+		for i in range(4):
+			self.mv(logic, room, a, *spots[i])
+			if i < 3:
+				self.mv(logic, room, b, 14, 14 - i * 3)
+		self.assertIsNone(logic.at(7, 7))
+		self.assertTrue(any(e["type"] == "fade" for e in room.events))
+		self.assertIn("거기에는", self.mv(logic, room, b, 1, 13)[1])
+
+	def test_draw_buy_and_pity(self):
+		logic, room, a, b = self.setup()
+		logic.points["black"] = 3
+		self.assertIn("4포인트", logic.on_message(room, a, {"type": "draw"})[1])
+		logic.points["black"] = 4
+		self.assertEqual(logic.on_message(room, a, {"type": "draw"}), (True, None))
+		self.assertEqual(logic.points["black"], 0)
+		self.assertEqual(logic.turn, "white")  # 뽑으면 턴 끝
+		self.assertTrue(any(e["type"] == "draw" for e in room.events))
+		# 천장: 9번 연속 영웅 미만이면 10번째는 영웅 이상 (처음 뽑힌 '일반' 을 영웅 이상으로 다시 뽑음)
+		logic.pity["white"] = 9
+		real = logic.rng.choices
+		rolls = iter([["common"], ["epic"]])
+		logic.rng.choices = lambda *args, **kw: next(rolls)
+		cid = logic._roll("white")
+		logic.rng.choices = real
+		self.assertEqual(self.A.CARDS[cid][0], "epic")
+		self.assertEqual(logic.pity["white"], 0)
+		# 골라 사기
+		import random
+		logic.rng = random.Random(1)
+		logic.shop["white"] = ["gust", "candle", "joker"]
+		logic.points["white"] = 3
+		self.assertIn("6포인트", logic.on_message(room, b, {"type": "buy", "slot": 0})[1])
+		self.assertEqual(logic.on_message(room, b, {"type": "buy", "slot": 1}), (True, None))
+		self.assertIn("candle", logic.hand["white"])
+
+	def give(self, logic, seat, *cards):
+		logic.hand[seat] = list(cards)
+
+	def test_cards_gust_twin_one_per_turn(self):
+		logic, room, a, b = self.setup()
+		self.mv(logic, room, a, 7, 7)
+		self.give(logic, "white", "gust", "twin")
+		self.assertIn("상대 돌", logic.on_message(room, b, {"type": "use", "card": "gust", "target": [0, 0]})[1])
+		self.assertEqual(logic.on_message(room, b, {"type": "use", "card": "gust", "target": [7, 7]}), (True, None))
+		self.assertIsNone(logic.at(7, 7))
+		self.assertIn("한 장만", logic.on_message(room, b, {"type": "use", "card": "twin"})[1])
+		self.mv(logic, room, b, 3, 3)
+		self.give(logic, "black", "twin")
+		logic.on_message(room, a, {"type": "use", "card": "twin"})
+		self.mv(logic, room, a, 7, 7)
+		self.assertEqual(logic.turn, "black")  # 한 번 더
+		self.assertIn("3칸 이상", self.mv(logic, room, a, 8, 8)[1])
+		self.mv(logic, room, a, 11, 11)
+		self.assertEqual(logic.turn, "white")
+
+	def test_joker_and_steal_make_five(self):
+		logic, room, a, b = self.setup()
+		for x in range(4):
+			logic.cells[logic.key(x, 5)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		self.give(logic, "black", "joker")
+		logic.on_message(room, a, {"type": "use", "card": "joker", "target": [4, 5]})
+		self.assertEqual((logic.status, logic.winner), ("over", "black"))
+		self.assertEqual(len(logic.win_line), 5)
+		# 강탈로 상대 돌을 빼앗아 다섯
+		logic, room, a, b = self.setup()
+		for x in range(4):
+			logic.cells[logic.key(x, 9)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		logic.cells[logic.key(4, 9)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}
+		self.give(logic, "black", "steal")
+		logic.on_message(room, a, {"type": "use", "card": "steal", "target": [4, 9]})
+		self.assertEqual(logic.winner, "black")
+
+	def test_puppet_eternal_blackhole_ruler(self):
+		logic, room, a, b = self.setup()
+		self.give(logic, "black", "puppet")
+		logic.on_message(room, a, {"type": "use", "card": "puppet", "target": [0, 14]})
+		self.mv(logic, room, a, 7, 7)
+		# 백 차례가 오자마자 (0,14) 에 강제로 놓이고 다시 흑 차례
+		self.assertEqual(logic.at(0, 14)["o"], "w")
+		self.assertEqual(logic.turn, "black")
+		self.assertTrue(any(e["type"] == "puppet" for e in room.events))
+		self.give(logic, "black", "eternal")
+		logic.on_message(room, a, {"type": "use", "card": "eternal", "target": [7, 7]})
+		self.assertTrue(logic.at(7, 7)["perm"])
+		self.mv(logic, room, a, 7, 9)
+		self.give(logic, "white", "blackhole")
+		logic.on_message(room, b, {"type": "use", "card": "blackhole", "target": [7, 8]})
+		self.assertIsNotNone(logic.at(7, 7))  # 불멸은 안 삼켜짐
+		self.assertIsNone(logic.at(7, 9))
+		self.mv(logic, room, b, 2, 2)
+		# 지배자: 상대의 가장 긴 줄 돌 2개를 가져옴
+		for x in range(3):
+			logic.cells[logic.key(10 + x, 12)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}
+		self.give(logic, "black", "ruler")
+		logic.on_message(room, a, {"type": "use", "card": "ruler"})
+		self.assertEqual(sum(1 for x in range(3) if logic.at(10 + x, 12)["o"] == "b"), 2)
+
+	def test_instant_piggy_and_life_grows(self):
+		logic, room, a, b = self.setup()
+		logic._gain_card(room, "black", "piggy", "buy")
+		self.assertEqual((logic.points["black"], logic.hand["black"]), (7, []))
+		logic.turns = self.A.GROW_EVERY * 2
+		self.mv(logic, room, a, 5, 5)
+		self.assertEqual(logic.at(5, 5)["ttl"], logic.life + 2 - 1)  # 놓을 때 7, 내 턴 끝나며 -1
+
+	def test_bot_plays_on_tick(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, b, {"type": "resign"})
+		logic.on_message(room, b, {"type": "stand"})
+		logic.on_message(room, a, {"type": "add-bot"})
+		logic.on_message(room, a, {"type": "rematch"})  # 다음 판은 백(컴퓨터)부터
+		self.assertEqual(logic.turn, "white")
+		self.assertFalse(logic.tick(room, logic.bot_due - 0.1))
+		self.assertTrue(logic.tick(room, logic.bot_due + 0.1))
+		self.assertEqual(logic.turn, "black")
+		self.assertTrue(logic.cells or logic.hand["white"])
