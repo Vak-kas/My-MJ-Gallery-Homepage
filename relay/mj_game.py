@@ -1,4 +1,4 @@
-"""실시간 게임 방 — mj-relay 데몬 안에서 함께 돈다.
+"""실시간 게임 방 (오목·오셀로·그림 맞추기·점 잇기) — mj-relay 데몬 안에서 함께 돈다.
 
 방 하나 = 링크(token)를 가진 사람들. 처음 앉은 사람이 플레이어, 나머지는 구경꾼.
 판은 서버가 들고 규칙도 서버가 판단한다 (차례·빈 칸·승패) → 브라우저는 보여 주기만.
@@ -623,7 +623,309 @@ class CatchLogic:
 		}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic}
+# ── 점 잇기 땅따먹기 ─────────────────────────
+
+class DotsLogic:
+	"""점 잇기 땅따먹기 (Dots and Boxes). 2~4명(컴퓨터 포함), 칸 3×3·5×5·7×7.
+	차례에 선 하나를 긋고, 네모의 마지막 변을 닫으면 그 칸을 먹고 한 번 더. 선이 다 그어지면 칸 많은 사람이 승리.
+	선: h[y*n+x] (가로, y 0..n, x 0..n-1), v[y*(n+1)+x] (세로, y 0..n-1, x 0..n) — 값은 그은 사람 번호(0~3), 안 그었으면 -1.
+	칸: boxes[y*n+x] = 먹은 사람 번호 또는 -1."""
+
+	kind = "dots"
+	SEATS = ("p1", "p2", "p3", "p4")
+	SIZES = (3, 5, 7)
+	BOT_DELAY = 0.8  # 컴퓨터가 두기 전 잠깐 (사람이 보고 따라올 수 있게)
+	BOT_NAME = "🤖 컴퓨터"
+
+	def __init__(self, rng=None):
+		import random as _random
+		self.rng = rng or _random.Random()
+		self.seats = {s: None for s in self.SEATS}  # pid 또는 'bot:p2'
+		self.names = {s: "" for s in self.SEATS}
+		self.bots = set()
+		self.wins = {s: 0 for s in self.SEATS}
+		self.size = 5
+		self.starter = 0
+		self.reset()
+		self.status = "waiting"
+
+	def reset(self):
+		n = self.size
+		self.h = [-1] * ((n + 1) * n)
+		self.v = [-1] * (n * (n + 1))
+		self.boxes = [-1] * (n * n)
+		self.status = "waiting"
+		self.turn = None
+		self.last = None
+		self.last_boxes = []
+		self.moves = 0
+		self.reason = ""
+		self.winners = []
+		self.bot_due = 0.0
+
+	# ── 판 계산 (컴퓨터 수 읽기에서도 쓰려고 배열을 받음) ──
+	def _sides(self, h, v, bx, by):
+		n = self.size
+		return (h[by * n + bx] >= 0) + (h[(by + 1) * n + bx] >= 0) + (v[by * (n + 1) + bx] >= 0) + (v[by * (n + 1) + bx + 1] >= 0)
+
+	def _adjacent(self, kind, x, y):
+		n = self.size
+		if kind == "h":
+			return [(x, y - 1)] * (y > 0) + [(x, y)] * (y < n)
+		return [(x - 1, y)] * (x > 0) + [(x, y)] * (x < n)
+
+	def _free_lines(self, h=None, v=None):
+		h, v, n = h or self.h, v or self.v, self.size
+		out = [("h", i % n, i // n) for i, o in enumerate(h) if o < 0]
+		out += [("v", i % (n + 1), i // (n + 1)) for i, o in enumerate(v) if o < 0]
+		return out
+
+	def _set(self, h, v, kind, x, y, who):
+		n = self.size
+		if kind == "h":
+			h[y * n + x] = who
+		else:
+			v[y * (n + 1) + x] = who
+
+	def _missing_side(self, h, v, bx, by):
+		n = self.size
+		if h[by * n + bx] < 0:
+			return ("h", bx, by)
+		if h[(by + 1) * n + bx] < 0:
+			return ("h", bx, by + 1)
+		if v[by * (n + 1) + bx] < 0:
+			return ("v", bx, by)
+		return ("v", bx + 1, by)
+
+	def order(self):
+		return [s for s in self.SEATS if self.seats[s]]
+
+	def seat_of(self, pid):
+		return next((s for s, p in self.seats.items() if p == pid and s not in self.bots), None)
+
+	def scores(self):
+		return {s: sum(1 for b in self.boxes if b == i) for i, s in enumerate(self.SEATS)}
+
+	# ── 한 수 ──
+	def _play(self, room, seat, kind, x, y):
+		who = self.SEATS.index(seat)
+		self._set(self.h, self.v, kind, x, y, who)
+		self.moves += 1
+		self.last = [kind, x, y]
+		got = []
+		for bx, by in self._adjacent(kind, x, y):
+			if self.boxes[by * self.size + bx] < 0 and self._sides(self.h, self.v, bx, by) == 4:
+				self.boxes[by * self.size + bx] = who
+				got.append([bx, by])
+		self.last_boxes = got
+		if not self._free_lines():
+			self._finish(room)
+			return
+		if not got:  # 칸을 못 먹으면 다음 사람, 먹으면 한 번 더
+			seats = self.order()
+			self.turn = seats[(seats.index(seat) + 1) % len(seats)]
+		self._arm_bot()
+
+	def _finish(self, room):
+		self.status = "over"
+		self.turn = None
+		sc = self.scores()
+		seats = self.order()
+		best = max(sc[s] for s in seats)
+		self.winners = [s for s in seats if sc[s] == best]
+		if len(self.winners) == 1:
+			w = self.winners[0]
+			self.wins[w] += 1
+			self.reason = f"{self.names[w]} 님이 {best}칸으로 이겼어요! (" + " · ".join(f"{self.names[s]} {sc[s]}" for s in seats) + ")"
+		else:
+			self.reason = "무승부! " + " · ".join(f"{self.names[s]} {sc[s]}" for s in seats)
+		room.notice(f"🏁 {self.reason}")
+
+	def _arm_bot(self):
+		if self.status == "playing" and self.turn in self.bots:
+			self.bot_due = time.time() + self.BOT_DELAY
+
+	# ── 컴퓨터 ──
+	def bot_line(self):
+		"""1) 닫을 수 있는 칸이 있으면 먹고  2) 없으면 어느 칸에도 세 번째 변을 만들지 않는 선
+		3) 그것도 없으면 상대가 이어서 먹을 칸 수가 가장 적은 선."""
+		free = self._free_lines()
+		take = [ln for ln in free if any(self._sides(self.h, self.v, bx, by) == 3 for bx, by in self._adjacent(*ln))]
+		if take:
+			return self.rng.choice(take)
+		safe = [ln for ln in free if all(self._sides(self.h, self.v, bx, by) < 2 for bx, by in self._adjacent(*ln))]
+		if safe:
+			return self.rng.choice(safe)
+		best, best_cost = [], None
+		for ln in free:
+			cost = self._giveaway(ln)
+			if best_cost is None or cost < best_cost:
+				best, best_cost = [ln], cost
+			elif cost == best_cost:
+				best.append(ln)
+		return self.rng.choice(best)
+
+	def _giveaway(self, line):
+		"""이 선을 그으면 다음 사람이 줄줄이 먹을 수 있는 칸 수 (탐욕스럽게 끝까지 먹는다고 침)."""
+		h, v, n = list(self.h), list(self.v), self.size
+		self._set(h, v, *line, 9)
+		taken = set()
+		while True:
+			box = next(((bx, by) for by in range(n) for bx in range(n) if (bx, by) not in taken and self._sides(h, v, bx, by) == 3), None)
+			if box is None:
+				return len(taken)
+			self._set(h, v, *self._missing_side(h, v, *box), 9)
+			for by in range(n):
+				for bx in range(n):
+					if (bx, by) not in taken and self.boxes[by * n + bx] < 0 and self._sides(h, v, bx, by) == 4:
+						taken.add((bx, by))
+
+	def tick(self, room, now):
+		if self.status != "playing" or self.turn not in self.bots or now < self.bot_due:
+			return False
+		self._play(room, self.turn, *self.bot_line())
+		return True
+
+	# ── 메시지 ──
+	def on_message(self, room, peer, data):
+		kind = data.get("type")
+		seat = self.seat_of(peer.pid)
+		if kind == "sit":
+			if seat:
+				return False, "이미 앉아 있어요."
+			if self.status == "playing":
+				return False, "판이 진행 중이에요. 끝나면 앉을 수 있어요."
+			free = [s for s in self.SEATS if not self.seats[s]]
+			want = data.get("seat")
+			target = want if want in free else (free[0] if free and want in (None, "any") else None)
+			if not target:
+				return False, "빈 자리가 없어요."
+			self.seats[target], self.names[target] = peer.pid, peer.name
+			room.notice(f"{peer.name} 님이 {self.SEATS.index(target) + 1}번 자리에 앉았어요.")
+			return True, None
+		if kind == "stand":
+			if not seat:
+				return False, None
+			if self.status == "playing":
+				return False, "판이 진행 중이에요. 그만하려면 '컴퓨터에게 맡기기'를 누르세요."
+			self.seats[seat], self.names[seat] = None, ""
+			room.notice(f"{peer.name} 님이 자리에서 일어났어요.")
+			return True, None
+		if kind == "add-bot":
+			if not seat:
+				return False, "먼저 자리에 앉으세요."
+			if self.status == "playing":
+				return False, "판이 끝나고 넣을 수 있어요."
+			free = [s for s in self.SEATS if not self.seats[s]]
+			if not free:
+				return False, "빈 자리가 없어요."
+			s = free[0]
+			n = 1 + sum(1 for b in self.bots if self.names[b].startswith(self.BOT_NAME))
+			self.seats[s], self.names[s] = f"bot:{s}", f"{self.BOT_NAME} {n}"
+			self.bots.add(s)
+			room.notice("🤖 컴퓨터가 들어왔어요.")
+			return True, None
+		if kind == "remove-bot":
+			s = data.get("seat")
+			if not seat or s not in self.bots or self.status == "playing":
+				return False, None
+			self.bots.discard(s)
+			self.seats[s], self.names[s] = None, ""
+			room.notice("🤖 컴퓨터가 나갔어요.")
+			return True, None
+		if kind == "size":
+			try:
+				size = int(data.get("size"))
+			except (TypeError, ValueError):
+				return False, None
+			if not seat or self.status == "playing" or size not in self.SIZES:
+				return False, None
+			self.size = size
+			self.reset()
+			room.notice(f"판 크기를 {size}×{size} 칸으로 바꿨어요.")
+			return True, None
+		if kind in ("start", "rematch"):
+			if not seat or self.status == "playing":
+				return False, None
+			seats = self.order()
+			if len(seats) < 2:
+				return False, "두 명 이상이어야 시작해요. 컴퓨터를 넣어도 돼요."
+			self.reset()
+			self.status = "playing"
+			self.turn = seats[self.starter % len(seats)]
+			self.starter += 1  # 다음 판은 다음 사람부터
+			self._arm_bot()
+			room.notice(f"{self.size}×{self.size} 판 시작! {self.names[self.turn]} 님부터예요.")
+			return True, None
+		if kind == "move":
+			if self.status != "playing":
+				return False, "아직 판이 시작되지 않았어요."
+			if seat != self.turn:
+				return False, "내 차례가 아니에요." if seat else "구경 중이에요."
+			line = data.get("line")
+			if not (isinstance(line, list) and len(line) == 3 and line[0] in ("h", "v")):
+				return False, None
+			try:
+				k, x, y = line[0], int(line[1]), int(line[2])
+			except (TypeError, ValueError):
+				return False, None
+			n = self.size
+			ok_range = (0 <= x < n and 0 <= y <= n) if k == "h" else (0 <= x <= n and 0 <= y < n)
+			if not ok_range or (k, x, y) not in self._free_lines():
+				return False, "이미 그은 선이에요."
+			self._play(room, seat, k, x, y)
+			return True, None
+		if kind == "resign":
+			# 여럿이 하는 판이라 그만두면 컴퓨터가 이어서 둠
+			if self.status != "playing" or not seat:
+				return False, None
+			self._to_bot(room, seat, f"{peer.name} 님 대신 컴퓨터가 이어서 둬요.")
+			return True, None
+		return False, None
+
+	def _to_bot(self, room, seat, text):
+		self.bots.add(seat)
+		self.seats[seat] = f"bot:{seat}"
+		self.names[seat] = f"🤖 {self.names[seat]}"[:16]
+		room.notice(text)
+		self._arm_bot()
+
+	def on_join(self, room, peer):
+		seat = self.seat_of(peer.pid)
+		if seat:
+			self.names[seat] = peer.name
+
+	def on_leave(self, room, pid):
+		seat = self.seat_of(pid)
+		if not seat:
+			return None
+		name = self.names[seat]
+		if self.status == "playing":
+			self._to_bot(room, seat, f"{name} 님이 나가서 컴퓨터가 대신 둬요.")
+			return None
+		self.seats[seat], self.names[seat] = None, ""
+		return f"{name} 님의 자리가 비었어요."
+
+	def snapshot(self, room, pid=None):
+		sc = self.scores()
+		return {
+			"size": self.size,
+			"h": self.h,
+			"v": self.v,
+			"boxes": self.boxes,
+			"status": self.status,
+			"turn": self.turn,
+			"last": self.last,
+			"last_boxes": self.last_boxes,
+			"move_count": self.moves,
+			"reason": self.reason,
+			"winners": self.winners,
+			"seats": {s: ({"name": self.names[s], "bot": s in self.bots, "online": s in self.bots or p in room.peers,
+						   "score": sc[s], "wins": self.wins[s]} if p else None) for s, p in self.seats.items()},
+		}
+
+
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic}
 
 
 @dataclass
