@@ -785,6 +785,22 @@ class AugOmokMoreCardsTestCase(unittest.TestCase):
 		self.assertEqual(len(logic.cells), n - 1)  # 한쪽 모서리 돌만 밀려 나감
 		self.assertIsNone(logic.at(9, 9))
 
+	def test_bot_waits_after_card_so_people_can_read(self):
+		import time
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		logic.on_message(room, b, {"type": "stand"})  # 판 중이라 못 일어남 → 직접 컴퓨터로
+		logic.bots.add("white")
+		self.mv(logic, room, a, 7, 7)
+		self.assertGreaterEqual(logic.bot_due - time.time(), self.A.BOT_DELAY - 0.2)
+		logic.hand["white"] = ["vital"]
+		logic.bot_act(room)  # 카드만 쓰고 아직 안 둠
+		self.assertEqual(logic.turn, "white")
+		self.assertEqual(logic.hand["white"], [])
+		self.assertGreater(logic.bot_due - time.time(), self.A.BOT_READ_DELAY - 0.5)
+		logic.bot_act(room)  # 다음 틱에 둠
+		self.assertEqual(logic.turn, "black")
+
 	def test_bot_games_still_finish_with_new_cards(self):
 		import random
 		from relay import mj_augomok as A
