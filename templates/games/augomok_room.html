@@ -227,14 +227,15 @@
         if (!S) return;
         const winSet = new Set((S.win_line || []).map(([x, y]) => `${x},${y}`));
         let animating = false;
-        // 잠긴 칸(🔒 금고, 해금 가능)·봉인된 칸(⛔ 시간 지나면 풀림)
+        // 잠긴 칸(🔒 금고, 해금 가능)·봉인된 칸(⛔ 시간 지나면 풀림)·씨앗(🌱)·시한폭탄(💣)
+        const LOCK_LOOK = { lock: ['rgba(234,179,8,0.28)', '🔒'], seal: ['rgba(239,68,68,0.25)', '⛔'], seed: ['rgba(34,197,94,0.25)', '🌱'], bomb: ['rgba(239,68,68,0.35)', '💣'] };
         (S.locks || []).forEach((l) => {
-            const cx = P(l.x), cy = P(l.y), half = CELL * 0.46;
-            ctx.fillStyle = l.kind === 'lock' ? 'rgba(234,179,8,0.28)' : 'rgba(239,68,68,0.25)';
+            const cx = P(l.x), cy = P(l.y), half = CELL * 0.46, [bg, ic] = LOCK_LOOK[l.kind] || LOCK_LOOK.seal;
+            ctx.fillStyle = bg;
             ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
             ctx.font = `${Math.round(CELL * 0.42)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(l.kind === 'lock' ? '🔒' : '⛔', cx, cy);
-            if (l.kind === 'seal') { ctx.fillStyle = '#b91c1c'; ctx.font = `700 ${Math.round(CELL * 0.24)}px sans-serif`; ctx.fillText(l.ttl, cx + half * 0.7, cy - half * 0.7); }
+            ctx.fillText(ic, cx, cy);
+            if (l.kind !== 'lock') { ctx.fillStyle = '#b91c1c'; ctx.font = `700 ${Math.round(CELL * 0.24)}px sans-serif`; ctx.fillText(l.ttl, cx + half * 0.7, cy - half * 0.7); }
         });
         if (S.hint) { const [hx, hy] = S.hint; const t = (Math.sin(now / 200) + 1) / 2; ctx.strokeStyle = `rgba(168,85,247,${0.5 + t * 0.5})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P(hx), P(hy), CELL * (0.42 + t * 0.12), 0, Math.PI * 2); ctx.stroke(); ctx.font = `${Math.round(CELL * 0.4)}px sans-serif`; ctx.fillText('🔮', P(hx), P(hy)); animating = true; }
         S.cells.forEach((c) => {
@@ -287,7 +288,7 @@
         const lock = (S.locks || []).find((l) => l.x === c[0] && l.y === c[1]);
         if (lock) {
             if (lock.kind === 'lock' && confirm(`🔒 잠긴 구역이에요. ${S.unlock_price}P 로 해금할까요? (턴은 쓰지 않아요)`)) send({ type: 'unlock', x: c[0], y: c[1] });
-            else if (lock.kind !== 'lock') toast('⛔ 봉인된 칸이에요. 시간이 지나면 풀려요.');
+            else if (lock.kind !== 'lock') toast({ seal: '⛔ 봉인된 칸이에요. 시간이 지나면 풀려요.', seed: `🌱 씨앗이 자라는 칸이에요. (${lock.ttl}턴 뒤 싹)`, bomb: `💣 시한폭탄! ${lock.ttl}턴 뒤 터져요` }[lock.kind] || '둘 수 없는 칸이에요.');
             return;
         }
         if (get(...c) && !S.stack_turns) { toast('빈칸에만 둘 수 있어요.'); return; }
@@ -296,7 +297,7 @@
     const targetHelp = (t) => ({ own: '내 돌을 고르세요', opp: '상대 돌을 고르세요', empty: '빈칸을 고르세요', any: '아무 칸이나 고르세요' }[t] || '');
 
     // ── 카드 ──
-    const durClass = (d) => (d === '영구' ? 'perm' : d?.startsWith('지속') ? 'timed' : d === '즉시' ? 'now' : 'once');
+    const durClass = (d) => (d?.startsWith('영구') ? 'perm' : d?.startsWith('지속') ? 'timed' : d === '즉시' ? 'now' : 'once');
     const durTag = (d) => `<span class="du ${durClass(d)}">${esc(d || '1회용')}</span>`;
     function cardHTML(c, extra = '') {
         return `<button type="button" class="card r-${c.rarity}" ${extra}><span class="rr">${RNAME[c.rarity]}</span><span class="ic">${c.icon}</span><span class="nm">${esc(c.name)}</span>${durTag(c.dur)}<span class="ds">${esc(c.desc)}</span>`;
@@ -304,7 +305,7 @@
     function renderHand() {
         const hand = S?.hand || [];
         $('ag-hand-txt').textContent = S ? `${hand.length}/${S.hand_max}장${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
-        const can = myTurn() && !S.used_card;
+        const can = myTurn() && !S.used_card && !S.freeze?.[mySeat];
         $('ag-hand').innerHTML = hand.length ? hand.map((c, i) => cardHTML(c, `data-use="${i}" ${can ? '' : 'disabled'}`).replace('class="card', `class="card ${picking && picking.id === c.id ? 'sel' : ''}`) + '</button>').join('') : '<p class="self-center text-[13px] text-[#8e8e93]">아직 없어요. 포인트를 모아 뽑아 보세요!</p>';
         $('ag-target').classList.toggle('hidden', !picking);
         if (picking) $('ag-target').innerHTML = `${picking.icon} <b>${esc(picking.name)}</b> — ${targetHelp(picking.target)} <button type="button" class="gm-btn ml-2" id="ag-cancel">취소</button>`;
@@ -320,7 +321,7 @@
     function renderShop() {
         const pts = S && mySeat ? S.points[mySeat] : 0;
         $('ag-points').textContent = S && mySeat ? `💰 ${pts}P` : '';
-        const can = myTurn() && !(S.extra && S.extra.first);
+        const can = myTurn() && !(S.extra && S.extra.first) && !S.freeze?.[mySeat];
         const full = S && (S.hand || []).length >= S.hand_max;
         $('ag-draw').disabled = !(can && pts >= (S?.random_price || 4) && !full);
         $('ag-draw').textContent = `🎰 무작위 뽑기 (${S?.random_price || 4}P)`;
@@ -473,13 +474,15 @@
         } else if (S.status === 'over') status = `🏁 ${S.reason}`;
         else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
         $('ag-status').textContent = status;
-        $('ag-life').textContent = S && S.status === 'playing' ? `새 돌 수명 ${S.current_life}턴 · ${S.next_grow}턴 뒤 +1${S.events_on ? ` · 중립 이벤트까지 ${S.next_event}턴` : ''}` : '';
+        $('ag-life').textContent = S && S.status === 'playing' ? `새 돌 수명 ${mySeat ? S.life_of[mySeat] : S.current_life}턴 · ${S.next_grow}턴 뒤 +1${S.events_on ? ` · 중립 이벤트까지 ${S.next_event}턴` : ''}` : '';
         $('ag-blind').classList.toggle('hidden', !(S && S.blind));
         if (S && S.blind) $('ag-blind').innerHTML = `🕶 암흑!<br><span style="font-size:15px;font-weight:600">${S.blind}턴 동안 돌이 하나도 안 보여요.<br>기억을 더듬어 두세요…</span>`;
         const flags = [];
         if (S?.gray) flags.push(`🩶 잿빛 세상 — 모든 돌이 회색, 내 돌을 기억하세요 (${S.gray}턴)`);
         if (S?.stack_turns) flags.push(`🥞 돌 업기 중 (${S.stack_turns}턴) — 돌 위에도 둘 수 있어요`);
         if (S?.hint) flags.push('🔮 AI 조언: 보라색으로 빛나는 칸이 최선의 수');
+        if (S?.opp_hand) flags.push(`👀 상대 손패: ${S.opp_hand.length ? S.opp_hand.map((c) => `${c.icon} ${c.name}`).join(', ') : '없음'}`);
+        if (mySeat && S?.freeze?.[mySeat] && myTurn()) flags.push('❄️ 얼었어요 — 이번 턴엔 돌만 둘 수 있어요');
         if (S?.skip?.length) flags.push(`😴 ${S.skip.map((x) => S.seats[x]?.name || x).join(', ')} 님 다음 턴 쉼`);
         $('ag-flags').textContent = flags.join(' · ');
         $('ag-events').checked = S ? S.events_on : true;

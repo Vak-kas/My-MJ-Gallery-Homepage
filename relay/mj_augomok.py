@@ -32,6 +32,11 @@ BOT_DELAY = 1.1
 EVENT_EVERY = 10      # 이만큼 턴(둘 합쳐)마다 중립 이벤트
 UNLOCK_PRICE = 3      # 잠긴 구역 해금 값 (턴을 쓰지 않음)
 BOT_NAME = "🤖 컴퓨터"
+LOCK_HELP = {
+	"seal": "봉인은 시간이 지나야 풀려요. (만능 열쇠로는 풀 수 있어요)",
+	"seed": "🌱 씨앗이 자라는 칸이에요.",
+	"bomb": "💣 시한폭탄이 설치된 칸이에요!",
+}
 
 # id: (등급, 아이콘, 이름, 설명, 대상) — 대상: none / own / opp / empty / any / instant
 CARDS = {
@@ -77,13 +82,31 @@ CARDS = {
 	"myreset": ("rare", "🔄", "나의 회귀", "내 돌을 모두 거두고 하나에 2P씩 돌려받아요. 내 턴부터 다시", "none"),
 	"quake": ("epic", "🌋", "지진", "판 위의 돌 중 무작위 4개가 사라져요 (누구 돌이든, 불멸 빼고)", "none"),
 	"grandreset": ("myth", "⏮", "대회귀", "판 전체를 처음으로 되돌려요. 내 턴부터 다시 시작", "none"),
+	"vital": ("common", "🌿", "생명의 뿌리", "이 판 내내: 앞으로 두는 내 돌이 1턴 더 버텨요 (여러 장 쓰면 겹쳐 쌓여요)", "none"),
+	"wither": ("rare", "🥀", "시듦", "이 판 내내: 상대가 앞으로 두는 돌이 1턴 덜 버텨요 (겹쳐 쌓임, 최소 3턴)", "none"),
+	"coupon": ("common", "🛍", "할인 쿠폰", "다음 골라 사기가 반값", "none"),
+	"peek": ("common", "👀", "엿보기", "3턴 동안 상대 손패가 보여요", "none"),
+	"seed": ("common", "🌱", "씨앗", "빈칸에 심으면 내 턴 2번 뒤 내 돌로 자라나요 (그동안 아무도 못 둬요)", "empty"),
+	"clover": ("rare", "🍀", "네잎클로버", "다음 무작위 뽑기 등급이 한 단계 올라가요", "none"),
+	"mirror": ("rare", "🪞", "거울", "상대가 마지막에 둔 돌의 정반대(점대칭) 칸에 내 돌이 생겨요", "none"),
+	"clone": ("rare", "🧬", "복제", "내 돌 하나를, 줄이 가장 길어지는 옆칸에 하나 더 복사해요", "own"),
+	"freeze": ("rare", "❄️", "동결", "상대의 다음 턴엔 카드 쓰기·뽑기·사기가 막혀요 (돌만 둘 수 있어요)", "none"),
+	"timebomb": ("epic", "💣", "시한폭탄", "빈칸에 설치하면 내 턴 3번 뒤 둘레 3×3 의 돌이 터져요 (내 돌도!)", "empty"),
+	"ghost": ("epic", "👻", "유령 돌", "상대 화면에 안 보이는 내 돌을 하나 더 둬요. 상대가 모르고 그 칸에 두면 깨져요", "empty"),
+	"vortex": ("epic", "🌀", "소용돌이", "고른 칸 둘레 8칸의 돌이 시계 방향으로 한 칸씩 돌아요", "any"),
+	"swap": ("epic", "🔀", "손패 바꾸기", "내 손패와 상대 손패를 통째로 바꿔요", "none"),
+	"jackpot": ("epic", "💰", "잭팟", "내 포인트가 두 배 (최대 +15P)", "none"),
+	"thief": ("legend", "⌛", "시간 도둑", "상대 돌 모두 -2턴, 내 돌 모두 +2턴", "none"),
+	"tsunami": ("myth", "🌊", "해일", "판의 모든 돌이 무작위 한 방향으로 한 칸씩 밀려나요 (판 밖으로 밀리면 사라짐, 불멸도)", "none"),
 }
+MIN_LIFE = 3  # 시듦으로 깎여도 이 아래로는 안 내려감
 BY_RARITY = {r: [k for k, v in CARDS.items() if v[0] == r] for r in RARITIES}
 DIRS = ((1, 0), (0, 1), (1, 1), (1, -1))
 
 
 # 지속(N턴)·영구(이 판 내내) 카드 — 나머지는 1회용
-TIMED = {"quick": 4, "compound": 3, "memory": 4, "seal": 4, "dark": 2, "oracle": 3, "stack": 3}
+TIMED = {"quick": 4, "compound": 3, "memory": 4, "seal": 4, "dark": 2, "oracle": 3, "stack": 3, "peek": 3}
+STACKABLE = {"vital", "wither"}  # 영구 + 여러 장 겹쳐 쌓임
 ROULETTE = [  # (확률 가중치, 아이콘, 이름)
 	(25, "💰", "+6P"),
 	(20, "🌪", "상대 돌 무작위 2개 날림"),
@@ -98,7 +121,7 @@ PERMANENT = {"saver", "fifth", "sturdy"}
 
 def card_info(cid):
 	r, icon, name, desc, target = CARDS[cid]
-	dur = "영구" if cid in PERMANENT else f"지속 {TIMED[cid]}턴" if cid in TIMED else "즉시" if target == "instant" else "1회용"
+	dur = "영구·중첩" if cid in STACKABLE else "영구" if cid in PERMANENT else f"지속 {TIMED[cid]}턴" if cid in TIMED else "즉시" if target == "instant" else "1회용"
 	return {"id": cid, "rarity": r, "icon": icon, "name": name, "desc": desc, "target": target, "price": PRICE[r], "dur": dur}
 
 
@@ -133,6 +156,10 @@ class AugOmokLogic:
 		self.timed = {s: {} for s in self.SEATS}  # 지속 효과 → 남은 턴 (복리 등)
 		self.passives = {s: [] for s in self.SEATS}  # 영구 효과 (이 판 내내)
 		self.place_count = {s: 0 for s in self.SEATS}
+		self.life_bonus = {s: 0 for s in self.SEATS}  # 생명의 뿌리(+)·시듦(-) 누적
+		self.coupon = {s: False for s in self.SEATS}
+		self.clover = {s: False for s in self.SEATS}
+		self.freeze = {s: 0 for s in self.SEATS}      # 동결: 이 자리 다음 턴엔 카드·뽑기 금지
 		self.bonus_now = False
 		self.dark = {s: 0 for s in self.SEATS}    # 암흑: 이 자리 화면에 돌이 안 보이는 남은 턴 (그 자리 턴 기준)
 		self.memory = 0                            # 잿빛 세상: 모든 돌이 회색으로 보이는 남은 턴 (둘 합쳐)
@@ -150,6 +177,14 @@ class AugOmokLogic:
 
 	def current_life(self):
 		return self.life + self.turns // GROW_EVERY
+
+	def life_for(self, s):
+		"""s 가 지금 새로 두는 돌의 수명 (시간 증가 + 단단한 돌 + 생명의 뿌리/시듦)."""
+		return max(MIN_LIFE, self.current_life() + (1 if "sturdy" in self.passives[s] else 0) + self.life_bonus[s])
+
+	def _new_stone(self, s, x, y, **extra):
+		self.cells[self.key(x, y)] = {"o": self.color(s), "ttl": self.life_for(s), "by": s, "perm": False, **extra}
+		self.placed[s].append([x, y])
 
 	# ── 공통 ──
 	def seat_of(self, pid):
@@ -222,9 +257,7 @@ class AugOmokLogic:
 
 	# ── 돌 두기 ──
 	def _place(self, room, s, x, y, *, forced=False):
-		life = self.current_life() + (1 if "sturdy" in self.passives[s] else 0)
-		self.cells[self.key(x, y)] = {"o": self.color(s), "ttl": life, "by": s, "perm": False}
-		self.placed[s].append([x, y])
+		self._new_stone(s, x, y)
 		self.last = {"type": "place", "seat": s, "cell": [x, y], "forced": forced}
 		if not forced:
 			window = QUICK_WINDOW if self.quick[s] else FAST_WINDOW
@@ -263,11 +296,37 @@ class AugOmokLogic:
 			self.memory -= 1
 		if self.stack_turns:
 			self.stack_turns -= 1
+		if self.freeze[s]:
+			self.freeze[s] -= 1
+		grown, boom = [], []
 		for k, lk in list(self.locks.items()):
 			if lk["kind"] == "seal":
 				lk["ttl"] -= 1
 				if lk["ttl"] <= 0:
 					del self.locks[k]
+			elif lk["kind"] in ("seed", "bomb") and lk["seat"] == s:
+				lk["ttl"] -= 1
+				if lk["ttl"] <= 0:
+					del self.locks[k]
+					(grown if lk["kind"] == "seed" else boom).append(k)
+		for k in boom:  # 시한폭탄: 둘레 3×3 의 돌(불멸 빼고)이 모두 터짐
+			x, y = map(int, k.split(","))
+			hit = []
+			for dx in (-1, 0, 1):
+				for dy in (-1, 0, 1):
+					k2 = self.key(x + dx, y + dy)
+					if k2 in self.cells and not self.cells[k2]["perm"]:
+						del self.cells[k2]
+						hit.append([x + dx, y + dy])
+			room.notice(f"💣 쾅! {self.names[s]} 님의 시한폭탄이 터졌어요. ({len(hit)}개)")
+			room.emit({"type": "event", "icon": "💣", "name": "쾅!", "desc": f"시한폭탄이 터져 돌 {len(hit)}개가 날아갔어요", "cells": hit + [[x, y]]})
+		for k in grown:  # 씨앗: 내 돌로 자라남
+			x, y = map(int, k.split(","))
+			if k not in self.cells:
+				self._new_stone(s, x, y)
+				room.emit({"type": "event", "icon": "🌱", "name": "싹이 텄어요!", "desc": f"{self.names[s]} 님의 씨앗이 돌로 자랐어요", "cells": [[x, y]]})
+				if self._check_win(room, s):
+					return
 		self.turns += 1
 		self.extra = None
 		self.used_card = False
@@ -316,6 +375,9 @@ class AugOmokLogic:
 
 	def _roll(self, s, count_pity=True):
 		rarity = self.rng.choices(RARITIES, weights=[RARITY_WEIGHTS[r] for r in RARITIES])[0]
+		if count_pity and self.clover[s]:  # 네잎클로버: 한 단계 위로
+			self.clover[s] = False
+			rarity = RARITIES[min(len(RARITIES) - 1, RARITIES.index(rarity) + 1)]
 		if count_pity:
 			if self.pity[s] >= PITY - 1 and RARITIES.index(rarity) < 2:
 				rarity = self.rng.choices(("epic", "legend", "myth"), weights=(70, 24, 6))[0]
@@ -399,7 +461,7 @@ class AugOmokLogic:
 	def _act_unlock(self, room, seat, x, y):
 		lk = self.locks.get(self.key(x, y))
 		if not lk or lk["kind"] != "lock":
-			return False, "잠긴 칸이 아니에요." if not lk else "봉인은 시간이 지나야 풀려요. (만능 열쇠로는 풀 수 있어요)"
+			return False, "잠긴 칸이 아니에요." if not lk else LOCK_HELP.get(lk["kind"], "")
 		if self.points[seat] < UNLOCK_PRICE:
 			return False, f"해금하려면 {UNLOCK_PRICE}P 가 필요해요."
 		self.points[seat] -= UNLOCK_PRICE
@@ -428,6 +490,8 @@ class AugOmokLogic:
 		o = self.other(s)
 		kind = CARDS[cid][4]
 		cell = None
+		if self.freeze[s]:
+			return "❄️ 얼어 있어서 이번 턴엔 카드를 못 써요."
 		if kind in ("own", "opp", "empty", "any"):
 			try:
 				tx, ty = int(target[0]), int(target[1])
@@ -446,6 +510,7 @@ class AugOmokLogic:
 			return "이미 한 번 더 두기를 쓰는 중이에요."
 		# 효과
 		affected = []
+		consumed = False
 		if cid == "candle":
 			cell["ttl"] += 3
 			affected = [[tx, ty]]
@@ -572,7 +637,7 @@ class AugOmokLogic:
 		elif cid == "duel":
 			a, b = self.rng.randint(1, 6), self.rng.randint(1, 6)
 			if a > b:
-				cell.update(o=self.color(s), by=s, ttl=self.current_life(), perm=False, h=1)
+				cell.update(o=self.color(s), by=s, ttl=self.life_for(s), perm=False, h=1)
 				text = f"승리! 그 칸을 뺏었어요"
 				affected = [[tx, ty]]
 			elif a < b:
@@ -611,8 +676,10 @@ class AugOmokLogic:
 			for x in self.SEATS:
 				self.points[x] = max(0, self.points[x] - 4)
 		elif cid == "key":
-			affected = [list(map(int, k.split(","))) for k in self.locks]
-			self.locks.clear()
+			opened = [k for k, v in self.locks.items() if v["kind"] in ("lock", "seal")]
+			for k in opened:
+				del self.locks[k]
+			affected = [list(map(int, k.split(","))) for k in opened]
 		elif cid == "memory":
 			self.memory = TIMED["memory"]
 		elif cid == "seal":
@@ -639,6 +706,81 @@ class AugOmokLogic:
 			self.points[s] += 2 * len(mine)
 			self.placed[s] = []
 			self.turn_started = time.time()  # 내 턴부터 다시 (빠른 두기도 다시)
+		elif cid in STACKABLE:
+			who = s if cid == "vital" else o
+			self.life_bonus[who] += 1 if cid == "vital" else -1
+		elif cid == "coupon":
+			if self.coupon[s]:
+				return "이미 할인 쿠폰이 있어요."
+			self.coupon[s] = True
+		elif cid == "peek":
+			self.timed[s]["peek"] = TIMED["peek"]
+		elif cid in ("seed", "timebomb"):
+			kind2 = "seed" if cid == "seed" else "bomb"
+			self.locks[self.key(tx, ty)] = {"kind": kind2, "ttl": 2 if cid == "seed" else 3, "region": 0, "seat": s}
+			affected = [[tx, ty]]
+		elif cid == "clover":
+			if self.clover[s]:
+				return "이미 네잎클로버가 있어요."
+			self.clover[s] = True
+		elif cid == "mirror":
+			if not self.placed[o]:
+				return "상대가 아직 돌을 두지 않았어요."
+			mx, my = SIZE - 1 - self.placed[o][-1][0], SIZE - 1 - self.placed[o][-1][1]
+			if not self.empty(mx, my):
+				return "거울 칸(정반대 칸)이 비어 있지 않아요."
+			self._new_stone(s, mx, my)
+			affected = [[mx, my]]
+		elif cid == "clone":
+			near = [(tx + dx, ty + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx or dy) and self.empty(tx + dx, ty + dy)]
+			if not near:
+				return "그 돌 둘레에 빈칸이 없어요."
+			cx, cy = max(near, key=lambda p: (self._cell_score(p[0], p[1], self.color(s)), self.rng.random()))
+			self._new_stone(s, cx, cy)
+			affected = [[tx, ty], [cx, cy]]
+		elif cid == "freeze":
+			self.freeze[o] = 1
+		elif cid == "ghost":
+			self._new_stone(s, tx, ty, ghost=True)
+			affected = [[tx, ty]]
+		elif cid == "vortex":
+			if not (1 <= tx < SIZE - 1 and 1 <= ty < SIZE - 1):
+				return "가장자리가 아닌 칸을 골라 주세요."
+			ring = [(tx + dx, ty + dy) for dx, dy in ((-1, -1), (0, -1), (1, -1), (1, 0), (1, 1), (0, 1), (-1, 1), (-1, 0))]
+			ring = [p for p in ring if self.key(*p) not in self.locks]
+			vals = [self.cells.pop(self.key(*p), None) for p in ring]
+			for i, v in enumerate(vals):
+				if v is not None:
+					nx, ny = ring[(i + 1) % len(ring)]
+					self.cells[self.key(nx, ny)] = v
+					affected.append([nx, ny])
+		elif cid == "swap":
+			self.hand[s].remove(cid)
+			consumed = True
+			self.hand[s], self.hand[o] = self.hand[o], self.hand[s]
+		elif cid == "jackpot":
+			self.points[s] += min(self.points[s], 15)
+		elif cid == "thief":
+			for k, v in self.cells.items():
+				if v["perm"] or v["o"] not in ("b", "w"):
+					continue
+				v["ttl"] += 2 if v["o"] == self.color(s) else -2
+				affected.append(list(map(int, k.split(","))))
+		elif cid == "tsunami":
+			dx, dy, label = self.rng.choice(((1, 0, "오른쪽"), (-1, 0, "왼쪽"), (0, 1, "아래"), (0, -1, "위")))
+			moved = {}
+			for k, v in self.cells.items():
+				x, y = map(int, k.split(","))
+				nx, ny = x + dx, y + dy
+				if 0 <= nx < SIZE and 0 <= ny < SIZE:
+					moved[self.key(nx, ny)] = v
+					affected.append([nx, ny])
+			self.cells = moved
+			for k in list(self.locks):
+				if k in self.cells:
+					del self.locks[k]
+			self.placed = {x: [] for x in self.SEATS}
+			room.emit({"type": "event", "icon": "🌊", "name": "해일!", "desc": f"모든 돌이 {label}으로 한 칸 밀려났어요"})
 		elif cid == "grandreset":
 			affected = [list(map(int, k.split(","))) for k in self.cells]
 			self.cells.clear()
@@ -649,15 +791,18 @@ class AugOmokLogic:
 		for k, v in list(self.cells.items()):
 			if v["ttl"] <= 0 and not v["perm"]:
 				del self.cells[k]
-		self.hand[s].remove(cid)
+		if not consumed:
+			self.hand[s].remove(cid)
 		self.used_card = True
 		info = card_info(cid)
 		self.last = {"type": "use", "seat": s, "card": cid, "cells": affected}
 		room.emit({"type": "use", "seat": s, "card": info, "cells": affected, "target": [tx, ty] if cell is not None or kind in ("empty", "any") else None})
 		room.notice(f"{info['icon']} {self.names[s]} 님이 '{info['name']}' 을(를) 썼어요!" + (" (신화)" if info["rarity"] == "myth" else ""))
 		# 내 돌이 늘어난 카드(강탈·지배자)는 바로 다섯 줄 확인
-		if cid in ("steal", "ruler", "joker", "duel"):
+		if cid in ("steal", "ruler", "joker", "duel", "mirror", "clone", "ghost", "thief"):
 			self._check_win(room, s)
+		elif cid in ("vortex", "tsunami"):  # 돌이 움직이면 둘 다 확인 (쓴 사람 먼저)
+			self._check_win(room, s) or self._check_win(room, o)
 		return None
 
 	# ── 메시지 ──
@@ -766,8 +911,13 @@ class AugOmokLogic:
 	def _act_move(self, room, seat, x, y):
 		lk = self.locks.get(self.key(x, y))
 		if lk:
-			return False, f"잠긴 칸이에요. {UNLOCK_PRICE}P 로 해금하세요." if lk["kind"] == "lock" else "봉인된 칸이에요. 시간이 지나면 풀려요."
+			return False, f"잠긴 칸이에요. {UNLOCK_PRICE}P 로 해금하세요." if lk["kind"] == "lock" else "봉인된 칸이에요. 시간이 지나면 풀려요." if lk["kind"] == "seal" else LOCK_HELP[lk["kind"]]
 		target = self.at(x, y)
+		if target and target.get("ghost") and target["by"] != seat:  # 모르고 유령 돌 칸에 두면 유령이 깨짐
+			del self.cells[self.key(x, y)]
+			room.notice(f"👻 {self.names[seat]} 님이 숨어 있던 유령 돌을 깨뜨렸어요!")
+			room.emit({"type": "event", "icon": "👻", "name": "유령 돌이 깨졌어요!", "desc": "보이지 않던 돌이 거기 있었어요", "cells": [[x, y]]})
+			target = None
 		if target and self.stack_turns and target["o"] in ("b", "w") and not target["perm"] and target.get("h", 1) < 2:
 			return self._act_stack(room, seat, x, y, target)
 		if not self.empty(x, y):
@@ -795,7 +945,7 @@ class AugOmokLogic:
 	def _act_stack(self, room, seat, x, y, target):
 		"""돌 업기 중: 내 돌 위 → 그 칸 2개, 상대 돌 위 → 그 칸을 뺏음. 돌 하나 둔 것으로 침."""
 		mine = target["o"] == self.color(seat)
-		life = self.current_life() + (1 if "sturdy" in self.passives[seat] else 0)
+		life = self.life_for(seat)
 		if mine:
 			target.update(h=2, ttl=max(target["ttl"], life))
 		else:
@@ -810,9 +960,15 @@ class AugOmokLogic:
 		self._end_turn(room)
 		return True, None
 
+	def price_for(self, s, cid):
+		p = PRICE[CARDS[cid][0]]
+		return (p + 1) // 2 if self.coupon[s] else p
+
 	def _act_draw(self, room, seat):
 		if self.extra and self.extra.get("first"):
 			return False, "두 번째 돌을 먼저 두세요."
+		if self.freeze[seat]:
+			return False, "❄️ 얼어 있어서 이번 턴엔 뽑을 수 없어요."
 		if self.points[seat] < RANDOM_PRICE:
 			return False, f"무작위 뽑기는 {RANDOM_PRICE}포인트가 필요해요."
 		if len(self.hand[seat]) >= HAND_MAX:
@@ -828,13 +984,17 @@ class AugOmokLogic:
 			return False, "두 번째 돌을 먼저 두세요."
 		if not 0 <= i < len(self.shop[seat]):
 			return False, None
+		if self.freeze[seat]:
+			return False, "❄️ 얼어 있어서 이번 턴엔 살 수 없어요."
 		cid = self.shop[seat][i]
-		price = PRICE[CARDS[cid][0]]
+		price = self.price_for(seat, cid)
 		if self.points[seat] < price:
 			return False, f"'{CARDS[cid][2]}' 은(는) {price}포인트예요."
 		if len(self.hand[seat]) >= HAND_MAX and CARDS[cid][4] != "instant":
 			return False, f"손에는 {HAND_MAX}장까지예요. 먼저 한 장 쓰세요."
 		self.points[seat] -= price
+		if self.coupon[seat]:
+			self.coupon[seat] = False
 		self.shop[seat].pop(i)
 		self._gain_card(room, seat, cid, "buy")
 		self.last = {"type": "buy", "seat": seat}
@@ -923,7 +1083,7 @@ class AugOmokLogic:
 		if not self.used_card and hand:
 			pick, target = None, None
 			if danger >= 3:
-				for cid in ("ruler", "grandreset", "blackhole", "steal", "gust", "sleep", "chain", "rewind", "puppet", "seal", "undo", "quake", "dark", "eclipse", "breeze"):
+				for cid in ("ruler", "grandreset", "blackhole", "steal", "thief", "gust", "sleep", "chain", "rewind", "puppet", "seal", "undo", "quake", "dark", "eclipse", "breeze"):
 					if cid in hand and not (cid == "grandreset" and (danger < 4 or self._threat(s) >= 3)):
 						pick = cid
 						break
@@ -933,14 +1093,14 @@ class AugOmokLogic:
 					far = [(x, y) for x in (0, SIZE - 1) for y in (0, SIZE - 1) if self.empty(x, y)]
 					target = list(far[0]) if far else None
 			if not pick:
-				for cid in ("sturdy", "fifth", "saver", "compound", "double", "twin", "joker", "hourglass", "eternal", "candle", "quick", "pickpocket", "key", "rockfall", "wall"):
-					if cid in hand and (cid not in ("eternal", "candle") or self.stones_of(s)) and not (cid == "pickpocket" and self.points[o] < 2) and not (cid == "key" and not self.locks) \
+				for cid in ("sturdy", "vital", "wither", "fifth", "saver", "compound", "double", "twin", "joker", "clone", "ghost", "thief", "jackpot", "hourglass", "eternal", "candle", "seed", "clover", "coupon", "freeze", "quick", "pickpocket", "key", "rockfall", "wall"):
+					if cid in hand and (cid not in ("eternal", "candle", "clone") or self.stones_of(s)) and not (cid == "clover" and self.clover[s]) and not (cid == "coupon" and self.coupon[s]) and not (cid == "pickpocket" and self.points[o] < 2) and not (cid == "key" and not self.locks) \
 							and cid not in self.passives[s]:
 						pick = cid
 						break
-				if pick in ("eternal", "candle"):
+				if pick in ("eternal", "candle", "clone"):
 					target = list(map(int, self._danger_stones(s, 1)[0].split(",")))
-				elif pick in ("joker", "wall"):
+				elif pick in ("joker", "wall", "ghost", "seed"):
 					cell, _ = self._best_cell(s)
 					target = list(cell)
 			if pick and (CARDS[pick][4] in ("none",) or target):
@@ -950,7 +1110,7 @@ class AugOmokLogic:
 		_, v = self._best_cell(s)
 		calm = danger <= 2 and v < 4000
 		if calm and len(hand) < HAND_MAX and not self.extra:
-			affordable = [i for i, cid in enumerate(self.shop[s]) if PRICE[CARDS[cid][0]] <= self.points[s] and RARITIES.index(CARDS[cid][0]) >= 2]
+			affordable = [i for i, cid in enumerate(self.shop[s]) if self.price_for(s, cid) <= self.points[s] and RARITIES.index(CARDS[cid][0]) >= 2]
 			if affordable and self.rng.random() < 0.5:
 				self._act_buy(room, s, affordable[0])
 				return
@@ -985,6 +1145,8 @@ class AugOmokLogic:
 		if not blind:
 			for k, v in self.cells.items():
 				x, y = map(int, k.split(","))
+				if v.get("ghost") and v["by"] != me and not over:  # 유령 돌은 둔 사람에게만 보임
+					continue
 				cells.append({"x": x, "y": y, "o": "g", "ttl": None, "perm": False, "by": None} if gray else {"x": x, "y": y, **v})
 		return {
 			"size": SIZE,
@@ -1000,14 +1162,20 @@ class AugOmokLogic:
 			"used_card": self.used_card, "extra": self.extra, "forced": self.forced if self.forced and me == self.other(self.forced["seat"]) else None,
 			"points": self.points, "hand_count": {s: len(self.hand[s]) for s in self.SEATS},
 			"hand": [card_info(c) for c in self.hand[me]] if me else [],
-			"shop": [card_info(c) for c in self.shop[me]] if me else [],
+			"shop": [{**card_info(c), "price": self.price_for(me, c)} for c in self.shop[me]] if me else [],
+			"opp_hand": [card_info(c) for c in self.hand[self.other(me)]] if me and self.timed[me].get("peek") else None,
+			"life_of": {x: self.life_for(x) for x in self.SEATS}, "freeze": self.freeze,
 			"pity": self.pity[me] if me else 0, "pity_max": PITY,
 			"random_price": RANDOM_PRICE, "hand_max": HAND_MAX,
 			"odds": RARITY_WEIGHTS, "prices": PRICE,
 			"quick": self.quick,
 			"effects": {x: ([{"id": c, "icon": CARDS[c][1], "name": CARDS[c][2], "dur": "영구"} for c in self.passives[x]]
 							+ [{"id": c, "icon": CARDS[c][1], "name": CARDS[c][2], "dur": f"{n}턴 남음"} for c, n in self.timed[x].items()]
-							+ ([{"id": "quick", "icon": "⚡", "name": "번개손", "dur": f"{self.quick[x]}턴 남음"}] if self.quick[x] else []))
+							+ ([{"id": "quick", "icon": "⚡", "name": "번개손", "dur": f"{self.quick[x]}턴 남음"}] if self.quick[x] else [])
+							+ ([{"id": "vital", "icon": "🌿" if self.life_bonus[x] > 0 else "🥀", "name": "돌 수명", "dur": f"{self.life_bonus[x]:+d}턴 (영구)"}] if self.life_bonus[x] else [])
+							+ ([{"id": "coupon", "icon": "🛍", "name": "할인 쿠폰", "dur": "다음 구매 반값"}] if self.coupon[x] else [])
+							+ ([{"id": "clover", "icon": "🍀", "name": "네잎클로버", "dur": "다음 뽑기 +1등급"}] if self.clover[x] else [])
+							+ ([{"id": "freeze", "icon": "❄️", "name": "동결", "dur": "다음 턴 카드·뽑기 금지"}] if self.freeze[x] else []))
 						for x in self.SEATS},
 			"place_count": self.place_count,
 			"seats": {s: ({"name": self.names[s], "bot": s in self.bots, "online": s in self.bots or p in room.peers, "wins": self.wins[s]} if p else None)

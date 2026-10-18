@@ -668,6 +668,144 @@ class AugOmokTestCase(unittest.TestCase):
 		self.assertTrue(logic.cells or logic.hand["white"])
 
 
+class AugOmokMoreCardsTestCase(unittest.TestCase):
+	setup = AugOmokTestCase.setup
+	mv = AugOmokTestCase.mv
+	give = AugOmokTestCase.give
+
+	def use(self, logic, room, peer, card, target=None):
+		seat = logic.seat_of(peer.pid)
+		self.give(logic, seat, card)
+		logic.used_card = False
+		return logic.on_message(room, peer, {"type": "use", "card": card, **({"target": target} if target else {})})
+
+	def test_vital_and_wither_stack_permanently(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		base = logic.current_life()
+		self.use(logic, room, a, "vital")
+		self.use(logic, room, a, "vital")
+		self.use(logic, room, a, "wither")
+		self.assertEqual(logic.life_for("black"), base + 2)
+		self.assertEqual(logic.life_for("white"), base - 1)
+		self.mv(logic, room, a, 7, 7)
+		self.assertEqual(logic.at(7, 7)["ttl"], base + 2 - 1)  # 흑 턴 하나 끝남
+		self.mv(logic, room, b, 0, 0)
+		self.assertEqual(logic.at(0, 0)["ttl"], base - 1 - 1)
+		for _ in range(5):  # 시듦은 최소 수명 아래로는 못 깎음
+			logic.life_bonus["white"] -= 1
+		self.assertEqual(logic.life_for("white"), self.A.MIN_LIFE)
+		snap = logic.snapshot(room, "a")
+		self.assertEqual(snap["life_of"]["black"], base + 2)
+		self.assertTrue(any("수명" in e["name"] for e in snap["effects"]["black"]))
+
+	def test_coupon_clover_peek_freeze_swap_jackpot(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		self.use(logic, room, a, "coupon")
+		cid = logic.shop["black"][0]
+		full = self.A.PRICE[self.A.CARDS[cid][0]]
+		self.assertEqual(logic.snapshot(room, "a")["shop"][0]["price"], (full + 1) // 2)
+		self.use(logic, room, a, "clover")
+		logic.rng.choices = lambda *aa, **kk: ["common"]  # 일반이 나와도 한 단계 위(희귀)
+		self.assertEqual(self.A.CARDS[logic._roll("black")][0], "rare")
+		self.assertFalse(logic.clover["black"])
+		del logic.rng.choices
+		self.use(logic, room, a, "peek")
+		logic.hand["white"] = ["gust"]
+		self.assertEqual([c["id"] for c in logic.snapshot(room, "a")["opp_hand"]], ["gust"])
+		self.assertIsNone(logic.snapshot(room, "b")["opp_hand"])
+		logic.points["black"] = 4
+		self.use(logic, room, a, "jackpot")
+		self.assertEqual(logic.points["black"], 8)
+		logic.hand["black"] = ["swap", "candle"]
+		logic.used_card = False
+		logic.on_message(room, a, {"type": "use", "card": "swap"})
+		self.assertEqual(logic.hand["black"], ["gust"])
+		self.assertEqual(logic.hand["white"], ["candle"])
+		self.use(logic, room, a, "freeze")
+		self.mv(logic, room, a, 7, 7)
+		logic.points["white"] = 20
+		self.assertIn("얼어", logic.on_message(room, b, {"type": "draw"})[1])
+		self.assertIn("얼어", logic.on_message(room, b, {"type": "use", "card": "candle"})[1])
+		self.assertEqual(self.mv(logic, room, b, 0, 0), (True, None))  # 돌은 둘 수 있음
+		self.mv(logic, room, a, 7, 8)
+		self.assertEqual(logic.freeze["white"], 0)  # 한 턴만
+
+	def test_seed_and_timebomb(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		self.use(logic, room, a, "seed", [3, 3])
+		self.assertIn("씨앗", self.mv(logic, room, a, 3, 3)[1])
+		self.use(logic, room, a, "timebomb", [10, 10])
+		logic.cells[logic.key(11, 11)] = {"o": "w", "ttl": 9, "by": "white", "perm": False}
+		logic.cells[logic.key(9, 10)] = {"o": "b", "ttl": 9, "by": "black", "perm": False}
+		for i in range(3):
+			self.mv(logic, room, a, 0, i * 2)
+			if i == 1:
+				self.assertEqual(logic.at(3, 3)["o"], "b")  # 내 턴 2번 뒤 싹
+			self.mv(logic, room, b, 14, i * 2)
+		self.assertIsNone(logic.at(11, 11))
+		self.assertIsNone(logic.at(9, 10))  # 내 돌도 터짐
+		self.assertNotIn(logic.key(10, 10), logic.locks)
+
+	def test_mirror_clone_ghost(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		self.mv(logic, room, a, 7, 7)
+		self.mv(logic, room, b, 2, 3)
+		self.use(logic, room, a, "mirror")
+		self.assertEqual(logic.at(12, 11)["o"], "b")
+		self.use(logic, room, a, "clone", [7, 7])
+		self.assertEqual(len(logic.stones_of("black")), 3)
+		self.use(logic, room, a, "ghost", [0, 14])
+		self.assertTrue(logic.at(0, 14)["ghost"])
+		self.assertFalse(any((c["x"], c["y"]) == (0, 14) for c in logic.snapshot(room, "b")["cells"]))
+		self.assertTrue(any((c["x"], c["y"]) == (0, 14) for c in logic.snapshot(room, "a")["cells"]))
+		self.mv(logic, room, a, 14, 0)
+		self.assertEqual(self.mv(logic, room, b, 0, 14), (True, None))  # 모르고 둠 → 유령 깨짐, 백 돌
+		self.assertEqual(logic.at(0, 14)["o"], "w")
+		self.assertTrue(any(e.get("icon") == "👻" for e in room.events))
+
+	def test_vortex_thief_tsunami(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		logic.cells[logic.key(4, 5)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}  # 위
+		self.use(logic, room, a, "vortex", [5, 6])
+		self.assertIsNone(logic.at(4, 5))
+		self.assertEqual(logic.at(5, 5)["o"], "w")  # 시계 방향 한 칸
+		logic.cells[logic.key(9, 9)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		self.use(logic, room, a, "thief")
+		self.assertEqual(logic.at(9, 9)["ttl"], 7)
+		self.assertEqual(logic.at(5, 5)["ttl"], 3)
+		logic.cells[logic.key(0, 0)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		logic.cells[logic.key(14, 14)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		n = len(logic.cells)
+		self.use(logic, room, a, "tsunami")
+		self.assertEqual(len(logic.cells), n - 1)  # 한쪽 모서리 돌만 밀려 나감
+		self.assertIsNone(logic.at(9, 9))
+
+	def test_bot_games_still_finish_with_new_cards(self):
+		import random
+		from relay import mj_augomok as A
+		done = 0
+		for seed in range(12):
+			logic, room = A.AugOmokLogic(rng=random.Random(seed)), _EmitRoom()
+			for s in A.AugOmokLogic.SEATS:
+				logic.seats[s], logic.names[s] = f"bot:{s}", "봇"
+				logic.bots.add(s)
+			logic.status, logic.turn = "playing", "black"
+			logic._restock("black")
+			for s in logic.SEATS:
+				logic.hand[s] = random.Random(seed).sample(["vital", "wither", "clone", "ghost", "thief", "jackpot", "seed", "freeze", "clover", "coupon"], 3)
+			for _ in range(600):
+				if logic.status != "playing":
+					break
+				logic.bot_act(room)
+			done += logic.status == "over"
+		self.assertGreaterEqual(done, 11)
+
+
 class AugOmokResetCardsTestCase(unittest.TestCase):
 	setup = AugOmokTestCase.setup  # 판 준비·두기·카드 주기만 빌려 씀 (기존 시험은 다시 안 돌림)
 	mv = AugOmokTestCase.mv
