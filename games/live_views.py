@@ -1,4 +1,4 @@
-"""실시간 대전 게임 (오목·오셀로·점 잇기·알까기·증목·그림 맞추기) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
+"""실시간 대전 게임 (오목·오셀로·점 잇기·알까기·증목·숫자 야구·그림 맞추기) — 방은 mj-relay 데몬(relay/mj_game.py)이 들고 있음.
 
 방 만들기는 로그인 회원, 링크를 받은 사람은 로그인 없이 닉네임만으로 참여.
 게임 종류는 KINDS 에 한 줄 + 방 화면 템플릿 하나.
@@ -45,9 +45,15 @@ KINDS = {
 	},
 	"augomok": {
 		"title": "증목 (증강 오목)", "icon": "🌈", "eyebrow": "VERSUS · AUGMENTED OMOK", "template": "games/augomok_room.html",
-		"intro": "오목인데 돌이 내 턴 5번 뒤에 사라져요! 돌을 둘 때마다 포인트(2초 안에 두면 2배)를 모아 증강 카드를 뽑아요 — 일반·희귀·영웅·전설·신화 19종. 혼자면 컴퓨터와.",
+		"intro": "오목인데 돌이 내 턴 5번 뒤에 사라져요! 돌을 둘 때마다 포인트(2초 안에 두면 2배)를 모아 증강 카드를 뽑아요 — 일반·희귀·영웅·전설·신화 58종. 혼자면 컴퓨터와.",
 		"invite": "님이 증목(증강 오목) 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.",
 		"placeholder": "방 이름 (예: 신화 뽑으면 이김)",
+	},
+	"baseball": {
+		"title": "숫자 야구", "icon": "⚾", "eyebrow": "VERSUS · NUMBER BASEBALL", "template": "games/baseball_room.html",
+		"intro": "서로 비밀 숫자(3·4자리)를 정하고 번갈아 맞혀요. 숫자·자리가 맞으면 S, 숫자만 맞으면 B! 🔍정찰·❌지우개·🎯위치 탐지·✌️더블 찬스·🔀바꿔치기·🌫안개·🛡방패 스킬. 혼자면 컴퓨터와.",
+		"invite": "님이 숫자 야구 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.",
+		"placeholder": "방 이름 (예: 커피 내기 숫자 야구)",
 	},
 	"catchmind": {
 		"title": "그림 맞추기", "icon": "🎨", "eyebrow": "VERSUS · DRAW & GUESS", "template": "games/catchmind_room.html",
