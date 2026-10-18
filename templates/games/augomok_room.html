@@ -304,7 +304,7 @@
     }
     function renderHand() {
         const hand = S?.hand || [];
-        $('ag-hand-txt').textContent = S ? `${hand.length}/${S.hand_max}장${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
+        $('ag-hand-txt').textContent = S ? `(가진 카드) ${hand.length}/${S.hand_max}장${hand.length >= S.hand_max ? ' · 가득 참 — 한 장 써야 더 뽑을 수 있어요' : ''}${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
         const can = myTurn() && !S.used_card && !S.freeze?.[mySeat];
         $('ag-hand').innerHTML = hand.length ? hand.map((c, i) => cardHTML(c, `data-use="${i}" ${can ? '' : 'disabled'}`).replace('class="card', `class="card ${picking && picking.id === c.id ? 'sel' : ''}`) + '</button>').join('') : '<p class="self-center text-[13px] text-[#8e8e93]">아직 없어요. 포인트를 모아 뽑아 보세요!</p>';
         $('ag-target').classList.toggle('hidden', !picking);
@@ -358,12 +358,11 @@
             if (tier >= 2) { $('ag-main').classList.remove('shake'); void $('ag-main').offsetWidth; $('ag-main').classList.add('shake'); }
             fanfare(tier);
             sparks(tier);
-            gachaTimer = setTimeout(closeGacha, mine ? 2600 + tier * 500 : 1800);
+            holdGacha(mine ? 7000 + tier * 800 : 5000 + tier * 500);
         }, charge);
     }
     // 카드를 쓰면 모두의 화면 가운데에 그 카드가 크게 떴다가 사라짐
     function cast(card, who, mine) {
-        if (G.classList.contains('charging')) return;  // 뽑기 연출 중이면 배너만
         clearTimeout(gachaTimer);
         G.style.setProperty('--rc', RCOLOR[card.rarity]);
         G.classList.remove('charging', 'myth');
@@ -376,7 +375,7 @@
         G.classList.add('on', 'revealed');
         const tier = ['common', 'rare', 'epic', 'legend', 'myth'].indexOf(card.rarity);
         sparks(Math.max(1, tier));
-        gachaTimer = setTimeout(closeGacha, 1500 + tier * 250);
+        holdGacha(5000 + tier * 600);
     }
     // 주사위: 모두의 화면에서 굴러가다 멈춤
     const FX = $('ag-fx');
@@ -397,7 +396,7 @@
             $('fx-result').style.opacity = 1;
             fanfare(m.kind === 'duel' && m.text.startsWith('승리') ? 2 : 1);
         }, 1100);
-        fxTimer = setTimeout(() => FX.classList.remove('on'), 2900);
+        fxTimer = setTimeout(() => FX.classList.remove('on'), 4500);
     }
     // 룰렛: 칸 7개 원판이 돌다 고른 칸에서 멈춤
     function rouletteFx(m) {
@@ -413,10 +412,22 @@
         requestAnimationFrame(() => { w.style.transform = `rotate(${target}deg)`; });
         tone(500, 2.4, 'triangle', 0.03);
         setTimeout(() => { $('fx-result').style.opacity = 1; fanfare(m.index === 6 ? 3 : m.index === 0 ? 2 : 0); }, 2700);
-        fxTimer = setTimeout(() => FX.classList.remove('on'), 4600);
+        fxTimer = setTimeout(() => FX.classList.remove('on'), 6500);
     }
     FX.addEventListener('click', () => FX.classList.remove('on'));
-    function closeGacha() { clearTimeout(gachaTimer); G.classList.remove('on', 'revealed', 'charging', 'myth'); }
+    // 카드 연출은 줄 세워 하나씩 (앞 카드를 덮어쓰지 않게) — 정해진 시간이 지나거나 누르면 다음으로
+    const showQueue = [];
+    let showing = false, holdTick = null;
+    function enqueueShow(fn) { showQueue.push(fn); if (!showing) nextShow(); }
+    function nextShow() { const fn = showQueue.shift(); showing = !!fn; if (fn) fn(); }
+    function holdGacha(ms) {
+        const end = Date.now() + ms;
+        clearInterval(holdTick);
+        const upd = () => { const left = Math.ceil((end - Date.now()) / 1000); $('g-hint').textContent = `눌러서 닫기 · ${left}초${showQueue.length ? ` · 다음 카드 ${showQueue.length}장` : ''}`; };
+        upd(); holdTick = setInterval(upd, 250);
+        gachaTimer = setTimeout(closeGacha, ms);
+    }
+    function closeGacha() { clearTimeout(gachaTimer); clearInterval(holdTick); G.classList.remove('on', 'revealed', 'charging', 'myth'); setTimeout(nextShow, 250); }
     G.addEventListener('click', () => { if (G.classList.contains('revealed')) closeGacha(); });
     function sparks(tier) {
         const n = [6, 14, 28, 46, 80][tier];
@@ -561,9 +572,9 @@
                 render(m.peers.filter((p) => !p.seat).map((p) => p.name));
             } else if (m.type === 'draw') {
                 const mine = m.seat === mySeat, who = S?.seats?.[m.seat]?.name || '';
-                gacha(m.card, m.rarity, mine, who);  // 누가 뽑든 모두에게
+                enqueueShow(() => gacha(m.card, m.rarity, mine, who));  // 누가 뽑든 모두에게
             } else if (m.type === 'use') {
-                if (!['dice', 'duel', 'roulette'].includes(m.card.id)) cast(m.card, S?.seats?.[m.seat]?.name || '', m.seat === mySeat);
+                if (!['dice', 'duel', 'roulette'].includes(m.card.id)) { const nm = S?.seats?.[m.seat]?.name || '', me2 = m.seat === mySeat; enqueueShow(() => cast(m.card, nm, me2)); }
                 banner(m.card);
                 pulses.push({ cells: m.cells || [], color: RCOLOR[m.card.rarity], start: performance.now() });
                 tone(m.card.rarity === 'myth' ? 220 : 440, 0.25, 'sawtooth', 0.08);

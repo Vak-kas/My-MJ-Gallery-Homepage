@@ -28,7 +28,8 @@ RARITIES = ("common", "rare", "epic", "legend", "myth")
 RARITY_WEIGHTS = {"common": 50, "rare": 28, "epic": 14, "legend": 6, "myth": 2}
 PRICE = {"common": 3, "rare": 6, "epic": 10, "legend": 15, "myth": 22}
 RARITY_NAMES = {"common": "일반", "rare": "희귀", "epic": "영웅", "legend": "전설", "myth": "신화"}
-BOT_DELAY = 1.1
+BOT_DELAY = 1.6
+BOT_READ_DELAY = 4.5  # 카드를 뽑거나 쓴 직후엔 사람이 카드 설명을 읽을 시간을 줌
 EVENT_EVERY = 10      # 이만큼 턴(둘 합쳐)마다 중립 이벤트
 UNLOCK_PRICE = 3      # 잠긴 구역 해금 값 (턴을 쓰지 않음)
 BOT_NAME = "🤖 컴퓨터"
@@ -174,6 +175,7 @@ class AugOmokLogic:
 		self.turns = 0
 		self.last = None
 		self.bot_due = 0.0
+		self.slow = False  # 방금 카드 연출이 있었음 → 컴퓨터가 조금 더 기다림
 
 	def current_life(self):
 		return self.life + self.turns // GROW_EVERY
@@ -387,6 +389,7 @@ class AugOmokLogic:
 	def _gain_card(self, room, s, cid, how):
 		info = card_info(cid)
 		# 누가 뽑든 모두의 화면에 같은 연출 (카드 이름까지)
+		self.slow = True
 		room.emit({"type": "draw", "seat": s, "how": how, "rarity": info["rarity"], "card": info})
 		if CARDS[cid][4] == "instant":
 			self._instant(room, s, cid)
@@ -794,6 +797,7 @@ class AugOmokLogic:
 		if not consumed:
 			self.hand[s].remove(cid)
 		self.used_card = True
+		self.slow = True
 		info = card_info(cid)
 		self.last = {"type": "use", "seat": s, "card": cid, "cells": affected}
 		room.emit({"type": "use", "seat": s, "card": info, "cells": affected, "target": [tx, ty] if cell is not None or kind in ("empty", "any") else None})
@@ -1019,7 +1023,8 @@ class AugOmokLogic:
 	# ── 컴퓨터 ──
 	def _arm_bot(self):
 		if self.status == "playing" and self.turn in self.bots:
-			self.bot_due = time.time() + BOT_DELAY
+			self.bot_due = time.time() + (BOT_READ_DELAY if self.slow else BOT_DELAY)
+			self.slow = False
 
 	def _cell_score(self, x, y, c):
 		"""(x, y) 에 c 를 두면 생기는 줄들의 점수 (열린 끝 고려)."""
@@ -1104,7 +1109,11 @@ class AugOmokLogic:
 					cell, _ = self._best_cell(s)
 					target = list(cell)
 			if pick and (CARDS[pick][4] in ("none",) or target):
-				if self._use(room, s, pick, target or []) is None and self.status != "playing":
+				if self._use(room, s, pick, target or []) is None:
+					# 카드를 썼으면 바로 두지 않고, 연출을 읽을 시간을 준 뒤 다음 틱에 이어서 둠
+					if self.status == "playing" and self.turn == s:
+						self.bot_due = time.time() + BOT_READ_DELAY
+						self.slow = False
 					return
 		# 2) 뽑기: 급하지 않고 포인트가 넉넉하면 가끔
 		_, v = self._best_cell(s)
