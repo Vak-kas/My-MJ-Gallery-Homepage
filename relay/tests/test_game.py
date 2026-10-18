@@ -666,3 +666,213 @@ class AugOmokTestCase(unittest.TestCase):
 		self.assertTrue(logic.tick(room, logic.bot_due + 0.1))
 		self.assertEqual(logic.turn, "black")
 		self.assertTrue(logic.cells or logic.hand["white"])
+
+
+class AugOmokResetCardsTestCase(unittest.TestCase):
+	setup = AugOmokTestCase.setup  # 판 준비·두기·카드 주기만 빌려 씀 (기존 시험은 다시 안 돌림)
+	mv = AugOmokTestCase.mv
+	give = AugOmokTestCase.give
+
+	def test_quake_myreset_grandreset(self):
+		logic, room, a, b = self.setup()
+		for i in range(4):
+			logic.cells[logic.key(i, 0)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+			logic.cells[logic.key(i, 2)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}
+		logic.cells[logic.key(9, 9)] = {"o": "b", "ttl": 5, "by": "black", "perm": True}
+		# 지진: 무작위 4개 (불멸 빼고)
+		self.give(logic, "black", "quake")
+		logic.on_message(room, a, {"type": "use", "card": "quake"})
+		self.assertEqual(len(logic.cells), 9 - 4)
+		self.assertIn(logic.key(9, 9), logic.cells)
+		self.assertEqual(room.events[-1]["type"], "use")
+		# 나의 회귀: 내 돌(불멸 빼고) 다 거두고 하나에 2P, 내 턴은 그대로
+		logic.used_card = False
+		mine = sum(1 for k, v in logic.stones_of("black") if not v["perm"])
+		pts = logic.points["black"]
+		self.give(logic, "black", "myreset")
+		logic.on_message(room, a, {"type": "use", "card": "myreset"})
+		self.assertEqual(logic.points["black"], pts + 2 * mine)
+		self.assertEqual([k for k, v in logic.stones_of("black")], [logic.key(9, 9)])
+		self.assertEqual(logic.turn, "black")
+		self.assertEqual(self.mv(logic, room, a, 7, 7), (True, None))  # 이어서 둠
+		# 대회귀: 판 전체 (불멸까지) 비우고 쓴 사람 턴부터
+		self.give(logic, "white", "grandreset")
+		logic.on_message(room, b, {"type": "use", "card": "grandreset"})
+		self.assertEqual(logic.cells, {})
+		self.assertEqual(logic.turn, "white")
+		self.assertEqual(self.mv(logic, room, b, 3, 3), (True, None))
+
+	def test_draw_is_shown_to_everyone(self):
+		logic, room, a, b = self.setup()
+		logic.points["black"] = 10
+		logic.on_message(room, a, {"type": "draw"})
+		draw = next(e for e in room.events if e["type"] == "draw")
+		self.assertIsNotNone(draw["card"])  # 모두에게 카드 이름까지
+
+	def test_undo_points_and_charity(self):
+		logic, room, a, b = self.setup()
+		self.mv(logic, room, a, 7, 7)
+		logic.turn_started -= 10
+		self.mv(logic, room, b, 3, 3)
+		self.give(logic, "black", "undo")
+		logic.on_message(room, a, {"type": "use", "card": "undo"})
+		self.assertIsNone(logic.at(3, 3))  # 상대 마지막 돌을 물림
+		logic.points.update(black=1, white=5)
+		logic.used_card = False
+		self.give(logic, "black", "pickpocket")
+		logic.on_message(room, a, {"type": "use", "card": "pickpocket"})
+		self.assertEqual(logic.points, {"black": 4, "white": 2})
+		logic.used_card = False
+		ttl = logic.at(7, 7)["ttl"]
+		self.give(logic, "black", "charity")
+		logic.on_message(room, a, {"type": "use", "card": "charity"})
+		self.assertEqual((logic.points["black"], logic.points["white"], logic.at(7, 7)["ttl"]), (1, 5, ttl + 1))
+
+	def test_timed_and_permanent_effects(self):
+		logic, room, a, b = self.setup()
+		self.assertEqual(self.A.card_info("compound")["dur"], "지속 3턴")
+		self.assertEqual(self.A.card_info("fifth")["dur"], "영구")
+		self.assertEqual(self.A.card_info("gust")["dur"], "1회용")
+		self.give(logic, "black", "fifth", "sturdy", "compound")
+		logic.on_message(room, a, {"type": "use", "card": "fifth"})
+		st = logic.snapshot(room)
+		self.assertEqual([e["dur"] for e in st["effects"]["black"]], ["영구"])  # 상대도 보는 효과 목록
+		spots = [(0, 0), (4, 0), (8, 0), (12, 0), (0, 4)]
+		for i, (x, y) in enumerate(spots):
+			logic.used_card = False
+			if i == 0:
+				logic.on_message(room, a, {"type": "use", "card": "sturdy"})
+			if i == 1:
+				pts = logic.points["black"]
+				logic.on_message(room, a, {"type": "use", "card": "compound"})
+			self.mv(logic, room, a, x, y)
+			if i == 0:
+				self.assertEqual(logic.at(0, 0)["ttl"], logic.life + 1 - 1)  # 단단한 돌 +1, 턴 끝 -1
+			if i == 1:
+				self.assertEqual(logic.points["black"], pts + 3)  # 빠르게 2 + 복리 1
+			if i < 4:
+				logic.turn_started -= 10
+				self.mv(logic, room, b, 14, 14 - i * 3)
+		# 다섯 번째 돌 → 한 번 더 (2칸 이상)
+		self.assertEqual(logic.turn, "black")
+		self.assertTrue(logic.extra and logic.extra.get("bonus"))
+		self.assertIn("2칸 이상", self.mv(logic, room, a, 1, 4)[1])
+		self.assertEqual(self.mv(logic, room, a, 7, 9), (True, None))
+		self.assertEqual(logic.turn, "white")
+		# 영구는 두 번 켤 수 없음
+		logic.turn = "black"
+		logic.used_card = False
+		self.give(logic, "black", "fifth")
+		self.assertIn("이미 켜져", logic.on_message(room, a, {"type": "use", "card": "fifth"})[1])
+
+	def test_dark_memory_sleep_points(self):
+		logic, room, a, b = self.setup()
+		room.peers = {"a": 1, "b": 1}
+		self.mv(logic, room, a, 7, 7)
+		self.give(logic, "white", "dark")
+		logic.on_message(room, b, {"type": "use", "card": "dark"})
+		self.assertEqual(logic.snapshot(room, "a")["cells"], [])  # 흑 화면엔 안 보임
+		self.assertTrue(logic.snapshot(room, "b")["cells"])        # 백은 보임
+		self.mv(logic, room, b, 3, 3)
+		self.assertIn("거기에는", self.mv(logic, room, a, 3, 3)[1])  # 안 보여도 못 둠
+		# 기억력: 모두에게 회색
+		logic.used_card = False
+		self.give(logic, "black", "memory")
+		logic.on_message(room, a, {"type": "use", "card": "memory"})
+		st = logic.snapshot(room, "b")
+		self.assertEqual({c["o"] for c in st["cells"]}, {"g"})
+		self.assertIsNone(st["cells"][0]["ttl"])
+		# 동반 성장·공멸
+		logic.points.update(black=1, white=2)
+		logic.used_card = False
+		self.give(logic, "black", "together")
+		logic.on_message(room, a, {"type": "use", "card": "together"})
+		self.assertEqual(logic.points, {"black": 5, "white": 6})
+		self.mv(logic, room, a, 10, 10)  # 빠르게 둬서 흑 +2 → 7
+		self.assertEqual(logic.points, {"black": 7, "white": 6})
+		self.give(logic, "white", "famine")
+		logic.on_message(room, b, {"type": "use", "card": "famine"})
+		self.assertEqual(logic.points, {"black": 3, "white": 2})
+		self.give(logic, "white", "sleep")
+		self.assertIn("한 장만", logic.on_message(room, b, {"type": "use", "card": "sleep"})[1])  # 이번 턴엔 이미 씀
+
+	def test_sleep_seal_lock_unlock_events(self):
+		logic, room, a, b = self.setup()
+		self.give(logic, "black", "sleep")
+		logic.on_message(room, a, {"type": "use", "card": "sleep"})
+		self.mv(logic, room, a, 7, 7)
+		self.assertEqual(logic.turn, "black")  # 백은 쉼
+		self.assertTrue(any(e["type"] == "event" for e in room.events))
+		# 봉인: 3×3 빈칸에 못 둠, 시간 지나면 풀림
+		logic.used_card = False
+		self.give(logic, "black", "seal")
+		logic.on_message(room, a, {"type": "use", "card": "seal", "target": [3, 3]})
+		self.assertIn("봉인", self.mv(logic, room, a, 3, 4)[1])
+		# 금고(잠금) → 3P 로 해금 (턴 안 씀)
+		logic.locks[logic.key(12, 12)] = {"kind": "lock", "ttl": 0, "region": 9}
+		logic.locks[logic.key(12, 13)] = {"kind": "lock", "ttl": 0, "region": 9}
+		self.assertIn("해금", self.mv(logic, room, a, 12, 12)[1])
+		logic.points["black"] = 3
+		self.assertEqual(logic.on_message(room, a, {"type": "unlock", "x": 12, "y": 12}), (True, None))
+		self.assertNotIn(logic.key(12, 13), logic.locks)
+		self.assertEqual((logic.points["black"], logic.turn), (0, "black"))
+		self.assertIn("봉인은", logic.on_message(room, a, {"type": "unlock", "x": 3, "y": 3})[1])
+		# 만능 열쇠
+		logic.used_card = False
+		self.give(logic, "black", "key")
+		logic.on_message(room, a, {"type": "use", "card": "key"})
+		self.assertEqual(logic.locks, {})
+		# 이벤트: EVENT_EVERY 턴마다
+		before = sum(1 for e in room.events if e["type"] == "event")
+		logic.turns = self.A.EVENT_EVERY - 1
+		self.mv(logic, room, a, 9, 9)
+		self.assertEqual(sum(1 for e in room.events if e["type"] == "event"), before + 1)
+
+	def test_stack_duel_dice_roulette_oracle(self):
+		logic, room, a, b = self.setup()
+		room.peers = {"a": 1, "b": 1}
+		for x in range(3):
+			logic.cells[logic.key(x, 0)] = {"o": "b", "ttl": 5, "by": "black", "perm": False}
+		logic.cells[logic.key(5, 5)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}
+		# 돌 업기: 내 돌 위 → 2개로 (3개 + 업은 1 = 4, 하나 더 두면 5)
+		self.give(logic, "black", "stack")
+		logic.on_message(room, a, {"type": "use", "card": "stack"})
+		self.assertEqual(self.mv(logic, room, a, 2, 0), (True, None))
+		self.assertEqual(logic.at(2, 0)["h"], 2)
+		# 상대도 업기 가능: 상대 돌 위 → 그 칸을 뺏음
+		self.mv(logic, room, b, 1, 0)
+		self.assertEqual(logic.at(1, 0)["o"], "w")
+		self.assertIn("2개까지", self.mv(logic, room, a, 2, 0)[1])  # 이미 2개
+		# 결투: 주사위 6 vs 1 → 뺏음
+		rolls = iter([6, 1])
+		logic.rng.randint = lambda lo, hi: next(rolls)
+		self.give(logic, "black", "duel")
+		logic.on_message(room, a, {"type": "use", "card": "duel", "target": [1, 0]})
+		self.assertEqual(logic.at(1, 0)["o"], "b")
+		dice = [e for e in room.events if e["type"] == "dice"][-1]
+		self.assertEqual(dice["rolls"], {"black": 6, "white": 1})
+		# (0,0) 1 + (1,0) 1 + (2,0) 업어서 2 = 4개 → 한 칸 더 두면 칸 4개로 다섯
+		self.assertEqual(logic._weight([(0, 0), (1, 0), (2, 0)]), 4)
+		self.assertIsNone(logic.winner)
+		self.mv(logic, room, a, 3, 0)
+		self.assertEqual(logic.winner, "black")
+
+	def test_dice_roulette_oracle(self):
+		logic, room, a, b = self.setup()
+		room.peers = {"a": 1, "b": 1}
+		logic.rng.randint = lambda lo, hi: 3
+		pts = logic.points["black"]
+		self.give(logic, "black", "dice")
+		logic.on_message(room, a, {"type": "use", "card": "dice"})
+		self.assertEqual(logic.points["black"], pts + 3)
+		logic.used_card = False
+		logic.rng.choices = lambda pop, weights=None: [0]  # 룰렛 첫 칸 +6P
+		self.give(logic, "black", "roulette")
+		logic.on_message(room, a, {"type": "use", "card": "roulette"})
+		self.assertEqual(logic.points["black"], pts + 3 + 6)
+		self.assertEqual(room.events[-2]["type"], "roulette")
+		logic.used_card = False
+		self.give(logic, "black", "oracle")
+		logic.on_message(room, a, {"type": "use", "card": "oracle"})
+		self.assertIsNotNone(logic.snapshot(room, "a")["hint"])
+		self.assertIsNone(logic.snapshot(room, "b")["hint"])  # 상대는 못 봄
