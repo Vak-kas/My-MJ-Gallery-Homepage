@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 16px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: linear-gradient(135deg, #7c3aed, #ec4899); border: 0; color: #fff; font-weight: 600; }
+    .ag-wrap { position: relative; width: min(100%, 620px); aspect-ratio: 1; margin: 0 auto; }
+    #ag-board { width: 100%; height: 100%; display: block; border-radius: 14px; box-shadow: 0 10px 30px rgba(120, 72, 20, 0.3); cursor: pointer; touch-action: manipulation; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 10px 12px; }
+    .seat.turn { border-color: #a855f7; background: #faf5ff; }
+    .stone { display: inline-block; width: 16px; height: 16px; border-radius: 999px; vertical-align: -3px; flex: none; }
+    .stone.b { background: radial-gradient(circle at 35% 30%, #666, #000); }
+    .stone.w { background: radial-gradient(circle at 35% 30%, #fff, #cfcfcf); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .tag { border-radius: 6px; background: #ececf0; padding: 0 6px; font-size: 11px; color: #6e6e73; }
+    .fastbar { height: 6px; border-radius: 999px; background: rgba(0, 0, 0, 0.07); overflow: hidden; }
+    .fastbar span { display: block; height: 100%; background: linear-gradient(90deg, #facc15, #f97316); }
+
+    /* 카드 */
+    .card { position: relative; width: 112px; min-height: 146px; border-radius: 14px; padding: 8px 8px 10px; text-align: center; background: #fff; border: 3px solid var(--rc); box-shadow: 0 4px 14px color-mix(in srgb, var(--rc) 35%, transparent); color: #1d1d1f; display: flex; flex-direction: column; align-items: center; gap: 3px; transition: transform .15s; }
+    .card:hover:not(:disabled) { transform: translateY(-4px); }
+    .card:disabled { opacity: 0.45; }
+    .card.sel { transform: translateY(-8px) scale(1.04); box-shadow: 0 0 0 4px color-mix(in srgb, var(--rc) 40%, transparent), 0 10px 24px color-mix(in srgb, var(--rc) 45%, transparent); }
+    .card .ic { font-size: 30px; line-height: 1.15; }
+    .card .nm { font-size: 12.5px; font-weight: 700; line-height: 1.25; }
+    .card .ds { font-size: 10.5px; line-height: 1.3; color: #6e6e73; }
+    .card .rr { font-size: 10px; font-weight: 700; color: var(--rc); letter-spacing: .05em; }
+    .card .pr { margin-top: auto; font-size: 11.5px; font-weight: 700; }
+    .du { display: inline-block; border-radius: 999px; padding: 0 6px; font-size: 10px; font-weight: 700; line-height: 16px; }
+    .du.once { background: #f1f5f9; color: #475569; } .du.timed { background: #e0f2fe; color: #0369a1; } .du.perm { background: #fef3c7; color: #b45309; } .du.now { background: #dcfce7; color: #15803d; }
+    .fx { display: inline-flex; align-items: center; gap: 3px; border-radius: 999px; padding: 1px 7px; font-size: 11.5px; background: #faf5ff; color: #6b21a8; margin: 2px 3px 0 0; }
+    html.theme-dark .fx { background: #2a1840; color: #e9d5ff; }
+    .r-common { --rc: #9ca3af; } .r-rare { --rc: #3b82f6; } .r-epic { --rc: #a855f7; } .r-legend { --rc: #f59e0b; } .r-myth { --rc: #ec4899; }
+    .r-myth { border-image: linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7) 1; border-radius: 0; }
+    .r-myth.card { border: 0; padding: 11px; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444) border-box; border: 3px solid transparent; border-radius: 14px; background-size: 100% 100%, 300% 300%; animation: rainbow 3s linear infinite; }
+    @keyframes rainbow { to { background-position: 0 0, 300% 0; } }
+
+    /* 뽑기 연출 */
+    #gacha { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(5, 5, 15, 0.82); backdrop-filter: blur(3px); }
+    #gacha.on { display: flex; }
+    #gacha .rays { position: absolute; width: 900px; height: 900px; border-radius: 999px; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 55%, transparent) 0 8deg, transparent 8deg 22deg); filter: blur(2px); opacity: 0; animation: spin 6s linear infinite; }
+    #gacha.revealed .rays { opacity: .9; transition: opacity .5s; }
+    #gacha.myth .rays { background: repeating-conic-gradient(from 0deg, rgba(239,68,68,.6) 0 7deg, transparent 7deg 14deg, rgba(245,158,11,.6) 14deg 21deg, transparent 21deg 28deg, rgba(34,197,94,.6) 28deg 35deg, transparent 35deg 42deg, rgba(59,130,246,.6) 42deg 49deg, transparent 49deg 56deg, rgba(168,85,247,.6) 56deg 63deg, transparent 63deg 72deg); animation-duration: 3s; }
+    #gacha .stage { position: relative; perspective: 1200px; }
+    #gacha .flip { width: 220px; height: 300px; position: relative; transform-style: preserve-3d; transition: transform 0.9s cubic-bezier(.2, 1.4, .4, 1); }
+    #gacha.charging .flip { animation: wobble .18s linear infinite; }
+    #gacha.revealed .flip { transform: rotateY(180deg); }
+    #gacha .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 22px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px; text-align: center; }
+    #gacha .back { background: radial-gradient(circle at 50% 35%, #4c1d95, #1e1b4b); border: 4px solid color-mix(in srgb, var(--rc) 80%, #fff); box-shadow: 0 0 40px var(--rc); color: #fff; font-size: 64px; }
+    #gacha .front { transform: rotateY(180deg); background: #fff; border: 5px solid var(--rc); box-shadow: 0 0 60px var(--rc), 0 0 120px color-mix(in srgb, var(--rc) 50%, transparent); }
+    #gacha.myth .front { border: 5px solid transparent; background: linear-gradient(#fff, #fff) padding-box, linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444) border-box; background-size: 100% 100%, 300% 300%; animation: rainbow 2s linear infinite; }
+    #gacha .front .ic { font-size: 72px; line-height: 1; }
+    #gacha .front .rr { font-size: 14px; font-weight: 800; color: var(--rc); letter-spacing: .15em; }
+    #gacha .front .nm { font-size: 22px; font-weight: 800; color: #1d1d1f; }
+    #gacha .front .ds { font-size: 13px; color: #6e6e73; line-height: 1.4; }
+    #gacha .shout { position: absolute; left: 50%; top: -96px; transform: translateX(-50%) scale(.3); white-space: nowrap; font-size: 44px; font-weight: 900; color: #fff; text-shadow: 0 0 20px var(--rc), 0 4px 0 rgba(0,0,0,.4); opacity: 0; letter-spacing: -.02em; }
+    #gacha.revealed .shout { animation: shout .6s .35s cubic-bezier(.2, 1.6, .4, 1) forwards; }
+    #gacha.myth .shout { background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: none; filter: drop-shadow(0 0 12px rgba(255,255,255,.7)); font-size: 50px; }
+    #gacha .hint { position: absolute; bottom: -54px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.7); font-size: 13px; white-space: nowrap; }
+    .spark { position: fixed; z-index: 81; width: 10px; height: 10px; border-radius: 2px; pointer-events: none; animation: spark 1.2s ease-out forwards; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes wobble { 0%, 100% { transform: rotate(-3deg) scale(1.02); } 50% { transform: rotate(3deg) scale(.98); } }
+    @keyframes shout { to { transform: translateX(-50%) scale(1); opacity: 1; } }
+    @keyframes spark { to { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; } }
+    .shake { animation: shake .45s linear; }
+    @keyframes shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-10px, 6px); } 40% { transform: translate(9px, -7px); } 60% { transform: translate(-7px, -4px); } 80% { transform: translate(6px, 5px); } }
+    #ag-banner { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(.6); opacity: 0; pointer-events: none; padding: 10px 18px; border-radius: 16px; background: rgba(17, 17, 27, 0.88); color: #fff; font-size: 20px; font-weight: 800; white-space: nowrap; border: 3px solid var(--rc); box-shadow: 0 0 30px var(--rc); }
+    #ag-banner.show { animation: banner 1.6s ease forwards; }
+    @keyframes banner { 15% { transform: translate(-50%, -50%) scale(1.08); opacity: 1; } 25%, 80% { transform: translate(-50%, -50%) scale(1); opacity: 1; } 100% { transform: translate(-50%, -60%) scale(1); opacity: 0; } }
+
+    #ag-chat { height: 170px; overflow-y: auto; }
+    #ag-fx { position: fixed; inset: 0; z-index: 79; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 18px; background: rgba(5, 5, 15, 0.7); }
+    #ag-fx.on { display: flex; }
+    .die { width: 96px; height: 96px; border-radius: 20px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.4), inset 0 -6px 0 #e5e7eb; display: grid; place-items: center; font-size: 54px; font-weight: 900; color: #1d1d1f; }
+    .die.roll { animation: tumble .25s linear infinite; }
+    @keyframes tumble { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(180deg) scale(.9); } 100% { transform: rotate(360deg) scale(1); } }
+    .fx-name { color: #fff; font-size: 14px; text-align: center; }
+    .fx-text { color: #fff; font-size: 24px; font-weight: 800; text-align: center; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+    #wheel { width: 300px; height: 300px; border-radius: 999px; transition: transform 2.6s cubic-bezier(.12, .8, .2, 1); box-shadow: 0 0 0 8px #fff, 0 12px 40px rgba(0,0,0,.5); }
+    .pin { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid #facc15; margin-bottom: -26px; z-index: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
+    .ag-cover.hidden, #ag-fx:not(.on) { display: none !important; }  /* display:flex 가 숨김(hidden)을 덮지 않게 */
+    .ag-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 14px; background: rgba(10, 10, 20, 0.92); color: #fff; font-size: 22px; font-weight: 800; text-align: center; padding: 20px; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .seat { background: #111318; }
+    html.theme-dark .seat.turn { background: #2a1840; }
+    html.theme-dark .tag { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .card { background: #1c1f26; color: #e8e8ea; }
+    html.theme-dark .r-myth.card { background: linear-gradient(#1c1f26, #1c1f26) padding-box, linear-gradient(135deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444) border-box; background-size: 100% 100%, 300% 300%; }
+    html.theme-dark .card .ds { color: #a1a1a6; }
+    html.theme-dark .fastbar { background: rgba(255, 255, 255, 0.1); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12" id="ag-main">
+    <a href="{% url 'games:augomok' %}" class="text-[13px] text-[#a855f7]">← 증목 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🌈 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 증목 · 돌은 내 턴 몇 번 뒤에 사라지고, 포인트로 증강을 뽑아요</p>
+        </div>
+        <button type="button" class="gm-btn" id="ag-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="ag-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:augomok_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="ag-name-box" class="gm-card mt-5 hidden">
+        <form id="ag-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="ag-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#a855f7] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <section class="gm-card min-w-0">
+            <p id="ag-status" class="text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="mx-auto mt-2 max-w-[620px]"><div class="fastbar" id="ag-fast" title="이 막대가 남아 있을 때 두면 포인트 ×2"><span></span></div>
+                <p class="mt-1 flex justify-between text-[11.5px] text-[#8e8e93]"><span id="ag-fast-txt"></span><span id="ag-life"></span></p></div>
+            <div class="ag-wrap mt-2"><canvas id="ag-board" width="1200" height="1200"></canvas><div id="ag-banner"></div><div id="ag-blind" class="ag-cover hidden"></div></div>
+            <p id="ag-flags" class="mt-2 text-center text-[12.5px] font-semibold text-[#7c3aed]"></p>
+
+            <h2 class="mt-4 text-[14px] font-semibold">🃏 내 증강 <span class="font-normal text-[#8e8e93]" id="ag-hand-txt"></span></h2>
+            <div id="ag-hand" class="mt-2 flex min-h-[60px] flex-wrap gap-2"></div>
+            <p id="ag-target" class="mt-2 hidden rounded-xl bg-[#faf5ff] px-3 py-2 text-[13px] text-[#7c3aed] dark:bg-[#2a1840] dark:text-[#d8b4fe]"></p>
+
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <select id="ag-life-sel" class="gm-btn" aria-label="돌 수명"><option value="5">돌 수명 5턴</option><option value="7">7턴</option><option value="9">9턴</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="ag-events" type="checkbox" class="h-4 w-4" checked> 중립 이벤트</label>
+                <button type="button" class="gm-btn" id="ag-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="ag-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="ag-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="ag-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="ag-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="ag-seats"></section>
+            <section class="gm-card">
+                <div class="flex items-center gap-2"><h2 class="text-[14px] font-semibold">🎰 증강 뽑기</h2><span class="ml-auto text-[13px] font-bold" id="ag-points"></span></div>
+                <button type="button" id="ag-draw" class="mt-2 w-full rounded-2xl px-4 py-3 text-[15px] font-bold text-white" style="background:linear-gradient(135deg,#7c3aed,#ec4899,#f59e0b)">🎰 무작위 뽑기</button>
+                <p class="mt-1.5 text-[11.5px] leading-5 text-[#8e8e93]" id="ag-odds"></p>
+                <h3 class="mt-3 text-[13px] font-semibold">🛒 골라 사기 <span class="font-normal text-[#8e8e93]">(내 턴마다 새로 진열)</span></h3>
+                <div id="ag-shop" class="mt-2 flex flex-wrap gap-2"></div>
+                <p class="mt-2 text-[11.5px] text-[#8e8e93]">뽑거나 사면 그 턴은 끝나요. 손에 든 카드는 내 턴에 한 장 쓰고 돌도 둘 수 있어요.</p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="ag-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="ag-chat-form" class="mt-2 flex gap-2"><input id="ag-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+<!-- 주사위·룰렛 -->
+<div id="ag-fx"></div>
+
+<!-- 뽑기 연출 -->
+<div id="gacha" aria-live="polite">
+    <div class="rays"></div>
+    <div class="stage">
+        <div class="shout" id="g-shout"></div>
+        <div class="flip"><div class="face back">✦</div><div class="face front"><div class="ic" id="g-ic"></div><div class="rr" id="g-rr"></div><div class="nm" id="g-nm"></div><div class="ds" id="g-ds"></div></div></div>
+        <div class="hint" id="g-hint">눌러서 닫기</div>
+    </div>
+</div>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const RNAME = { common: '일반', rare: '희귀', epic: '영웅', legend: '전설', myth: '신화' };
+    const RCOLOR = { common: '#9ca3af', rare: '#3b82f6', epic: '#a855f7', legend: '#f59e0b', myth: '#ec4899' };
+    const SHOUT = { common: '일반 증강', rare: '희귀 증강!', epic: '영웅 증강!!', legend: '★ 전설 증강 ★', myth: '🌈 신화 강림 🌈' };
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+
+    let pid = store.get(`mj-augomok-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-augomok-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, hover = null;
+    let picking = null;            // 대상 고르는 카드
+    let turnStart = 0;             // 빠른 두기 기준 (내 시계)
+    let pulses = [];               // 카드 효과가 닿은 칸 강조 { cells, color, start }
+    let fades = [];                // 사라지는 돌 { x, y, o, start }
+    const canvas = $('ag-board'), ctx = canvas.getContext('2d');
+
+    // ── 판 ──
+    const N = 15, W = 1200, PAD = W * 0.045, CELL = (W - PAD * 2) / (N - 1);
+    const P = (i) => PAD + i * CELL;
+    const cellAt = (e) => { const r = canvas.getBoundingClientRect(); const x = Math.round(((e.clientX - r.left) * (W / r.width) - PAD) / CELL), y = Math.round(((e.clientY - r.top) * (W / r.height) - PAD) / CELL); return x >= 0 && y >= 0 && x < N && y < N ? [x, y] : null; };
+    const get = (x, y) => (S?.cells || []).find((c) => c.x === x && c.y === y);
+    function stone(x, y, o, alpha = 1, scale = 1) {
+        const r = CELL * 0.45 * scale, cx = P(x), cy = P(y);
+        ctx.save(); ctx.globalAlpha = alpha;
+        ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = r * 0.3; ctx.shadowOffsetY = r * 0.12;
+        let g;
+        if (o === 'j') { g = ctx.createConicGradient ? ctx.createConicGradient(0, cx, cy) : null; if (g) ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#ef4444'].forEach((c, i) => g.addColorStop(i / 5, c)); }
+        if (!g) { g = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r); if (o === 'b') { g.addColorStop(0, '#666'); g.addColorStop(1, '#050505'); } else if (o === 'w') { g.addColorStop(0, '#fff'); g.addColorStop(1, '#d4d4d4'); } else if (o === 'g') { g.addColorStop(0, '#c4c4c4'); g.addColorStop(1, '#7a7a7a'); } else { g.addColorStop(0, '#a8a29e'); g.addColorStop(1, '#57534e'); } }
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+    }
+    function draw(now) {
+        now = now || performance.now();
+        const dark = document.documentElement.classList.contains('theme-dark');
+        ctx.clearRect(0, 0, W, W);
+        ctx.fillStyle = '#dcb06b'; ctx.fillRect(0, 0, W, W);
+        ctx.strokeStyle = 'rgba(60,35,10,0.8)'; ctx.lineWidth = 2;
+        for (let i = 0; i < N; i++) { ctx.beginPath(); ctx.moveTo(P(0), P(i)); ctx.lineTo(P(N - 1), P(i)); ctx.stroke(); ctx.beginPath(); ctx.moveTo(P(i), P(0)); ctx.lineTo(P(i), P(N - 1)); ctx.stroke(); }
+        ctx.fillStyle = 'rgba(60,35,10,0.85)';
+        [[3, 3], [3, 11], [11, 3], [11, 11], [7, 7]].forEach(([a, b]) => { ctx.beginPath(); ctx.arc(P(a), P(b), 7, 0, Math.PI * 2); ctx.fill(); });
+        if (!S) return;
+        const winSet = new Set((S.win_line || []).map(([x, y]) => `${x},${y}`));
+        let animating = false;
+        // 잠긴 칸(🔒 금고, 해금 가능)·봉인된 칸(⛔ 시간 지나면 풀림)
+        (S.locks || []).forEach((l) => {
+            const cx = P(l.x), cy = P(l.y), half = CELL * 0.46;
+            ctx.fillStyle = l.kind === 'lock' ? 'rgba(234,179,8,0.28)' : 'rgba(239,68,68,0.25)';
+            ctx.fillRect(cx - half, cy - half, half * 2, half * 2);
+            ctx.font = `${Math.round(CELL * 0.42)}px sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(l.kind === 'lock' ? '🔒' : '⛔', cx, cy);
+            if (l.kind === 'seal') { ctx.fillStyle = '#b91c1c'; ctx.font = `700 ${Math.round(CELL * 0.24)}px sans-serif`; ctx.fillText(l.ttl, cx + half * 0.7, cy - half * 0.7); }
+        });
+        if (S.hint) { const [hx, hy] = S.hint; const t = (Math.sin(now / 200) + 1) / 2; ctx.strokeStyle = `rgba(168,85,247,${0.5 + t * 0.5})`; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P(hx), P(hy), CELL * (0.42 + t * 0.12), 0, Math.PI * 2); ctx.stroke(); ctx.font = `${Math.round(CELL * 0.4)}px sans-serif`; ctx.fillText('🔮', P(hx), P(hy)); animating = true; }
+        S.cells.forEach((c) => {
+            if (c.h === 2) stone(c.x + 0.07, c.y - 0.07, c.o, 0.85);  // 업은 돌: 아래에 한 겹 더
+            const blink = c.ttl === 1 && !c.perm && (c.o === 'b' || c.o === 'w');
+            const a = blink ? 0.55 + 0.45 * Math.abs(Math.sin(now / 260)) : 1;
+            if (blink) animating = true;
+            stone(c.x, c.y, c.o, a);
+            // 남은 턴 숫자·표시
+            ctx.font = `700 ${Math.round(CELL * 0.34)}px -apple-system, sans-serif`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            const label = c.o === 'g' ? '' : c.perm ? '💎' : c.o === 'n' ? '🪨' : c.o === 'j' ? '🃏' : (c.h === 2 ? `×2·${c.ttl}` : String(c.ttl));
+            ctx.fillStyle = c.o === 'b' ? (c.ttl <= 1 ? '#fca5a5' : '#e5e7eb') : c.o === 'w' ? (c.ttl <= 1 ? '#dc2626' : '#374151') : '#fff';
+            ctx.fillText(label, P(c.x), P(c.y) + 1);
+            if (winSet.has(`${c.x},${c.y}`)) { ctx.strokeStyle = '#facc15'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P(c.x), P(c.y), CELL * 0.5, 0, Math.PI * 2); ctx.stroke(); }
+        });
+        // 사라지는 돌 (흐려지며 커짐)
+        fades = fades.filter((f) => now - f.start < 600);
+        fades.forEach((f) => { const t = (now - f.start) / 600; stone(f.x, f.y, f.o, 1 - t, 1 + t * 0.5); animating = true; });
+        // 방금 둔 곳
+        if (S.last?.type === 'place') { const [x, y] = S.last.cell; ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.arc(P(x), P(y), CELL * 0.09, 0, Math.PI * 2); ctx.fill(); }
+        // 꼭두각시 예약 칸 (건 사람에게만 보임)
+        if (S.forced) { const [x, y] = S.forced.cell; ctx.font = `${Math.round(CELL * 0.6)}px sans-serif`; ctx.fillText('🎭', P(x), P(y)); }
+        // 카드 효과 강조
+        pulses = pulses.filter((p) => now - p.start < 1400);
+        pulses.forEach((p) => { const t = (now - p.start) / 1400; ctx.strokeStyle = p.color; ctx.globalAlpha = 1 - t; ctx.lineWidth = 7; p.cells.forEach(([x, y]) => { ctx.beginPath(); ctx.arc(P(x), P(y), CELL * (0.5 + t * 0.6), 0, Math.PI * 2); ctx.stroke(); }); ctx.globalAlpha = 1; animating = true; });
+        // 대상 고르기 / 두기 미리 보기
+        if (picking && hover && validTarget(hover)) { ctx.strokeStyle = RCOLOR[picking.rarity]; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(P(hover[0]), P(hover[1]), CELL * 0.52, 0, Math.PI * 2); ctx.stroke(); }
+        else if (!picking && myTurn() && hover && !get(...hover)) stone(hover[0], hover[1], mySeat[0], 0.4);
+        if (animating) requestAnimationFrame(draw);
+    }
+    function validTarget([x, y]) {
+        const c = get(x, y), t = picking?.target, my = mySeat?.[0], op = mySeat === 'black' ? 'w' : 'b';
+        if (t === 'own') return c && c.o === my;
+        if (t === 'opp') return c && c.o === op;
+        if (t === 'empty') return !c;
+        return t === 'any';
+    }
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat;
+    canvas.addEventListener('pointermove', (e) => { const c = cellAt(e); if (String(c) !== String(hover)) { hover = c; draw(); } });
+    canvas.addEventListener('pointerleave', () => { hover = null; draw(); });
+    canvas.addEventListener('click', (e) => {
+        const c = cellAt(e); if (!c || !S) return;
+        if (!mySeat) { toast(S.status === 'playing' ? '구경 중이에요.' : '먼저 오른쪽에서 자리에 앉으세요.'); return; }
+        if (!myTurn()) { toast(S.status === 'playing' ? '내 차례가 아니에요.' : '▶ 시작을 누르면 시작해요.'); return; }
+        if (picking) {
+            if (!validTarget(c)) { toast(targetHelp(picking.target)); return; }
+            send({ type: 'use', card: picking.id, target: c });
+            picking = null; renderHand(); return;
+        }
+        const lock = (S.locks || []).find((l) => l.x === c[0] && l.y === c[1]);
+        if (lock) {
+            if (lock.kind === 'lock' && confirm(`🔒 잠긴 구역이에요. ${S.unlock_price}P 로 해금할까요? (턴은 쓰지 않아요)`)) send({ type: 'unlock', x: c[0], y: c[1] });
+            else if (lock.kind !== 'lock') toast('⛔ 봉인된 칸이에요. 시간이 지나면 풀려요.');
+            return;
+        }
+        if (get(...c) && !S.stack_turns) { toast('빈칸에만 둘 수 있어요.'); return; }
+        send({ type: 'move', x: c[0], y: c[1] });
+    });
+    const targetHelp = (t) => ({ own: '내 돌을 고르세요', opp: '상대 돌을 고르세요', empty: '빈칸을 고르세요', any: '아무 칸이나 고르세요' }[t] || '');
+
+    // ── 카드 ──
+    const durClass = (d) => (d === '영구' ? 'perm' : d?.startsWith('지속') ? 'timed' : d === '즉시' ? 'now' : 'once');
+    const durTag = (d) => `<span class="du ${durClass(d)}">${esc(d || '1회용')}</span>`;
+    function cardHTML(c, extra = '') {
+        return `<button type="button" class="card r-${c.rarity}" ${extra}><span class="rr">${RNAME[c.rarity]}</span><span class="ic">${c.icon}</span><span class="nm">${esc(c.name)}</span>${durTag(c.dur)}<span class="ds">${esc(c.desc)}</span>`;
+    }
+    function renderHand() {
+        const hand = S?.hand || [];
+        $('ag-hand-txt').textContent = S ? `${hand.length}/${S.hand_max}장${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
+        const can = myTurn() && !S.used_card;
+        $('ag-hand').innerHTML = hand.length ? hand.map((c, i) => cardHTML(c, `data-use="${i}" ${can ? '' : 'disabled'}`).replace('class="card', `class="card ${picking && picking.id === c.id ? 'sel' : ''}`) + '</button>').join('') : '<p class="self-center text-[13px] text-[#8e8e93]">아직 없어요. 포인트를 모아 뽑아 보세요!</p>';
+        $('ag-target').classList.toggle('hidden', !picking);
+        if (picking) $('ag-target').innerHTML = `${picking.icon} <b>${esc(picking.name)}</b> — ${targetHelp(picking.target)} <button type="button" class="gm-btn ml-2" id="ag-cancel">취소</button>`;
+    }
+    $('ag-hand').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-use]'); if (!b || b.disabled) return;
+        const c = S.hand[+b.dataset.use];
+        if (c.target === 'none') { if (confirm(`${c.icon} ${c.name}\n${c.desc}\n\n지금 쓸까요?`)) send({ type: 'use', card: c.id }); return; }
+        picking = picking && picking.id === c.id ? null : c;
+        renderHand(); draw();
+    });
+    $('ag-target').addEventListener('click', (e) => { if (e.target.id === 'ag-cancel') { picking = null; renderHand(); draw(); } });
+    function renderShop() {
+        const pts = S && mySeat ? S.points[mySeat] : 0;
+        $('ag-points').textContent = S && mySeat ? `💰 ${pts}P` : '';
+        const can = myTurn() && !(S.extra && S.extra.first);
+        const full = S && (S.hand || []).length >= S.hand_max;
+        $('ag-draw').disabled = !(can && pts >= (S?.random_price || 4) && !full);
+        $('ag-draw').textContent = `🎰 무작위 뽑기 (${S?.random_price || 4}P)`;
+        $('ag-draw').style.opacity = $('ag-draw').disabled ? 0.45 : 1;
+        if (S) {
+            const tot = Object.values(S.odds).reduce((a, b) => a + b, 0);
+            $('ag-odds').innerHTML = Object.entries(S.odds).map(([r, w]) => `<span style="color:${RCOLOR[r]};font-weight:700">${RNAME[r]}</span> ${Math.round(w / tot * 100)}%`).join(' · ') + (mySeat ? ` · 천장까지 ${S.pity_max - S.pity}번 (영웅 이상 확정)` : '');
+        }
+        $('ag-shop').innerHTML = (S?.shop || []).map((c, i) => cardHTML(c, `data-buy="${i}" ${can && pts >= c.price && (!full || c.target === 'instant') ? '' : 'disabled'}`).replace('</span><span class="nm">', `</span><span class="nm">`) + `<span class="pr">${c.price}P</span></button>`).join('') || '<p class="text-[12.5px] text-[#8e8e93]">내 턴에 진열돼요.</p>';
+    }
+    $('ag-draw').addEventListener('click', () => send({ type: 'draw' }));
+    $('ag-shop').addEventListener('click', (e) => { const b = e.target.closest('[data-buy]'); if (b && !b.disabled) send({ type: 'buy', slot: +b.dataset.buy }); });
+
+    // ── 뽑기 연출 ──
+    const G = $('gacha');
+    let gachaTimer = null;
+    function gacha(card, rarity, mine, who) {
+        G.style.setProperty('--rc', RCOLOR[rarity]);
+        G.classList.remove('revealed', 'myth', 'charging');
+        G.classList.add('on', 'charging');
+        if (rarity === 'myth') G.classList.add('myth');
+        $('g-ic').textContent = card ? card.icon : '✦';
+        $('g-rr').textContent = `${RNAME[rarity]}${mine ? '' : ` · ${who}`}`;
+        $('g-nm').textContent = card ? card.name : `${RNAME[rarity]} 증강`;
+        $('g-ds').innerHTML = card ? `${durTag(card.dur)}<br>${esc(card.desc)}` : `${esc(who)} 님이 뽑았어요`;
+        $('g-shout').textContent = card && card.id === 'ruler' ? '👑 돌을 지배하는 자!!!' : SHOUT[rarity];
+        const tier = ['common', 'rare', 'epic', 'legend', 'myth'].indexOf(rarity);
+        // 등급이 높을수록 오래 흔들림 → 두근두근
+        const charge = 500 + tier * 280;
+        tone(330 + tier * 60, 0.08, 'square', 0.06);
+        clearTimeout(gachaTimer);
+        gachaTimer = setTimeout(() => {
+            G.classList.remove('charging'); G.classList.add('revealed');
+            if (tier >= 2) { $('ag-main').classList.remove('shake'); void $('ag-main').offsetWidth; $('ag-main').classList.add('shake'); }
+            fanfare(tier);
+            sparks(tier);
+            gachaTimer = setTimeout(closeGacha, mine ? 2600 + tier * 500 : 1800);
+        }, charge);
+    }
+    // 카드를 쓰면 모두의 화면 가운데에 그 카드가 크게 떴다가 사라짐
+    function cast(card, who, mine) {
+        if (G.classList.contains('charging')) return;  // 뽑기 연출 중이면 배너만
+        clearTimeout(gachaTimer);
+        G.style.setProperty('--rc', RCOLOR[card.rarity]);
+        G.classList.remove('charging', 'myth');
+        if (card.rarity === 'myth') G.classList.add('myth');
+        $('g-ic').textContent = card.icon;
+        $('g-rr').textContent = `${RNAME[card.rarity]} · ${mine ? '내가' : who + ' 님이'} 사용`;
+        $('g-nm').textContent = card.name;
+        $('g-ds').innerHTML = `${durTag(card.dur)}<br>${esc(card.desc)}`;
+        $('g-shout').textContent = card.id === 'ruler' ? '👑 돌을 지배하는 자!!!' : card.id === 'grandreset' ? '⏮ 시간이 되돌아갑니다!' : `${mine ? '' : who + ' 님의 '}${card.name}!`;
+        G.classList.add('on', 'revealed');
+        const tier = ['common', 'rare', 'epic', 'legend', 'myth'].indexOf(card.rarity);
+        sparks(Math.max(1, tier));
+        gachaTimer = setTimeout(closeGacha, 1500 + tier * 250);
+    }
+    // 주사위: 모두의 화면에서 굴러가다 멈춤
+    const FX = $('ag-fx');
+    let fxTimer = null;
+    function diceFx(m) {
+        clearTimeout(fxTimer);
+        const seats = Object.keys(m.rolls);
+        FX.innerHTML = `<div class="fx-name">${m.kind === 'duel' ? '⚔️ 칸 뺏기 결투' : '🎲 행운의 주사위'}</div>
+            <div class="flex items-end gap-6">${seats.map((x) => `<div class="flex flex-col items-center gap-2"><div class="die roll" data-final="${m.rolls[x]}">🎲</div><span class="fx-name">${esc(S?.seats?.[x]?.name || x)}</span></div>`).join(m.kind === 'duel' ? '<span class="fx-text">VS</span>' : '')}</div>
+            <div class="fx-text" id="fx-result" style="opacity:0">${esc(m.text)}</div>`;
+        FX.classList.add('on');
+        const dice = [...FX.querySelectorAll('.die')];
+        const spin = setInterval(() => dice.forEach((d) => { d.textContent = 1 + Math.floor(Math.random() * 6); }), 80);
+        tone(300, 0.6, 'square', 0.04);
+        setTimeout(() => {
+            clearInterval(spin);
+            dice.forEach((d) => { d.classList.remove('roll'); d.textContent = d.dataset.final; });
+            $('fx-result').style.opacity = 1;
+            fanfare(m.kind === 'duel' && m.text.startsWith('승리') ? 2 : 1);
+        }, 1100);
+        fxTimer = setTimeout(() => FX.classList.remove('on'), 2900);
+    }
+    // 룰렛: 칸 7개 원판이 돌다 고른 칸에서 멈춤
+    function rouletteFx(m) {
+        clearTimeout(fxTimer);
+        const n = m.slots.length, cols = ['#f59e0b', '#ef4444', '#3b82f6', '#6b7280', '#8b5cf6', '#9ca3af', '#facc15'];
+        const conic = m.slots.map((_, i) => `${cols[i % cols.length]} ${(i / n) * 360}deg ${((i + 1) / n) * 360}deg`).join(', ');
+        FX.innerHTML = `<div class="fx-name">🎡 ${esc(S?.seats?.[m.seat]?.name || '')} 님의 운명의 룰렛</div><div class="pin"></div>
+            <div id="wheel" style="background:conic-gradient(${conic});position:relative">${m.slots.map(([ic], i) => `<span style="position:absolute;left:50%;top:50%;font-size:28px;transform:rotate(${(i + 0.5) * 360 / n}deg) translateY(-112px) translateX(-50%)">${ic}</span>`).join('')}</div>
+            <div class="fx-text" id="fx-result" style="opacity:0">${m.slots[m.index][0]} ${esc(m.slots[m.index][1])}</div>`;
+        FX.classList.add('on');
+        const w = $('wheel');
+        const target = 360 * 6 - (m.index + 0.5) * (360 / n);
+        requestAnimationFrame(() => { w.style.transform = `rotate(${target}deg)`; });
+        tone(500, 2.4, 'triangle', 0.03);
+        setTimeout(() => { $('fx-result').style.opacity = 1; fanfare(m.index === 6 ? 3 : m.index === 0 ? 2 : 0); }, 2700);
+        fxTimer = setTimeout(() => FX.classList.remove('on'), 4600);
+    }
+    FX.addEventListener('click', () => FX.classList.remove('on'));
+    function closeGacha() { clearTimeout(gachaTimer); G.classList.remove('on', 'revealed', 'charging', 'myth'); }
+    G.addEventListener('click', () => { if (G.classList.contains('revealed')) closeGacha(); });
+    function sparks(tier) {
+        const n = [6, 14, 28, 46, 80][tier];
+        const cols = tier === 4 ? ['#ef4444', '#f59e0b', '#22c55e', '#3b82f6', '#a855f7', '#fff'] : [RCOLOR[['common', 'rare', 'epic', 'legend', 'myth'][tier]], '#fff'];
+        for (let i = 0; i < n; i++) {
+            const s = document.createElement('div');
+            s.className = 'spark';
+            const a = Math.random() * Math.PI * 2, d = 160 + Math.random() * (220 + tier * 80);
+            s.style.left = '50%'; s.style.top = '50%';
+            s.style.background = cols[i % cols.length];
+            s.style.setProperty('--dx', `${Math.cos(a) * d}px`); s.style.setProperty('--dy', `${Math.sin(a) * d}px`);
+            document.body.appendChild(s);
+            setTimeout(() => s.remove(), 1300);
+        }
+    }
+
+    // ── 소리 ──
+    let audio = null;
+    function tone(freq, len, type = 'triangle', vol = 0.15, at = 0) {
+        if (!$('ag-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + at;
+            o.type = type; o.frequency.setValueAtTime(freq, t0);
+            g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+            o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + len + 0.02);
+        } catch (e) { /* 소리 없이 */ }
+    }
+    function fanfare(tier) {
+        const notes = [[523], [523, 659], [523, 659, 784], [523, 659, 784, 1047], [523, 659, 784, 1047, 1319, 1568]][tier];
+        notes.forEach((f, i) => tone(f, 0.25 + (i === notes.length - 1 ? 0.4 : 0), 'triangle', 0.16, i * 0.09));
+    }
+
+    // ── 자리·상태 ──
+    function seatHTML(seat) {
+        const p = S?.seats?.[seat], cls = seat[0], label = seat === 'black' ? '흑' : '백';
+        const turn = S?.status === 'playing' && S.turn === seat, win = S?.status === 'over' && S.winner === seat;
+        if (!p) return `<div class="seat flex items-center gap-2"><span class="stone ${cls}"></span><b class="text-[14px]">${label}</b><span class="text-[13px] text-[#8e8e93]">빈 자리</span>${!mySeat && S?.status !== 'playing' ? `<button type="button" class="gm-btn ml-auto" data-sit="${seat}">여기 앉기</button>` : ''}</div>`;
+        return `<div class="seat ${turn ? 'turn' : ''}"><div class="flex items-center gap-2"><span class="stone ${cls}"></span><b class="min-w-0 truncate text-[14px]">${win ? '🏆 ' : ''}${esc(p.name)}${mySeat === seat ? ' (나)' : ''}</b>
+            ${p.bot ? '<span class="tag">컴퓨터</span>' : `<span class="dot" style="background:${p.online ? '#10b981' : '#c7c7cc'}"></span>`}
+            ${p.bot && mySeat && S.status !== 'playing' ? `<button type="button" class="text-[12px] text-[#c4271d]" data-unbot="${seat}">빼기</button>` : ''}
+            <span class="ml-auto text-[12px] text-[#6e6e73]">${p.wins}승</span></div>
+            <p class="mt-1 text-[12.5px] text-[#6e6e73]">💰 ${S.points[seat]}P · 🃏 ${S.hand_count[seat]}장 · 🪨 ${S.place_count?.[seat] || 0}번 둠</p>
+            ${(S.effects?.[seat] || []).length ? `<div class="mt-1 leading-none">${S.effects[seat].map((e) => `<span class="fx" title="${esc(e.name)}">${e.icon} ${esc(e.name)} <b>${esc(e.dur)}</b></span>`).join('')}</div>` : ''}</div>`;
+    }
+    function render(spectators) {
+        $('ag-seats').innerHTML = seatHTML('black') + seatHTML('white') + '<p id="ag-spec" class="pt-1 text-[12px] text-[#8e8e93]"></p>';
+        if (spectators) $('ag-spec').textContent = spectators.length ? `구경 ${spectators.length}명: ${spectators.join(', ')}` : '';
+        const both = S && S.seats.black && S.seats.white;
+        let status = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'playing') {
+            if (myTurn()) status = S.extra && S.extra.first ? `${S.extra.bonus ? '🔁 다섯 번째 돌! 공짜로' : '🟢'} 한 번 더 두세요${S.extra.min_dist ? ` (방금 돌에서 ${S.extra.min_dist}칸 이상)` : ''}` : '🟢 내 차례! 돌을 두거나, 카드를 쓰거나, 뽑으세요';
+            else status = `${S.seats[S.turn]?.name || ''} 차례${S.seats[S.turn]?.bot ? ' (생각 중…)' : ''}`;
+        } else if (S.status === 'over') status = `🏁 ${S.reason}`;
+        else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
+        $('ag-status').textContent = status;
+        $('ag-life').textContent = S && S.status === 'playing' ? `새 돌 수명 ${S.current_life}턴 · ${S.next_grow}턴 뒤 +1${S.events_on ? ` · 중립 이벤트까지 ${S.next_event}턴` : ''}` : '';
+        $('ag-blind').classList.toggle('hidden', !(S && S.blind));
+        if (S && S.blind) $('ag-blind').innerHTML = `🕶 암흑!<br><span style="font-size:15px;font-weight:600">${S.blind}턴 동안 돌이 하나도 안 보여요.<br>기억을 더듬어 두세요…</span>`;
+        const flags = [];
+        if (S?.gray) flags.push(`🩶 잿빛 세상 — 모든 돌이 회색, 내 돌을 기억하세요 (${S.gray}턴)`);
+        if (S?.stack_turns) flags.push(`🥞 돌 업기 중 (${S.stack_turns}턴) — 돌 위에도 둘 수 있어요`);
+        if (S?.hint) flags.push('🔮 AI 조언: 보라색으로 빛나는 칸이 최선의 수');
+        if (S?.skip?.length) flags.push(`😴 ${S.skip.map((x) => S.seats[x]?.name || x).join(', ')} 님 다음 턴 쉼`);
+        $('ag-flags').textContent = flags.join(' · ');
+        $('ag-events').checked = S ? S.events_on : true;
+        $('ag-events').disabled = !(S && S.status !== 'playing' && mySeat);
+        const idle = S && S.status !== 'playing';
+        $('ag-life-sel').value = String(S?.life || 5);
+        $('ag-life-sel').disabled = !(idle && mySeat);
+        $('ag-bot').disabled = !(idle && mySeat && !both);
+        $('ag-start').disabled = !(idle && mySeat && both);
+        $('ag-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('ag-resign').classList.toggle('hidden', !(S?.status === 'playing' && mySeat));
+        $('ag-stand').disabled = !(mySeat && idle);
+        if (!myTurn()) picking = null;
+        document.title = myTurn() ? '🟢 내 차례 · {{ room.title|escapejs }}' : '🌈 {{ room.title|escapejs }} · 증목';
+        renderHand(); renderShop(); draw();
+    }
+    // 빠른 두기 막대
+    function fastLoop() {
+        const bar = $('ag-fast').firstElementChild;
+        if (myTurn() && S.elapsed !== null) {
+            const left = Math.max(0, S.fast_window - (performance.now() - turnStart) / 1000);
+            bar.style.width = `${(left / S.fast_window) * 100}%`;
+            $('ag-fast-txt').textContent = left > 0 ? `⚡ ${left.toFixed(1)}초 안에 두면 포인트 ×2` : '지금 두면 1포인트';
+        } else { bar.style.width = '0%'; $('ag-fast-txt').textContent = S?.status === 'playing' ? '' : ''; }
+        requestAnimationFrame(fastLoop);
+    }
+    requestAnimationFrame(fastLoop);
+    $('ag-seats').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit });
+        const u = e.target.closest('[data-unbot]'); if (u) send({ type: 'remove-bot', seat: u.dataset.unbot });
+    });
+    $('ag-life-sel').addEventListener('change', () => send({ type: 'options', life: +$('ag-life-sel').value }));
+    $('ag-events').addEventListener('change', () => send({ type: 'options', events: $('ag-events').checked }));
+    $('ag-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('ag-start').addEventListener('click', () => send({ type: S?.status === 'over' ? 'rematch' : 'start' }));
+    $('ag-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('ag-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('ag-chat'), div = document.createElement('div');
+        if (m.system) div.innerHTML = `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>`;
+        else div.innerHTML = `${m.seat ? `<span class="stone ${m.seat[0]}" style="width:10px;height:10px;vertical-align:0"></span> ` : ''}<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+    $('ag-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('ag-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('ag-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+    function banner(card) {
+        const b = $('ag-banner');
+        b.style.setProperty('--rc', RCOLOR[card.rarity]);
+        b.textContent = `${card.icon} ${card.name}`;
+        b.classList.remove('show'); void b.offsetWidth; b.classList.add('show');
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => {
+            if (ended) return;
+            $('ag-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function handle(m) {
+        {
+            if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('ag-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+            else if (m.type === 'state') {
+                const prevTurn = S?.turn, prevStatus = S?.status, prevCount = S?.turns;
+                S = m.state; mySeat = m.you || null;
+                if (S.turn !== prevTurn || S.turns !== prevCount || S.status !== prevStatus) turnStart = performance.now() - (S.elapsed || 0) * 1000;
+                if (S.last?.type === 'place' && S.last.fast && S.last.seat === mySeat && prevCount !== S.turns) tone(1046, 0.12, 'triangle', 0.12);
+                if (S.status === 'playing' && myTurn() && prevTurn !== S.turn) tone(660, 0.12);
+                if (S.status === 'over' && prevStatus === 'playing') fanfare(S.winner === mySeat ? 3 : 0);
+                render(m.peers.filter((p) => !p.seat).map((p) => p.name));
+            } else if (m.type === 'draw') {
+                const mine = m.seat === mySeat, who = S?.seats?.[m.seat]?.name || '';
+                gacha(m.card, m.rarity, mine, who);  // 누가 뽑든 모두에게
+            } else if (m.type === 'use') {
+                if (!['dice', 'duel', 'roulette'].includes(m.card.id)) cast(m.card, S?.seats?.[m.seat]?.name || '', m.seat === mySeat);
+                banner(m.card);
+                pulses.push({ cells: m.cells || [], color: RCOLOR[m.card.rarity], start: performance.now() });
+                tone(m.card.rarity === 'myth' ? 220 : 440, 0.25, 'sawtooth', 0.08);
+                if (m.card.rarity === 'myth') { $('ag-main').classList.remove('shake'); void $('ag-main').offsetWidth; $('ag-main').classList.add('shake'); sparks(4); }
+                requestAnimationFrame(draw);
+            } else if (m.type === 'fade') {
+                (m.cells || []).forEach((k) => { const [x, y] = k.split(',').map(Number); const c = get(x, y); fades.push({ x, y, o: c ? c.o : 'b', start: performance.now() }); });
+                tone(200, 0.15, 'sine', 0.06);
+                requestAnimationFrame(draw);
+            } else if (m.type === 'puppet') { banner({ icon: '🎭', name: '꼭두각시!', rarity: 'myth' }); }
+            else if (m.type === 'dice') diceFx(m);
+            else if (m.type === 'roulette') rouletteFx(m);
+            else if (m.type === 'event') {
+                banner({ icon: m.icon, name: m.name, rarity: 'epic' });
+                if (m.cells?.length) pulses.push({ cells: m.cells, color: '#a855f7', start: performance.now() });
+                tone(392, 0.2, 'triangle', 0.1); tone(523, 0.3, 'triangle', 0.1, 0.12);
+                requestAnimationFrame(draw);
+            }
+            else if (m.type === 'chat') chatLine(m);
+            else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+            else if (m.type === 'end') { ended = true; $('ag-status').textContent = `🚪 ${m.reason}`; }
+        }
+    }
+    function begin(name) { store.set('mj-game-name', name); $('ag-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved); else { $('ag-name-box').classList.remove('hidden'); $('ag-name').focus(); }
+    $('ag-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('ag-name').value.trim()); });
+
+    $('ag-copy').addEventListener('click', async () => {
+        const url = $('ag-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('ag-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('ag-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('ag-kakao').addEventListener('click', () => mjShare({ title: `🌈 증목 한 판 — {{ room.title|escapejs }}`, text: '돌이 사라지는 오목 + 증강 카드! 링크를 열고 닉네임만 넣으면 돼요.', url: $('ag-copy').dataset.url, button: '증목 하러 가기' }));
+    new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    render();
+    window.__augomok = { state: () => S, seat: () => mySeat, send, gacha, feed: handle };  // feed: 화면 시험용 (서버 메시지를 그대로 넣어 봄)
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}

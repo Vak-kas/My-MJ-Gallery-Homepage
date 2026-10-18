@@ -1,4 +1,4 @@
-"""실시간 게임 방 (오목·오셀로·그림 맞추기·점 잇기·알까기) — mj-relay 데몬 안에서 함께 돈다.
+"""실시간 게임 방 (오목·오셀로·그림 맞추기·점 잇기·알까기·증목) — mj-relay 데몬 안에서 함께 돈다.
 
 방 하나 = 링크(token)를 가진 사람들. 처음 앉은 사람이 플레이어, 나머지는 구경꾼.
 판은 서버가 들고 규칙도 서버가 판단한다 (차례·빈 칸·승패) → 브라우저는 보여 주기만.
@@ -27,8 +27,10 @@ from aiohttp import WSMsgType, web
 
 try:
 	from catch_words import ALL as CATCH_WORDS  # systemd 에서 relay/ 폴더 기준으로 실행
+	from mj_augomok import AugOmokLogic
 except ImportError:
 	from relay.catch_words import ALL as CATCH_WORDS
+	from relay.mj_augomok import AugOmokLogic
 
 log = logging.getLogger("mj-relay.game")
 
@@ -1317,7 +1319,7 @@ class AlkkagiLogic:
 SKILL_NAMES = {"heavy": "💪 무거운 돌", "ice": "🧊 빙판", "shield": "🛡 방패", "bomb": "💥 폭탄", "curve": "↪️ 커브샷"}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic}
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic}
 
 
 @dataclass

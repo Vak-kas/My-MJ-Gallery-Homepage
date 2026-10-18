@@ -129,6 +129,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "augomok",
+		"url_name": "games:augomok",
+		"icon": "🌈",
+		"title": "증목 (증강 오목)",
+		"description": "돌이 5턴 뒤 사라지는 오목! 빠르게 둘수록 포인트 2배, 포인트로 증강 카드 뽑기(일반~신화 19종, 천장 있음) — 돌풍·강탈·조커 돌·꼭두각시·👑돌을 지배하는 자!!! 컴퓨터와도.",
+		"tags": ["1:1", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
