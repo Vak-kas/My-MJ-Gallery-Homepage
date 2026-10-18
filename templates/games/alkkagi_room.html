@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #b7791f; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #b7791f; border-color: #b7791f; color: #fff; font-weight: 600; }
+    .ak-wrap { position: relative; width: min(100%, 640px); aspect-ratio: 1; margin: 0 auto; }
+    #ak-board { width: 100%; height: 100%; display: block; border-radius: 16px; box-shadow: 0 12px 30px rgba(120, 72, 20, 0.35); touch-action: none; cursor: grab; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 10px 12px; }
+    .seat.turn { border-color: #b7791f; background: #fdf6e9; }
+    .stone { display: inline-block; width: 16px; height: 16px; border-radius: 999px; vertical-align: -3px; flex: none; }
+    .stone.b { background: radial-gradient(circle at 35% 30%, #666, #000); }
+    .stone.w { background: radial-gradient(circle at 35% 30%, #fff, #cfcfcf); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25); }
+    .mini { width: 9px; height: 9px; margin-right: 1px; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .tag { border-radius: 6px; background: #ececf0; padding: 0 6px; font-size: 11px; color: #6e6e73; }
+    .skill { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; min-width: 68px; border-radius: 14px; border: 2px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 6px 8px; font-size: 12px; color: #1d1d1f; }
+    .skill b { font-size: 20px; line-height: 1; }
+    .skill.on { border-color: #b7791f; background: #fdf6e9; box-shadow: 0 0 0 3px rgba(183, 121, 31, 0.15); }
+    .skill:disabled { opacity: 0.35; cursor: default; }
+    #ak-chat { height: 180px; overflow-y: auto; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go { background: #b7791f; color: #fff; }
+    html.theme-dark .seat { background: #111318; }
+    html.theme-dark .seat.turn { background: #3a2a12; }
+    html.theme-dark .tag { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .skill { background: #1c1f26; border-color: rgba(255, 255, 255, 0.12); color: #e8e8ea; }
+    html.theme-dark .skill.on { background: #3a2a12; border-color: #d69e2e; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:alkkagi' %}" class="text-[13px] text-[#b7791f]">← 알까기 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🥌 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 1:1 · 내 돌을 뒤로 당겼다 놓아서 상대 돌을 판 밖으로</p>
+        </div>
+        <button type="button" class="gm-btn" id="ak-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="ak-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:alkkagi_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="ak-name-box" class="gm-card mt-5 hidden">
+        <form id="ak-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="ak-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#b7791f] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <p id="ak-status" class="mb-3 text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="ak-wrap"><canvas id="ak-board" width="1200" height="1200"></canvas></div>
+            <div id="ak-skills" class="mt-4 flex flex-wrap justify-center gap-2"></div>
+            <p id="ak-skill-help" class="mt-2 min-h-[18px] text-center text-[12.5px] text-[#8e8e93]"></p>
+            <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+                <select id="ak-count" class="gm-btn" aria-label="돌 개수"><option value="5">돌 5개씩</option><option value="8">돌 8개씩</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="ak-skills-on" type="checkbox" class="h-4 w-4" checked> 스킬</label>
+                <button type="button" class="gm-btn" id="ak-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="ak-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="ak-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="ak-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="ak-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+            <p class="mt-3 text-center text-[12px] text-[#8e8e93]">내 돌을 누른 채 <b>쏘고 싶은 반대쪽으로 끌었다가</b> 놓으세요. 멀리 끌수록 세게 나가요. 판 밖으로 나간 돌은 빠져요.</p>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="ak-seats"></section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="ak-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="ak-chat-form" class="mt-2 flex gap-2"><input id="ak-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const SKILLS = {
+        heavy: ['💪', '무거운 돌', '내 돌이 3배 무거워져 상대를 세게 밀어요'],
+        ice: ['🧊', '빙판', '이번 턴은 모든 돌이 덜 멈춰서 멀리 미끄러져요'],
+        shield: ['🛡', '방패', '상대의 다음 턴 동안 내 돌이 잘 안 밀려요'],
+        bomb: ['💥', '폭탄', '처음 부딪힌 곳 주변 돌까지 사방으로 튕겨요'],
+        curve: ['↪️', '커브샷', '왼쪽/오른쪽으로 휘어 나가요 (한 번 더 누르면 방향 바꾸기)'],
+    };
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+
+    let pid = store.get(`mj-alkkagi-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-alkkagi-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0;
+    let skill = null, curveDir = 1;       // 고른 스킬
+    let aim = null;                       // { id, sx, sy, px, py } 끌고 있는 중
+    let replay = null;                    // { frames, start } 장면 재생 중
+    let pending = null;                   // 장면이 끝난 뒤 보여 줄 상태
+    const canvas = $('ak-board'), ctx = canvas.getContext('2d');
+
+    // ── 좌표: 판 1000 단위 ↔ 캔버스 1200px ──
+    const W = 1200, PAD = 70, SC = (W - PAD * 2) / 1000;
+    const toPx = (u) => PAD + u * SC;
+    const fromEvent = (e) => { const r = canvas.getBoundingClientRect(); return [((e.clientX - r.left) * (W / r.width) - PAD) / SC, ((e.clientY - r.top) * (W / r.height) - PAD) / SC]; };
+    const POWER_DRAG = 300;               // 이만큼(판 단위) 끌면 최대 세기
+
+    function drawBoard() {
+        const g = ctx.createLinearGradient(0, 0, W, W);
+        g.addColorStop(0, '#e6b873'); g.addColorStop(1, '#c98f46');
+        ctx.fillStyle = g; ctx.fillRect(0, 0, W, W);
+        // 나뭇결 느낌
+        ctx.globalAlpha = 0.07; ctx.strokeStyle = '#5a3412';
+        for (let i = 0; i < 26; i++) { ctx.lineWidth = 2 + (i % 3); ctx.beginPath(); ctx.moveTo(0, i * 48 + 10); ctx.bezierCurveTo(W * 0.3, i * 48 - 14, W * 0.7, i * 48 + 30, W, i * 48 + 6); ctx.stroke(); }
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = 'rgba(60,35,10,0.75)'; ctx.lineWidth = 2;
+        for (let i = 0; i < 19; i++) {
+            const p = toPx(i * 1000 / 18);
+            ctx.beginPath(); ctx.moveTo(toPx(0), p); ctx.lineTo(toPx(1000), p); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(p, toPx(0)); ctx.lineTo(p, toPx(1000)); ctx.stroke();
+        }
+        ctx.lineWidth = 5; ctx.strokeRect(toPx(0), toPx(0), 1000 * SC, 1000 * SC);
+        ctx.fillStyle = 'rgba(60,35,10,0.85)';
+        [3, 9, 15].forEach((a) => [3, 9, 15].forEach((b) => { ctx.beginPath(); ctx.arc(toPx(a * 1000 / 18), toPx(b * 1000 / 18), 7, 0, Math.PI * 2); ctx.fill(); }));
+    }
+    function drawStone(x, y, owner, opts = {}) {
+        const r = (S?.radius || 26) * SC, cx = toPx(x), cy = toPx(y);
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.45)'; ctx.shadowBlur = r * 0.35; ctx.shadowOffsetY = r * 0.18;
+        const grad = ctx.createRadialGradient(cx - r * 0.35, cy - r * 0.35, r * 0.1, cx, cy, r);
+        if (owner === 'black') { grad.addColorStop(0, '#6b6b6b'); grad.addColorStop(1, '#050505'); } else { grad.addColorStop(0, '#ffffff'); grad.addColorStop(1, '#cfcfcf'); }
+        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        if (opts.glow) { ctx.strokeStyle = 'rgba(255,214,102,0.95)'; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(cx, cy, r + 6, 0, Math.PI * 2); ctx.stroke(); }
+        if (opts.shield) { ctx.strokeStyle = 'rgba(96,165,250,0.85)'; ctx.lineWidth = 4; ctx.setLineDash([8, 6]); ctx.beginPath(); ctx.arc(cx, cy, r + 10, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]); }
+    }
+    function owners() { const m = {}; (S?.stones || []).forEach((s) => { m[s.id] = s.owner; }); return m; }
+    function draw() {
+        drawBoard();
+        if (!S) return;
+        if (replay) {
+            const own = replay.owners;
+            const i = Math.min(replay.frames.length - 1, Math.floor((performance.now() - replay.start) / (1000 / 30)));
+            replay.frames[i].forEach(([id, x, y]) => drawStone(x, y, own[id] || (id < 100 ? 'black' : 'white')));
+            if (i >= replay.frames.length - 1) finishReplay(); else requestAnimationFrame(draw);
+            return;
+        }
+        const mine = myTurn();
+        S.stones.forEach((s) => drawStone(s.x, s.y, s.owner, { glow: mine && s.owner === mySeat && (!aim || aim.id === s.id), shield: S.shield && S.shield === s.owner && S.turn !== s.owner }));
+        if (aim) {
+            const st = S.stones.find((s) => s.id === aim.id);
+            if (st) {
+                const dx = aim.sx - aim.px, dy = aim.sy - aim.py, len = Math.min(POWER_DRAG, Math.hypot(dx, dy));
+                const ux = dx / (Math.hypot(dx, dy) || 1), uy = dy / (Math.hypot(dx, dy) || 1), power = len / POWER_DRAG;
+                // 당긴 줄 (고무줄)
+                ctx.strokeStyle = 'rgba(80,40,10,0.6)'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(toPx(st.x), toPx(st.y)); ctx.lineTo(toPx(st.x - ux * len), toPx(st.y - uy * len)); ctx.stroke();
+                // 나갈 방향 화살표
+                const reach = 80 + power * 380, col = power > 0.85 ? '#ef4444' : power > 0.5 ? '#f59e0b' : '#22c55e';
+                const ex = st.x + ux * reach, ey = st.y + uy * reach;
+                ctx.strokeStyle = col; ctx.lineWidth = 8; ctx.lineCap = 'round'; ctx.setLineDash([18, 12]);
+                ctx.beginPath(); ctx.moveTo(toPx(st.x + ux * 34), toPx(st.y + uy * 34)); ctx.lineTo(toPx(ex), toPx(ey)); ctx.stroke(); ctx.setLineDash([]);
+                const ang = Math.atan2(uy, ux); ctx.fillStyle = col; ctx.beginPath();
+                ctx.moveTo(toPx(ex) + Math.cos(ang) * 26, toPx(ey) + Math.sin(ang) * 26);
+                ctx.lineTo(toPx(ex) + Math.cos(ang + 2.5) * 22, toPx(ey) + Math.sin(ang + 2.5) * 22);
+                ctx.lineTo(toPx(ex) + Math.cos(ang - 2.5) * 22, toPx(ey) + Math.sin(ang - 2.5) * 22); ctx.fill();
+                // 세기 막대
+                ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(40, W - 46, W - 80, 18);
+                ctx.fillStyle = col; ctx.fillRect(40, W - 46, (W - 80) * power, 18);
+                ctx.fillStyle = '#fff'; ctx.font = '600 22px -apple-system, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(`세기 ${Math.round(power * 100)}%${skill ? ` · ${SKILLS[skill][0]} ${SKILLS[skill][1]}${skill === 'curve' ? (curveDir > 0 ? ' →' : ' ←') : ''}` : ''}`, W / 2, W - 54);
+            }
+        }
+    }
+    function finishReplay() {
+        replay = null;
+        if (pending) { S = pending.state; mySeat = pending.you; pending = null; }
+        render();
+    }
+
+    // ── 당겨서 쏘기 ──
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat && !replay;
+    canvas.addEventListener('pointerdown', (e) => {
+        if (!S) return;
+        if (!mySeat) { toast(S.status === 'playing' ? '구경 중이에요.' : '먼저 오른쪽에서 자리에 앉으세요.'); return; }
+        if (S.status !== 'playing') { toast('▶ 시작을 누르면 시작해요.'); return; }
+        if (!myTurn()) { toast(replay ? '돌이 멈출 때까지 기다려 주세요.' : '내 차례가 아니에요.'); return; }
+        const [x, y] = fromEvent(e), r = (S.radius || 26) * 1.6;
+        const st = S.stones.filter((s) => s.owner === mySeat).sort((a, b) => Math.hypot(a.x - x, a.y - y) - Math.hypot(b.x - x, b.y - y))[0];
+        if (!st || Math.hypot(st.x - x, st.y - y) > r) { toast('내 돌을 눌러서 끌어 주세요.'); return; }
+        aim = { id: st.id, sx: x, sy: y, px: x, py: y };
+        try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* 일부 브라우저·가짜 입력 */ }
+        canvas.style.cursor = 'grabbing';
+        draw();
+    });
+    canvas.addEventListener('pointermove', (e) => { if (!aim) return; [aim.px, aim.py] = fromEvent(e); draw(); });
+    const release = (e, cancel) => {
+        if (!aim) return;
+        const a = aim; aim = null; canvas.style.cursor = 'grab';
+        const dx = a.sx - a.px, dy = a.sy - a.py, len = Math.min(POWER_DRAG, Math.hypot(dx, dy));
+        if (cancel || len < 18) { draw(); return; }
+        const v = (len / POWER_DRAG) * (S.vmax || 1500), d = Math.hypot(dx, dy);
+        const msg = { type: 'flick', stone: a.id, vx: dx / d * v, vy: dy / d * v };
+        if (skill) { msg.skill = skill; if (skill === 'curve') msg.curve = curveDir; }
+        send(msg);
+        skill = null;
+        renderSkills();
+        draw();
+    };
+    canvas.addEventListener('pointerup', (e) => release(e, false));
+    canvas.addEventListener('pointercancel', (e) => release(e, true));
+
+    // ── 스킬 ──
+    function renderSkills() {
+        const box = $('ak-skills');
+        if (!S || !S.skills_on || !mySeat) { box.innerHTML = ''; $('ak-skill-help').textContent = S && !S.skills_on ? '스킬 없이 하는 판이에요.' : ''; return; }
+        const info = S.skills[mySeat], usedUp = info.used >= info.max;
+        box.innerHTML = Object.entries(SKILLS).map(([k, [ic, name]]) => {
+            const ok = info.left.includes(k) && !usedUp && S.status === 'playing';
+            return `<button type="button" class="skill ${skill === k ? 'on' : ''}" data-skill="${k}" ${ok ? '' : 'disabled'} title="${SKILLS[k][2]}"><b>${ic}</b>${name}${k === 'curve' && skill === 'curve' ? (curveDir > 0 ? ' →' : ' ←') : ''}</button>`;
+        }).join('') + `<span class="self-center text-[12px] text-[#8e8e93]">남은 스킬 ${info.max - info.used}번</span>`;
+        $('ak-skill-help').textContent = skill ? `${SKILLS[skill][0]} ${SKILLS[skill][1]}: ${SKILLS[skill][2]} — 이번에 쏠 때 써요` : '스킬을 고르면 이번 샷에 써요 (한 판 3번, 종류마다 한 번)';
+    }
+    $('ak-skills').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-skill]'); if (!b) return;
+        const k = b.dataset.skill;
+        if (k === 'curve' && skill === 'curve') curveDir = -curveDir;  // 한 번 더 누르면 방향
+        else skill = skill === k ? null : k;
+        renderSkills(); draw();
+    });
+
+    // ── 자리·상태 ──
+    function seatHTML(seat) {
+        const p = S?.seats?.[seat], cls = seat === 'black' ? 'b' : 'w', label = seat === 'black' ? '흑' : '백';
+        const turn = S?.status === 'playing' && S.turn === seat, win = S?.status === 'over' && S.winner === seat;
+        if (!p) return `<div class="seat flex items-center gap-2"><span class="stone ${cls}"></span><b class="text-[14px]">${label}</b><span class="text-[13px] text-[#8e8e93]">빈 자리</span>${!mySeat && S?.status !== 'playing' ? `<button type="button" class="gm-btn ml-auto" data-sit="${seat}">여기 앉기</button>` : ''}</div>`;
+        const left = Array.from({ length: p.left }, () => `<span class="stone ${cls} mini"></span>`).join('');
+        return `<div class="seat ${turn ? 'turn' : ''}">
+            <div class="flex items-center gap-2"><span class="stone ${cls}"></span><b class="min-w-0 truncate text-[14px]">${win ? '🏆 ' : ''}${esc(p.name)}${mySeat === seat ? ' (나)' : ''}</b>
+            ${p.bot ? '<span class="tag">컴퓨터</span>' : `<span class="dot" style="background:${p.online ? '#10b981' : '#c7c7cc'}"></span>`}
+            ${p.bot && mySeat && S.status !== 'playing' ? `<button type="button" class="text-[12px] text-[#c4271d]" data-unbot="${seat}">빼기</button>` : ''}
+            <span class="ml-auto text-[18px] font-bold tabular-nums">${p.left}</span><span class="w-8 text-right text-[12px] text-[#6e6e73]">${p.wins}승</span></div>
+            <div class="mt-1.5 leading-none">${left}</div>
+            ${S.shield === seat ? '<p class="mt-1 text-[11.5px] text-[#2563eb]">🛡 방패: 상대의 다음 턴 동안 잘 안 밀려요</p>' : ''}
+        </div>`;
+    }
+    function render(spectators) {
+        $('ak-seats').innerHTML = seatHTML('black') + seatHTML('white') + `<p id="ak-spec" class="pt-1 text-[12px] text-[#8e8e93]"></p>`;
+        if (spectators) $('ak-spec').textContent = spectators.length ? `구경 ${spectators.length}명: ${spectators.join(', ')}` : '';
+        const both = S && S.seats.black && S.seats.white;
+        let status = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'playing') status = myTurn() ? '🟢 내 차례예요! 내 돌을 뒤로 당겼다 놓으세요' : `${S.seats[S.turn]?.name || ''} 차례${S.seats[S.turn]?.bot ? ' (생각 중…)' : ''}`;
+        else if (S.status === 'over') status = `🏁 ${S.reason}`;
+        else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
+        $('ak-status').textContent = status;
+        const idle = S && S.status !== 'playing';
+        $('ak-count').value = String(S?.count || 8);
+        $('ak-skills-on').checked = S ? S.skills_on : true;
+        $('ak-count').disabled = $('ak-skills-on').disabled = !(idle && mySeat);
+        $('ak-bot').disabled = !(idle && mySeat && !both);
+        $('ak-start').disabled = !(idle && mySeat && both);
+        $('ak-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('ak-resign').classList.toggle('hidden', !(S?.status === 'playing' && mySeat));
+        $('ak-stand').disabled = !(mySeat && idle);
+        document.title = myTurn() ? '🟢 내 차례 · {{ room.title|escapejs }}' : '🥌 {{ room.title|escapejs }} · 알까기';
+        renderSkills();
+        draw();
+    }
+    $('ak-seats').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit });
+        const u = e.target.closest('[data-unbot]'); if (u) send({ type: 'remove-bot', seat: u.dataset.unbot });
+    });
+    $('ak-count').addEventListener('change', () => send({ type: 'options', count: +$('ak-count').value }));
+    $('ak-skills-on').addEventListener('change', () => send({ type: 'options', skills: $('ak-skills-on').checked }));
+    $('ak-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('ak-start').addEventListener('click', () => send({ type: S?.status === 'over' ? 'rematch' : 'start' }));
+    $('ak-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('ak-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // ── 채팅·소리 ──
+    function chatLine(m) {
+        const box = $('ak-chat'), div = document.createElement('div');
+        if (m.system) div.innerHTML = `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>`;
+        else div.innerHTML = `${m.seat ? `<span class="stone ${m.seat === 'black' ? 'b' : 'w'}" style="width:10px;height:10px;vertical-align:0"></span> ` : ''}<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+    $('ak-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('ak-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('ak-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+    let audio = null;
+    function beep(freq, len, type = 'triangle', vol = 0.18, at = 0) {
+        if (!$('ak-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain(), t0 = audio.currentTime + at;
+            o.type = type; o.frequency.setValueAtTime(freq, t0);
+            g.gain.setValueAtTime(vol, t0); g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+            o.connect(g).connect(audio.destination); o.start(t0); o.stop(t0 + len + 0.02);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => {
+            const m = JSON.parse(ev.data);
+            if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('ak-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+            else if (m.type === 'shot') {
+                // 서버가 계산한 장면을 그대로 재생 (모두 같은 장면)
+                replay = { frames: m.frames, start: performance.now(), owners: owners() };
+                beep(m.skill === 'bomb' ? 120 : 520, 0.08, 'square', 0.16);
+                const dur = m.frames.length / 30;
+                (m.out || []).forEach((_, i) => beep(300 - i * 30, 0.25, 'sine', 0.2, Math.min(dur, 0.6 + i * 0.15)));
+                requestAnimationFrame(draw);
+            } else if (m.type === 'state') {
+                const spect = m.peers.filter((p) => !p.seat).map((p) => p.name);
+                if (replay) { pending = { state: m.state, you: m.you || null }; render(spect); return; }  // 장면이 끝나면 바꿈
+                S = m.state; mySeat = m.you || null;
+                render(spect);
+            } else if (m.type === 'chat') chatLine(m);
+            else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+            else if (m.type === 'end') { ended = true; $('ak-status').textContent = `🚪 ${m.reason}`; }
+        };
+        ws.onclose = () => {
+            if (ended) return;
+            $('ak-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) { store.set('mj-game-name', name); $('ak-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved); else { $('ak-name-box').classList.remove('hidden'); $('ak-name').focus(); }
+    $('ak-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('ak-name').value.trim()); });
+
+    $('ak-copy').addEventListener('click', async () => {
+        const url = $('ak-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('ak-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('ak-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('ak-kakao').addEventListener('click', () => mjShare({ title: `🥌 알까기 한 판 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('ak-copy').dataset.url, button: '알까기 하러 가기' }));
+    render();
+    window.__alkkagi = { state: () => S, seat: () => mySeat, send, replaying: () => !!replay };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}

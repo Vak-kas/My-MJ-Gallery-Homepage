@@ -1,4 +1,4 @@
-"""실시간 게임 방 (오목·오셀로·그림 맞추기·점 잇기) — mj-relay 데몬 안에서 함께 돈다.
+"""실시간 게임 방 (오목·오셀로·그림 맞추기·점 잇기·알까기) — mj-relay 데몬 안에서 함께 돈다.
 
 방 하나 = 링크(token)를 가진 사람들. 처음 앉은 사람이 플레이어, 나머지는 구경꾼.
 판은 서버가 들고 규칙도 서버가 판단한다 (차례·빈 칸·승패) → 브라우저는 보여 주기만.
@@ -18,6 +18,7 @@ import asyncio
 import hmac
 import json
 import logging
+import math
 import secrets
 import time
 from dataclasses import dataclass, field
@@ -925,7 +926,398 @@ class DotsLogic:
 		}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic}
+# ── 알까기 ──────────────────────────────────
+
+class AlkkagiLogic:
+	"""알까기 1:1 (+ 컴퓨터). 판은 1000×1000, 돌 반지름 26. 차례에 내 돌 하나를 튕기면 서버가 물리 계산
+	(마찰·부딪힘)을 끝까지 해서 장면(프레임)을 모두에게 보내고, 판 밖으로 나간 돌은 빠짐. 상대 돌을 다 내보내면 승리.
+	스킬(한 판 3번, 종류마다 한 번): heavy 무거운 돌 · ice 빙판 · shield 방패 · bomb 폭탄 · curve 커브샷."""
+
+	kind = "alkkagi"
+	SEATS = ("black", "white")
+	BOARD = 1000.0
+	R = 26.0
+	FRICTION = 420.0       # 속도가 1초에 줄어드는 양 (단위/초²)
+	VMAX = 1500.0          # 가장 세게 튕긴 속도
+	E = 0.92               # 부딪힘 반발 계수
+	DT = 1 / 240
+	FRAME_EVERY = 8        # 240Hz 계산 중 8번에 한 번 기록 → 30fps
+	MAX_TIME = 8.0
+	SKILLS = ("heavy", "ice", "shield", "bomb", "curve")
+	SKILL_USES = 3
+	BOT_DELAY = 1.0
+	BOT_NAME = "🤖 컴퓨터"
+
+	def __init__(self, rng=None):
+		import random as _random
+		self.rng = rng or _random.Random()
+		self.seats = {"black": None, "white": None}
+		self.names = {"black": "", "white": ""}
+		self.bots = set()
+		self.wins = {"black": 0, "white": 0}
+		self.count = 8
+		self.skills_on = True
+		self.starter = "black"
+		self.reset()
+
+	def reset(self):
+		self.stones = self._layout(self.count)
+		self.status = "waiting"
+		self.turn = None
+		self.winner = None
+		self.reason = ""
+		self.shots = 0
+		self.skill_left = {s: list(self.SKILLS) for s in self.SEATS}
+		self.skill_used = {s: 0 for s in self.SEATS}
+		self.shield = None      # 이 자리의 돌은 다음 상대 턴 동안 무거움
+		self.busy_until = 0.0   # 장면이 다 재생될 때까지 다음 수를 받지 않음
+		self.bot_due = 0.0
+		self.last = None
+
+	def _layout(self, count):
+		B = self.BOARD
+		xs = [B * (0.14 + 0.72 * i / max(1, count - 1)) for i in range(count)]
+		stones = []
+		for i, x in enumerate(xs):
+			stones.append({"id": i, "owner": "black", "x": x, "y": B * 0.8})
+			stones.append({"id": 100 + i, "owner": "white", "x": x, "y": B * 0.2})
+		return stones
+
+	def seat_of(self, pid):
+		return next((s for s, p in self.seats.items() if p == pid and s not in self.bots), None)
+
+	def other(self, seat):
+		return "white" if seat == "black" else "black"
+
+	def alive(self, seat):
+		return [st for st in self.stones if st["owner"] == seat]
+
+	# ── 물리 ──
+	def simulate(self, stones, shooter_id, vx, vy, *, skill=None, curve=0, shield=None):
+		"""stones 를 그 자리에서 움직임. 프레임 [[id, x, y], ...] 목록과 빠진 돌 id 목록을 돌려줌."""
+		B, R, dt = self.BOARD, self.R, self.DT
+		mu = self.FRICTION * (0.4 if skill == "ice" else 1.0)
+		for st in stones:
+			st["vx"] = st["vy"] = 0.0
+			st["m"] = 3.0 if shield and st["owner"] == shield else 1.0
+		shooter = next(st for st in stones if st["id"] == shooter_id)
+		shooter["vx"], shooter["vy"] = vx, vy
+		if skill == "heavy":
+			shooter["m"] = 3.0
+		speed0 = math.hypot(vx, vy) or 1.0
+		lat = (-vy / speed0 * curve, vx / speed0 * curve)  # 커브: 처음 방향에 수직
+		curving, bombed = skill == "curve" and curve != 0, skill != "bomb"
+		frames, out, t, step = [], [], 0.0, 0
+		live = list(stones)
+		while t < self.MAX_TIME:
+			moving = False
+			for st in live:
+				sp = math.hypot(st["vx"], st["vy"])
+				if st is shooter and curving and sp > 0:
+					st["vx"] += lat[0] * 520 * dt
+					st["vy"] += lat[1] * 520 * dt
+					sp = math.hypot(st["vx"], st["vy"])
+				if sp > 0:
+					dec = mu * dt
+					if sp <= dec:
+						st["vx"] = st["vy"] = 0.0
+					else:
+						k = (sp - dec) / sp
+						st["vx"] *= k
+						st["vy"] *= k
+						moving = True
+					st["x"] += st["vx"] * dt
+					st["y"] += st["vy"] * dt
+			# 부딪힘
+			for i in range(len(live)):
+				a = live[i]
+				for j in range(i + 1, len(live)):
+					b = live[j]
+					dx, dy = b["x"] - a["x"], b["y"] - a["y"]
+					d2 = dx * dx + dy * dy
+					if d2 >= 4 * R * R or d2 == 0:
+						continue
+					d = math.sqrt(d2)
+					nx, ny = dx / d, dy / d
+					ia, ib = 1 / a["m"], 1 / b["m"]
+					over = 2 * R - d
+					a["x"] -= nx * over * ia / (ia + ib)
+					a["y"] -= ny * over * ia / (ia + ib)
+					b["x"] += nx * over * ib / (ia + ib)
+					b["y"] += ny * over * ib / (ia + ib)
+					vn = (a["vx"] - b["vx"]) * nx + (a["vy"] - b["vy"]) * ny
+					if vn > 0:
+						J = (1 + self.E) * vn / (ia + ib)
+						a["vx"] -= J * ia * nx
+						a["vy"] -= J * ia * ny
+						b["vx"] += J * ib * nx
+						b["vy"] += J * ib * ny
+						moving = True
+					if a is shooter or b is shooter:
+						curving = False  # 부딪히면 커브 끝
+						if not bombed:  # 폭탄: 처음 부딪힌 곳 주변을 사방으로
+							bombed = True
+							cx, cy = (a["x"] + b["x"]) / 2, (a["y"] + b["y"]) / 2
+							for st in live:
+								if st is shooter:
+									continue
+								ex, ey = st["x"] - cx, st["y"] - cy
+								dist = math.hypot(ex, ey)
+								if dist < 170:
+									push = 700 * (1 - dist / 170) / st["m"]
+									st["vx"] += (ex / (dist or 1)) * push
+									st["vy"] += (ey / (dist or 1)) * push
+			# 판 밖
+			for st in list(live):
+				if not (0 <= st["x"] <= B and 0 <= st["y"] <= B):
+					live.remove(st)
+					out.append(st["id"])
+			if step % self.FRAME_EVERY == 0:
+				frames.append([[st["id"], round(st["x"], 1), round(st["y"], 1)] for st in live])
+			step += 1
+			t += dt
+			if not moving:
+				break
+		frames.append([[st["id"], round(st["x"], 1), round(st["y"], 1)] for st in live])
+		stones[:] = [st for st in stones if st["id"] not in out]
+		for st in stones:
+			for k in ("vx", "vy", "m"):
+				st.pop(k, None)
+		return frames, out
+
+	def _shoot(self, room, seat, stone_id, vx, vy, skill=None, curve=0):
+		sp = math.hypot(vx, vy)
+		if sp > self.VMAX:
+			vx, vy = vx / sp * self.VMAX, vy / sp * self.VMAX
+		shield = self.shield if self.shield and self.shield != seat else None
+		frames, out = self.simulate(self.stones, stone_id, vx, vy, skill=skill, curve=curve, shield=shield)
+		if shield:
+			self.shield = None  # 상대 턴 한 번 막고 끝
+		if skill:
+			self.skill_left[seat].remove(skill)
+			self.skill_used[seat] += 1
+			if skill == "shield":
+				self.shield = seat
+			room.notice(f"{self.names[seat]} 님이 {SKILL_NAMES[skill]} 스킬을 썼어요!")
+		self.shots += 1
+		lost = {s: sum(1 for i in out if (i < 100) == (s == "black")) for s in self.SEATS}
+		self.last = {"seat": seat, "stone": stone_id, "out": out, "skill": skill}
+		duration = len(frames) / 30
+		self.busy_until = time.time() + duration
+		room.emit({"type": "shot", "seat": seat, "skill": skill, "frames": frames, "out": out})
+		if lost[self.other(seat)]:
+			room.notice(f"{self.names[seat]} 님이 {lost[self.other(seat)]}개를 쳐냈어요!")
+		mine, theirs = self.alive(seat), self.alive(self.other(seat))
+		if not theirs or not mine:
+			self.status = "over"
+			self.turn = None
+			if not theirs and not mine:
+				self.winner, self.reason = None, "둘 다 마지막 돌이 나갔어요. 무승부!"
+			else:
+				w = seat if mine else self.other(seat)
+				self.winner = w
+				self.wins[w] += 1
+				self.reason = f"{self.names[w]} 님이 이겼어요! (남은 돌 {len(self.alive(w))}개)"
+			room.notice(f"🏁 {self.reason}")
+			return
+		self.turn = self.other(seat)
+		self._arm_bot()
+
+	def _arm_bot(self):
+		if self.status == "playing" and self.turn in self.bots:
+			self.bot_due = max(time.time(), self.busy_until) + self.BOT_DELAY
+
+	# ── 컴퓨터: 판 밖까지 밀어낼 수 있는 가장 쉬운 정면 샷 ──
+	def bot_shot(self, seat):
+		"""(stone_id, vx, vy, skill). 정면으로 맞히면 같은 무게의 돌은 속도를 거의 그대로 넘겨받는다고 보고,
+		과녁 돌이 판 밖까지 갈 속도를 거꾸로 계산. 가는 길이 막힌 샷은 빼고, 필요한 속도가 가장 작은 걸 고름."""
+		B, R, mu = self.BOARD, self.R, self.FRICTION
+		mine, theirs = self.alive(seat), self.alive(self.other(seat))
+		others = mine + theirs
+		best = None
+		for a in mine:
+			for b in theirs:
+				dx, dy = b["x"] - a["x"], b["y"] - a["y"]
+				dist = math.hypot(dx, dy)
+				if dist < 1:
+					continue
+				ux, uy = dx / dist, dy / dist
+				# 가는 길에 다른 돌이 있으면 빼기
+				blocked = False
+				for c in others:
+					if c is a or c is b:
+						continue
+					px, py = c["x"] - a["x"], c["y"] - a["y"]
+					along = px * ux + py * uy
+					if 0 < along < dist and abs(px * uy - py * ux) < 2 * R:
+						blocked = True
+						break
+				if blocked:
+					continue
+				# 과녁이 이 방향으로 판 밖까지 가는 거리
+				edge = min(((B - b["x"]) / ux if ux > 0 else (-b["x"] / ux if ux < 0 else 1e9)),
+						   ((B - b["y"]) / uy if uy > 0 else (-b["y"] / uy if uy < 0 else 1e9)))
+				travel = dist - 2 * R
+				vc2 = 2 * mu * (edge + R) / (((1 + self.E) / 2) ** 2)
+				v0 = math.sqrt(vc2 + 2 * mu * travel) * 1.12
+				if best is None or v0 < best[0]:
+					best = (v0, a["id"], ux, uy)
+		if best is None:  # 다 막혔으면 가장 가까운 상대 돌 쪽으로 세게
+			a = self.rng.choice(mine)
+			b = min(theirs, key=lambda t: math.hypot(t["x"] - a["x"], t["y"] - a["y"]))
+			d = math.hypot(b["x"] - a["x"], b["y"] - a["y"]) or 1
+			best = (self.VMAX * 0.8, a["id"], (b["x"] - a["x"]) / d, (b["y"] - a["y"]) / d)
+		v0, sid, ux, uy = best
+		skill = None
+		left = self.skill_left[seat] if self.skills_on and self.skill_used[seat] < self.SKILL_USES else []
+		if v0 > self.VMAX and "ice" in left:
+			skill, v0 = "ice", v0 * math.sqrt(0.4)
+		elif v0 > self.VMAX and "heavy" in left:
+			skill = "heavy"
+		elif len(theirs) >= 3 and "bomb" in left and self.rng.random() < 0.35:
+			skill = "bomb"
+		ang = math.atan2(uy, ux) + self.rng.gauss(0, 0.035)  # 사람처럼 살짝 빗나감
+		v = min(self.VMAX, v0)
+		return sid, math.cos(ang) * v, math.sin(ang) * v, skill
+
+	def tick(self, room, now):
+		if self.status != "playing" or self.turn not in self.bots or now < self.bot_due:
+			return False
+		sid, vx, vy, skill = self.bot_shot(self.turn)
+		self._shoot(room, self.turn, sid, vx, vy, skill)
+		return True
+
+	# ── 메시지 ──
+	def on_message(self, room, peer, data):
+		kind = data.get("type")
+		seat = self.seat_of(peer.pid)
+		if kind == "sit":
+			if seat:
+				return False, "이미 앉아 있어요."
+			if self.status == "playing":
+				return False, "판이 진행 중이에요. 끝나면 앉을 수 있어요."
+			free = [s for s in self.SEATS if not self.seats[s]]
+			want = data.get("seat")
+			target = want if want in free else (free[0] if free and want in (None, "any") else None)
+			if not target:
+				return False, "빈 자리가 없어요."
+			self.seats[target], self.names[target] = peer.pid, peer.name
+			room.notice(f"{peer.name} 님이 {'흑' if target == 'black' else '백'}돌로 앉았어요.")
+			return True, None
+		if kind == "stand":
+			if not seat or self.status == "playing":
+				return False, "판이 진행 중이에요. 그만하려면 기권하세요." if seat else None
+			self.seats[seat], self.names[seat] = None, ""
+			room.notice(f"{peer.name} 님이 자리에서 일어났어요.")
+			return True, None
+		if kind == "add-bot":
+			free = [s for s in self.SEATS if not self.seats[s]]
+			if not seat or self.status == "playing" or not free:
+				return False, "먼저 자리에 앉으세요." if not seat else None
+			s = free[0]
+			self.seats[s], self.names[s] = f"bot:{s}", self.BOT_NAME
+			self.bots.add(s)
+			room.notice("🤖 컴퓨터가 들어왔어요.")
+			return True, None
+		if kind == "remove-bot":
+			s = data.get("seat")
+			if not seat or s not in self.bots or self.status == "playing":
+				return False, None
+			self.bots.discard(s)
+			self.seats[s], self.names[s] = None, ""
+			room.notice("🤖 컴퓨터가 나갔어요.")
+			return True, None
+		if kind == "options":
+			if not seat or self.status == "playing":
+				return False, None
+			if data.get("count") in (5, 8):
+				self.count = data["count"]
+			if isinstance(data.get("skills"), bool):
+				self.skills_on = data["skills"]
+			self.reset()
+			return True, None
+		if kind in ("start", "rematch"):
+			if not seat or self.status == "playing":
+				return False, None
+			if not all(self.seats.values()):
+				return False, "상대가 있어야 시작해요. 컴퓨터를 넣어도 돼요."
+			self.reset()
+			self.status = "playing"
+			self.turn = self.starter
+			self.starter = self.other(self.starter)  # 다음 판은 반대쪽부터
+			self._arm_bot()
+			room.notice(f"알까기 시작! {self.names[self.turn]} 님({'흑' if self.turn == 'black' else '백'})부터예요.")
+			return True, None
+		if kind == "flick":
+			if self.status != "playing":
+				return False, "아직 판이 시작되지 않았어요."
+			if seat != self.turn:
+				return False, "내 차례가 아니에요." if seat else "구경 중이에요."
+			if time.time() < self.busy_until - 0.3:
+				return False, "돌이 아직 움직이고 있어요."
+			try:
+				sid, vx, vy = int(data.get("stone")), float(data.get("vx")), float(data.get("vy"))
+			except (TypeError, ValueError):
+				return False, None
+			if not (math.isfinite(vx) and math.isfinite(vy)) or math.hypot(vx, vy) < 30:
+				return False, "조금 더 세게 당겨 주세요."
+			if not any(st["id"] == sid and st["owner"] == seat for st in self.stones):
+				return False, "내 돌만 튕길 수 있어요."
+			skill = data.get("skill") or None
+			if skill:
+				if not self.skills_on or skill not in self.skill_left[seat] or self.skill_used[seat] >= self.SKILL_USES:
+					return False, "그 스킬은 쓸 수 없어요."
+			curve = 0
+			if skill == "curve":
+				curve = 1 if data.get("curve") == 1 else -1
+			self._shoot(room, seat, sid, vx, vy, skill, curve)
+			return True, None
+		if kind == "resign":
+			if self.status != "playing" or not seat:
+				return False, None
+			w = self.other(seat)
+			self.status, self.turn, self.winner = "over", None, w
+			self.wins[w] += 1
+			self.reason = f"{self.names[seat]} 님이 기권했어요."
+			room.notice(f"🏁 {self.reason}")
+			return True, None
+		return False, None
+
+	def on_join(self, room, peer):
+		seat = self.seat_of(peer.pid)
+		if seat:
+			self.names[seat] = peer.name
+
+	def on_leave(self, room, pid):
+		seat = self.seat_of(pid)
+		if not seat:
+			return None
+		name = self.names[seat]
+		if self.status == "playing":
+			w = self.other(seat)
+			self.status, self.turn, self.winner = "over", None, w
+			self.wins[w] += 1
+			self.reason = f"{name} 님이 나가서 판이 끝났어요."
+		self.seats[seat], self.names[seat] = None, ""
+		return f"{name} 님의 자리가 비었어요."
+
+	def snapshot(self, room, pid=None):
+		return {
+			"board": self.BOARD, "radius": self.R, "vmax": self.VMAX,
+			"stones": [{"id": st["id"], "owner": st["owner"], "x": round(st["x"], 1), "y": round(st["y"], 1)} for st in self.stones],
+			"count": self.count, "skills_on": self.skills_on, "status": self.status, "turn": self.turn,
+			"winner": self.winner, "reason": self.reason, "shots": self.shots, "shield": self.shield, "last": self.last,
+			"busy": max(0.0, round(self.busy_until - time.time(), 2)),
+			"skills": {s: {"left": self.skill_left[s], "used": self.skill_used[s], "max": self.SKILL_USES} for s in self.SEATS},
+			"seats": {s: ({"name": self.names[s], "bot": s in self.bots, "online": s in self.bots or p in room.peers,
+						   "left": len(self.alive(s)), "wins": self.wins[s]} if p else None) for s, p in self.seats.items()},
+		}
+
+
+SKILL_NAMES = {"heavy": "💪 무거운 돌", "ice": "🧊 빙판", "shield": "🛡 방패", "bomb": "💥 폭탄", "curve": "↪️ 커브샷"}
+
+
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic}
 
 
 @dataclass
