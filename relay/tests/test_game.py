@@ -414,3 +414,112 @@ class DotsTestCase(unittest.TestCase):
 		self.assertTrue(st["seats"]["p2"]["bot"])
 		self.assertIsNone(logic.seat_of("b"))
 		self.assertEqual(logic.on_message(room, b, {"type": "resign"}), (False, None))  # 이미 자리가 없음
+
+
+class _EmitRoom(_Room):
+	def __init__(self):
+		super().__init__()
+		self.events = []
+
+	def emit(self, data, to=None, exclude=None):
+		self.events.append(data)
+
+
+class AlkkagiTestCase(unittest.TestCase):
+	def setup(self, count=5):
+		import random
+		logic, room = mj_game.AlkkagiLogic(rng=random.Random(0)), _EmitRoom()
+		a, b = _Peer("a", "흑"), _Peer("b", "백")
+		logic.on_message(room, a, {"type": "sit", "seat": "black"})
+		logic.on_message(room, b, {"type": "sit", "seat": "white"})
+		logic.on_message(room, a, {"type": "options", "count": count})
+		logic.on_message(room, a, {"type": "start"})
+		return logic, room, a, b
+
+	def place(self, logic, *stones):
+		logic.stones = [{"id": i, "owner": o, "x": x, "y": y} for i, o, x, y in stones]
+
+	def flick(self, logic, room, peer, sid, vx, vy, **kw):
+		import time as _t
+		logic.busy_until = 0  # 장면 재생을 기다리지 않음
+		return logic.on_message(room, peer, {"type": "flick", "stone": sid, "vx": vx, "vy": vy, **kw})
+
+	def test_head_on_knocks_out_and_turn_passes(self):
+		logic, room, a, b = self.setup()
+		self.place(logic, (0, "black", 200, 500), (1, "black", 200, 900), (100, "white", 300, 500), (101, "white", 500, 100))
+		self.assertIn("내 차례", self.flick(logic, room, b, 100, -500, 0)[1])
+		self.assertIn("내 돌만", self.flick(logic, room, a, 100, 500, 0)[1])
+		self.assertEqual(self.flick(logic, room, a, 0, 900, 0), (True, None))
+		shot = room.events[-1]
+		self.assertEqual((shot["type"], shot["out"]), ("shot", [100]))
+		self.assertGreater(len(shot["frames"]), 5)
+		st = logic.snapshot(room)
+		self.assertEqual((st["turn"], st["seats"]["white"]["left"]), ("white", 1))
+		self.assertIn("쳐냈어요", room.notices[-1])
+
+	def test_win_when_opponent_has_no_stones(self):
+		logic, room, a, b = self.setup()
+		self.place(logic, (0, "black", 200, 500), (100, "white", 300, 500))
+		self.flick(logic, room, a, 0, 900, 0)
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["winner"], st["seats"]["black"]["wins"]), ("over", "black", 1))
+		logic.on_message(room, b, {"type": "rematch"})  # 다음 판은 백부터, 돌 5개씩
+		st = logic.snapshot(room)
+		self.assertEqual((st["status"], st["turn"], len(st["stones"])), ("playing", "white", 10))
+
+	def test_skills_heavy_ice_shield_and_limits(self):
+		logic, room, a, b = self.setup()
+		far = lambda: next(s for s in logic.stones if s["id"] == 100)["x"]
+		# 같은 힘이라도 빙판이면 더 멀리 감
+		self.place(logic, (0, "black", 100, 500), (100, "white", 160, 500), (101, "white", 900, 900))
+		import copy
+		base = copy.deepcopy(logic.stones)
+		logic.simulate(logic.stones, 0, 400, 0)
+		plain = far()
+		logic.stones = copy.deepcopy(base)
+		logic.simulate(logic.stones, 0, 400, 0, skill="ice")
+		self.assertGreater(far(), plain + 50)
+		# 방패: 상대 턴에 내 돌이 3배 무거워 덜 밀림
+		logic.stones = copy.deepcopy(base)
+		logic.simulate(logic.stones, 0, 400, 0, shield="white")
+		self.assertLess(far(), plain - 20)
+		# 스킬 쓰면 줄고, 같은 스킬은 한 번만
+		logic.stones = copy.deepcopy(base)
+		self.assertEqual(self.flick(logic, room, a, 0, 300, 0, skill="shield"), (True, None))
+		self.assertEqual(logic.shield, "black")
+		self.assertNotIn("shield", logic.snapshot(room)["skills"]["black"]["left"])
+		self.flick(logic, room, b, 100, -50, 0)  # 백 차례에 흑 돌들이 무거움 → 끝나면 방패 꺼짐
+		self.assertIsNone(logic.shield)
+		self.assertIn("쓸 수 없어요", self.flick(logic, room, a, 0, 300, 0, skill="shield")[1])
+
+	def test_curve_and_bomb_change_paths(self):
+		logic, _, _, _ = self.setup()
+		import copy
+		self.place(logic, (0, "black", 500, 900), (101, "white", 900, 100))
+		base = copy.deepcopy(logic.stones)
+		logic.simulate(logic.stones, 0, 0, -600)
+		straight = logic.stones[0]["x"]
+		logic.stones = copy.deepcopy(base)
+		logic.simulate(logic.stones, 0, 0, -600, skill="curve", curve=1)
+		self.assertNotAlmostEqual(logic.stones[0]["x"], straight, delta=30)  # 옆으로 휨
+		# 폭탄: 옆에 있던 돌까지 밀려남
+		self.place(logic, (0, "black", 500, 800), (100, "white", 500, 600), (101, "white", 600, 600))
+		logic.simulate(logic.stones, 0, 0, -500, skill="bomb")
+		side = next(s for s in logic.stones if s["id"] == 101)
+		self.assertGreater(side["x"], 640)
+
+	def test_bot_finds_clear_shot(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, b, {"type": "resign"})
+		logic.on_message(room, b, {"type": "stand"})
+		logic.on_message(room, a, {"type": "add-bot"})
+		self.assertEqual(logic.snapshot(room)["seats"]["white"]["name"], "🤖 컴퓨터")
+		self.place(logic, (100, "white", 300, 300), (101, "white", 900, 900), (0, "black", 300, 420), (1, "black", 700, 100))
+		logic.status, logic.turn = "playing", "white"
+		sid, vx, vy, _ = logic.bot_shot("white")
+		self.assertIn(sid, (100, 101))
+		logic._arm_bot()
+		self.assertFalse(logic.tick(room, logic.bot_due - 0.1))
+		self.assertTrue(logic.tick(room, logic.bot_due + 0.1))
+		self.assertEqual(logic.shots, 1)
+		self.assertEqual(room.events[-1]["type"], "shot")

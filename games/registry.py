@@ -120,6 +120,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "alkkagi",
+		"url_name": "games:alkkagi",
+		"icon": "🥌",
+		"title": "알까기",
+		"description": "내 돌을 당겼다 놓아 상대 돌을 판 밖으로! 서버가 계산하는 진짜 물리, 💪무거운 돌·🧊빙판·🛡방패·💥폭탄·↪️커브샷 스킬, 1:1 또는 컴퓨터와. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["1:1", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
