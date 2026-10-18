@@ -1,0 +1,443 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #16a34a; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #16a34a; border-color: #16a34a; color: #fff; font-weight: 600; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 9px 12px; }
+    .seat.turn { border-color: #16a34a; background: #f0fdf4; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .tag { border-radius: 6px; background: #ececf0; padding: 0 6px; font-size: 11px; color: #6e6e73; }
+    #bb-chat { height: 200px; overflow-y: auto; }
+    /* 숫자 칸 */
+    .slots { display: flex; gap: 10px; justify-content: center; }
+    .slot { width: 58px; height: 70px; border-radius: 14px; border: 2px solid rgba(0, 0, 0, 0.12); display: flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; background: #fff; }
+    .slot.on { border-color: #16a34a; box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.15); }
+    .keys { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; max-width: 360px; margin: 0 auto; }
+    .key { position: relative; border-radius: 14px; padding: 12px 0; font-size: 22px; font-weight: 700; background: #f5f5f7; border: 1px solid rgba(0, 0, 0, 0.06); }
+    .key:disabled { opacity: 0.3; }
+    .key.no { text-decoration: line-through; color: #ef4444; background: #fef2f2; }
+    .key.yes { color: #16a34a; background: #f0fdf4; box-shadow: inset 0 0 0 2px #16a34a; }
+    .key.maybe { color: #b45309; background: #fffbeb; }
+    /* 기록 */
+    .row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 12px; }
+    .row:nth-child(odd) { background: rgba(0, 0, 0, 0.025); }
+    .row .n { width: 20px; font-size: 11px; color: #8e8e93; text-align: right; }
+    .d { width: 28px; height: 32px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; background: #f1f5f9; }
+    .d.S { background: #16a34a; color: #fff; } .d.B { background: #f59e0b; color: #fff; } .d.X { background: #e5e7eb; color: #9ca3af; }
+    .res { margin-left: auto; font-weight: 800; font-size: 15px; white-space: nowrap; }
+    .res .s { color: #16a34a; } .res .b { color: #d97706; } .res .o { color: #ef4444; }
+    .swapline { text-align: center; font-size: 12px; color: #7c3aed; padding: 4px; }
+    .skill { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; padding: 8px 4px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; font-size: 12px; font-weight: 600; min-width: 0; }
+    .skill .ic { font-size: 22px; }
+    .skill:disabled { opacity: 0.35; }
+    .skill.used { text-decoration: line-through; }
+    .skill.armed { border-color: #16a34a; background: #f0fdf4; }
+    .bar { height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: #16a34a; transition: width .25s linear; }
+    /* 큰 결과 */
+    #bb-pop { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(5, 10, 5, 0.55); backdrop-filter: blur(2px); cursor: pointer; }
+    #bb-pop.on { display: flex; }
+    #bb-pop .box { text-align: center; color: #fff; animation: popin .45s cubic-bezier(.2, 1.6, .4, 1); }
+    #bb-pop .big { font-size: 76px; font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+    #bb-pop .sub { font-size: 18px; font-weight: 600; opacity: 0.9; }
+    #bb-pop .digits { display: flex; gap: 10px; justify-content: center; margin: 14px 0; }
+    #bb-pop .digits span { width: 56px; height: 66px; border-radius: 14px; display: inline-flex; align-items: center; justify-content: center; font-size: 34px; font-weight: 900; background: rgba(255, 255, 255, 0.15); }
+    #bb-pop .digits span.S { background: #16a34a; } #bb-pop .digits span.B { background: #f59e0b; }
+    @keyframes popin { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .ball { display: inline-block; animation: throw .7s ease-out; }
+    @keyframes throw { from { transform: translateX(-160px) rotate(-540deg) scale(.5); opacity: 0; } to { transform: none; opacity: 1; } }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn, html.theme-dark .skill { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go { background: #16a34a; color: #fff; }
+    html.theme-dark .seat, html.theme-dark .key { background: #111318; color: #e8e8ea; }
+    html.theme-dark .seat.turn { background: #0f2a18; }
+    html.theme-dark .slot { background: #111318; border-color: rgba(255, 255, 255, 0.16); color: #e8e8ea; }
+    html.theme-dark .d { background: #23262d; color: #e8e8ea; }
+    html.theme-dark .tag { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .row:nth-child(odd) { background: rgba(255, 255, 255, 0.03); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:baseball' %}" class="text-[13px] text-[#16a34a]">← 숫자 야구 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">⚾ {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 1:1 · 숫자와 자리가 맞으면 S, 숫자만 맞으면 B</p>
+        </div>
+        <button type="button" class="gm-btn" id="bb-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="bb-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:baseball_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="bb-name-box" class="gm-card mt-5 hidden">
+        <form id="bb-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="bb-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#16a34a] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <p id="bb-status" class="text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="bar mx-auto mt-2 max-w-[360px] hidden" id="bb-timer"><i></i></div>
+            <p id="bb-mine" class="mt-2 text-center text-[13px] text-[#6e6e73]"></p>
+
+            <!-- 입력 (숫자 정하기 / 추측) -->
+            <div id="bb-input" class="mt-4 hidden">
+                <p id="bb-input-title" class="mb-2 text-center text-[13px] font-semibold text-[#6e6e73]"></p>
+                <div class="slots" id="bb-slots"></div>
+                <div class="keys mt-4" id="bb-keys"></div>
+                <div class="mt-3 flex justify-center gap-2">
+                    <button type="button" class="gm-btn" id="bb-back">⌫ 지우기</button>
+                    <button type="button" class="gm-btn" id="bb-rand">🎲 무작위</button>
+                    <button type="button" class="gm-btn go" id="bb-ok">확인</button>
+                </div>
+                <p class="mt-2 text-center text-[11.5px] text-[#8e8e93]" id="bb-memo-help">키보드로 숫자를 쳐도 돼요 · 오른쪽 클릭(길게 누르기)으로 숫자 메모: ⭕ 있음 → ❌ 없음 → ❔</p>
+            </div>
+
+            <!-- 스킬 -->
+            <div id="bb-skills-box" class="mt-5 hidden">
+                <h2 class="text-[14px] font-semibold">✨ 스킬 <span class="font-normal text-[12px] text-[#8e8e93]">종류별로 한 판에 한 번 · 한 턴에 하나 · 쓰고도 추측해요</span></h2>
+                <div id="bb-skills" class="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7"></div>
+                <p id="bb-intel" class="mt-2 text-[13px] font-semibold text-[#7c3aed]"></p>
+            </div>
+
+            <!-- 기록 -->
+            <div class="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div><h2 class="text-[14px] font-semibold" id="bb-h-me">내 추측</h2><div id="bb-log-me" class="mt-2 space-y-0.5"></div></div>
+                <div><h2 class="text-[14px] font-semibold" id="bb-h-op">상대 추측</h2><div id="bb-log-op" class="mt-2 space-y-0.5"></div></div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-black/5 pt-4">
+                <select id="bb-digits" class="gm-btn" aria-label="자릿수"><option value="3">3자리</option><option value="4">4자리 (어려움)</option></select>
+                <select id="bb-level" class="gm-btn" aria-label="컴퓨터 난이도"><option value="easy">🤖 쉬움</option><option value="normal">🤖 보통</option><option value="hard">🤖 어려움</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="bb-skillopt" type="checkbox" class="h-4 w-4" checked> ✨ 스킬</label>
+                <button type="button" class="gm-btn" id="bb-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="bb-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="bb-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="bb-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="bb-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="bb-seats"></section>
+            <section class="gm-card text-[12.5px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[14px] font-semibold text-[#1d1d1f] dark:text-inherit">규칙</h2>
+                <p>서로 비밀 숫자(같은 숫자 없음, 0 가능)를 정하고 번갈아 맞혀요. 숫자·자리 다 맞으면 <b class="text-[#16a34a]">S</b>, 숫자만 맞으면 <b class="text-[#d97706]">B</b>, 하나도 없으면 <b class="text-[#ef4444]">OUT</b>. 선공이 먼저 맞히면 후공에게 마지막 기회! 둘 다 맞히면 무승부. 한 턴 60초.</p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="bb-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="bb-chat-form" class="mt-2 flex gap-2"><input id="bb-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+<div id="bb-pop" aria-live="polite"><div class="box" id="bb-pop-box"></div></div>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+
+    let pid = store.get(`mj-baseball-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-baseball-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, typed = '', turnStart = 0, prevKey = '';
+    let memo = {};  // 숫자 메모 (내 화면에만): d → 'yes' | 'no' | 'maybe'
+    const other = (s) => (s === 'p1' ? 'p2' : 'p1');
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat;
+    const mode = () => (S?.status === 'setup' && mySeat ? 'secret' : myTurn() ? 'guess' : null);
+
+    // ── 입력 ──
+    function renderInput() {
+        const m = mode(), n = S?.digits || 3;
+        $('bb-input').classList.toggle('hidden', !m);
+        if (!m) return;
+        $('bb-input-title').textContent = m === 'secret'
+            ? (S.ready[mySeat] ? `🔒 내 숫자: ${S.my_secret} — 바꾸려면 다시 넣어요. 상대를 기다리는 중…` : `상대가 맞힐 내 비밀 숫자 ${n}자리를 정하세요`)
+            : `상대 숫자 ${n}자리를 맞혀 보세요${S.guesses_left > 1 ? ` (✌️ ${S.guesses_left}번 남음)` : ''}${S.pos_now ? ' · 🎯 자리마다 보여 줘요' : ''}`;
+        $('bb-slots').innerHTML = Array.from({ length: n }, (_, i) => `<div class="slot ${i === typed.length ? 'on' : ''}">${esc(typed[i] || '')}</div>`).join('');
+        const known = S.known || { in: [], out: [] };
+        $('bb-keys').innerHTML = '1234567890'.split('').map((d) => {
+            const st = m === 'guess' ? (known.out.includes(d) ? 'no' : known.in.includes(d) ? 'yes' : memo[d] || '') : '';
+            return `<button type="button" class="key ${st}" data-d="${d}" ${typed.includes(d) || typed.length >= n ? 'disabled' : ''}>${d}</button>`;
+        }).join('');
+        $('bb-ok').disabled = typed.length !== n;
+        $('bb-memo-help').classList.toggle('hidden', m !== 'guess');
+    }
+    function press(d) { const n = S?.digits || 3; if (!mode() || typed.length >= n || typed.includes(d)) return; typed += d; tick(500 + Number(d) * 30, 0.04); renderInput(); }
+    $('bb-keys').addEventListener('click', (e) => { const b = e.target.closest('[data-d]'); if (b && !b.disabled) press(b.dataset.d); });
+    $('bb-keys').addEventListener('contextmenu', (e) => {
+        const b = e.target.closest('[data-d]'); if (!b || mode() !== 'guess') return;
+        e.preventDefault();
+        const d = b.dataset.d, nx = { '': 'yes', yes: 'no', no: 'maybe', maybe: '' }[memo[d] || ''];
+        if (nx) memo[d] = nx; else delete memo[d];
+        store.set(`mj-baseball-memo-${ROOM}`, JSON.stringify(memo));
+        renderInput();
+    });
+    $('bb-back').addEventListener('click', () => { typed = typed.slice(0, -1); renderInput(); });
+    $('bb-rand').addEventListener('click', () => {
+        const n = S?.digits || 3, ds = '0123456789'.split('');
+        for (let i = ds.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ds[i], ds[j]] = [ds[j], ds[i]]; }
+        typed = ds.slice(0, n).join(''); renderInput();
+    });
+    function submit() {
+        const m = mode(); if (!m || typed.length !== (S?.digits || 3)) return;
+        send({ type: m === 'secret' ? 'secret' : 'guess', value: typed });
+        typed = ''; renderInput();
+    }
+    $('bb-ok').addEventListener('click', submit);
+    document.addEventListener('keydown', (e) => {
+        if (!mode() || e.target.closest('input, textarea, select')) return;
+        if (/^[0-9]$/.test(e.key)) press(e.key);
+        else if (e.key === 'Backspace') { typed = typed.slice(0, -1); renderInput(); }
+        else if (e.key === 'Enter') submit();
+    });
+
+    // ── 스킬 ──
+    function renderSkills() {
+        const show = S && S.skills_on && S.status !== 'waiting';
+        $('bb-skills-box').classList.toggle('hidden', !show);
+        if (!show) return;
+        const used = mySeat ? S.used[mySeat] : [];
+        const can = myTurn() && !S.skill_this_turn;
+        $('bb-skills').innerHTML = S.skills.map((k) => {
+            const u = used.includes(k.id), armed = (k.id === 'pos' && S.pos_now) || (k.id === 'shield' && S.my_shield);
+            return `<button type="button" class="skill ${u ? 'used' : ''} ${armed ? 'armed' : ''}" data-skill="${k.id}" title="${esc(k.desc)}" ${!mySeat || u || !can ? 'disabled' : ''}><span class="ic">${k.icon}</span>${esc(k.name)}</button>`;
+        }).join('');
+        const opUsed = mySeat && S.used[other(mySeat)].length ? `상대가 쓴 스킬: ${S.used[other(mySeat)].map((id) => S.skills.find((k) => k.id === id)?.icon).join(' ')}` : '';
+        const kn = S.known && (S.known.in.length || S.known.out.length) ? `알아낸 것 — ⭕ ${S.known.in.join(', ') || '없음'} · ❌ ${S.known.out.join(', ') || '없음'}` : '';
+        $('bb-intel').textContent = [kn, opUsed].filter(Boolean).join('  ·  ');
+    }
+    $('bb-skills').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-skill]'); if (!b || b.disabled) return;
+        const k = S.skills.find((x) => x.id === b.dataset.skill);
+        if (k.id === 'swap') {
+            const sec = S.my_secret, n = S.digits;
+            const pos = prompt(`🔀 바꿔치기 — 내 숫자 ${sec}\n바꿀 자리 (1~${n})`); if (!pos) return;
+            const i = Number(pos) - 1;
+            if (!(i >= 0 && i < n)) { toast('자리를 1~' + n + ' 중에서 골라요.'); return; }
+            const d = prompt(`${i + 1}번째 자리 ${sec[i]} 을(를) 어떤 숫자로? (내 숫자에 없는 숫자)`); if (d === null) return;
+            send({ type: 'skill', id: 'swap', pos: i, digit: d.trim() });
+            return;
+        }
+        if (confirm(`${k.icon} ${k.name}\n${k.desc}\n\n지금 쓸까요?`)) send({ type: 'skill', id: k.id });
+    });
+
+    // ── 기록 ──
+    function resHTML(e, n) {
+        if (e.hidden) return '<span class="res">🌫 ???</span>';
+        if (e.s === n) return '<span class="res s">🎉 홈런!</span>';
+        if (e.s + e.b === 0) return '<span class="res o">OUT</span>';
+        return `<span class="res">${e.s ? `<span class="s">${e.s}S</span> ` : ''}${e.b ? `<span class="b">${e.b}B</span>` : ''}</span>`;
+    }
+    function logHTML(list, n) {
+        let i = 0;
+        return list.map((e) => {
+            if (e.swap) return '<div class="swapline">🔀 여기서 숫자 한 자리가 바뀌었어요 — 위 결과는 믿지 마세요!</div>';
+            i++;
+            const ds = e.guess.split('').map((d, j) => `<span class="d ${e.pos ? (e.pos[j] === '-' ? 'X' : e.pos[j]) : ''}">${esc(d)}</span>`).join('');
+            return `<div class="row"><span class="n">${i}</span>${ds}${e.pos ? '<span title="위치 탐지" class="text-[12px]">🎯</span>' : ''}${resHTML(e, n)}</div>`;
+        }).reverse().join('') || '<p class="px-2 text-[12.5px] text-[#8e8e93]">아직 없어요.</p>';
+    }
+    function renderLogs() {
+        const me = mySeat || 'p1', op = other(me), n = S?.digits || 3;
+        const nm = (s) => S?.seats?.[s]?.name || (s === 'p1' ? '1번' : '2번');
+        $('bb-h-me').textContent = mySeat ? `내 추측 → 상대 숫자 ${S?.secrets ? `(${S.secrets[op]})` : ''}` : `${nm('p1')} 추측`;
+        $('bb-h-op').textContent = mySeat ? `${nm(op)} 추측 → 내 숫자` : `${nm('p2')} 추측`;
+        $('bb-log-me').innerHTML = S ? logHTML(S.history[me], n) : '';
+        $('bb-log-op').innerHTML = S ? logHTML(S.history[op], n) : '';
+    }
+
+    // ── 자리·상태 ──
+    function seatHTML(s) {
+        const p = S?.seats?.[s], label = s === 'p1' ? '1번' : '2번';
+        const turn = S?.status === 'playing' && S.turn === s, win = S?.status === 'over' && S.winner === s;
+        if (!p) return `<div class="seat flex items-center gap-2"><b class="text-[14px]">⚾ ${label}</b><span class="text-[13px] text-[#8e8e93]">빈 자리</span>${!mySeat && !['setup', 'playing'].includes(S?.status) ? `<button type="button" class="gm-btn ml-auto" data-sit="${s}">여기 앉기</button>` : ''}</div>`;
+        const extra = S.status === 'setup' ? (S.ready[s] ? '🔒 숫자 정함' : '✍️ 정하는 중…') : S.status === 'playing' || S.status === 'over' ? `던진 횟수 ${S.turns[s]}${S.first === s ? ' · 선공' : ''}` : '';
+        return `<div class="seat ${turn ? 'turn' : ''}"><div class="flex items-center gap-2"><b class="min-w-0 truncate text-[14px]">${win ? '🏆 ' : ''}${esc(p.name)}${mySeat === s ? ' (나)' : ''}</b>
+            ${p.bot ? '<span class="tag">컴퓨터</span>' : `<span class="dot" style="background:${p.online ? '#10b981' : '#c7c7cc'}"></span>`}
+            ${p.bot && mySeat && !['setup', 'playing'].includes(S.status) ? `<button type="button" class="text-[12px] text-[#c4271d]" data-unbot="${s}">빼기</button>` : ''}
+            <span class="ml-auto text-[12px] text-[#6e6e73]">${p.wins}승</span></div>
+            ${extra ? `<p class="mt-1 text-[12.5px] text-[#6e6e73]">${extra}${S.secrets ? ` · 숫자 <b>${esc(S.secrets[s])}</b>` : ''}</p>` : ''}</div>`;
+    }
+    function render(spectators) {
+        $('bb-seats').innerHTML = seatHTML('p1') + seatHTML('p2') + `<p class="pt-1 text-[12px] text-[#8e8e93]">${S?.draws ? `무승부 ${S.draws}번 · ` : ''}${spectators?.length ? `구경 ${spectators.length}명: ${esc(spectators.join(', '))}` : ''}</p>`;
+        const both = S && S.seats.p1 && S.seats.p2;
+        let status = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'setup') status = mySeat ? (S.ready[mySeat] ? '상대가 숫자를 정하는 중…' : '🔒 내 비밀 숫자를 정하세요') : '두 사람이 숫자를 정하는 중…';
+        else if (S.status === 'playing') {
+            const lc = S.last_chance ? '🔥 마지막 기회! ' : '';
+            status = lc + (myTurn() ? '🟢 내 차례! 상대 숫자를 맞혀 보세요' : `${S.seats[S.turn]?.name || ''} 차례${S.seats[S.turn]?.bot ? ' (생각 중…)' : ''}`);
+        } else if (S.status === 'over') status = `🏁 ${S.reason}`;
+        else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
+        $('bb-status').textContent = status;
+        $('bb-mine').textContent = mySeat && S?.my_secret && S.status !== 'setup' ? `🔒 내 숫자 ${S.my_secret}${S.my_shield ? ' · 🛡 방패 준비됨' : ''}` : '';
+        const idle = S && !['setup', 'playing'].includes(S.status);
+        $('bb-digits').value = String(S?.digits || 3); $('bb-digits').disabled = !(idle && mySeat);
+        $('bb-level').value = S?.bot_level || 'normal'; $('bb-level').disabled = !(idle && mySeat);
+        $('bb-skillopt').checked = S ? S.skills_on : true; $('bb-skillopt').disabled = !(idle && mySeat);
+        $('bb-bot').disabled = !(idle && mySeat && !both);
+        $('bb-start').disabled = !(idle && mySeat && both);
+        $('bb-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('bb-resign').classList.toggle('hidden', !(S && !idle && mySeat));
+        $('bb-stand').disabled = !(mySeat && idle);
+        document.title = myTurn() ? '🟢 내 차례 · {{ room.title|escapejs }}' : '⚾ {{ room.title|escapejs }} · 숫자 야구';
+        renderInput(); renderSkills(); renderLogs();
+    }
+    $('bb-seats').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit });
+        const u = e.target.closest('[data-unbot]'); if (u) send({ type: 'remove-bot', seat: u.dataset.unbot });
+    });
+    const opts = () => send({ type: 'options', digits: +$('bb-digits').value, skills: $('bb-skillopt').checked, bot_level: $('bb-level').value });
+    $('bb-level').addEventListener('change', opts);
+    $('bb-digits').addEventListener('change', opts);
+    $('bb-skillopt').addEventListener('change', opts);
+    $('bb-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('bb-start').addEventListener('click', () => { memo = {}; store.set(`mj-baseball-memo-${ROOM}`, '{}'); send({ type: S?.status === 'over' ? 'rematch' : 'start' }); });
+    $('bb-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('bb-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // 남은 시간 막대
+    setInterval(() => {
+        const on = S && S.status === 'playing';
+        $('bb-timer').classList.toggle('hidden', !on);
+        if (!on) return;
+        const left = Math.max(0, S.turn_limit - (performance.now() - turnStart) / 1000);
+        const bar = $('bb-timer').firstElementChild;
+        bar.style.width = `${(left / S.turn_limit) * 100}%`;
+        bar.style.background = left < 10 ? '#ef4444' : '#16a34a';
+    }, 250);
+
+    // ── 큰 결과·스킬 연출 ──
+    const POP = $('bb-pop');
+    // 연출은 줄 세워 하나씩 (앞 것을 덮어쓰지 않게) — 시간이 지나거나 누르면 다음
+    let popTimer = null, popping = false;
+    const popQueue = [];
+    function pop(html, ms, sound) { popQueue.push([html, ms, sound]); if (!popping) nextPop(); }
+    function nextPop() {
+        const item = popQueue.shift();
+        popping = !!item;
+        if (!item) { POP.classList.remove('on'); return; }
+        const [html, ms, sound] = item;
+        $('bb-pop-box').innerHTML = html + `<div class="sub mt-3" style="font-size:12px;opacity:.6">눌러서 넘기기${popQueue.length ? ` · 다음 ${popQueue.length}개` : ''}</div>`;
+        POP.classList.remove('on'); void POP.offsetWidth; POP.classList.add('on');
+        if (sound) sound();
+        clearTimeout(popTimer); popTimer = setTimeout(closePop, ms);
+    }
+    function closePop() { clearTimeout(popTimer); POP.classList.remove('on'); setTimeout(nextPop, 200); }
+    POP.addEventListener('click', closePop);
+    function showResult(m) {
+        const who = m.seat === mySeat ? '내 추측' : `${S?.seats?.[m.seat]?.name || ''} 님의 추측`;
+        const ds = m.guess.split('').map((d, j) => `<span class="${m.pos ? m.pos[j] : ''}">${esc(d)}</span>`).join('');
+        let big, sub = '';
+        if (m.hidden) { big = '🌫 ???'; sub = '안개 때문에 결과가 가려졌어요'; }
+        else if (m.s === m.n) { big = '🎉 홈런!'; sub = '다 맞혔어요!'; }
+        else if (m.s + m.b === 0) big = '<span style="color:#f87171">OUT</span>';
+        else big = `${m.s ? `<span style="color:#4ade80">${m.s}S</span> ` : ''}${m.b ? `<span style="color:#fbbf24">${m.b}B</span>` : ''}`;
+        pop(`<div class="sub"><span class="ball">⚾</span> ${esc(who)}</div><div class="digits">${ds}</div><div class="big">${big}</div>${sub ? `<div class="sub">${esc(sub)}</div>` : ''}`, m.s === m.n ? 4500 : 3500, () => {
+            if (m.hidden) tick(200, 0.3, 'sawtooth');
+            else if (m.s === m.n) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tick(f, 0.25, 'triangle', 0.16), i * 110));
+            else if (m.s + m.b === 0) tick(160, 0.35, 'square', 0.08);
+            else { for (let i = 0; i < m.s; i++) setTimeout(() => tick(880, 0.12), i * 130); for (let i = 0; i < m.b; i++) setTimeout(() => tick(587, 0.12), (m.s + i) * 130); }
+        });
+    }
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('bb-chat'), div = document.createElement('div');
+        div.innerHTML = m.system ? `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>` : `<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div);
+        box.scrollTop = box.scrollHeight;
+    }
+    $('bb-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('bb-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('bb-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+
+    let audio = null;
+    function tick(freq, len, type = 'triangle', vol = 0.12) {
+        if (!$('bb-sound').checked) return;
+        try {
+            audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+            const o = audio.createOscillator(), g = audio.createGain();
+            o.type = type; o.frequency.value = freq;
+            g.gain.setValueAtTime(vol, audio.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + len);
+            o.connect(g).connect(audio.destination); o.start(); o.stop(audio.currentTime + len + 0.02);
+        } catch (e) { /* 소리 없이 */ }
+    }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function handle(m) {
+        if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('bb-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+        else if (m.type === 'state') {
+            S = m.state; mySeat = m.you || null;
+            const key = `${S.status}|${S.turn}|${S.turns?.p1}|${S.turns?.p2}`;
+            if (key !== prevKey) { turnStart = performance.now() - (S.elapsed || 0) * 1000; if (myTurn() && prevKey) tick(660, 0.15); prevKey = key; }
+            if (!mode()) typed = '';
+            render(m.peers.filter((p) => !p.seat).map((p) => p.name));
+        } else if (m.type === 'result') showResult(m);
+        else if (m.type === 'skill') {
+            const who = m.seat === mySeat ? '내가' : `${S?.seats?.[m.seat]?.name || ''} 님이`;
+            const desc = S?.skills?.find((k) => k.id === m.id)?.desc || '';
+            pop(`<div class="big" style="font-size:64px">${m.icon}</div><div class="sub">${esc(who)} <b>${esc(m.name)}</b> 스킬!${m.blocked ? '<br>🛡 하지만 방패에 막혔어요!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${esc(desc)}</div>`, 3500, () => tick(m.blocked ? 300 : 740, 0.2, 'sine', 0.14));
+        } else if (m.type === 'intel') { toast(m.text); $('bb-intel').textContent = m.text; }
+        else if (m.type === 'last-chance') { if (m.seat === mySeat) pop('<div class="big" style="font-size:54px">🔥 마지막 기회!</div><div class="sub">상대가 다 맞혔어요. 이번에 맞히면 무승부!</div>', 3500); }
+        else if (m.type === 'chat') chatLine(m);
+        else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+        else if (m.type === 'end') { ended = true; $('bb-status').textContent = `🚪 ${m.reason}`; }
+    }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => {
+            if (ended) return;
+            $('bb-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) {
+        store.set('mj-game-name', name);
+        $('bb-name-box').classList.add('hidden');
+        connect(name);
+    }
+    try { memo = JSON.parse(store.get(`mj-baseball-memo-${ROOM}`) || '{}') || {}; } catch (e) { memo = {}; }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved);
+    else { $('bb-name-box').classList.remove('hidden'); $('bb-name').focus(); }
+    $('bb-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('bb-name').value.trim()); });
+
+    $('bb-copy').addEventListener('click', async () => {
+        const url = $('bb-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('bb-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('bb-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('bb-kakao').addEventListener('click', () => mjShare({ title: `⚾ 숫자 야구 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bb-copy').dataset.url, button: '숫자 야구 하러 가기' }));
+    render();
+    window.__baseball = { state: () => S, seat: () => mySeat, send, feed: handle };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}

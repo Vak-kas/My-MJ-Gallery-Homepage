@@ -668,6 +668,183 @@ class AugOmokTestCase(unittest.TestCase):
 		self.assertTrue(logic.cells or logic.hand["white"])
 
 
+class _ToRoom(_EmitRoom):
+	def emit(self, data, to=None, exclude=None):
+		self.events.append(data)
+		self.sent = getattr(self, "sent", []) + [(data, to, exclude)]
+
+
+class BaseballTestCase(unittest.TestCase):
+	def setup(self, digits=3, skills=True):
+		import random
+		from relay import mj_baseball as B
+		self.B = B
+		logic, room = B.BaseballLogic(rng=random.Random(0)), _ToRoom()
+		a, b = _Peer("a", "가"), _Peer("b", "나")
+		room.peers = {"a": a, "b": b}
+		logic.on_message(room, a, {"type": "sit", "seat": "p1"})
+		logic.on_message(room, b, {"type": "sit", "seat": "p2"})
+		logic.on_message(room, a, {"type": "options", "digits": digits, "skills": skills})
+		logic.on_message(room, a, {"type": "start"})
+		return logic, room, a, b
+
+	def play(self, logic, room, a, b, sa="123", sb="456"):
+		logic.on_message(room, a, {"type": "secret", "value": sa})
+		logic.on_message(room, b, {"type": "secret", "value": sb})
+
+	def g(self, logic, room, peer, v):
+		return logic.on_message(room, peer, {"type": "guess", "value": v})
+
+	def test_judge(self):
+		from relay.mj_baseball import judge, marks, valid_number
+		self.assertEqual(judge("123", "132"), (1, 2))
+		self.assertEqual(judge("123", "456"), (0, 0))
+		self.assertEqual(marks("123", "321"), ["B", "S", "B"])
+		self.assertFalse(valid_number("112", 3))
+		self.assertTrue(valid_number("0123", 4))
+
+	def test_secret_hidden_and_turns(self):
+		logic, room, a, b = self.setup()
+		self.assertEqual(logic.status, "setup")
+		self.assertIn("서로 다른", logic.on_message(room, a, {"type": "secret", "value": "112"})[1])
+		self.play(logic, room, a, b)
+		self.assertEqual(logic.status, "playing")
+		self.assertEqual(logic.turn, "p1")
+		self.assertIsNone(logic.snapshot(room, "b")["secrets"])
+		self.assertEqual(logic.snapshot(room, "b")["my_secret"], "456")
+		self.assertIsNone(logic.snapshot(room, "x")["my_secret"])  # 구경꾼은 못 봄
+		self.assertIn("차례", self.g(logic, room, b, "123")[1])
+		self.assertEqual(self.g(logic, room, a, "465"), (True, None))
+		self.assertEqual(logic.history["p1"][-1]["s"], 1)
+		self.assertEqual(logic.history["p1"][-1]["b"], 2)
+		self.assertEqual(logic.turn, "p2")
+
+	def test_last_chance_and_draw(self):
+		logic, room, a, b = self.setup()
+		self.play(logic, room, a, b)
+		self.g(logic, room, a, "456")  # 선공이 맞힘 → 후공 마지막 기회
+		self.assertEqual(logic.status, "playing")
+		self.assertTrue(logic.snapshot(room, "b")["last_chance"])
+		self.g(logic, room, b, "123")
+		self.assertEqual(logic.status, "over")
+		self.assertIsNone(logic.winner)
+		# 다음 판: 후공(이번엔 p2 선공)이 놓치면 선공 승
+		logic.on_message(room, a, {"type": "rematch"})
+		self.play(logic, room, a, b)
+		self.assertEqual(logic.turn, "p2")
+		self.g(logic, room, b, "123")
+		self.g(logic, room, a, "789")
+		self.assertEqual(logic.winner, "p2")
+
+	def test_skills_scout_exclude_pos_double(self):
+		logic, room, a, b = self.setup()
+		self.play(logic, room, a, b)
+		logic.on_message(room, a, {"type": "skill", "id": "scout"})
+		self.assertEqual(len(logic.known["p1"]["in"]), 1)
+		self.assertIn(logic.known["p1"]["in"][0], "456")
+		self.assertIn("한 턴에", logic.on_message(room, a, {"type": "skill", "id": "exclude"})[1])
+		intel = [(d, to) for d, to, ex in room.sent if d["type"] == "intel"]
+		self.assertEqual([to for _, to in intel], ["a"])  # 정찰 결과는 쓴 사람에게만
+		self.g(logic, room, a, "789")
+		self.g(logic, room, b, "789")
+		logic.on_message(room, a, {"type": "skill", "id": "exclude"})
+		self.assertTrue(set(logic.known["p1"]["out"]).isdisjoint("456"))
+		self.assertIn("이미", logic.on_message(room, a, {"type": "skill", "id": "scout"})[1])
+		self.g(logic, room, a, "789")
+		self.g(logic, room, b, "789")
+		logic.on_message(room, a, {"type": "skill", "id": "double"})
+		self.g(logic, room, a, "654")
+		self.assertEqual(logic.turn, "p1")  # 한 번 더
+		self.g(logic, room, a, "465")
+		self.assertEqual(logic.turn, "p2")
+		self.g(logic, room, b, "789")
+		logic.on_message(room, a, {"type": "skill", "id": "pos"})
+		self.g(logic, room, a, "465")
+		self.assertEqual(logic.history["p1"][-1]["pos"], ["S", "B", "B"])
+		self.assertIsNone(logic.snapshot(room, "x")["history"]["p1"][-1]["pos"])  # 구경꾼은 자리 표시 못 봄
+
+	def test_fog_shield_swap(self):
+		logic, room, a, b = self.setup()
+		self.play(logic, room, a, b)
+		logic.on_message(room, a, {"type": "skill", "id": "shield"})
+		self.g(logic, room, a, "789")
+		logic.on_message(room, b, {"type": "skill", "id": "fog"})  # 방패에 막힘
+		self.assertFalse(logic.fog["p1"])
+		self.assertFalse(logic.shield["p1"])
+		self.g(logic, room, b, "789")
+		logic.on_message(room, a, {"type": "skill", "id": "fog"})
+		self.g(logic, room, a, "789")
+		room.sent = []
+		self.g(logic, room, b, "132")  # 안개: b 에게만 결과가 가려짐
+		to_b = [d for d, to, ex in room.sent if d["type"] == "result" and to == "b"]
+		to_rest = [d for d, to, ex in room.sent if d["type"] == "result" and ex == "b"]
+		self.assertIsNone(to_b[0]["s"])
+		self.assertEqual((to_rest[0]["s"], to_rest[0]["b"]), (1, 2))
+		self.assertIsNone(logic.snapshot(room, "b")["history"]["p2"][-1]["s"])
+		self.assertEqual(logic.snapshot(room, "a")["history"]["p2"][-1]["s"], 1)
+		# 바꿔치기: 내 숫자에 있는 숫자로는 못 바꿈, 바꾸면 상대 기록에 표시
+		self.assertIn("없는 숫자", logic.on_message(room, a, {"type": "skill", "id": "swap", "pos": 0, "digit": "2"})[1])
+		logic.on_message(room, a, {"type": "skill", "id": "swap", "pos": 0, "digit": "9"})
+		self.assertEqual(logic.secret["p1"], "923")
+		self.assertTrue(logic.history["p2"][-1]["swap"])
+
+	def test_bot_level_option(self):
+		logic, room, a, b = self.setup()
+		logic.on_message(room, a, {"type": "resign"})
+		logic.on_message(room, a, {"type": "options", "bot_level": "easy"})
+		self.assertEqual(logic.bot_level, "easy")
+		logic.on_message(room, a, {"type": "options", "bot_level": "nope"})
+		self.assertEqual(logic.bot_level, "easy")
+		self.assertEqual(logic.snapshot(room, "a")["bot_level"], "easy")
+		# 쉬움은 스킬을 안 씀
+		self.assertEqual(logic._bot_skill("p1", "p2", ["123"] * 3), (None, None))
+
+	def test_timeout_passes_turn(self):
+		import time
+		logic, room, a, b = self.setup()
+		self.play(logic, room, a, b)
+		logic.turn_started = time.time() - self.B.TURN_LIMIT - 1
+		self.assertTrue(logic.tick(room, time.time()))
+		self.assertEqual(logic.turn, "p2")
+		self.assertEqual(logic.turns["p1"], 1)
+
+	def test_bot_plays_and_games_finish(self):
+		import random, time
+		from relay import mj_baseball as B
+		logic, room, a, b = self.setup()
+		logic.on_message(room, b, {"type": "resign"})
+		logic.on_message(room, b, {"type": "stand"})
+		logic.on_message(room, a, {"type": "add-bot"})
+		logic.on_message(room, a, {"type": "start"})
+		self.assertIsNotNone(logic.secret["p2"])  # 컴퓨터는 바로 정함
+		logic.on_message(room, a, {"type": "secret", "value": "012"})
+		self.assertEqual(logic.status, "playing")
+		for _ in range(200):
+			if logic.status != "playing":
+				break
+			if logic.turn == "p1":
+				self.g(logic, room, a, "".join(random.Random(_).sample("0123456789", 3)))
+			else:
+				logic.bot_due = 0
+				logic.tick(room, time.time())
+		self.assertEqual(logic.status, "over")
+		for digits in (3, 4):  # 컴퓨터끼리
+			for seed in range(30):
+				L = B.BaseballLogic(rng=random.Random(seed))
+				L.digits = digits
+				r = _ToRoom()
+				for s in L.SEATS:
+					L.seats[s], L.names[s] = f"bot:{s}", "봇"
+					L.bots.add(s)
+					L.secret[s] = "".join(L.rng.sample("0123456789", digits))
+				L._begin_play(r)
+				for _ in range(300):
+					if L.status != "playing":
+						break
+					L.bot_act(r)
+				self.assertEqual(L.status, "over")
+
+
 class AugOmokMoreCardsTestCase(unittest.TestCase):
 	setup = AugOmokTestCase.setup
 	mv = AugOmokTestCase.mv
