@@ -85,7 +85,8 @@
     #wheel { width: 300px; height: 300px; border-radius: 999px; transition: transform 2.6s cubic-bezier(.12, .8, .2, 1); box-shadow: 0 0 0 8px #fff, 0 12px 40px rgba(0,0,0,.5); }
     .pin { width: 0; height: 0; border-left: 16px solid transparent; border-right: 16px solid transparent; border-top: 30px solid #facc15; margin-bottom: -26px; z-index: 1; filter: drop-shadow(0 2px 2px rgba(0,0,0,.5)); }
     .ag-cover.hidden, #ag-fx:not(.on) { display: none !important; }  /* display:flex 가 숨김(hidden)을 덮지 않게 */
-    .ag-cover { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 14px; background: rgba(10, 10, 20, 0.92); color: #fff; font-size: 22px; font-weight: 800; text-align: center; padding: 20px; }
+    /* 암흑: 판 위쪽 띠 — 클릭은 판으로 그대로 통과 (돌만 안 보이고 두기는 됨) */
+    .ag-cover { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px 14px 0 0; background: rgba(10, 10, 20, 0.78); color: #fff; font-size: 15px; font-weight: 800; text-align: center; padding: 8px 12px; pointer-events: none; }
     html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
     html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
     html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
@@ -129,7 +130,7 @@
             <div class="ag-wrap mt-2"><canvas id="ag-board" width="1200" height="1200"></canvas><div id="ag-banner"></div><div id="ag-blind" class="ag-cover hidden"></div></div>
             <p id="ag-flags" class="mt-2 text-center text-[12.5px] font-semibold text-[#7c3aed]"></p>
 
-            <h2 class="mt-4 text-[14px] font-semibold">🃏 내 증강 <span class="font-normal text-[#8e8e93]" id="ag-hand-txt"></span></h2>
+            <h2 class="mt-4 text-[14px] font-semibold">🛡 방어 카드 <span class="font-normal text-[#8e8e93]" id="ag-hand-txt"></span></h2>
             <div id="ag-hand" class="mt-2 flex min-h-[60px] flex-wrap gap-2"></div>
             <p id="ag-target" class="mt-2 hidden rounded-xl bg-[#faf5ff] px-3 py-2 text-[13px] text-[#7c3aed] dark:bg-[#2a1840] dark:text-[#d8b4fe]"></p>
 
@@ -152,7 +153,7 @@
                 <p class="mt-1.5 text-[11.5px] leading-5 text-[#8e8e93]" id="ag-odds"></p>
                 <h3 class="mt-3 text-[13px] font-semibold">🛒 골라 사기 <span class="font-normal text-[#8e8e93]">(내 턴마다 새로 진열)</span></h3>
                 <div id="ag-shop" class="mt-2 flex flex-wrap gap-2"></div>
-                <p class="mt-2 text-[11.5px] text-[#8e8e93]">뽑거나 사면 그 턴은 끝나요. 손에 든 카드는 내 턴에 한 장 쓰고 돌도 둘 수 있어요.</p>
+                <p class="mt-2 text-[11.5px] leading-5 text-[#8e8e93]">내 차례엔 <b>돌 두기</b> 또는 <b>뽑기·사기</b> 중 하나예요. 뽑은 증강은 <b>바로 발동</b>하고 턴이 끝나요 (대상이 필요하면 판에서 고른 뒤). 👯✌️⚡🔄⏮ 처럼 '이번 턴' 카드는 이어서 돌을 둬요. 방어 카드(🕯⏳💎🗝↩️⏪)만 손에 보관했다가, 내 턴에 써도 돌은 그대로 둘 수 있어요.</p>
             </section>
             <section class="gm-card">
                 <h2 class="text-[14px] font-semibold">채팅</h2>
@@ -283,7 +284,8 @@
         if (picking) {
             if (!validTarget(c)) { toast(targetHelp(picking.target)); return; }
             send({ type: 'use', card: picking.id, target: c });
-            picking = null; renderHand(); return;
+            if (!picking.pending) { picking = null; renderHand(); }  // 방금 뽑은 카드는 서버가 받아들이면 상태로 풀림
+            return;
         }
         const lock = (S.locks || []).find((l) => l.x === c[0] && l.y === c[1]);
         if (lock) {
@@ -304,11 +306,11 @@
     }
     function renderHand() {
         const hand = S?.hand || [];
-        $('ag-hand-txt').textContent = S ? `(가진 카드) ${hand.length}/${S.hand_max}장${hand.length >= S.hand_max ? ' · 가득 참 — 한 장 써야 더 뽑을 수 있어요' : ''}${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
-        const can = myTurn() && !S.used_card && !S.freeze?.[mySeat];
+        $('ag-hand-txt').textContent = S ? `(손에 보관) ${hand.length}/${S.hand_max}장${hand.length >= S.hand_max ? ' · 가득 참 — 더 뽑은 방어 카드는 바로 써져요' : ''}${S.used_card ? ' · 이번 턴엔 이미 한 장 썼어요' : ''}` : '';
+        const can = myTurn() && !S.used_card && !S.freeze?.[mySeat] && !S.pending;
         $('ag-hand').innerHTML = hand.length ? hand.map((c, i) => cardHTML(c, `data-use="${i}" ${can ? '' : 'disabled'}`).replace('class="card', `class="card ${picking && picking.id === c.id ? 'sel' : ''}`) + '</button>').join('') : '<p class="self-center text-[13px] text-[#8e8e93]">아직 없어요. 포인트를 모아 뽑아 보세요!</p>';
         $('ag-target').classList.toggle('hidden', !picking);
-        if (picking) $('ag-target').innerHTML = `${picking.icon} <b>${esc(picking.name)}</b> — ${targetHelp(picking.target)} <button type="button" class="gm-btn ml-2" id="ag-cancel">취소</button>`;
+        if (picking) $('ag-target').innerHTML = `${picking.pending ? '🎯 방금 뽑은 ' : ''}${picking.icon} <b>${esc(picking.name)}</b> — ${targetHelp(picking.target)}${picking.pending ? ' (판을 누르세요)' : ''} <button type="button" class="gm-btn ml-2" id="ag-cancel">${picking.pending ? '버리기' : '취소'}</button>`;
     }
     $('ag-hand').addEventListener('click', (e) => {
         const b = e.target.closest('[data-use]'); if (!b || b.disabled) return;
@@ -317,20 +319,23 @@
         picking = picking && picking.id === c.id ? null : c;
         renderHand(); draw();
     });
-    $('ag-target').addEventListener('click', (e) => { if (e.target.id === 'ag-cancel') { picking = null; renderHand(); draw(); } });
+    $('ag-target').addEventListener('click', (e) => {
+        if (e.target.id !== 'ag-cancel') return;
+        if (picking?.pending) { if (confirm(`'${picking.name}' 을(를) 버릴까요?`)) send({ type: 'discard' }); return; }
+        picking = null; renderHand(); draw();
+    });
     function renderShop() {
         const pts = S && mySeat ? S.points[mySeat] : 0;
         $('ag-points').textContent = S && mySeat ? `💰 ${pts}P` : '';
-        const can = myTurn() && !(S.extra && S.extra.first) && !S.freeze?.[mySeat];
-        const full = S && (S.hand || []).length >= S.hand_max;
-        $('ag-draw').disabled = !(can && pts >= (S?.random_price || 4) && !full);
+        const can = myTurn() && !(S.extra && S.extra.first) && !S.freeze?.[mySeat] && !S.drew && !S.pending;
+        $('ag-draw').disabled = !(can && pts >= (S?.random_price || 4));
         $('ag-draw').textContent = `🎰 무작위 뽑기 (${S?.random_price || 4}P)`;
         $('ag-draw').style.opacity = $('ag-draw').disabled ? 0.45 : 1;
         if (S) {
             const tot = Object.values(S.odds).reduce((a, b) => a + b, 0);
             $('ag-odds').innerHTML = Object.entries(S.odds).map(([r, w]) => `<span style="color:${RCOLOR[r]};font-weight:700">${RNAME[r]}</span> ${Math.round(w / tot * 100)}%`).join(' · ') + (mySeat ? ` · 천장까지 ${S.pity_max - S.pity}번 (영웅 이상 확정)` : '');
         }
-        $('ag-shop').innerHTML = (S?.shop || []).map((c, i) => cardHTML(c, `data-buy="${i}" ${can && pts >= c.price && (!full || c.target === 'instant') ? '' : 'disabled'}`).replace('</span><span class="nm">', `</span><span class="nm">`) + `<span class="pr">${c.price}P</span></button>`).join('') || '<p class="text-[12.5px] text-[#8e8e93]">내 턴에 진열돼요.</p>';
+        $('ag-shop').innerHTML = (S?.shop || []).map((c, i) => cardHTML(c, `data-buy="${i}" ${can && pts >= c.price ? '' : 'disabled'}`).replace('</span><span class="nm">', `</span><span class="nm">`) + `<span class="pr">${c.price}P</span></button>`).join('') || '<p class="text-[12.5px] text-[#8e8e93]">내 턴에 진열돼요.</p>';
     }
     $('ag-draw').addEventListener('click', () => send({ type: 'draw' }));
     $('ag-shop').addEventListener('click', (e) => { const b = e.target.closest('[data-buy]'); if (b && !b.disabled) send({ type: 'buy', slot: +b.dataset.buy }); });
@@ -338,7 +343,13 @@
     // ── 뽑기 연출 ──
     const G = $('gacha');
     let gachaTimer = null;
-    function gacha(card, rarity, mine, who) {
+    const FATE = {
+        now: (mine, card, cont) => (cont ? '⚡ 바로 발동! 이어서 돌을 두세요' : '⚡ 바로 발동!'),
+        target: (mine) => (mine ? '🎯 판에서 대상을 고르세요' : '🎯 대상을 고르는 중…'),
+        hand: (mine, card) => (card?.defense ? '🛡 방어 카드 — 손에 보관' : '📥 아직 대상이 없어 손에 보관'),
+        lost: () => '💨 손이 가득 차 사라졌어요',
+    };
+    function gacha(card, rarity, mine, who, fate, cont) {
         G.style.setProperty('--rc', RCOLOR[rarity]);
         G.classList.remove('revealed', 'myth', 'charging');
         G.classList.add('on', 'charging');
@@ -346,7 +357,8 @@
         $('g-ic').textContent = card ? card.icon : '✦';
         $('g-rr').textContent = `${RNAME[rarity]}${mine ? '' : ` · ${who}`}`;
         $('g-nm').textContent = card ? card.name : `${RNAME[rarity]} 증강`;
-        $('g-ds').innerHTML = card ? `${durTag(card.dur)}<br>${esc(card.desc)}` : `${esc(who)} 님이 뽑았어요`;
+        const fateTxt = FATE[fate] ? FATE[fate](mine, card, cont) : '';
+        $('g-ds').innerHTML = card ? `${durTag(card.dur)}<br>${esc(card.desc)}${fateTxt ? `<br><b style="display:inline-block;margin-top:6px">${fateTxt}</b>` : ''}` : `${esc(who)} 님이 뽑았어요`;
         $('g-shout').textContent = card && card.id === 'ruler' ? '👑 돌을 지배하는 자!!!' : SHOUT[rarity];
         const tier = ['common', 'rare', 'epic', 'legend', 'myth'].indexOf(rarity);
         // 등급이 높을수록 오래 흔들림 → 두근두근
@@ -358,7 +370,7 @@
             if (tier >= 2) { $('ag-main').classList.remove('shake'); void $('ag-main').offsetWidth; $('ag-main').classList.add('shake'); }
             fanfare(tier);
             sparks(tier);
-            holdGacha(mine ? 7000 + tier * 800 : 5000 + tier * 500);
+            holdGacha(mine && fate === 'target' ? 3500 : mine ? 7000 + tier * 800 : 5000 + tier * 500);  // 대상 고를 카드는 빨리 닫고 판으로
         }, charge);
     }
     // 카드를 쓰면 모두의 화면 가운데에 그 카드가 크게 떴다가 사라짐
@@ -480,14 +492,15 @@
         let status = '';
         if (!S) status = '연결하는 중…';
         else if (S.status === 'playing') {
-            if (myTurn()) status = S.extra && S.extra.first ? `${S.extra.bonus ? '🔁 다섯 번째 돌! 공짜로' : '🟢'} 한 번 더 두세요${S.extra.min_dist ? ` (방금 돌에서 ${S.extra.min_dist}칸 이상)` : ''}` : '🟢 내 차례! 돌을 두거나, 카드를 쓰거나, 뽑으세요';
+            if (myTurn() && S.pending) status = `🎯 ${S.pending.icon} ${S.pending.name} — ${targetHelp(S.pending.target)}`;
+            else if (myTurn()) status = S.extra && S.extra.first ? `${S.extra.bonus ? '🔁 다섯 번째 돌! 공짜로' : '🟢'} 한 번 더 두세요${S.extra.min_dist ? ` (방금 돌에서 ${S.extra.min_dist}칸 이상)` : ''}` : S.drew ? '🟢 이어서 돌을 두세요' : '🟢 내 차례! 돌을 두거나, 증강을 뽑으세요 (뽑으면 턴 끝)';
             else status = `${S.seats[S.turn]?.name || ''} 차례${S.seats[S.turn]?.bot ? ' (생각 중…)' : ''}`;
         } else if (S.status === 'over') status = `🏁 ${S.reason}`;
         else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
         $('ag-status').textContent = status;
         $('ag-life').textContent = S && S.status === 'playing' ? `새 돌 수명 ${mySeat ? S.life_of[mySeat] : S.current_life}턴 · ${S.next_grow}턴 뒤 +1${S.events_on ? ` · 중립 이벤트까지 ${S.next_event}턴` : ''}` : '';
         $('ag-blind').classList.toggle('hidden', !(S && S.blind));
-        if (S && S.blind) $('ag-blind').innerHTML = `🕶 암흑!<br><span style="font-size:15px;font-weight:600">${S.blind}턴 동안 돌이 하나도 안 보여요.<br>기억을 더듬어 두세요…</span>`;
+        if (S && S.blind) $('ag-blind').innerHTML = `🕶 암흑! <span style="font-weight:600">${S.blind}턴 동안 돌이 안 보여요 — 기억을 더듬어 두세요</span>`;
         const flags = [];
         if (S?.gray) flags.push(`🩶 잿빛 세상 — 모든 돌이 회색, 내 돌을 기억하세요 (${S.gray}턴)`);
         if (S?.stack_turns) flags.push(`🥞 돌 업기 중 (${S.stack_turns}턴) — 돌 위에도 둘 수 있어요`);
@@ -565,6 +578,7 @@
             else if (m.type === 'state') {
                 const prevTurn = S?.turn, prevStatus = S?.status, prevCount = S?.turns;
                 S = m.state; mySeat = m.you || null;
+                if (S.pending) picking = S.pending; else if (picking?.pending) picking = null;
                 if (S.turn !== prevTurn || S.turns !== prevCount || S.status !== prevStatus) turnStart = performance.now() - (S.elapsed || 0) * 1000;
                 if (S.last?.type === 'place' && S.last.fast && S.last.seat === mySeat && prevCount !== S.turns) tone(1046, 0.12, 'triangle', 0.12);
                 if (S.status === 'playing' && myTurn() && prevTurn !== S.turn) tone(660, 0.12);
@@ -572,9 +586,9 @@
                 render(m.peers.filter((p) => !p.seat).map((p) => p.name));
             } else if (m.type === 'draw') {
                 const mine = m.seat === mySeat, who = S?.seats?.[m.seat]?.name || '';
-                enqueueShow(() => gacha(m.card, m.rarity, mine, who));  // 누가 뽑든 모두에게
+                enqueueShow(() => gacha(m.card, m.rarity, mine, who, m.fate, m.cont));  // 누가 뽑든 모두에게
             } else if (m.type === 'use') {
-                if (!['dice', 'duel', 'roulette'].includes(m.card.id)) { const nm = S?.seats?.[m.seat]?.name || '', me2 = m.seat === mySeat; enqueueShow(() => cast(m.card, nm, me2)); }
+                if (!m.auto && !['dice', 'duel', 'roulette'].includes(m.card.id)) { const nm = S?.seats?.[m.seat]?.name || '', me2 = m.seat === mySeat; enqueueShow(() => cast(m.card, nm, me2)); }
                 banner(m.card);
                 pulses.push({ cells: m.cells || [], color: RCOLOR[m.card.rarity], start: performance.now() });
                 tone(m.card.rarity === 'myth' ? 220 : 440, 0.25, 'sawtooth', 0.08);

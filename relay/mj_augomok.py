@@ -118,12 +118,17 @@ ROULETTE = [  # (확률 가중치, 아이콘, 이름)
 	(5, "🌟", "전설 증강 1장"),
 ]
 PERMANENT = {"saver", "fifth", "sturdy"}
+# 방어 카드: 뽑으면 손에 보관했다가 필요할 때 씀 — 나머지는 뽑는 즉시 발동
+DEFENSE = {"candle", "hourglass", "eternal", "key", "undo", "rewind"}
+# 뽑기·사기는 돌 두기 대신 — 턴이 끝남. 다만 카드 자체가 '이번 턴' 인 것은 이어서 돌을 둠
+CONTINUE = {"twin", "double", "quick", "myreset", "grandreset"}
 
 
 def card_info(cid):
 	r, icon, name, desc, target = CARDS[cid]
-	dur = "영구·중첩" if cid in STACKABLE else "영구" if cid in PERMANENT else f"지속 {TIMED[cid]}턴" if cid in TIMED else "즉시" if target == "instant" else "1회용"
-	return {"id": cid, "rarity": r, "icon": icon, "name": name, "desc": desc, "target": target, "price": PRICE[r], "dur": dur}
+	dur = "방어" if cid in DEFENSE else "영구·중첩" if cid in STACKABLE else "영구" if cid in PERMANENT else f"지속 {TIMED[cid]}턴" if cid in TIMED else "즉시" if target == "instant" else "1회용"
+	return {"id": cid, "rarity": r, "icon": icon, "name": name, "desc": desc, "target": target, "price": PRICE[r], "dur": dur,
+			"defense": cid in DEFENSE, "kind": "방어" if cid in DEFENSE else "영구" if cid in PERMANENT | STACKABLE else f"지속 {TIMED[cid]}턴" if cid in TIMED else "1회용"}
 
 
 class AugOmokLogic:
@@ -168,7 +173,9 @@ class AugOmokLogic:
 		self.locks = {}
 		self.stack_turns = 0                       # 돌 업기: 남은 턴 (둘 합쳐)                            # 'x,y' → {'kind': 'seal'|'lock', 'ttl': n, 'region': id}
 		self.next_region = 1
-		self.used_card = False                     # 이번 턴에 카드 썼는지
+		self.used_card = False                     # 이번 턴에 방어 카드 썼는지
+		self.drew = False                          # 이번 턴에 뽑기·사기 했는지 (턴에 한 번)
+		self.pending = None                        # {'seat', 'card'} 뽑았는데 대상을 아직 안 고른 카드
 		self.extra = None                          # {'left': n, 'min_dist': d, 'first': [x, y]}
 		self.forced = None                         # {'seat': 상대, 'cell': [x, y]}
 		self.placed = {s: [] for s in self.SEATS}  # 둔 순서 (되감기)
@@ -332,6 +339,8 @@ class AugOmokLogic:
 		self.turns += 1
 		self.extra = None
 		self.used_card = False
+		self.drew = False
+		self.pending = None
 		if self.events_on and self.turns % EVENT_EVERY == 0:
 			self._event(room)
 			if self.status != "playing":
@@ -386,17 +395,52 @@ class AugOmokLogic:
 			self.pity[s] = 0 if RARITIES.index(rarity) >= 2 else self.pity[s] + 1
 		return self.rng.choice(BY_RARITY[rarity])
 
+	def _has_target(self, s, kind):
+		if kind == "own":
+			return bool(self.stones_of(s))
+		if kind == "opp":
+			return bool(self.stones_of(self.other(s)))
+		if kind == "empty":
+			return any(self.empty(x, y) for x in range(SIZE) for y in range(SIZE))
+		return True
+
 	def _gain_card(self, room, s, cid, how):
+		"""카드를 얻음 — 방어 카드는 손에, 나머지는 바로 발동 (대상이 필요하면 고를 때까지 기다림)."""
 		info = card_info(cid)
-		# 누가 뽑든 모두의 화면에 같은 연출 (카드 이름까지)
+		kind = CARDS[cid][4]
+		room_left = len(self.hand[s]) < HAND_MAX
+		if kind == "instant":
+			fate = "instant"
+		elif cid in DEFENSE:
+			fate = "hand" if room_left else ("target" if kind != "none" and s == self.turn and self._has_target(s, kind) else "now" if kind == "none" else "lost")
+		elif kind == "none":
+			fate = "now"
+		elif s == self.turn and self._has_target(s, kind):
+			fate = "target"
+		else:  # 아직 대상이 없음(상대 돌이 없는 등) → 손에 보관
+			fate = "hand" if room_left else "lost"
+		# 누가 뽑든 모두의 화면에 같은 연출 (카드 이름 + 어떻게 되는지)
 		self.slow = True
-		room.emit({"type": "draw", "seat": s, "how": how, "rarity": info["rarity"], "card": info})
-		if CARDS[cid][4] == "instant":
-			self._instant(room, s, cid)
-			return
-		self.hand[s].append(cid)
+		room.emit({"type": "draw", "seat": s, "how": how, "rarity": info["rarity"], "card": info, "fate": fate,
+				   "cont": how in ("draw", "buy") and cid in CONTINUE})
 		if info["rarity"] in ("legend", "myth"):
-			room.notice(f"{'🌈' if info['rarity'] == 'myth' else '🌟'} {self.names[s]} 님이 {RARITY_NAMES[info['rarity']]} 증강 '{info['name']}' 을(를) 손에 넣었어요!")
+			room.notice(f"{'🌈' if info['rarity'] == 'myth' else '🌟'} {self.names[s]} 님이 {RARITY_NAMES[info['rarity']]} 증강 '{info['name']}' 을(를) 뽑았어요!")
+		if fate == "instant":
+			self._instant(room, s, cid)
+		elif fate == "hand":
+			self.hand[s].append(cid)
+		elif fate == "target":
+			self.pending = {"seat": s, "card": cid}
+		elif fate == "now":
+			err = self._use(room, s, cid, [], auto=True)
+			if err:  # 지금은 쓸 수 없는 카드(이미 켜진 영구 효과 등)
+				if room_left and cid not in PERMANENT:
+					self.hand[s].append(cid)
+					room.notice(f"{info['icon']} 지금은 쓸 수 없어서 손에 보관했어요. ({err})")
+				else:
+					room.notice(f"{info['icon']} '{info['name']}' 은(는) 지금 쓸 수 없어 사라졌어요. ({err})")
+		else:
+			room.notice(f"{info['icon']} 손이 가득 차서 '{info['name']}' 이(가) 사라졌어요.")
 
 	def _instant(self, room, s, cid):
 		if cid == "piggy":
@@ -404,8 +448,7 @@ class AugOmokLogic:
 			room.notice(f"🐷 {self.names[s]} 님 저금통 +5포인트!")
 		elif cid == "chest":
 			room.notice(f"🎁 {self.names[s]} 님이 보물상자를 열었어요!")
-			if len(self.hand[s]) < HAND_MAX:
-				self._gain_card(room, s, self._roll(s, count_pity=False), "chest")
+			self._gain_card(room, s, self._roll(s, count_pity=False), "chest")
 
 	# ── 중립 이벤트 (EVENT_EVERY 턴마다) ──
 	EVENTS = {
@@ -455,11 +498,12 @@ class AugOmokLogic:
 		elif eid == "fog":
 			self.memory = max(self.memory, 2)
 		elif eid == "luck":
-			for x in self.SEATS:
-				if len(self.hand[x]) < HAND_MAX:
-					self.hand[x].append(self.rng.choice(BY_RARITY["common"]))
+			rewards = [(x, self.rng.choice(BY_RARITY["common"])) for x in self.SEATS]
 		room.notice(f"{icon} 중립 이벤트 — {name}: {desc}")
 		room.emit({"type": "event", "icon": icon, "name": name, "desc": desc, "cells": cells})
+		if eid == "luck":
+			for x, cid in rewards:
+				self._gain_card(room, x, cid, "luck")
 
 	def _act_unlock(self, room, seat, x, y):
 		lk = self.locks.get(self.key(x, y))
@@ -489,8 +533,10 @@ class AugOmokLogic:
 		scored.sort(reverse=True)
 		return [k for _, _, k in scored[:n]]
 
-	def _use(self, room, s, cid, target):
+	def _use(self, room, s, cid, target, auto=False):
+		"""auto: 뽑자마자 발동 (손에서 빼지 않고, 한 턴 한 장 제한에도 안 셈)."""
 		o = self.other(s)
+		reward = None
 		kind = CARDS[cid][4]
 		cell = None
 		if self.freeze[s]:
@@ -625,14 +671,14 @@ class AugOmokLogic:
 				self.points[s] = max(0, self.points[s] - 2)
 			elif roll in (2, 3):
 				self.points[s] += roll
-			elif roll == 4 and len(self.hand[s]) < HAND_MAX:
-				self.hand[s].append(self.rng.choice(BY_RARITY["common"]))
+			elif roll == 4:
+				reward = self.rng.choice(BY_RARITY["common"])
 			elif roll == 5:
 				for k, v in self.stones_of(s):
 					v["ttl"] += 1
-			elif roll == 6 and len(self.hand[s]) < HAND_MAX:
+			elif roll == 6:
 				r = self.rng.choices(("rare", "epic", "legend", "myth"), weights=(55, 28, 13, 4))[0]
-				self.hand[s].append(self.rng.choice(BY_RARITY[r]))
+				reward = self.rng.choice(BY_RARITY[r])
 			room.emit({"type": "dice", "kind": "luck", "seat": s, "rolls": {s: roll}, "text": text})
 			room.notice(f"🎲 {self.names[s]} 님 주사위 {roll} → {text}")
 		elif cid == "oracle":
@@ -666,8 +712,8 @@ class AugOmokLogic:
 					v["ttl"] += 2
 			elif i == 4:
 				self.skip.add(s)
-			elif i == 6 and len(self.hand[s]) < HAND_MAX:
-				self.hand[s].append(self.rng.choice(BY_RARITY["legend"]))
+			elif i == 6:
+				reward = self.rng.choice(BY_RARITY["legend"])
 			room.emit({"type": "roulette", "seat": s, "index": i, "slots": [[ic, lb] for _, ic, lb in ROULETTE]})
 			room.notice(f"🎡 {self.names[s]} 님 룰렛 → {icon} {label}")
 		elif cid == "stack":
@@ -758,7 +804,8 @@ class AugOmokLogic:
 					self.cells[self.key(nx, ny)] = v
 					affected.append([nx, ny])
 		elif cid == "swap":
-			self.hand[s].remove(cid)
+			if not auto:  # 바꾸기 전에 이 카드는 손에서 빼 둠
+				self.hand[s].remove(cid)
 			consumed = True
 			self.hand[s], self.hand[o] = self.hand[o], self.hand[s]
 		elif cid == "jackpot":
@@ -794,15 +841,21 @@ class AugOmokLogic:
 		for k, v in list(self.cells.items()):
 			if v["ttl"] <= 0 and not v["perm"]:
 				del self.cells[k]
-		if not consumed:
-			self.hand[s].remove(cid)
-		self.used_card = True
+		if not auto:
+			if not consumed:
+				self.hand[s].remove(cid)
+			self.used_card = True
 		self.slow = True
 		info = card_info(cid)
 		self.last = {"type": "use", "seat": s, "card": cid, "cells": affected}
-		room.emit({"type": "use", "seat": s, "card": info, "cells": affected, "target": [tx, ty] if cell is not None or kind in ("empty", "any") else None})
-		room.notice(f"{info['icon']} {self.names[s]} 님이 '{info['name']}' 을(를) 썼어요!" + (" (신화)" if info["rarity"] == "myth" else ""))
+		# auto: 뽑기 연출에서 이미 보여 줬으니 화면은 칸 강조만 (카드 연출을 두 번 띄우지 않음)
+		room.emit({"type": "use", "seat": s, "card": info, "cells": affected, "auto": auto, "target": [tx, ty] if cell is not None or kind in ("empty", "any") else None})
+		room.notice(f"{info['icon']} {self.names[s]} 님의 '{info['name']}' 발동!" + (" (신화)" if info["rarity"] == "myth" else ""))
+		if reward:  # 주사위·룰렛 보상 카드는 연출이 끝난 뒤에
+			self._gain_card(room, s, reward, cid)
 		# 내 돌이 늘어난 카드(강탈·지배자)는 바로 다섯 줄 확인
+		if self.status != "playing":
+			return None
 		if cid in ("steal", "ruler", "joker", "duel", "mirror", "clone", "ghost", "thief"):
 			self._check_win(room, s)
 		elif cid in ("vortex", "tsunami"):  # 돌이 움직이면 둘 다 확인 (쓴 사람 먼저)
@@ -871,10 +924,20 @@ class AugOmokLogic:
 			self._arm_bot()
 			room.notice(f"증목 시작! {self.names[self.turn]} 님부터. 돌은 내 턴 {self.life}번 뒤에 사라져요.")
 			return True, None
-		if self.status != "playing" and kind in ("move", "draw", "buy", "use", "unlock"):
+		if self.status != "playing" and kind in ("move", "draw", "buy", "use", "unlock", "discard"):
 			return False, "아직 판이 시작되지 않았어요."
-		if kind in ("move", "draw", "buy", "use", "unlock") and seat != self.turn:
+		if kind in ("move", "draw", "buy", "use", "unlock", "discard") and seat != self.turn:
 			return False, "내 차례가 아니에요." if seat else "구경 중이에요."
+		if self.pending and kind in ("move", "draw", "buy", "unlock"):
+			return False, f"먼저 뽑은 '{CARDS[self.pending['card']][2]}' 의 대상을 판에서 골라 주세요."
+		if kind == "discard":
+			if not self.pending:
+				return False, None
+			cid = self.pending["card"]
+			self.pending = None
+			room.notice(f"{CARDS[cid][1]} {self.names[seat]} 님이 '{CARDS[cid][2]}' 을(를) 버렸어요.")
+			self._after_draw(room, cid)
+			return True, None
 		if kind == "move":
 			try:
 				x, y = int(data.get("x")), int(data.get("y"))
@@ -895,9 +958,18 @@ class AugOmokLogic:
 				return False, None
 			return self._act_buy(room, seat, i)
 		if kind == "use":
-			if self.used_card:
-				return False, "카드는 한 턴에 한 장만 쓸 수 있어요."
 			cid = data.get("card")
+			if self.pending:  # 방금 뽑은 카드의 대상 고르기
+				if cid != self.pending["card"]:
+					return False, f"먼저 뽑은 '{CARDS[self.pending['card']][2]}' 의 대상을 골라 주세요."
+				err = self._use(room, seat, cid, data.get("target") or [], auto=True)
+				if err:
+					return False, err
+				self.pending = None
+				self._after_draw(room, cid)
+				return True, None
+			if self.used_card:
+				return False, "방어 카드는 한 턴에 한 장만 쓸 수 있어요."
 			if cid not in self.hand[seat]:
 				return False, "손에 없는 카드예요."
 			err = self._use(room, seat, cid, data.get("target") or [])
@@ -964,6 +1036,15 @@ class AugOmokLogic:
 		self._end_turn(room)
 		return True, None
 
+	def _after_draw(self, room, cid):
+		"""뽑기·사기는 돌 두기 대신이라 턴이 끝남 — 대상 고르는 중이면 고른 뒤에, '이번 턴' 카드면 이어서 둠."""
+		if self.status != "playing" or self.pending:
+			return
+		if cid in CONTINUE:
+			room.notice("이어서 돌을 두세요!")
+			return
+		self._end_turn(room)
+
 	def price_for(self, s, cid):
 		p = PRICE[CARDS[cid][0]]
 		return (p + 1) // 2 if self.coupon[s] else p
@@ -973,14 +1054,16 @@ class AugOmokLogic:
 			return False, "두 번째 돌을 먼저 두세요."
 		if self.freeze[seat]:
 			return False, "❄️ 얼어 있어서 이번 턴엔 뽑을 수 없어요."
+		if self.drew:
+			return False, "뽑기·사기는 한 턴에 한 번이에요. 이어서 돌을 두세요."
 		if self.points[seat] < RANDOM_PRICE:
 			return False, f"무작위 뽑기는 {RANDOM_PRICE}포인트가 필요해요."
-		if len(self.hand[seat]) >= HAND_MAX:
-			return False, f"손에는 {HAND_MAX}장까지예요. 먼저 한 장 쓰세요."
 		self.points[seat] -= RANDOM_PRICE
-		self._gain_card(room, seat, self._roll(seat), "draw")
+		self.drew = True
 		self.last = {"type": "draw", "seat": seat}
-		self._end_turn(room)
+		cid = self._roll(seat)
+		self._gain_card(room, seat, cid, "draw")
+		self._after_draw(room, cid)
 		return True, None
 
 	def _act_buy(self, room, seat, i):
@@ -992,17 +1075,18 @@ class AugOmokLogic:
 			return False, "❄️ 얼어 있어서 이번 턴엔 살 수 없어요."
 		cid = self.shop[seat][i]
 		price = self.price_for(seat, cid)
+		if self.drew:
+			return False, "뽑기·사기는 한 턴에 한 번이에요. 이어서 돌을 두세요."
 		if self.points[seat] < price:
 			return False, f"'{CARDS[cid][2]}' 은(는) {price}포인트예요."
-		if len(self.hand[seat]) >= HAND_MAX and CARDS[cid][4] != "instant":
-			return False, f"손에는 {HAND_MAX}장까지예요. 먼저 한 장 쓰세요."
 		self.points[seat] -= price
+		self.drew = True
 		if self.coupon[seat]:
 			self.coupon[seat] = False
 		self.shop[seat].pop(i)
-		self._gain_card(room, seat, cid, "buy")
 		self.last = {"type": "buy", "seat": seat}
-		self._end_turn(room)
+		self._gain_card(room, seat, cid, "buy")
+		self._after_draw(room, cid)
 		return True, None
 
 	def on_join(self, room, peer):
@@ -1080,10 +1164,46 @@ class AugOmokLogic:
 				best = max(best, len(self._line(x, y, c)))
 		return best
 
+	def _bot_target(self, s, cid):
+		"""컴퓨터가 방금 뽑은 카드의 대상 칸."""
+		o, kind = self.other(s), CARDS[cid][4]
+		if kind == "opp" or (kind == "any" and self.stones_of(o)):
+			x, y = map(int, self._danger_stones(o, 1)[0].split(","))
+			if cid == "vortex":
+				x, y = min(max(x, 1), SIZE - 2), min(max(y, 1), SIZE - 2)
+			return [x, y]
+		if kind == "own":
+			return list(map(int, self._danger_stones(s, 1)[0].split(",")))
+		if kind == "any":
+			return [SIZE // 2, SIZE // 2]
+		if cid == "puppet":
+			far = [(x, y) for x in (0, SIZE - 1) for y in (0, SIZE - 1) if self.empty(x, y)]
+			if far:
+				return list(far[0])
+		if cid == "timebomb" and self.stones_of(o):
+			x, y = map(int, self._danger_stones(o, 1)[0].split(","))
+			near = [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if self.empty(x + dx, y + dy)]
+			if near:
+				return list(near[0])
+		cell, _ = self._best_cell(s)
+		return list(cell) if cell else None
+
 	def bot_act(self, room):
 		s, o = self.turn, self.other(self.turn)
 		hand = self.hand[s]
 		danger = self._threat(o)
+		# 0) 방금 뽑은 카드의 대상 고르기
+		if self.pending and self.pending["seat"] == s:
+			cid = self.pending["card"]
+			target = self._bot_target(s, cid)
+			if target is None or self._use(room, s, cid, target, auto=True):
+				room.notice(f"{CARDS[cid][1]} {self.names[s]} 님이 '{CARDS[cid][2]}' 을(를) 버렸어요.")
+			self.pending = None
+			self._after_draw(room, cid)
+			if self.status == "playing" and self.turn == s:
+				self.bot_due = time.time() + BOT_READ_DELAY
+				self.slow = False
+			return
 		# 1) 카드: 상대가 위험하면 막는 카드, 아니면 내 줄을 살리는 카드
 		if not self.used_card and hand:
 			pick, target = None, None
@@ -1115,16 +1235,20 @@ class AugOmokLogic:
 						self.bot_due = time.time() + BOT_READ_DELAY
 						self.slow = False
 					return
-		# 2) 뽑기: 급하지 않고 포인트가 넉넉하면 가끔
+		# 2) 뽑기 (돌 두기 대신이라 턴이 끝남): 급하지 않고 포인트가 넉넉하면 가끔
 		_, v = self._best_cell(s)
 		calm = danger <= 2 and v < 4000
-		if calm and len(hand) < HAND_MAX and not self.extra:
+		if calm and not self.drew and not self.extra and not self.freeze[s]:
 			affordable = [i for i, cid in enumerate(self.shop[s]) if self.price_for(s, cid) <= self.points[s] and RARITIES.index(CARDS[cid][0]) >= 2]
+			did = False
 			if affordable and self.rng.random() < 0.5:
-				self._act_buy(room, s, affordable[0])
-				return
-			if self.points[s] >= RANDOM_PRICE + 2 and self.rng.random() < 0.35:
-				self._act_draw(room, s)
+				did = self._act_buy(room, s, affordable[0])[0]
+			elif self.points[s] >= RANDOM_PRICE + 2 and self.rng.random() < 0.4:
+				did = self._act_draw(room, s)[0]
+			if did:
+				if self.status == "playing" and self.turn == s:
+					self.bot_due = time.time() + BOT_READ_DELAY
+					self.slow = False
 				return
 		# 3) 두기 (한 번 더 두기면 두 번)
 		for _ in range(2):
@@ -1168,7 +1292,9 @@ class AugOmokLogic:
 			"life": self.life, "current_life": self.current_life(), "grow_every": GROW_EVERY,
 			"next_grow": GROW_EVERY - self.turns % GROW_EVERY, "turns": self.turns, "last": None if (blind or gray) else self.last,
 			"elapsed": round(time.time() - self.turn_started, 2) if self.turn else None, "fast_window": window,
-			"used_card": self.used_card, "extra": self.extra, "forced": self.forced if self.forced and me == self.other(self.forced["seat"]) else None,
+			"used_card": self.used_card, "drew": self.drew, "extra": self.extra,
+			"pending": {**card_info(self.pending["card"]), "pending": True} if self.pending and self.pending["seat"] == me else None,
+			"pending_other": bool(self.pending and self.pending["seat"] != me), "forced": self.forced if self.forced and me == self.other(self.forced["seat"]) else None,
 			"points": self.points, "hand_count": {s: len(self.hand[s]) for s in self.SEATS},
 			"hand": [card_info(c) for c in self.hand[me]] if me else [],
 			"shop": [{**card_info(c), "price": self.price_for(me, c)} for c in self.shop[me]] if me else [],
