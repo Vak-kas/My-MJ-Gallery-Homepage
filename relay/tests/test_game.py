@@ -565,8 +565,13 @@ class AugOmokTestCase(unittest.TestCase):
 		logic.points["black"] = 4
 		self.assertEqual(logic.on_message(room, a, {"type": "draw"}), (True, None))
 		self.assertEqual(logic.points["black"], 0)
-		self.assertEqual(logic.turn, "white")  # 뽑으면 턴 끝
+		self.assertEqual(logic.turn, "black")  # 뽑아도 턴은 그대로 (돌을 둬야 끝남)
 		self.assertTrue(any(e["type"] == "draw" for e in room.events))
+		logic.points["black"] = 10
+		self.assertIn("한 번", logic.on_message(room, a, {"type": "draw"})[1])
+		logic.pending = None  # 대상 카드가 나왔을 수 있음
+		self.mv(logic, room, a, 7, 7)
+		self.assertEqual(logic.turn, "white")
 		# 천장: 9번 연속 영웅 미만이면 10번째는 영웅 이상 (처음 뽑힌 '일반' 을 영웅 이상으로 다시 뽑음)
 		logic.pity["white"] = 9
 		real = logic.rng.choices
@@ -997,6 +1002,95 @@ class AugOmokMoreCardsTestCase(unittest.TestCase):
 				logic.bot_act(room)
 			done += logic.status == "over"
 		self.assertGreaterEqual(done, 11)
+
+
+class AugOmokAutoUseTestCase(unittest.TestCase):
+	"""뽑으면 바로 발동, 대상 카드는 판에서 고르고, 방어 카드만 손에 보관."""
+	setup = AugOmokTestCase.setup
+	mv = AugOmokTestCase.mv
+
+	def draw_as(self, logic, room, peer, cid):
+		logic._roll = lambda s, count_pity=True: cid
+		logic.points[logic.seat_of(peer.pid)] = 20
+		logic.drew = False
+		return logic.on_message(room, peer, {"type": "draw"})
+
+	def test_none_card_fires_at_once_and_turn_continues(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		logic.cells[logic.key(0, 0)] = {"o": "w", "ttl": 5, "by": "white", "perm": False}
+		self.assertEqual(self.draw_as(logic, room, a, "eclipse"), (True, None))
+		self.assertEqual(logic.at(0, 0)["ttl"], 4)
+		self.assertEqual(logic.hand["black"], [])
+		self.assertFalse(logic.used_card)
+		draw = [e for e in room.events if e["type"] == "draw"][-1]
+		use = [e for e in room.events if e["type"] == "use"][-1]
+		self.assertEqual(draw["fate"], "now")
+		self.assertTrue(use["auto"])  # 화면은 카드 연출을 한 번만
+		self.assertEqual(logic.turn, "black")
+		self.assertEqual(self.mv(logic, room, a, 7, 7), (True, None))
+		self.assertEqual(logic.turn, "white")
+
+	def test_defense_card_goes_to_hand(self):
+		logic, room, a, b = self.setup()
+		self.draw_as(logic, room, a, "hourglass")
+		self.assertEqual(logic.hand["black"], ["hourglass"])
+		self.assertEqual([e for e in room.events if e["type"] == "draw"][-1]["fate"], "hand")
+		self.assertTrue(self.A.card_info("hourglass")["defense"])
+
+	def test_target_card_waits_for_target(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		# 상대 돌이 없으면 손에 보관
+		self.draw_as(logic, room, a, "gust")
+		self.assertEqual(logic.hand["black"], ["gust"])
+		self.assertIsNone(logic.pending)
+		self.mv(logic, room, a, 7, 7)
+		self.mv(logic, room, b, 3, 3)
+		# 상대 돌이 있으면 바로 대상 고르기 — 고를 때까지 두기·뽑기 막힘
+		logic.hand["black"] = []
+		self.draw_as(logic, room, a, "gust")
+		self.assertEqual(logic.pending, {"seat": "black", "card": "gust"})
+		self.assertEqual(logic.snapshot(room, "a")["pending"]["id"], "gust")
+		self.assertIsNone(logic.snapshot(room, "b")["pending"])
+		self.assertIn("대상", self.mv(logic, room, a, 8, 8)[1])
+		self.assertIn("상대 돌", logic.on_message(room, a, {"type": "use", "card": "gust", "target": [7, 7]})[1])
+		self.assertEqual(logic.on_message(room, a, {"type": "use", "card": "gust", "target": [3, 3]}), (True, None))
+		self.assertIsNone(logic.at(3, 3))
+		self.assertIsNone(logic.pending)
+		self.assertEqual(self.mv(logic, room, a, 8, 8), (True, None))
+		# 버리기
+		self.mv(logic, room, b, 3, 3)
+		self.draw_as(logic, room, a, "steal")
+		self.assertTrue(logic.on_message(room, a, {"type": "discard"})[0])
+		self.assertIsNone(logic.pending)
+		self.assertEqual(logic.at(3, 3)["o"], "w")
+
+	def test_bot_resolves_pending_target(self):
+		logic, room, a, b = self.setup()
+		logic.events_on = False
+		self.mv(logic, room, a, 7, 7)
+		logic.bots.add("white")
+		logic.pending = {"seat": "white", "card": "gust"}
+		logic.bot_act(room)
+		self.assertIsNone(logic.pending)
+		self.assertIsNone(logic.at(7, 7))
+		self.assertEqual(logic.turn, "white")  # 다음 틱에 둠
+		logic.bot_act(room)
+		self.assertEqual(logic.turn, "black")
+
+	def test_dice_reward_and_luck_event_cards_are_granted(self):
+		logic, room, a, b = self.setup()
+		logic.rng.randint = lambda lo, hi: 4  # 주사위 4: 일반 카드 1장
+		logic.rng.choice = lambda seq: "candle" if "candle" in seq else seq[0]
+		self.draw_as(logic, room, a, "dice")
+		self.assertEqual(logic.hand["black"], ["candle"])
+		types = [e["type"] for e in room.events]
+		self.assertLess(types.index("dice"), len(types) - 1 - types[::-1].index("draw"))  # 보상 카드 연출은 주사위 뒤에
+		logic.hand = {"black": [], "white": []}
+		logic.rng.choice = lambda seq: "luck" if "luck" in seq else ("candle" if "candle" in seq else seq[0])
+		logic._event(room)
+		self.assertEqual(logic.hand, {"black": ["candle"], "white": ["candle"]})
 
 
 class AugOmokResetCardsTestCase(unittest.TestCase):
