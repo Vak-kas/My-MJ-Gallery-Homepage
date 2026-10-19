@@ -565,13 +565,10 @@ class AugOmokTestCase(unittest.TestCase):
 		logic.points["black"] = 4
 		self.assertEqual(logic.on_message(room, a, {"type": "draw"}), (True, None))
 		self.assertEqual(logic.points["black"], 0)
-		self.assertEqual(logic.turn, "black")  # 뽑아도 턴은 그대로 (돌을 둬야 끝남)
+		if logic.pending:  # 대상 카드가 나왔으면 버림
+			logic.on_message(room, a, {"type": "discard"})
+		self.assertEqual(logic.turn, "white")  # 뽑기는 돌 두기 대신 → 턴 끝
 		self.assertTrue(any(e["type"] == "draw" for e in room.events))
-		logic.points["black"] = 10
-		self.assertIn("한 번", logic.on_message(room, a, {"type": "draw"})[1])
-		logic.pending = None  # 대상 카드가 나왔을 수 있음
-		self.mv(logic, room, a, 7, 7)
-		self.assertEqual(logic.turn, "white")
 		# 천장: 9번 연속 영웅 미만이면 10번째는 영웅 이상 (처음 뽑힌 '일반' 을 영웅 이상으로 다시 뽑음)
 		logic.pity["white"] = 9
 		real = logic.rng.choices
@@ -1027,27 +1024,38 @@ class AugOmokAutoUseTestCase(unittest.TestCase):
 		use = [e for e in room.events if e["type"] == "use"][-1]
 		self.assertEqual(draw["fate"], "now")
 		self.assertTrue(use["auto"])  # 화면은 카드 연출을 한 번만
+		self.assertEqual(logic.turn, "white")  # 뽑기 = 돌 두기 대신 → 턴 끝
+
+	def test_this_turn_cards_continue(self):
+		logic, room, a, b = self.setup()
+		self.draw_as(logic, room, a, "double")
+		self.assertEqual(logic.turn, "black")  # 연속 두기는 이어서 둠
+		self.assertTrue([e for e in room.events if e["type"] == "draw"][-1]["cont"])
+		self.assertIn("한 번", logic.on_message(room, a, {"type": "draw"})[1])
+		self.mv(logic, room, a, 7, 7)
 		self.assertEqual(logic.turn, "black")
-		self.assertEqual(self.mv(logic, room, a, 7, 7), (True, None))
+		self.mv(logic, room, a, 9, 9)
 		self.assertEqual(logic.turn, "white")
 
 	def test_defense_card_goes_to_hand(self):
 		logic, room, a, b = self.setup()
 		self.draw_as(logic, room, a, "hourglass")
 		self.assertEqual(logic.hand["black"], ["hourglass"])
+		self.assertEqual(logic.turn, "white")
 		self.assertEqual([e for e in room.events if e["type"] == "draw"][-1]["fate"], "hand")
 		self.assertTrue(self.A.card_info("hourglass")["defense"])
 
 	def test_target_card_waits_for_target(self):
 		logic, room, a, b = self.setup()
 		logic.events_on = False
-		# 상대 돌이 없으면 손에 보관
+		# 상대 돌이 없으면 손에 보관 (턴 끝)
 		self.draw_as(logic, room, a, "gust")
 		self.assertEqual(logic.hand["black"], ["gust"])
 		self.assertIsNone(logic.pending)
-		self.mv(logic, room, a, 7, 7)
 		self.mv(logic, room, b, 3, 3)
-		# 상대 돌이 있으면 바로 대상 고르기 — 고를 때까지 두기·뽑기 막힘
+		self.mv(logic, room, a, 7, 7)
+		self.mv(logic, room, b, 3, 4)
+		# 상대 돌이 있으면 바로 대상 고르기 — 고를 때까지 두기·뽑기 막힘, 고르면 턴 끝
 		logic.hand["black"] = []
 		self.draw_as(logic, room, a, "gust")
 		self.assertEqual(logic.pending, {"seat": "black", "card": "gust"})
@@ -1058,13 +1066,14 @@ class AugOmokAutoUseTestCase(unittest.TestCase):
 		self.assertEqual(logic.on_message(room, a, {"type": "use", "card": "gust", "target": [3, 3]}), (True, None))
 		self.assertIsNone(logic.at(3, 3))
 		self.assertIsNone(logic.pending)
-		self.assertEqual(self.mv(logic, room, a, 8, 8), (True, None))
-		# 버리기
+		self.assertEqual(logic.turn, "white")
+		# 버리기 (역시 턴 끝)
 		self.mv(logic, room, b, 3, 3)
 		self.draw_as(logic, room, a, "steal")
 		self.assertTrue(logic.on_message(room, a, {"type": "discard"})[0])
 		self.assertIsNone(logic.pending)
 		self.assertEqual(logic.at(3, 3)["o"], "w")
+		self.assertEqual(logic.turn, "white")
 
 	def test_bot_resolves_pending_target(self):
 		logic, room, a, b = self.setup()
@@ -1075,9 +1084,7 @@ class AugOmokAutoUseTestCase(unittest.TestCase):
 		logic.bot_act(room)
 		self.assertIsNone(logic.pending)
 		self.assertIsNone(logic.at(7, 7))
-		self.assertEqual(logic.turn, "white")  # 다음 틱에 둠
-		logic.bot_act(room)
-		self.assertEqual(logic.turn, "black")
+		self.assertEqual(logic.turn, "black")  # 대상을 고르면 턴 끝
 
 	def test_dice_reward_and_luck_event_cards_are_granted(self):
 		logic, room, a, b = self.setup()

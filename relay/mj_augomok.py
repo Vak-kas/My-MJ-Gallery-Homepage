@@ -120,6 +120,8 @@ ROULETTE = [  # (확률 가중치, 아이콘, 이름)
 PERMANENT = {"saver", "fifth", "sturdy"}
 # 방어 카드: 뽑으면 손에 보관했다가 필요할 때 씀 — 나머지는 뽑는 즉시 발동
 DEFENSE = {"candle", "hourglass", "eternal", "key", "undo", "rewind"}
+# 뽑기·사기는 돌 두기 대신 — 턴이 끝남. 다만 카드 자체가 '이번 턴' 인 것은 이어서 돌을 둠
+CONTINUE = {"twin", "double", "quick", "myreset", "grandreset"}
 
 
 def card_info(cid):
@@ -419,7 +421,8 @@ class AugOmokLogic:
 			fate = "hand" if room_left else "lost"
 		# 누가 뽑든 모두의 화면에 같은 연출 (카드 이름 + 어떻게 되는지)
 		self.slow = True
-		room.emit({"type": "draw", "seat": s, "how": how, "rarity": info["rarity"], "card": info, "fate": fate})
+		room.emit({"type": "draw", "seat": s, "how": how, "rarity": info["rarity"], "card": info, "fate": fate,
+				   "cont": how in ("draw", "buy") and cid in CONTINUE})
 		if info["rarity"] in ("legend", "myth"):
 			room.notice(f"{'🌈' if info['rarity'] == 'myth' else '🌟'} {self.names[s]} 님이 {RARITY_NAMES[info['rarity']]} 증강 '{info['name']}' 을(를) 뽑았어요!")
 		if fate == "instant":
@@ -933,6 +936,7 @@ class AugOmokLogic:
 			cid = self.pending["card"]
 			self.pending = None
 			room.notice(f"{CARDS[cid][1]} {self.names[seat]} 님이 '{CARDS[cid][2]}' 을(를) 버렸어요.")
+			self._after_draw(room, cid)
 			return True, None
 		if kind == "move":
 			try:
@@ -962,6 +966,7 @@ class AugOmokLogic:
 				if err:
 					return False, err
 				self.pending = None
+				self._after_draw(room, cid)
 				return True, None
 			if self.used_card:
 				return False, "방어 카드는 한 턴에 한 장만 쓸 수 있어요."
@@ -1031,6 +1036,15 @@ class AugOmokLogic:
 		self._end_turn(room)
 		return True, None
 
+	def _after_draw(self, room, cid):
+		"""뽑기·사기는 돌 두기 대신이라 턴이 끝남 — 대상 고르는 중이면 고른 뒤에, '이번 턴' 카드면 이어서 둠."""
+		if self.status != "playing" or self.pending:
+			return
+		if cid in CONTINUE:
+			room.notice("이어서 돌을 두세요!")
+			return
+		self._end_turn(room)
+
 	def price_for(self, s, cid):
 		p = PRICE[CARDS[cid][0]]
 		return (p + 1) // 2 if self.coupon[s] else p
@@ -1041,13 +1055,15 @@ class AugOmokLogic:
 		if self.freeze[seat]:
 			return False, "❄️ 얼어 있어서 이번 턴엔 뽑을 수 없어요."
 		if self.drew:
-			return False, "뽑기·사기는 한 턴에 한 번이에요. 이제 돌을 두세요."
+			return False, "뽑기·사기는 한 턴에 한 번이에요. 이어서 돌을 두세요."
 		if self.points[seat] < RANDOM_PRICE:
 			return False, f"무작위 뽑기는 {RANDOM_PRICE}포인트가 필요해요."
 		self.points[seat] -= RANDOM_PRICE
 		self.drew = True
 		self.last = {"type": "draw", "seat": seat}
-		self._gain_card(room, seat, self._roll(seat), "draw")
+		cid = self._roll(seat)
+		self._gain_card(room, seat, cid, "draw")
+		self._after_draw(room, cid)
 		return True, None
 
 	def _act_buy(self, room, seat, i):
@@ -1060,7 +1076,7 @@ class AugOmokLogic:
 		cid = self.shop[seat][i]
 		price = self.price_for(seat, cid)
 		if self.drew:
-			return False, "뽑기·사기는 한 턴에 한 번이에요. 이제 돌을 두세요."
+			return False, "뽑기·사기는 한 턴에 한 번이에요. 이어서 돌을 두세요."
 		if self.points[seat] < price:
 			return False, f"'{CARDS[cid][2]}' 은(는) {price}포인트예요."
 		self.points[seat] -= price
@@ -1070,6 +1086,7 @@ class AugOmokLogic:
 		self.shop[seat].pop(i)
 		self.last = {"type": "buy", "seat": seat}
 		self._gain_card(room, seat, cid, "buy")
+		self._after_draw(room, cid)
 		return True, None
 
 	def on_join(self, room, peer):
@@ -1182,6 +1199,7 @@ class AugOmokLogic:
 			if target is None or self._use(room, s, cid, target, auto=True):
 				room.notice(f"{CARDS[cid][1]} {self.names[s]} 님이 '{CARDS[cid][2]}' 을(를) 버렸어요.")
 			self.pending = None
+			self._after_draw(room, cid)
 			if self.status == "playing" and self.turn == s:
 				self.bot_due = time.time() + BOT_READ_DELAY
 				self.slow = False
@@ -1217,8 +1235,10 @@ class AugOmokLogic:
 						self.bot_due = time.time() + BOT_READ_DELAY
 						self.slow = False
 					return
-		# 2) 뽑기 (턴에 한 번, 뽑아도 돌은 그대로 둠): 포인트가 넉넉하면 가끔
-		if not self.drew and not self.extra and not self.freeze[s]:
+		# 2) 뽑기 (돌 두기 대신이라 턴이 끝남): 급하지 않고 포인트가 넉넉하면 가끔
+		_, v = self._best_cell(s)
+		calm = danger <= 2 and v < 4000
+		if calm and not self.drew and not self.extra and not self.freeze[s]:
 			affordable = [i for i, cid in enumerate(self.shop[s]) if self.price_for(s, cid) <= self.points[s] and RARITIES.index(CARDS[cid][0]) >= 2]
 			did = False
 			if affordable and self.rng.random() < 0.5:
