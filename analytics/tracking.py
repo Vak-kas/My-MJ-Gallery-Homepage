@@ -1,10 +1,12 @@
 """방문 기록 (middleware).
 
 기록하는 것: 날짜, 경로, 유입 경로 분류, 리퍼러 도메인, 기기 종류, 회원 여부, 그날만 유효한 방문자 해시
-기록하지 않는 것: IP, 브라우저 전체 문자열, 쿠키, 관리자 본인 방문, 봇·링크 미리보기
+기록하지 않는 것: IP, 브라우저 전체 문자열, 쿠키, 관리자 본인 방문, 봇·링크 미리보기,
+  서버 IP 로 직접 들어온 요청(스캐너), Meta(페이스북·메신저)의 링크 미리 열기
 """
 
 import hashlib
+import ipaddress
 import re
 from urllib.parse import urlparse
 
@@ -25,6 +27,29 @@ SKIP_PREFIXES = ("/studio/", "/admin/", "/notifications/", "/static/", "/media/"
 SEARCH_HOSTS = ("google.", "naver.", "daum.net", "bing.", "duckduckgo.", "yahoo.", "zum.com", "ecosia.")
 SOCIAL_HOSTS = ("facebook.", "instagram.", "t.co", "twitter.", "x.com", "discord", "slack", "linkedin.", "reddit.",
                 "threads.", "youtube.", "telegram", "band.us", "everytime.")
+
+
+# 메신저·페이스북에 링크를 붙이면 Meta 가 미리 열어 보는 서버 (브라우저인 척해서 UA 로는 못 거름)
+META_CRAWLER_NETS = [ipaddress.ip_network(n) for n in (
+    "57.141.0.0/16", "66.220.144.0/20", "69.63.176.0/20", "69.171.224.0/19", "173.252.64.0/18", "31.13.24.0/21",
+)]
+
+
+def is_meta_crawler(ip):
+    try:
+        addr = ipaddress.ip_address(ip or "")
+    except ValueError:
+        return False
+    return any(addr.version == n.version and addr in n for n in META_CRAWLER_NETS)
+
+
+def is_ip_host(host):
+    """도메인이 아니라 서버 IP 로 직접 들어온 요청 — 주로 취약점 스캐너."""
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        return True
+    except ValueError:
+        return False
 
 
 def classify(referer, user_agent, own_host):
@@ -97,6 +122,8 @@ class PageViewMiddleware:
             return
         ua = request.META.get("HTTP_USER_AGENT", "")
         if not ua or BOT_RE.search(ua):
+            return
+        if is_ip_host(request.get_host().rsplit(":", 1)[0]) or is_meta_crawler(client_ip(request)):
             return
         user = getattr(request, "user", None)
         if user is not None and user.is_authenticated and user.is_superuser:

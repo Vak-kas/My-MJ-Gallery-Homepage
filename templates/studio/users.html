@@ -93,6 +93,14 @@
                                     <p class="font-semibold">{% if u.first_name or u.last_name %}{{ u.get_full_name }} <span class="font-normal text-[#6e6e73]">@{{ u.username }}</span>{% else %}{{ u.username }}{% endif %}{% if u.id == request.user.id %} <span class="font-normal text-[#8e8e93]">(나)</span>{% endif %}</p>
                                     <p class="text-[12px] text-[#8e8e93]">{{ u.email|default:"이메일 없음" }}</p>
                                     {% if u.signup_request.message %}<p class="mt-1 max-w-[280px] rounded-lg bg-[#f5f5f7] px-2 py-1 text-[12px] text-[#1d1d1f]">💬 {{ u.signup_request.message }}</p>{% endif %}
+                                    {% if u.signup_request.flags %}<p class="mt-1 flex flex-wrap gap-1">{% for f in u.signup_request.flag_list %}<span class="rounded-full bg-[#ff3b30]/10 px-2 py-0.5 text-[11px] font-semibold text-[#c4271d]">🤖 {{ f }}</span>{% endfor %}</p>{% endif %}
+                                    {% if u.signup_request.ip %}
+                                    <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-[#8e8e93]">
+                                        <a href="{% url 'studio:security_ip' u.signup_request.ip %}" class="font-mono hover:text-[#0066cc]" title="이 IP 정보 보기">🌐 {{ u.signup_request.ip }}</a>
+                                        <span class="max-w-[260px] truncate" title="{{ u.signup_request.user_agent }}">{{ u.signup_request.user_agent|truncatechars:48 }}</span>
+                                        {% if not u.is_active %}<form method="post" action="{% url 'studio:users' %}" onsubmit="return confirm('{{ u.signup_request.ip|escapejs }} 을(를) 30일 동안 차단할까요?');">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="block_ip"><input type="hidden" name="ip" value="{{ u.signup_request.ip }}"><input type="hidden" name="username" value="{{ u.username }}"><button class="rounded-full border border-[#ff3b30]/30 px-2 py-0.5 text-[#c4271d] hover:bg-[#ff3b30]/10">이 IP 차단</button></form>{% endif %}
+                                    </div>
+                                    {% endif %}
                                 </td>
                                 <td class="px-2 py-3">
                                     {% if u.is_superuser %}<span class="rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[12px] text-[#0066cc]">관리자</span>

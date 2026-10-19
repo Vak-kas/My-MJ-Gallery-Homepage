@@ -33,9 +33,17 @@
                       class="space-y-7">
 
                     {% csrf_token %}
+                    <!-- 봇 거르기: 숨은 칸(사람은 안 채움) + JS 가 넣는 확인값 -->
+                    <div aria-hidden="true" style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden">
+                        <label>Website <input type="text" name="{{ honeypot }}" tabindex="-1" autocomplete="off"></label>
+                    </div>
+                    <input type="hidden" name="form_token" value="{{ form_token }}">
+                    <input type="hidden" name="js_check" id="js_check" value="">
 
                     {% if form.errors %}
                     <div class="rounded-[18px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-500">
+
+                        {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
 
                         {% for field in form %}
                             {% for error in field.errors %}
@@ -184,6 +192,12 @@
                     </button>
 
                 </form>
+                <script>
+                    (() => {  // 사람의 브라우저에서만 채워지는 확인값
+                        const f = document.querySelector('input[name="form_token"]');
+                        if (f) document.getElementById('js_check').value = f.value.split('').reverse().join('');
+                    })();
+                </script>
 
                 <!-- login -->
                 <p class="mt-10 text-center text-[15px] text-[#6e6e73]">

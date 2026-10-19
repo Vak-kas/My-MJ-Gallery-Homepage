@@ -12,11 +12,13 @@ class LoginEvent(models.Model):
     RESULT_FAILED = "failed"
     RESULT_LOCKED = "locked"
     RESULT_BLOCKED = "blocked"
+    RESULT_BOT = "bot"
     RESULT_CHOICES = [
         (RESULT_SUCCESS, "성공"),
         (RESULT_FAILED, "실패"),
         (RESULT_LOCKED, "잠김(반복 실패)"),
         (RESULT_BLOCKED, "차단된 IP"),
+        (RESULT_BOT, "가입 봇 걸러냄"),
     ]
 
     username = models.CharField(max_length=150, blank=True, db_index=True)  # 시도한 아이디

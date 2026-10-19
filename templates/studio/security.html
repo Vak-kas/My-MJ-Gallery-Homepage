@@ -30,7 +30,8 @@
         </section>
 
         {% if tab == 'overview' %}
-        <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <section class="grid grid-cols-2 gap-4 lg:grid-cols-5">
+            <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 가입 봇 걸러냄</p><p class="mt-2 text-[32px] font-semibold {% if stats.bots %}text-[#7c3aed]{% endif %}">{{ stats.bots }}</p></div>
             <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 로그인 실패</p><p class="mt-2 text-[32px] font-semibold {% if stats.failed %}text-[#c4271d]{% endif %}">{{ stats.failed }}</p></div>
             <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 잠김 (반복 실패)</p><p class="mt-2 text-[32px] font-semibold {% if stats.locked %}text-[#b26a00]{% endif %}">{{ stats.locked }}</p></div>
             <div class="rounded-[20px] border border-black/[0.06] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">24시간 로그인 성공</p><p class="mt-2 text-[32px] font-semibold">{{ stats.success }}</p></div>

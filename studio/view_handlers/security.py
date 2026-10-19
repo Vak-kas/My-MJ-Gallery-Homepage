@@ -122,6 +122,7 @@ def security(request):
                 "failed": recent.filter(result=LoginEvent.RESULT_FAILED).count(),
                 "locked": recent.filter(result=LoginEvent.RESULT_LOCKED).count(),
                 "success": recent.filter(result=LoginEvent.RESULT_SUCCESS).count(),
+                "bots": recent.filter(result=LoginEvent.RESULT_BOT).count(),
                 "blocks": sum(1 for b in IPBlock.objects.all() if b.is_active),
             },
             "admin_logins": LoginEvent.objects.filter(is_admin=True, result=LoginEvent.RESULT_SUCCESS)[:10],

@@ -31,6 +31,14 @@ class TrackingTests(TestCase):
 		self.assertEqual(len(pv.visitor), 16)
 		self.assertNotIn("203.0.113.5", str(PageView.objects.values().get()))
 
+	@override_settings(ALLOWED_HOSTS=["*"])
+	def test_skips_raw_ip_scanners_and_meta_link_checker(self):
+		self.get("/", HTTP_HOST="43.202.189.130")  # 도메인 말고 서버 IP 로 직접 → 스캐너
+		self.get("/?fbclid=abc", ip="57.141.0.9", HTTP_REFERER="https://www.facebook.com/")  # 메신저 링크 미리 열기
+		self.assertEqual(PageView.objects.count(), 0)
+		self.get("/", ip="203.0.113.9", HTTP_REFERER="https://www.facebook.com/", HTTP_HOST="smjgallery.kr")  # 진짜 사람
+		self.assertEqual(PageView.objects.get().referrer_host, "facebook.com")
+
 	def test_skips_bots_admin_studio_and_non_html(self):
 		self.get("/", ua="Mozilla/5.0 (compatible; Googlebot/2.1)")
 		self.get("/", ua="facebookexternalhit/1.1")

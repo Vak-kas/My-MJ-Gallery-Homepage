@@ -18,6 +18,10 @@ class SignupRequest(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PENDING, db_index=True)
     message = models.CharField("가입 인사", max_length=300, blank=True)
     privacy_agreed_at = models.DateTimeField("개인정보 수집·이용 동의 시각", null=True, blank=True)
+    # 가입한 곳 (봇 확인·차단용, 90일 지나면 비움)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.CharField(max_length=300, blank=True)
+    flags = models.CharField("의심 이유", max_length=200, blank=True)  # "무작위 이름 · 일회용 메일" 처럼
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
     decided_by = models.ForeignKey(
@@ -29,3 +33,7 @@ class SignupRequest(models.Model):
 
     def __str__(self):
         return f"{self.user} ({self.get_status_display()})"
+
+    @property
+    def flag_list(self):
+        return [f for f in self.flags.split(" · ") if f]
