@@ -89,13 +89,16 @@ def clear_failures(ip, username):
 # ── 보관 기간 정리 ─────────────────────────────
 
 def cleanup_old_records():
-    """90일 지난 로그인 기록 삭제, 글·댓글·방명록의 작성자 IP·브라우저 정보 비우기."""
+    """90일 지난 로그인 기록 삭제, 글·댓글·방명록·가입 요청의 IP·브라우저 정보 비우기."""
     from blog.models import Comment, GuestbookEntry, Post
 
     from .models import IPBlock, LoginEvent
 
     cutoff = timezone.now() - timezone.timedelta(days=RETENTION_DAYS)
+    from accounts.models import SignupRequest
+
     deleted = LoginEvent.objects.filter(created_at__lt=cutoff).delete()[0]
+    SignupRequest.objects.filter(created_at__lt=cutoff).exclude(ip=None).update(ip=None, user_agent="")
     cleared = 0
     for model in (Comment, GuestbookEntry, Post):
         cleared += model.objects.filter(created_at__lt=cutoff).exclude(author_ip=None).update(author_ip=None, author_agent="")

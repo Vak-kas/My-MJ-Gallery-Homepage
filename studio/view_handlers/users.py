@@ -55,6 +55,11 @@ def users(request):
         return_qs = (request.POST.get("return_qs") or "").strip()
         back = redirect(f"{base}?{return_qs}") if return_qs else redirect(base)
         action = (request.POST.get("action") or "").strip()
+        if action == "block_ip":  # 가입한 IP 를 30일 차단 (보안 화면과 같은 규칙: 내 IP·너무 넓은 대역은 거부)
+            from .security import _add_block
+
+            _add_block(request, request.POST.get("ip"), f"가입 봇 의심 ({request.POST.get('username', '')[:40]})", "30d")
+            return back
         ids = [int(v) for v in request.POST.getlist("ids") if v.isdigit()]
         # 나 자신과 관리자 계정은 일괄 작업 대상에서 제외
         targets = User.objects.filter(id__in=ids, is_superuser=False).exclude(id=request.user.id)

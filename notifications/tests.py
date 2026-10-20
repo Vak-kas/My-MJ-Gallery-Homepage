@@ -13,15 +13,32 @@ from .models import Notification
 User = get_user_model()
 
 
+def human_fields(age=10):
+    """사람 브라우저처럼: JS 가 넣는 확인값 + 몇 초 전에 받은 폼 토큰."""
+    import time
+
+    from django.core import signing
+
+    from accounts import antibot
+
+    token = signing.dumps({"t": time.time() - age}, salt=antibot.SALT)
+    return {"form_token": token, "js_check": token[::-1]}
+
+
 class SignupApprovalTests(TestCase):
     def setUp(self):
+        from django.core.cache import cache
+
+        from accounts import antibot
+
+        cache.delete(antibot._key("127.0.0.1"))  # 같은 IP 가입 제한이 시험끼리 섞이지 않게
         self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
 
     def signup(self, username="newbie", message="친구 소개로 왔어요", **extra):
         data = {
             "username": username, "email": f"{username}@example.com", "real_name": "김 철수",
             "password1": "Very-strong-pw-123", "password2": "Very-strong-pw-123", "message": message,
-            "privacy_agree": "on",
+            "privacy_agree": "on", **human_fields(),
         }
         data.update(extra)
         return self.client.post(reverse("accounts:signup"), {k: v for k, v in data.items() if v is not None})

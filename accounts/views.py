@@ -9,6 +9,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.db import transaction
 from django.utils import timezone
 
+from accounts import antibot
 from accounts.forms import UserForm
 from accounts.models import SignupRequest
 from security.models import LoginEvent
@@ -54,30 +55,52 @@ def index(request):
     return HttpResponse("안녕하세요. 오신것을 환영합니다.")
 
 
+class _FakeUser:
+    def __init__(self, username):
+        self.username = username
+
+
+def _signup_page(request, form):
+    return render(request, 'accounts/signup.html', {'form': form, 'form_token': antibot.make_token(), 'honeypot': antibot.HONEYPOT_FIELD})
+
+
 def signup_view(request):
-    if request.method == "POST":
-        form = UserForm(request.POST)
-        if form.is_valid():
-            # 관리자 승인 전까지는 비활성 계정 (로그인 불가)
-            with transaction.atomic():
-                user = form.save(commit=False)
-                user.is_active = False
-                user.first_name = form.cleaned_data["real_name"]  # 실명은 first_name 에 통째로 저장
-                user.save()
-                signup = SignupRequest.objects.create(
-                    user=user, message=(form.cleaned_data.get("message") or "").strip(),
-                    privacy_agreed_at=timezone.now(),
-                )
-            notify(
-                Notification.KIND_SIGNUP,
-                f"{user.first_name}({user.username}) 님이 가입을 요청했어요",
-                signup.message or user.email,
-                reverse("studio:users") + "?state=pending",
-            )
-            return render(request, "accounts/signup_pending.html", {"pending_user": user})
-    else:
-        form = UserForm()
-    return render(request, 'accounts/signup.html', {'form': form})
+    if request.method != "POST":
+        return _signup_page(request, UserForm())
+    ip, ua = client_ip(request), user_agent(request)
+    username = (request.POST.get("username") or "")[:150]
+    # 1) 봇: 가입된 척 화면만 보여 주고 아무것도 저장하지 않음 (기록만 남김)
+    reason = antibot.bot_reason(request.POST)
+    if reason:
+        LoginEvent.objects.create(username=username, ip=ip, user_agent=ua, result=LoginEvent.RESULT_BOT)
+        return render(request, "accounts/signup_pending.html", {"pending_user": _FakeUser(username or "회원")})
+    form = UserForm(request.POST)
+    # 2) 같은 IP 에서 너무 자주
+    if antibot.rate_limited(ip):
+        form.add_error(None, "같은 곳에서 가입 요청이 너무 많아요. 1시간 뒤에 다시 시도해 주세요.")
+        return _signup_page(request, form)
+    if not form.is_valid():
+        return _signup_page(request, form)
+    message = (form.cleaned_data.get("message") or "").strip()
+    flags = antibot.suspicion(form.cleaned_data["username"], form.cleaned_data["real_name"], message, form.cleaned_data["email"], ua)
+    # 관리자 승인 전까지는 비활성 계정 (로그인 불가)
+    with transaction.atomic():
+        user = form.save(commit=False)
+        user.is_active = False
+        user.first_name = form.cleaned_data["real_name"]  # 실명은 first_name 에 통째로 저장
+        user.save()
+        signup = SignupRequest.objects.create(
+            user=user, message=message, privacy_agreed_at=timezone.now(),
+            ip=ip, user_agent=ua, flags=" · ".join(flags),
+        )
+    antibot.note_signup(ip)
+    notify(
+        Notification.KIND_SIGNUP,
+        f"{'🤖 의심 · ' if flags else ''}{user.first_name}({user.username}) 님이 가입을 요청했어요",
+        (f"[{' · '.join(flags)}] " if flags else "") + (signup.message or user.email),
+        reverse("studio:users") + "?state=pending",
+    )
+    return render(request, "accounts/signup_pending.html", {"pending_user": user})
 
 
 def _inactive_reason(username, password):
