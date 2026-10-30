@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .pg-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .pg-btn { border-radius: 999px; padding: 7px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .pg-btn:hover { background: #f5f5f7; }
+    .pg-btn:disabled { opacity: 0.4; cursor: default; }
+    .pg-btn.go { background: #0066cc; border-color: #0066cc; color: #fff; font-weight: 600; }
+    .pg-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .pg-in:focus { border-color: #0066cc; }
+    .pg-drop { border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 18px; padding: 22px; text-align: center; color: #6e6e73; font-size: 14px; cursor: pointer; }
+    .pg-drop.over { border-color: #0066cc; background: rgba(0, 102, 204, 0.05); }
+    .pg-doc { display: flex; align-items: center; gap: 10px; border-radius: 14px; background: #f5f5f7; padding: 9px 12px; font-size: 13px; }
+    .pg-mx { border-collapse: separate; border-spacing: 4px; font-size: 13px; }
+    .pg-mx th { font-weight: 600; color: #6e6e73; padding: 4px 6px; text-align: left; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pg-mx td { border-radius: 10px; padding: 8px 10px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 700; cursor: pointer; min-width: 64px; }
+    .pg-mx td.self { background: transparent; color: #c7c7cc; cursor: default; font-weight: 400; }
+    .pg-mx td.sel { outline: 3px solid #0066cc; }
+    .pg-text { font-size: 14px; line-height: 1.8; white-space: pre-wrap; word-break: break-word; max-height: 560px; overflow-y: auto; padding: 14px 16px; border-radius: 16px; background: #fbfbfd; border: 1px solid rgba(0, 0, 0, 0.06); }
+    .pg-text mark { border-radius: 3px; padding: 0 1px; cursor: pointer; color: inherit; }
+    .pg-text mark.flash { outline: 3px solid #1d1d1f; }
+    .pg-text .ex { color: #a1a1a6; }
+    .pg-side { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    @media (min-width: 1024px) { .pg-side { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+    .pg-pill { display: inline-block; border-radius: 999px; padding: 1px 9px; font-size: 11.5px; font-weight: 700; }
+    .pg-tab { border-radius: 999px; padding: 7px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); }
+    .pg-tab.on { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    html.theme-dark .pg-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .pg-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .pg-btn.go { background: #0a84ff; border-color: #0a84ff; color: #fff; }
+    html.theme-dark .pg-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .pg-doc { background: #111318; }
+    html.theme-dark .pg-text { background: #111318; border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .pg-drop { border-color: rgba(255, 255, 255, 0.18); color: #a1a1a6; }
+    html.theme-dark .pg-tab { border-color: rgba(255, 255, 255, 0.18); color: #e8e8ea; }
+    html.theme-dark .pg-tab.on { background: #e8e8ea; color: #1d1d1f; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">DOCS · PLAGIARISM</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">표절 검사.</h1>
+        <p class="mt-3 max-w-[820px] text-[15px] leading-relaxed text-[#6e6e73]">문서를 두 개 이상 올리면 서로 겹친 문장을 같은 색 형광펜으로 보여줘요. <b>파일과 글은 이 브라우저 안에서만 읽고 계산해요</b> — 서버로 올라가지 않아요. 회원은 공개 논문 초록과 비교하거나 ✨AI 로 '단어만 바꾼 문장'까지 찾을 수 있어요.</p>
+        <p class="mt-2 max-w-[820px] text-[12.5px] leading-relaxed text-[#8e8e93]">결과는 판단을 돕는 참고용이에요. 카피킬러·Turnitin 처럼 모든 논문·과제·웹 문서와 비교하지는 않아요 — 올린 문서끼리, 그리고 공개 논문의 초록만 비교해요.</p>
+    </div>
+
+    <!-- 1. 문서 넣기 -->
+    <section class="pg-card mt-8">
+        <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-[16px] font-semibold">① 문서 넣기</h2>
+            <span id="pg-doc-count" class="text-[12.5px] text-[#8e8e93]"></span>
+            <button type="button" class="pg-btn ml-auto" id="pg-paste-btn">📋 글 붙여넣기</button>
+            <button type="button" class="pg-btn" id="pg-sample">예시 넣기</button>
+            <button type="button" class="pg-btn" id="pg-clear">모두 빼기</button>
+        </div>
+        <label class="pg-drop mt-3 block" id="pg-drop">
+            <input type="file" id="pg-file" multiple accept=".txt,.md,.pdf,.docx,.hwpx,text/plain,application/pdf" class="hidden">
+            📄 파일을 끌어다 놓거나 눌러서 고르세요 — <b>docx · PDF · hwpx · txt</b> (여러 개 가능, 파일당 30MB)<br>
+            <span class="text-[12px] text-[#8e8e93]">옛 한글(.hwp)·워드(.doc)는 한글·워드에서 hwpx·docx·PDF 로 다시 저장해서 올려 주세요. 스캔한 PDF(글자가 그림)는 글을 읽을 수 없어요.</span>
+        </label>
+        <div id="pg-paste" class="mt-3 hidden space-y-2">
+            <input id="pg-paste-name" class="pg-in" maxlength="60" placeholder="이름 (예: 김철수 과제)">
+            <textarea id="pg-paste-text" class="pg-in" rows="7" placeholder="글을 붙여넣으세요"></textarea>
+            <div class="flex justify-end gap-2"><button type="button" class="pg-btn" id="pg-paste-cancel">취소</button><button type="button" class="pg-btn go" id="pg-paste-add">추가</button></div>
+        </div>
+        <div id="pg-docs" class="mt-3 space-y-2"></div>
+        <div class="mt-4 flex flex-wrap items-center gap-3 text-[13px]">
+            <label class="flex items-center gap-1.5">기준
+                <select id="pg-min" class="pg-btn">
+                    <option value="20">엄격 (20자 넘게 같으면)</option>
+                    <option value="30" selected>보통 (30자)</option>
+                    <option value="50">느슨 (50자 — 흔한 표현 무시)</option>
+                </select>
+            </label>
+            <label class="flex items-center gap-1.5"><input type="checkbox" id="pg-quotes" class="h-4 w-4" checked> 따옴표 안 인용문 빼기</label>
+            <label class="flex items-center gap-1.5"><input type="checkbox" id="pg-refs" class="h-4 w-4" checked> 참고문헌 칸 빼기</label>
+            <button type="button" class="pg-btn go ml-auto" id="pg-run">🔍 서로 비교하기</button>
+        </div>
+    </section>
+
+    <!-- 2. 결과 -->
+    <section class="pg-card mt-5 hidden" id="pg-result">
+        <h2 class="text-[16px] font-semibold">문서끼리 겹친 정도</h2>
+        <p class="mt-1 text-[12.5px] text-[#8e8e93]">칸의 숫자 = <b>행 문서</b>의 글 중 <b>열 문서</b>에도 있는 비율. 칸을 누르면 두 문서를 나란히 비교해요.</p>
+        <div class="mt-3 overflow-x-auto"><table class="pg-mx" id="pg-matrix"></table></div>
+        <div id="pg-pair" class="mt-6 hidden">
+            <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-[15px] font-semibold" id="pg-pair-title"></h3>
+                <span class="ml-auto flex items-center gap-2"><span class="ai-quota" data-ai-quota></span><button type="button" class="ai-btn" id="pg-ai-pair">✨ AI 말 바꾸기 탐지</button></span>
+            </div>
+            <div id="pg-ai-out" class="ai-panel mt-3 hidden text-[14px] leading-relaxed"></div>
+            <div class="pg-side mt-3">
+                <div><p class="mb-1 text-[13px] font-semibold" id="pg-a-name"></p><div class="pg-text" id="pg-a"></div></div>
+                <div><p class="mb-1 text-[13px] font-semibold" id="pg-b-name"></p><div class="pg-text" id="pg-b"></div></div>
+            </div>
+            <h3 class="mt-5 text-[14px] font-semibold">겹친 문장 <span class="font-normal text-[#8e8e93]" id="pg-match-count"></span></h3>
+            <div id="pg-matches" class="mt-2 space-y-2 text-[13px]"></div>
+        </div>
+    </section>
+
+    <!-- 3. 공개 논문 비교 -->
+    <section class="pg-card mt-5">
+        <div class="flex flex-wrap items-center gap-2">
+            <h2 class="text-[16px] font-semibold">② 공개 논문과 비교 <span class="pg-pill bg-[#0066cc]/10 text-[#0066cc]">회원</span></h2>
+            <span class="ml-auto text-[12.5px] text-[#8e8e93]" id="pg-paper-left">{% if user.is_authenticated %}{% if paper_limit is None %}제한 없음{% else %}하루 {{ paper_limit }}번{% endif %}{% else %}로그인하면 쓸 수 있어요{% endif %}</span>
+        </div>
+        <p class="mt-1 text-[12.5px] leading-relaxed text-[#8e8e93]">문서에서 특징적인 문장 {{ sentences }}개만 골라 서버로 보내요(문서 전체는 안 가요). 서버가 OpenAlex(공개 논문 2억 건)에서 비슷한 논문을 찾아 <b>초록</b>을 돌려주면, 겹친 부분은 다시 이 브라우저에서 계산해요. 영어 논문 위주라 영어 글에서 잘 맞아요.</p>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <select id="pg-paper-doc" class="pg-btn"></select>
+            <button type="button" class="pg-btn go" id="pg-paper-run">📚 공개 논문 찾기</button>
+            <span id="pg-paper-status" class="text-[13px] text-[#6e6e73]"></span>
+        </div>
+        <div id="pg-paper-sentences" class="mt-3 hidden text-[12.5px] text-[#6e6e73]"></div>
+        <div id="pg-papers" class="mt-3 space-y-3"></div>
+    </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module">
+import * as pdfjsLib from "{% static 'vendor/pdfjs/pdf-4.10.38.min.js' %}";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "{% static 'vendor/pdfjs/pdf.worker-4.10.38.min.js' %}";
+window.__pdfjs = pdfjsLib;
+</script>
+<script>
+(() => {
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const AUTHED = {{ user.is_authenticated|yesno:"true,false" }};
+    const LOGIN = "{% url 'accounts:login' %}?next={{ request.get_full_path|urlencode }}";
+    const PAPERS_URL = "{% url 'tools:plagiarism_papers' %}";
+    const AI_URL = "{% url 'tools:plagiarism_ai' %}";
+    const N_SENT = {{ sentences }};
+    const K = 10;  // 글자 조각 길이 (공백·기호를 뺀 글자 수)
+    const COLORS = ['#fde68a', '#bbf7d0', '#bfdbfe', '#fbcfe8', '#ddd6fe', '#fed7aa', '#a5f3fc', '#d9f99d'];
+    const MAX_FILE = 30 * 1024 * 1024;
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    let docs = [], prepared = null, pairSel = null;
+
+    // ── 파일 읽기 (브라우저 안에서만) ──
+    async function readFile(file) {
+        const ext = (file.name.split('.').pop() || '').toLowerCase();
+        if (file.size > MAX_FILE) throw new Error('30MB 넘는 파일은 읽지 않아요');
+        if (ext === 'hwp' || ext === 'doc') throw new Error('옛 형식이에요 — hwpx·docx·PDF 로 다시 저장해서 올려 주세요');
+        if (ext === 'txt' || ext === 'md' || file.type.startsWith('text/')) return file.text();
+        const buf = await file.arrayBuffer();
+        if (ext === 'pdf') {
+            const lib = window.__pdfjs; if (!lib) throw new Error('PDF 읽기 준비가 아직 안 됐어요. 잠시 뒤 다시');
+            const pdf = await lib.getDocument({ data: buf }).promise;
+            const pages = [];
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const tc = await (await pdf.getPage(i)).getTextContent();
+                let line = '', out = [];
+                tc.items.forEach((it) => { line += it.str; if (it.hasEOL) { out.push(line); line = ''; } });
+                if (line) out.push(line);
+                pages.push(out.join('\n'));
+            }
+            const text = pages.join('\n\n');
+            if (text.replace(/\s/g, '').length < 20) throw new Error('글자를 찾지 못했어요 (스캔한 PDF 일 수 있어요)');
+            return text;
+        }
+        if (ext === 'docx' || ext === 'hwpx') {
+            if (!window.JSZip) throw new Error('압축 파일 읽기 준비가 안 됐어요');
+            const zip = await JSZip.loadAsync(buf);
+            const parse = (xml) => new DOMParser().parseFromString(xml, 'application/xml');
+            if (ext === 'docx') {
+                const f = zip.file('word/document.xml'); if (!f) throw new Error('docx 안에 본문이 없어요');
+                const x = parse(await f.async('string'));
+                return [...x.getElementsByTagName('w:p')].map((p) => [...p.getElementsByTagName('w:t')].map((t) => t.textContent).join('')).join('\n');
+            }
+            const secs = Object.keys(zip.files).filter((n) => /^Contents\/section\d+\.xml$/i.test(n)).sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/)));
+            if (!secs.length) throw new Error('hwpx 안에 본문이 없어요');
+            const parts = [];
+            for (const n of secs) {
+                const x = parse(await zip.file(n).async('string'));
+                parts.push([...x.getElementsByTagName('hp:p')].map((p) => [...p.getElementsByTagName('hp:t')].map((t) => t.textContent).join('')).join('\n'));
+            }
+            return parts.join('\n');
+        }
+        throw new Error('docx · PDF · hwpx · txt 만 읽을 수 있어요');
+    }
+    async function addFiles(files) {
+        for (const f of files) {
+            const tmp = { name: f.name, text: '', loading: true };
+            docs.push(tmp); renderDocs();
+            try { tmp.text = (await readFile(f)).replace(/\r\n?/g, '\n'); }
+            catch (e) { tmp.error = e.message; }
+            tmp.loading = false; renderDocs();
+        }
+        prepared = null;
+    }
+    function addText(name, text) {
+        if (!text.trim()) return;
+        docs.push({ name: name.trim() || `붙여넣은 글 ${docs.length + 1}`, text: text.replace(/\r\n?/g, '\n') });
+        prepared = null; renderDocs();
+    }
+    function renderDocs() {
+        const ok = docs.filter((d) => !d.error && !d.loading);
+        $('pg-doc-count').textContent = docs.length ? `${ok.length}개 준비됨` : '';
+        $('pg-docs').innerHTML = docs.map((d, i) => `<div class="pg-doc"><span class="text-[16px]">${d.error ? '⚠️' : d.loading ? '⏳' : '📄'}</span>
+            <b class="min-w-0 flex-1 truncate">${esc(d.name)}</b>
+            <span class="${d.error ? 'text-[#c4271d]' : 'text-[#8e8e93]'}">${d.error ? esc(d.error) : d.loading ? '읽는 중…' : `${d.text.length.toLocaleString()}자`}</span>
+            <button type="button" class="text-[12px] text-[#c4271d]" data-rm="${i}">빼기</button></div>`).join('');
+        $('pg-run').disabled = ok.length < 2;
+        $('pg-paper-doc').innerHTML = ok.map((d) => `<option value="${docs.indexOf(d)}">${esc(d.name)}</option>`).join('') || '<option value="">먼저 문서를 넣으세요</option>';
+    }
+    $('pg-docs').addEventListener('click', (e) => { const b = e.target.closest('[data-rm]'); if (b) { docs.splice(+b.dataset.rm, 1); prepared = null; renderDocs(); } });
+    $('pg-file').addEventListener('change', (e) => { addFiles([...e.target.files]); e.target.value = ''; });
+    const drop = $('pg-drop');
+    ['dragenter', 'dragover'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.add('over'); }));
+    ['dragleave', 'drop'].forEach((t) => drop.addEventListener(t, (e) => { e.preventDefault(); drop.classList.remove('over'); }));
+    drop.addEventListener('drop', (e) => addFiles([...e.dataTransfer.files]));
+    $('pg-paste-btn').addEventListener('click', () => { $('pg-paste').classList.remove('hidden'); $('pg-paste-text').focus(); });
+    $('pg-paste-cancel').addEventListener('click', () => $('pg-paste').classList.add('hidden'));
+    $('pg-paste-add').addEventListener('click', () => { addText($('pg-paste-name').value, $('pg-paste-text').value); $('pg-paste-name').value = ''; $('pg-paste-text').value = ''; $('pg-paste').classList.add('hidden'); });
+    $('pg-clear').addEventListener('click', () => { docs = []; prepared = null; renderDocs(); $('pg-result').classList.add('hidden'); });
+    $('pg-sample').addEventListener('click', () => {
+        addText('원본 보고서', '무선 통신에서 다중 경로 페이딩은 신호가 여러 경로로 반사되어 수신기에 서로 다른 시간에 도착하면서 생기는 현상이다. 이 때문에 수신 신호의 세기가 시간과 위치에 따라 크게 변한다.\n이를 줄이기 위해 다이버시티 기법과 등화기를 함께 사용하며, OFDM 은 넓은 대역을 여러 개의 좁은 부반송파로 나누어 주파수 선택적 페이딩에 강하다.\n참고문헌\n[1] Goldsmith, Wireless Communications, 2005.');
+        addText('제출된 과제', '이번 과제에서는 페이딩을 조사하였다. 무선 통신에서 다중 경로 페이딩은 신호가 여러 경로로 반사되어 수신기에 서로 다른 시간에 도착하면서 생기는 현상이다.\n수신 신호의 세기는 시간과 위치에 따라 크게 달라진다. 이를 해결하려고 OFDM 을 쓰는데, OFDM 은 넓은 대역을 여러 개의 좁은 부반송파로 나누어 주파수 선택적 페이딩에 강하다.\n"인용은 이렇게 따옴표 안에 넣으면 빼고 계산해요 — 무선 통신에서 다중 경로 페이딩은 신호가 여러 경로로 반사되어"');
+        addText('다른 학생 과제', '5G 의 밀리미터파 대역은 직진성이 강해 장애물에 약하다. 그래서 빔포밍으로 에너지를 한 방향에 모아 보낸다.');
+    });
+
+    // ── 비교 계산 ──
+    const KEEP = /[\p{L}\p{N}]/u;
+    function excluded(text, quotes, refs) {
+        const ex = new Uint8Array(text.length);
+        if (refs) {
+            const m = [...text.matchAll(/^[ \t]*(참\s*고\s*문\s*헌|references?|bibliography|works cited)[ \t]*:?[ \t]*$/gim)].pop();
+            if (m && m.index > text.length * 0.3) ex.fill(1, m.index);
+        }
+        if (quotes) for (const m of text.matchAll(/"[^"\n]{4,}"|“[^”]{4,}”|‘[^’]{4,}’|「[^」]{4,}」|『[^』]{4,}』/g)) ex.fill(1, m.index, m.index + m[0].length);
+        return ex;
+    }
+    function prep(doc, opts) {
+        const text = doc.text, ex = excluded(text, opts.quotes, opts.refs);
+        let s = ''; const map = [];
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (ex[i] || !KEEP.test(ch)) continue;
+            s += ch.toLowerCase(); map.push(i);
+        }
+        const set = new Set();
+        for (let i = 0; i + K <= s.length; i++) set.add(s.substr(i, K));
+        return { name: doc.name, text, s, map, set, ex };
+    }
+    function covered(A, B, minLen) {
+        const cov = new Uint8Array(A.s.length);
+        for (let i = 0; i + K <= A.s.length; i++) if (B.set.has(A.s.substr(i, K))) cov.fill(1, i, i + K);
+        const runs = [];
+        for (let i = 0; i < cov.length;) {
+            if (!cov[i]) { i++; continue; }
+            let j = i; while (j < cov.length && cov[j]) j++;
+            if (j - i >= minLen) runs.push([i, j]);
+            i = j;
+        }
+        const n = runs.reduce((t, [a, b]) => t + b - a, 0);
+        return { runs, chars: n, pct: A.s.length ? n / A.s.length : 0 };
+    }
+    // A 와 B 의 겹친 구간을 서로 같은 색으로 묶음
+    function pairUp(A, B, minLen) {
+        const ra = covered(A, B, minLen), rb = covered(B, A, minLen);
+        const owner = new Map();
+        ra.runs.forEach(([s, e], r) => { for (let i = s; i + K <= e; i++) { const k = A.s.substr(i, K); if (!owner.has(k)) owner.set(k, r); } });
+        const bColor = rb.runs.map(([s, e]) => { for (let i = s; i + K <= e; i++) { const r = owner.get(B.s.substr(i, K)); if (r !== undefined) return r; } return -1; });
+        return { ra, rb, bColor };
+    }
+    const span = (P, s, e) => [P.map[s], P.map[e - 1] + 1];  // 원문 위치
+    function marked(P, runs, colorOf, side) {
+        const marks = runs.map(([s, e], i) => { const [a, b] = span(P, s, e); return { a, b, r: colorOf(i) }; }).sort((x, y) => x.a - y.a);
+        let html = '', at = 0;
+        const plain = (from, to) => {  // 빼고 계산한 곳(인용·참고문헌)은 흐리게
+            let out = '', cur = null, buf = '';
+            for (let i = from; i < to; i++) { const ex = !!P.ex[i]; if (ex !== cur && buf) { out += cur ? `<span class="ex">${esc(buf)}</span>` : esc(buf); buf = ''; } cur = ex; buf += P.text[i]; }
+            if (buf) out += cur ? `<span class="ex">${esc(buf)}</span>` : esc(buf);
+            return out;
+        };
+        marks.forEach((m) => {
+            if (m.a < at) return;
+            html += plain(at, m.a);
+            const c = m.r >= 0 ? COLORS[m.r % COLORS.length] : '#e5e7eb';
+            html += `<mark data-r="${m.r}" data-side="${side}" style="background:${c}">${esc(P.text.slice(m.a, m.b))}</mark>`;
+            at = m.b;
+        });
+        return html + plain(at, P.text.length);
+    }
+    function heat(p) {
+        const v = Math.round(p * 100);
+        const bg = v >= 40 ? '#ff3b30' : v >= 20 ? '#ff9f0a' : v >= 5 ? '#ffd60a' : '#34c759';
+        return `background:${bg}${v >= 20 ? '' : '33'};color:${v >= 20 ? '#fff' : 'inherit'}`;
+    }
+    function run() {
+        const ok = docs.filter((d) => !d.error && !d.loading && d.text.trim());
+        if (ok.length < 2) return;
+        const opts = { quotes: $('pg-quotes').checked, refs: $('pg-refs').checked, min: +$('pg-min').value };
+        prepared = { docs: ok.map((d) => prep(d, opts)), opts };
+        const P = prepared.docs;
+        let html = '<tr><th></th>' + P.map((p) => `<th title="${esc(p.name)}">${esc(p.name)}</th>`).join('') + '</tr>';
+        P.forEach((a, i) => {
+            html += `<tr><th title="${esc(a.name)}">${esc(a.name)}</th>` + P.map((b, j) => {
+                if (i === j) return '<td class="self">—</td>';
+                const r = covered(a, b, opts.min);
+                return `<td data-i="${i}" data-j="${j}" style="${heat(r.pct)}">${Math.round(r.pct * 100)}%</td>`;
+            }).join('') + '</tr>';
+        });
+        $('pg-matrix').innerHTML = html;
+        $('pg-result').classList.remove('hidden');
+        // 가장 많이 겹친 짝을 바로 열어 줌
+        let best = null;
+        P.forEach((a, i) => P.forEach((b, j) => { if (i < j) { const p = Math.max(covered(a, b, opts.min).pct, covered(b, a, opts.min).pct); if (!best || p > best.p) best = { i, j, p }; } }));
+        if (best) showPair(best.i, best.j);
+        $('pg-result').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    function showPair(i, j) {
+        const A = prepared.docs[i], B = prepared.docs[j], min = prepared.opts.min;
+        pairSel = { i, j };
+        document.querySelectorAll('#pg-matrix td').forEach((td) => td.classList.toggle('sel', +td.dataset.i === i && +td.dataset.j === j));
+        const { ra, rb, bColor } = pairUp(A, B, min);
+        $('pg-pair').classList.remove('hidden');
+        $('pg-pair-title').textContent = `${A.name} ↔ ${B.name}`;
+        $('pg-a-name').innerHTML = `${esc(A.name)} <span class="font-normal text-[#8e8e93]">— ${Math.round(ra.pct * 100)}% 가 상대 문서에 있음</span>`;
+        $('pg-b-name').innerHTML = `${esc(B.name)} <span class="font-normal text-[#8e8e93]">— ${Math.round(rb.pct * 100)}% 가 상대 문서에 있음</span>`;
+        $('pg-a').innerHTML = marked(A, ra.runs, (r) => r, 'a');
+        $('pg-b').innerHTML = marked(B, rb.runs, (r) => bColor[r], 'b');
+        $('pg-ai-out').classList.add('hidden');
+        const list = ra.runs.map(([s, e], r) => {
+            const [a1, a2] = span(A, s, e);
+            const bi = bColor.indexOf(r);
+            const bt = bi >= 0 ? (() => { const [b1, b2] = span(B, rb.runs[bi][0], rb.runs[bi][1]); return B.text.slice(b1, b2); })() : '';
+            return { r, len: e - s, a: A.text.slice(a1, a2), b: bt };
+        }).sort((x, y) => y.len - x.len);
+        $('pg-match-count').textContent = list.length ? `${list.length}곳` : '';
+        const cut = (t) => (t.length > 260 ? t.slice(0, 260) + '…' : t);
+        $('pg-matches').innerHTML = list.length ? list.slice(0, 40).map((m) => `<div class="grid grid-cols-1 gap-2 rounded-xl p-2 lg:grid-cols-2" style="background:${COLORS[m.r % COLORS.length]}33">
+            <p><span class="pg-pill" style="background:${COLORS[m.r % COLORS.length]}">${m.len}자</span> ${esc(cut(m.a))}</p><p class="text-[#6e6e73]">${esc(cut(m.b))}</p></div>`).join('')
+            : '<p class="text-[#8e8e93]">기준 길이 넘게 겹친 문장이 없어요. ✨AI 로 단어만 바꾼 문장이 있는지 확인해 볼 수 있어요.</p>';
+    }
+    $('pg-run').addEventListener('click', run);
+    $('pg-matrix').addEventListener('click', (e) => { const td = e.target.closest('td[data-i]'); if (td) showPair(+td.dataset.i, +td.dataset.j); });
+    // 형광펜을 누르면 상대 문서의 같은 색 구간으로
+    ['pg-a', 'pg-b'].forEach((id) => $(id).addEventListener('click', (e) => {
+        const m = e.target.closest('mark'); if (!m || m.dataset.r === '-1') return;
+        const other = $(m.dataset.side === 'a' ? 'pg-b' : 'pg-a').querySelector(`mark[data-r="${m.dataset.r}"]`);
+        if (!other) return;
+        other.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        other.classList.add('flash'); setTimeout(() => other.classList.remove('flash'), 1200);
+    }));
+
+    // ── ✨ AI 말 바꾸기 탐지 ──
+    const KIND_COLOR = { '말 바꾸기': '#6e56cf', '번역': '#0066cc', '요약·압축': '#b26a00', '순서 바꾸기': '#1e7a35', '아이디어 차용': '#c4271d' };
+    function fit(a, b) {
+        // 한 번에 보낼 수 있는 글자 수(회원 등급)에 맞춰 앞부분부터 반씩
+        const max = (window.__aiQuota && window.__aiQuota.max_chars) || 4000;
+        if (a.length + b.length <= max) return { a, b, cut: false };
+        const half = Math.floor(max / 2);
+        return { a: a.slice(0, Math.max(half, max - b.length)), b: b.slice(0, Math.max(half, max - a.length)), cut: true };
+    }
+    async function aiCompare(a, b, la, lb, btn, out) {
+        if (!mjAI.guard()) return;
+        const f = fit(a, b);
+        try {
+            const d = await mjAI.post(AI_URL, { a: f.a, b: f.b, label_a: la, label_b: lb }, btn);
+            const vColor = { '높음': '#c4271d', '보통': '#b26a00', '낮음': '#1e7a35', '거의 없음': '#1e7a35' }[d.verdict];
+            out.innerHTML = `<p class="font-semibold">✨ 말 바꾸기 의심: <span style="color:${vColor}">${esc(d.verdict)}</span> <span class="text-[#8e8e93]">(${d.score}/100)</span></p>
+                <p class="mt-1">${esc(d.summary)}</p>`
+                + (d.pairs.length ? `<div class="mt-3 space-y-2">${d.pairs.map((p) => `<div class="rounded-xl bg-white/60 p-2.5 dark:bg-black/20">
+                    <p class="text-[12px]"><span class="ai-tag text-white" style="background:${KIND_COLOR[p.kind] || '#6e56cf'}">${esc(p.kind)}</span> ${esc(p.note)} ${p.verified ? '<span class="text-[#1e7a35]">✓ 원문에서 확인</span>' : '<span class="text-[#b26a00]">⚠️ 원문에서 그대로 찾지 못함 — AI 착각일 수 있어요</span>'}</p>
+                    <div class="mt-1.5 grid grid-cols-1 gap-2 text-[13px] lg:grid-cols-2"><p>“${esc(p.a)}”</p><p class="text-[#6e6e73]">“${esc(p.b)}”</p></div></div>`).join('')}</div>` : '<p class="mt-2 text-[#6e6e73]">바꿔 쓴 것으로 보이는 구간을 찾지 못했어요.</p>')
+                + `<p class="mt-2 text-[11px] text-[#8e8e93]">${f.cut ? '글이 길어서 두 글의 앞부분만 보냈어요. ' : ''}AI 판단은 틀릴 수 있어요. 최종 판단은 원문을 보고 직접 해 주세요. 글은 저장하지 않아요.</p>`;
+        } catch (err) {
+            out.innerHTML = `<p class="text-[#c4271d]">${esc(err.message)}</p>`;
+        }
+        out.classList.remove('hidden');
+    }
+    $('pg-ai-pair').addEventListener('click', () => {
+        if (!pairSel) return;
+        const A = prepared.docs[pairSel.i], B = prepared.docs[pairSel.j];
+        aiCompare(A.text, B.text, A.name, B.name, $('pg-ai-pair'), $('pg-ai-out'));
+    });
+
+    // ── 공개 논문 비교 ──
+    function pickSentences(text) {
+        const parts = text.split(/(?<=[.!?。])\s+|\n+/).map((s) => s.replace(/\s+/g, ' ').trim()).filter((s) => s.length >= 40 && s.length <= 400 && (s.match(/[\p{L}]/gu) || []).length > s.length * 0.6);
+        const top = parts.map((s, i) => ({ s, i })).sort((a, b) => b.s.length - a.s.length).slice(0, N_SENT * 3).sort((a, b) => a.i - b.i);
+        if (top.length <= N_SENT) return top.map((x) => x.s);
+        const step = top.length / N_SENT;
+        return Array.from({ length: N_SENT }, (_, k) => top[Math.floor(k * step)].s);
+    }
+    $('pg-paper-run').addEventListener('click', async () => {
+        if (!AUTHED) { location.href = LOGIN; return; }
+        const d = docs[+$('pg-paper-doc').value];
+        if (!d || d.error || !d.text.trim()) { $('pg-paper-status').textContent = '먼저 문서를 넣으세요.'; return; }
+        const sentences = pickSentences(d.text);
+        if (!sentences.length) { $('pg-paper-status').textContent = '40자 넘는 문장이 없어서 찾을 수 없어요.'; return; }
+        const btn = $('pg-paper-run'); btn.disabled = true; $('pg-paper-status').textContent = `문장 ${sentences.length}개로 찾는 중…`; $('pg-papers').innerHTML = '';
+        try {
+            const r = await fetch(PAPERS_URL, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify({ sentences }) });
+            const res = await r.json().catch(() => ({ error: '답을 받지 못했어요.' }));
+            if (!r.ok) throw new Error(res.error || '답을 받지 못했어요.');
+            if (res.left !== null && res.left !== undefined) $('pg-paper-left').textContent = `오늘 ${res.left}번 남음`;
+            $('pg-paper-sentences').classList.remove('hidden');
+            $('pg-paper-sentences').innerHTML = '<b>보낸 문장</b><ol class="mt-1 list-decimal space-y-0.5 pl-5">' + res.sentences.map((s) => `<li>${esc(s)}</li>`).join('') + '</ol>';
+            const opts = { quotes: $('pg-quotes').checked, refs: $('pg-refs').checked };
+            const me = prep(d, opts), min = Math.min(+$('pg-min').value, 30);
+            const scored = res.papers.map((p) => {
+                const P = prep({ name: p.title, text: p.abstract }, { quotes: false, refs: false });
+                const r1 = covered(P, me, min);
+                return { p, P, r1 };
+            }).sort((x, y) => y.r1.chars - x.r1.chars);
+            $('pg-paper-status').textContent = `비슷한 논문 ${scored.length}편 — 초록과 겹친 글자가 많은 순`;
+            window.__pgPapers = scored;
+            $('pg-papers').innerHTML = scored.map(({ p, P, r1 }, k) => `<div class="rounded-2xl border border-black/[0.06] p-3 dark:border-white/10">
+                <div class="flex flex-wrap items-start gap-2"><span class="pg-pill" style="${heat(r1.pct)}">${r1.chars ? `초록의 ${Math.round(r1.pct * 100)}% 겹침` : '글자 겹침 없음'}</span>
+                <a href="${esc(p.url || '#')}" target="_blank" rel="noopener" class="min-w-0 flex-1 text-[14px] font-semibold text-[#0066cc] hover:underline">${esc(p.title)}</a></div>
+                <p class="mt-1 text-[12px] text-[#8e8e93]">${esc(p.authors.join(', '))}${p.author_count > p.authors.length ? ' 외' : ''} · ${esc(p.venue || '')} ${p.year || ''} · 문장 ${p.found_by.map((i) => i + 1).join(', ')}번으로 찾음</p>
+                ${r1.chars ? `<div class="pg-text mt-2" style="max-height:200px">${marked(P, r1.runs, () => 0, 'p')}</div>` : `<p class="mt-2 text-[12.5px] text-[#6e6e73]">${esc(p.abstract.slice(0, 300))}${p.abstract.length > 300 ? '…' : ''}</p>`}
+                <div class="mt-2 flex items-center gap-2"><button type="button" class="ai-btn" data-paper-ai="${k}">✨ AI 로 이 초록과 말 바꾸기 확인</button></div>
+                <div class="ai-panel mt-2 hidden text-[14px]" id="pg-paper-ai-${k}"></div></div>`).join('') || '<p class="text-[13px] text-[#8e8e93]">비슷한 공개 논문을 찾지 못했어요.</p>';
+        } catch (err) {
+            $('pg-paper-status').textContent = err.message;
+        } finally { btn.disabled = false; }
+    });
+    $('pg-papers').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-paper-ai]'); if (!b) return;
+        const k = +b.dataset.paperAi, item = window.__pgPapers[k], d = docs[+$('pg-paper-doc').value];
+        aiCompare(d.text, item.p.abstract, d.name, `${item.p.title} (초록)`, b, $(`pg-paper-ai-${k}`));
+    });
+
+    // 남은 AI 횟수(글자 수 한도 포함)를 기억
+    if (AUTHED) fetch("{% url 'tools:ai_status' %}", { cache: 'no-store' }).then((r) => r.json()).then((q) => { window.__aiQuota = q; }).catch(() => {});
+    renderDocs();
+    window.__plag = { docs: () => docs, addText, run, prep, covered, pickSentences };
+})();
+</script>
+{% include "tools/_ai_assist.html" %}
+{% endblock %}

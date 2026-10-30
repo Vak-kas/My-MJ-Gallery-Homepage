@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import ai_views, cite, satellite, specdocs, specs, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
+from . import ai_views, cite, plagiarism, satellite, specdocs, specs, ghfind, paper_ai, paper_sections, papers, stdlib, clipboard_views, ocr_views, link_views, live_views, meet_views, paste_views, webhook_views, myip, netcheck, qr_ai, share_views, speedtest, views
 
 app_name = "tools"
 
@@ -26,6 +26,9 @@ urlpatterns = [
     path("pdf/", views.pdf_tool, name="pdf"),
     path("charcount/", views.charcount, name="charcount"),
     path("diff/", views.textdiff, name="textdiff"),
+    path("plagiarism/", plagiarism.plagiarism, name="plagiarism"),
+    path("plagiarism/papers/", plagiarism.papers_check, name="plagiarism_papers"),
+    path("plagiarism/ai/", plagiarism.plagiarism_ai, name="plagiarism_ai"),
     path("gpa/", views.gpa, name="gpa"),
     path("cite/", views.cite_page, name="cite"),
     path("specs/", specs.page, name="specs"),
