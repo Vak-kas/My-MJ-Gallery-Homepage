@@ -1,0 +1,19 @@
+{# 혼자 하기 게임 공용: window.mjSolo.post(url, body), esc(s), renderBoard(el, data, unit) — el 안의 _leaderboard.html 을 다시 그림 #}
+<script>
+window.mjSolo = window.mjSolo || (() => {
+    const csrf = () => (document.cookie.match(/(?:^|; )csrftoken=([^;]+)/) || [])[1] || '';
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf() }, body: JSON.stringify(body || {}) })
+        .then((r) => r.json()).catch(() => ({ ok: false, error: '서버에 연결하지 못했어요.' }));
+    const medal = (n) => (n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : n);
+    function renderBoard(el, data, unit) {
+        if (!el || !data) return;
+        const val = (r) => (r.text ? r.text : `${r.score}${unit || ''}`);
+        el.querySelector('.lb-rows').innerHTML = data.rows.map((r) => `<li class="flex items-center gap-2 rounded-xl px-2 py-1.5 ${r.me ? 'bg-[#ecfdf5] font-semibold dark:bg-[#14432d]' : ''}"><span class="w-6 text-center tabular-nums">${medal(r.rank)}</span><span class="min-w-0 flex-1 truncate">${esc(r.name)}</span><span class="tabular-nums">${esc(val(r))}</span></li>`).join('')
+            || '<li class="px-2 py-3 text-[13px] text-[#8e8e93]">아직 기록이 없어요. 첫 번째가 되어 보세요!</li>';
+        if (data.mine) el.querySelector('.lb-mine').textContent = `내 최고 ${val(data.mine)} · ${data.mine.rank}위`;
+    }
+    const clock = (ms) => { const s = ms / 1000; return s >= 60 ? `${Math.floor(s / 60)}:${(s % 60).toFixed(1).padStart(4, '0')}` : `${s.toFixed(1)}초`; };
+    return { post, esc, renderBoard, clock };
+})();
+</script>
