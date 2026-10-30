@@ -49,6 +49,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "plagiarism",
+		"url_name": "tools:plagiarism",
+		"icon": "🕵️",
+		"title": "표절 검사",
+		"description": "여러 문서를 올리면 서로 겹친 문장을 형광펜으로 — docx·PDF·hwpx·txt, 파일은 서버로 안 가요. 회원은 공개 논문 초록과 비교·✨AI 말 바꾸기 탐지까지.",
+		"tags": ["문서", "비교", "AI"],
+		"category": "docs",
+		"added": "2026-10-30T12:00",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "pdf",
 		"url_name": "tools:pdf",
 		"icon": "📄",

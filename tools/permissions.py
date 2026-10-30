@@ -89,6 +89,10 @@ def quota_multiplier(user):
 
 # AI 기능 (QR 스타일 추천·정규식 만들기·글 비교 요약·네트워크 결과 풀이 모두 합쳐서)
 # per_day: 하루 횟수 (None = 제한 없음), max_chars: 한 번에 보낼 수 있는 글자 수
+# 표절 검사 — 공개 논문 비교(서버가 OpenAlex 를 대신 검색): 하루 횟수 (한 번에 문장 PLAGIARISM_SENTENCES 개)
+PLAGIARISM_PAPER_LIMITS = {"anon": 0, "member": 10, "vip": 40, "admin": None}
+PLAGIARISM_SENTENCES = 6
+
 AI_LIMITS = {
 	"member": {"per_day": 20, "max_chars": 4_000},
 	"vip": {"per_day": 100, "max_chars": 15_000},
