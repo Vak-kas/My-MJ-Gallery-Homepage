@@ -233,3 +233,134 @@ class CatchmindViewTests(TestCase):
 		with mock.patch("tools.relay_client.get_game", return_value=self.ROOM):
 			self.assertContains(self.client.get("/games/catchmind/cm123456/?t=tok-cm"), "/relay/ws/game/cm123456")
 			self.assertEqual(self.client.get("/games/omok/cm123456/?t=tok-cm").status_code, 404)  # 종류가 다르면 404
+
+
+class SoloPuzzleTests(TestCase):
+	"""스도쿠·지뢰찾기·따라그리기: 서버가 판을 정하고 서버가 채점."""
+
+	def setUp(self):
+		cache.clear()
+		self.user = get_user_model().objects.create_user("solo", "s@example.com", "pw-for-tests-only")
+
+	def tearDown(self):
+		cache.clear()
+
+	def post(self, name, body):
+		import json
+		return self.client.post(reverse(f"games:{name}"), json.dumps(body), content_type="application/json").json()
+
+	def test_sudoku_puzzles_have_one_answer(self):
+		from . import sudoku
+
+		for level, (_, target) in sudoku.LEVELS.items():
+			puzzle, solution = sudoku.generate(level)
+			self.assertEqual(sudoku.count_solutions([int(c) for c in puzzle]), 1)
+			self.assertLessEqual(81 - puzzle.count("0"), target + 2)
+			self.assertTrue(all(p in ("0", s) for p, s in zip(puzzle, solution)))
+			for unit in sudoku.ROWS + sudoku.COLS + sudoku.BOXES:
+				self.assertEqual({solution[i] for i in unit}, set("123456789"))
+
+	def test_sudoku_submit_checks_answer_and_saves_time(self):
+		from .models import Score
+
+		self.client.force_login(self.user)
+		s = self.post("sudoku_start", {"level": "easy"})
+		session = cache.get(f"sudoku:{s['token']}")
+		self.assertEqual(s["puzzle"], session["puzzle"])
+		self.assertNotIn("solution", s)  # 답은 보내지 않음
+		wrong = session["solution"][:-1] + ("1" if session["solution"][-1] != "1" else "2")
+		self.assertIn("맞지 않아요", self.post("sudoku_submit", {"token": s["token"], "grid": wrong})["error"])
+		r = self.post("sudoku_submit", {"token": s["token"], "grid": session["solution"]})
+		self.assertTrue(r["ok"] and r["saved"] and r["best"])
+		self.assertEqual(Score.objects.get().board, "sudoku-easy")
+		self.assertIn("초", r["leaderboard"]["rows"][0]["text"])
+		self.assertIn("게임 정보가 없어요", self.post("sudoku_submit", {"token": s["token"], "grid": session["solution"]})["error"])  # 한 번만
+
+	def test_sudoku_hint_fixes_wrong_cell_and_skips_ranking(self):
+		from .models import Score
+
+		self.client.force_login(self.user)
+		s = self.post("sudoku_start", {"level": "easy"})
+		sol = cache.get(f"sudoku:{s['token']}")["solution"]
+		blank = s["puzzle"].index("0")
+		grid = list(s["puzzle"])
+		grid[blank] = "1" if sol[blank] != "1" else "2"
+		h = self.post("sudoku_hint", {"token": s["token"], "grid": "".join(grid)})
+		self.assertEqual((h["i"], h["v"], h["wrong"]), (blank, int(sol[blank]), True))
+		r = self.post("sudoku_submit", {"token": s["token"], "grid": sol})
+		self.assertEqual((r["saved"], r["reason"]), (False, "hint"))
+		self.assertFalse(Score.objects.exists())
+
+	def test_time_leaderboard_lower_is_better(self):
+		from .models import Score
+		from .scores import leaderboard
+
+		other = get_user_model().objects.create_user("fast", "f@example.com", "pw-for-tests-only")
+		Score.objects.create(board="mines-easy", user=self.user, score=30_000)
+		Score.objects.create(board="mines-easy", user=self.user, score=95_500)
+		Score.objects.create(board="mines-easy", user=other, score=12_300)
+		lb = leaderboard("mines-easy", self.user)
+		self.assertEqual([(r["name"], r["text"]) for r in lb["rows"]], [("fast", "12.3초"), ("solo", "30.0초")])
+		self.assertEqual((lb["mine"]["rank"], lb["mine"]["text"]), (2, "30.0초"))
+		self.assertEqual(leaderboard("mines-hard")["rows"], [])
+		from .scores import time_text
+		self.assertEqual(time_text(95_500), "1:35.5")
+
+	def test_mines_first_click_safe_and_win_saves(self):
+		from .models import Score
+
+		self.client.force_login(self.user)
+		s = self.post("mines_start", {"level": "easy"})
+		self.assertEqual((s["rows"], s["cols"], s["count"]), (9, 9, 10))
+		r = self.post("mines_open", {"token": s["token"], "cells": [40]})
+		self.assertEqual(r["state"], "playing")
+		self.assertEqual(r["shown"]["40"], 0)  # 첫 칸과 주변엔 지뢰가 없음
+		self.assertNotIn("mines", r)  # 끝나기 전엔 지뢰 위치를 안 보냄
+		board = cache.get(f"mines:{s['token']}")["board"]
+		safe = [i for i in range(81) if i not in board.mines and i not in board.opened]
+		for k in range(0, len(safe), 8):
+			r = self.post("mines_open", {"token": s["token"], "cells": safe[k:k + 8]})
+		self.assertEqual(r["state"], "won")
+		self.assertEqual(len(r["mines"]), 10)
+		self.assertTrue(r["saved"])
+		self.assertEqual(Score.objects.get().board, "mines-easy")
+
+	def test_mines_boom_ends_game(self):
+		s = self.post("mines_start", {"level": "normal"})
+		self.post("mines_open", {"token": s["token"], "cells": [0]})
+		mine = min(cache.get(f"mines:{s['token']}")["board"].mines)
+		r = self.post("mines_open", {"token": s["token"], "cells": [mine]})
+		self.assertEqual((r["state"], r["boom"]), ("lost", mine))
+		self.assertIn(mine, r["mines"])
+		self.assertIn("게임 정보가 없어요", self.post("mines_open", {"token": s["token"], "cells": [1]})["error"])
+		t = self.post("mines_start", {})["token"]
+		self.assertIn("올바르지", self.post("mines_open", {"token": t, "cells": []})["error"])
+
+	def test_trace_scores_each_shape_and_total(self):
+		from . import trace
+		from .models import Score
+
+		self.client.force_login(self.user)
+		s = self.post("trace_start", {"mode": "memory"})
+		self.assertEqual(len(s["shapes"]), trace.ROUND)
+		scores = []
+		for i, shape in enumerate(s["shapes"]):
+			strokes = [shape["points"]] if i % 2 == 0 else [[[0.1, 0.1], [0.2, 0.9], [0.9, 0.2]]]
+			r = self.post("trace_draw", {"token": s["token"], "i": i, "strokes": strokes})
+			scores.append(r["score"])
+			if i == 0:
+				self.assertIn("이미 채점한", self.post("trace_draw", {"token": s["token"], "i": 0, "strokes": strokes})["error"])
+		self.assertTrue(r["done"])
+		self.assertEqual(scores[0], 100)
+		self.assertLess(scores[1], 40)
+		self.assertEqual(r["total"], sum(scores))
+		self.assertEqual(Score.objects.get().board, "trace-memory")
+
+	def test_trace_scoring_rejects_junk(self):
+		from . import trace
+
+		self.assertEqual(trace.score("circle", "nope"), 0)
+		self.assertEqual(trace.score("circle", [[["a", 1]], [[float("nan"), 0.5]]]), 0)
+		self.assertEqual(trace.score("star", [trace.SHAPES["star"][1]]), 100)
+		scribble = [[[x / 20, y / 20] for x in range(21)] for y in range(21)]  # 판 전체를 칠하기
+		self.assertLess(trace.score("star", scribble), 30)
