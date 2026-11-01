@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-btn { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .gm-btn.primary { background: #10b981; color: #fff; border-color: #10b981; font-weight: 600; }
+    .gm-btn:disabled { opacity: 0.4; }
+    .tr-stage { position: relative; width: min(100%, 520px); aspect-ratio: 1; margin: 0 auto; }
+    .tr-canvas { width: 100%; height: 100%; border-radius: 18px; background: #fbfbfd; border: 1px solid rgba(0, 0, 0, 0.08); touch-action: none; cursor: crosshair; display: block; }
+    .tr-over { position: absolute; inset: 0; border-radius: 18px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 20px; pointer-events: none; }
+    .tr-over.solid { background: rgba(255, 255, 255, 0.92); pointer-events: auto; }
+    .tr-score { font-size: 64px; font-weight: 900; line-height: 1; animation: tr-pop 0.4s; text-shadow: 0 2px 12px rgba(255, 255, 255, 0.9); }
+    @keyframes tr-pop { from { transform: scale(0.4); opacity: 0; } }
+    .tr-count { font-size: 80px; font-weight: 900; color: rgba(16, 185, 129, 0.85); }
+    .tr-dots { display: flex; gap: 6px; }
+    .tr-dots span { width: 34px; height: 6px; border-radius: 3px; background: #e5e5ea; }
+    .tr-dots span.done { background: #10b981; }
+    .tr-dots span.now { background: #1d1d1f; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .gm-btn.primary { background: #10b981; color: #fff; }
+    html.theme-dark .tr-canvas { background: #111318; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .tr-over.solid { background: rgba(23, 26, 32, 0.92); color: #f3f4f6; }
+    html.theme-dark .tr-score { text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8); }
+    html.theme-dark .tr-dots span { background: #3a3a3c; }
+    html.theme-dark .tr-dots span.now { background: #e8e8ea; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">SOLO · DRAWING</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">따라그리기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">연하게 보이는 도형을 마우스·손가락으로 따라 그려요. 도형 {{ round }}개, 하나마다 서버가 얼마나 닮았는지 100점 만점으로 채점해요. 자신 있으면 {{ memory_seconds }}초만 보고 기억해서 그리기!</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card">
+            <div class="mx-auto flex w-[min(100%,520px)] flex-wrap items-center gap-2">
+                <div class="flex gap-2" id="tr-modes">
+                    <button type="button" class="gm-btn is-on" data-mode="trace">✏️ 따라 그리기</button>
+                    <button type="button" class="gm-btn" data-mode="memory">🧠 보고 기억해서</button>
+                </div>
+                <div class="tr-dots ml-auto" id="tr-dots"></div>
+            </div>
+            <p class="mx-auto mt-3 w-[min(100%,520px)] text-[15px] font-semibold" id="tr-title">&nbsp;</p>
+            <div class="tr-stage mt-2">
+                <canvas class="tr-canvas" id="tr-canvas"></canvas>
+                <div class="tr-over solid" id="tr-over"></div>
+            </div>
+            <div class="mx-auto mt-4 flex w-[min(100%,520px)] items-center gap-2">
+                <button type="button" class="gm-btn" id="tr-clear" disabled>🧽 다시 그리기</button>
+                <button type="button" class="gm-btn" id="tr-undo" disabled>↩️ 한 획 지우기</button>
+                <button type="button" class="gm-btn primary ml-auto" id="tr-done" disabled>다 그렸어요</button>
+            </div>
+            <p class="mx-auto mt-3 w-[min(100%,520px)] text-[12px] text-[#8e8e93]">여러 번 끊어 그려도 돼요. 빠뜨린 부분이 있거나 선 밖으로 많이 나가면 점수가 깎여요.</p>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">🏆 랭킹 <span id="tr-lb-name" class="text-[13px] font-normal text-[#8e8e93]">따라 그리기</span></h2>
+                {% for key, label, board in boards %}
+                <div class="tr-lb mt-3 {% if key != 'trace' %}hidden{% endif %}" data-mode="{{ key }}">{% include "games/_leaderboard.html" with board=board unit="점" %}</div>
+                {% endfor %}
+                <p class="mt-2 text-[12px] text-[#8e8e93]">도형 {{ round }}개 점수의 합 ({{ round }}00점 만점)</p>
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">채점</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>도형의 모든 부분을 지나갔는지(빠뜨린 곳)와 내 선이 도형에서 얼마나 떨어졌는지를 함께 봐요.</li>
+                    <li>속도는 상관없어요. 천천히 정확하게!</li>
+                    <li>동그라미·별·하트·소용돌이·무한대·꽃·용수철 등 15가지 중에서 무작위로 나와요.</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+{% include "games/_solo_js.html" %}
+<script>
+(() => {
+    const URLS = { start: "{% url 'games:trace_start' %}", draw: "{% url 'games:trace_draw' %}" };
+    const LOGIN = "{% url 'accounts:login' %}?next={{ request.path|urlencode }}";
+    const { post, esc, renderBoard } = window.mjSolo;
+    const $ = (id) => document.getElementById(id);
+    const canvas = $('tr-canvas'), ctx = canvas.getContext('2d'), over = $('tr-over');
+    const dark = () => document.documentElement.classList.contains('theme-dark');
+
+    let mode = 'trace', run = null;
+    // run = { token, shapes, i, strokes:[[x,y]...], scores:[], phase:'show'|'draw'|'scored'|'busy'|'end', memory }
+
+    function size() {
+        const r = canvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+        canvas.width = Math.round(r.width * dpr); canvas.height = Math.round(r.height * dpr);
+        draw();
+    }
+    function path(pts, color, width, dash) {
+        if (!pts || pts.length < 2) { if (pts && pts.length === 1) { ctx.fillStyle = color; ctx.beginPath(); ctx.arc(pts[0][0] * canvas.width, pts[0][1] * canvas.height, width / 2, 0, 7); ctx.fill(); } return; }
+        ctx.save();
+        ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+        if (dash) ctx.setLineDash(dash);
+        ctx.beginPath();
+        pts.forEach(([x, y], k) => (k ? ctx.lineTo(x * canvas.width, y * canvas.height) : ctx.moveTo(x * canvas.width, y * canvas.height)));
+        ctx.stroke();
+        ctx.restore();
+    }
+    function draw() {
+        const dpr = window.devicePixelRatio || 1;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!run || run.phase === 'end') return;
+        const shape = run.shapes[run.i];
+        const showTarget = run.phase === 'show' || run.phase === 'scored' || (run.phase !== 'show' && run.mode === 'trace');
+        if (showTarget) {
+            const strong = run.phase === 'show' || run.phase === 'scored';
+            path(shape.points, strong ? 'rgba(16,185,129,0.9)' : (dark() ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.13)'), (strong ? 6 : 16) * dpr, null);
+        }
+        const ink = dark() ? '#6aa8ff' : '#1d4ed8';
+        run.strokes.forEach((s) => path(s, ink, 4 * dpr));
+    }
+    function dots() {
+        $('tr-dots').innerHTML = run.shapes.map((_, k) => `<span class="${k < run.scores.length ? 'done' : k === run.i ? 'now' : ''}" title="${run.scores[k] ?? ''}"></span>`).join('');
+    }
+    function buttons() {
+        const can = run && run.phase === 'draw';
+        $('tr-clear').disabled = !can || !run.strokes.length;
+        $('tr-undo').disabled = !can || !run.strokes.length;
+        $('tr-done').disabled = !can || !run.strokes.length;
+    }
+    function setOver(html, solid) {
+        over.className = `tr-over${solid ? ' solid' : ''}`;
+        over.innerHTML = html;
+        over.querySelector('[data-start]')?.addEventListener('click', start);
+        over.querySelector('[data-next]')?.addEventListener('click', next);
+    }
+
+    function intro() {
+        run = null;
+        draw();
+        $('tr-title').innerHTML = '&nbsp;';
+        $('tr-dots').innerHTML = '';
+        const what = mode === 'trace' ? '연한 도형 위를 그대로 따라 그려요.' : `도형이 {{ memory_seconds }}초 동안 보였다가 사라져요. 기억해서 같은 자리에 그려요!`;
+        setOver(`<p class="text-[44px]">${mode === 'trace' ? '✏️' : '🧠'}</p><p class="text-[18px] font-bold">${mode === 'trace' ? '따라 그리기' : '보고 기억해서 그리기'}</p><p class="text-[14px] text-[#6e6e73]">${what}<br>도형 {{ round }}개, 하나에 100점.</p><button class="gm-btn primary" data-start>시작</button>`, true);
+        buttons();
+    }
+
+    async function start() {
+        setOver('<p class="text-[15px]">준비 중…</p>', true);
+        const s = await post(URLS.start, { mode });
+        if (!s.token) { setOver(`<p>${esc(s.error || '시작하지 못했어요.')}</p><button class="gm-btn" data-start>다시</button>`, true); return; }
+        run = { token: s.token, mode: s.mode, shapes: s.shapes, i: -1, strokes: [], scores: [], memory: s.memory_seconds };
+        next();
+    }
+
+    function next() {
+        run.i += 1;
+        run.strokes = [];
+        const shape = run.shapes[run.i];
+        $('tr-title').textContent = `${run.i + 1} / ${run.shapes.length} · ${shape.label}`;
+        dots();
+        if (run.mode === 'memory') {
+            run.phase = 'show';
+            draw();
+            let left = run.memory;
+            setOver(`<p class="tr-count">${left}</p>`);
+            const t = setInterval(() => {
+                left -= 1;
+                if (left > 0) { setOver(`<p class="tr-count">${left}</p>`); return; }
+                clearInterval(t);
+                run.phase = 'draw';
+                setOver('');
+                draw(); buttons();
+            }, 1000);
+        } else {
+            run.phase = 'draw';
+            setOver('');
+            draw();
+        }
+        buttons();
+    }
+
+    async function submit() {
+        if (!run || run.phase !== 'draw' || !run.strokes.length) return;
+        run.phase = 'busy';
+        buttons();
+        const strokes = run.strokes.map((s) => s.map(([x, y]) => [Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000]));
+        const r = await post(URLS.draw, { token: run.token, i: run.i, strokes });
+        if (!r.ok) { run.phase = 'draw'; buttons(); setOver(`<p class="text-[14px] font-semibold">${esc(r.error)}</p>`); return; }
+        run.scores.push(r.score);
+        run.phase = 'scored';
+        draw(); dots();
+        const face = r.score >= 95 ? '🤩' : r.score >= 85 ? '😄' : r.score >= 70 ? '🙂' : r.score >= 50 ? '😅' : '😵';
+        const color = r.score >= 85 ? '#10b981' : r.score >= 60 ? '#f59f00' : '#e5484d';
+        if (r.done) {
+            run.phase = 'end';
+            const msg = r.saved ? (r.best ? '🎉 내 최고 기록!' : '랭킹에 저장했어요') : `<a class="font-semibold text-[#0f9f6e] underline" href="${LOGIN}">로그인하면 랭킹에 올라가요</a>`;
+            const list = run.shapes.map((s, k) => `<li class="flex justify-between gap-6"><span>${esc(s.label)}</span><b class="tabular-nums">${r.scores[k]}</b></li>`).join('');
+            setOver(`<p class="tr-score" style="color:${color}">${r.score}</p><p class="text-[13px]">${face} ${esc(r.label)}</p>`);
+            setTimeout(() => {
+                setOver(`<p class="text-[14px] text-[#6e6e73]">합계</p><p class="text-[44px] font-black tabular-nums">${r.total}<span class="text-[18px] font-semibold text-[#8e8e93]"> / ${run.shapes.length * 100}</span></p><ul class="w-[200px] space-y-1 text-[14px]">${list}</ul><p class="text-[14px]">${msg}</p><button class="gm-btn primary" data-start>한 판 더</button>`, true);
+                draw();
+            }, 1400);
+            if (r.leaderboard) renderBoard(document.querySelector(`.tr-lb[data-mode="${run.mode}"]`), r.leaderboard, '점');
+        } else {
+            setOver(`<p class="tr-score" style="color:${color}">${r.score}</p><p class="text-[14px] font-semibold">${face}</p><button class="gm-btn primary" data-next style="pointer-events:auto">다음 도형 →</button>`);
+        }
+        buttons();
+    }
+
+    // 그리기
+    let cur = null;
+    const pt = (e) => { const r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
+    canvas.addEventListener('pointerdown', (e) => {
+        if (!run || run.phase !== 'draw') return;
+        canvas.setPointerCapture(e.pointerId);
+        cur = [pt(e)];
+        run.strokes.push(cur);
+        draw();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+        if (!cur) return;
+        const merged = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+        (merged.length ? merged : [e]).forEach((ev) => cur.push(pt(ev)));
+        draw();
+    });
+    const end = () => { if (cur) { cur = null; buttons(); } };
+    canvas.addEventListener('pointerup', end);
+    canvas.addEventListener('pointercancel', end);
+
+    $('tr-clear').addEventListener('click', () => { if (run && run.phase === 'draw') { run.strokes = []; draw(); buttons(); } });
+    $('tr-undo').addEventListener('click', () => { if (run && run.phase === 'draw') { run.strokes.pop(); draw(); buttons(); } });
+    $('tr-done').addEventListener('click', submit);
+    document.addEventListener('keydown', (e) => {
+        if (e.target.closest('input, textarea')) return;
+        if (e.key === 'Enter' && run?.phase === 'draw') submit();
+        else if (e.key === 'Enter' && run?.phase === 'scored') next();
+        else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && run?.phase === 'draw') { e.preventDefault(); run.strokes.pop(); draw(); buttons(); }
+    });
+    $('tr-modes').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-mode]');
+        if (!b || (run && run.phase !== 'end' && run.scores.length && !confirm('지금 판을 그만둘까요?'))) return;
+        mode = b.dataset.mode;
+        document.querySelectorAll('#tr-modes [data-mode]').forEach((x) => x.classList.toggle('is-on', x === b));
+        document.querySelectorAll('.tr-lb').forEach((x) => x.classList.toggle('hidden', x.dataset.mode !== mode));
+        $('tr-lb-name').textContent = b.textContent.slice(2).trim();
+        intro();
+    });
+    window.addEventListener('resize', size);
+    size();
+    intro();
+    window.__trace = { state: () => run, start, submit, next, setStrokes: (s) => { run.strokes = s; draw(); buttons(); } };
+})();
+</script>
+{% endblock %}

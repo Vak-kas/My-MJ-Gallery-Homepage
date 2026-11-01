@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-btn { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .mi-bar { display: flex; align-items: center; gap: 10px; }
+    .mi-led { min-width: 84px; border-radius: 12px; background: #1d1d1f; color: #ff5a4f; font: 700 20px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px 10px; text-align: center; font-variant-numeric: tabular-nums; }
+    .mi-face { font-size: 30px; line-height: 1; border-radius: 14px; padding: 4px 10px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f5f5f7; }
+    .mi-scroll { position: relative; overflow-x: auto; padding-bottom: 4px; }
+    .mi-grid { display: grid; gap: 2px; margin: 0 auto; width: max-content; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    .mi-cell { width: var(--sz); height: var(--sz); border-radius: 5px; background: #c9d6e3; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.12); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: calc(var(--sz) * 0.55); cursor: pointer; -webkit-touch-callout: none; }
+    .mi-cell:hover { background: #b6c7d8; }
+    .mi-cell.open { background: #eef1f5; box-shadow: none; cursor: default; animation: mi-open 0.15s; }
+    .mi-cell.boom { background: #ff5a4f !important; }
+    .mi-cell.wrong { background: #ffd6d3; }
+    .mi-cell.wait { opacity: 0.6; }
+    @keyframes mi-open { from { transform: scale(0.8); } }
+    .n1 { color: #1e6fd9; } .n2 { color: #2f9e44; } .n3 { color: #e03131; } .n4 { color: #3b2fb0; } .n5 { color: #a61e4d; } .n6 { color: #0c8599; } .n7 { color: #1d1d1f; } .n8 { color: #868e96; }
+    .mi-over { position: absolute; inset: 0; background: rgba(255, 255, 255, 0.82); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; z-index: 5; border-radius: 12px; animation: mi-fade 0.4s; }
+    @keyframes mi-fade { from { opacity: 0; } }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .mi-face { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .mi-cell { background: #3d4756; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.3); }
+    html.theme-dark .mi-cell:hover { background: #4a5668; }
+    html.theme-dark .mi-cell.open { background: #1f242c; }
+    html.theme-dark .mi-cell.wrong { background: #5a2a2a; }
+    html.theme-dark .n1 { color: #6aa8ff; } html.theme-dark .n2 { color: #69db7c; } html.theme-dark .n3 { color: #ff8787; } html.theme-dark .n4 { color: #b197fc; } html.theme-dark .n5 { color: #f783ac; } html.theme-dark .n6 { color: #66d9e8; } html.theme-dark .n7 { color: #f3f4f6; }
+    html.theme-dark .mi-over { background: rgba(23, 26, 32, 0.88); color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">SOLO · PUZZLE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">지뢰찾기.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">숫자는 주변 8칸의 지뢰 수. 지뢰만 빼고 다 열면 성공! 첫 칸은 항상 안전하고, 지뢰 위치는 서버만 알아서 몰래 볼 수 없어요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card min-w-0">
+            <div class="flex flex-wrap items-center gap-2" id="mi-levels">
+                <button type="button" class="gm-btn is-on" data-level="easy">초급 9×9</button>
+                <button type="button" class="gm-btn" data-level="normal">중급 16×16</button>
+                <button type="button" class="gm-btn" data-level="hard">고급 16×30</button>
+            </div>
+            <div class="mi-bar mt-4 justify-center">
+                <div class="mi-led" id="mi-left" title="남은 지뢰">010</div>
+                <button type="button" class="mi-face" id="mi-face" title="새 게임">🙂</button>
+                <div class="mi-led" id="mi-time" title="시간">0.0</div>
+            </div>
+            <div class="mi-scroll mt-4"><div class="relative mx-auto w-max"><div class="mi-grid" id="mi-grid"></div></div></div>
+            <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+                <button type="button" class="gm-btn" id="mi-mode">👆 열기 모드</button>
+                <span class="text-[12px] text-[#8e8e93]" id="mi-help">왼쪽 클릭 열기 · 오른쪽 클릭(휴대폰은 꾹 누르기) 깃발 · 숫자를 누르면 깃발 수가 맞을 때 주변을 한꺼번에 열어요.</span>
+            </div>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">🏆 랭킹 <span id="mi-lb-name" class="text-[13px] font-normal text-[#8e8e93]">초급</span></h2>
+                {% for key, label, board in boards %}
+                <div class="mi-lb mt-3 {% if key != 'easy' %}hidden{% endif %}" data-level="{{ key }}" data-label="{{ label }}">{% include "games/_leaderboard.html" with board=board unit="" %}</div>
+                {% endfor %}
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">요령</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>1 옆에 닫힌 칸이 하나뿐이면 그게 지뢰예요.</li>
+                    <li>깃발을 다 꽂은 숫자는 눌러서 나머지를 한 번에 열면 빨라요.</li>
+                    <li>시간은 첫 칸을 연 순간부터 서버가 재요.</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+{% include "games/_solo_js.html" %}
+<script>
+(() => {
+    const URLS = { start: "{% url 'games:mines_start' %}", open: "{% url 'games:mines_open' %}" };
+    const LOGIN = "{% url 'accounts:login' %}?next={{ request.path|urlencode }}";
+    const { post, esc, renderBoard } = window.mjSolo;
+    const $ = (id) => document.getElementById(id);
+    const gridEl = $('mi-grid');
+    const SIZE = { easy: 36, normal: 30, hard: 27 };
+
+    let level = 'easy', g = null, timer = null, flagMode = false;
+    // g = { token, rows, cols, count, num:{i:n}, flags:Set, state, started, queue:Promise, cells:[el] }
+
+    const nb = (i) => {
+        const r = Math.floor(i / g.cols), c = i % g.cols, out = [];
+        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if ((dr || dc) && nr >= 0 && nr < g.rows && nc >= 0 && nc < g.cols) out.push(nr * g.cols + nc);
+        }
+        return out;
+    };
+    const led = (n) => (n < 0 ? '-' + String(-n).padStart(2, '0') : String(n).padStart(3, '0'));
+
+    function paint(i) {
+        const el = g.cells[i], n = g.num[i];
+        if (n !== undefined) { el.className = `mi-cell open ${n > 0 ? 'n' + n : ''}`; el.textContent = n > 0 ? n : ''; }
+        else { el.className = 'mi-cell'; el.textContent = g.flags.has(i) ? '🚩' : ''; }
+    }
+    function status() { $('mi-left').textContent = led(g.count - g.flags.size); }
+
+    function overlay(html) {
+        gridEl.parentElement.querySelector('.mi-over')?.remove();
+        if (!html) return;
+        const o = document.createElement('div'); o.className = 'mi-over'; o.innerHTML = html;
+        gridEl.parentElement.appendChild(o);
+        o.querySelector('[data-new]')?.addEventListener('click', start);
+    }
+
+    async function start() {
+        clearInterval(timer);
+        overlay('');
+        const s = await post(URLS.start, { level });
+        if (!s.token) { overlay(`<p>${esc(s.error || '시작하지 못했어요.')}</p><button class="gm-btn" data-new>다시</button>`); return; }
+        g = { token: s.token, rows: s.rows, cols: s.cols, count: s.count, num: {}, flags: new Set(), state: 'ready', started: 0, queue: Promise.resolve() };
+        gridEl.style.setProperty('--sz', `${SIZE[level]}px`);
+        gridEl.style.gridTemplateColumns = `repeat(${g.cols}, var(--sz))`;
+        gridEl.innerHTML = '';
+        g.cells = [...Array(g.rows * g.cols)].map((_, i) => { const el = document.createElement('div'); el.className = 'mi-cell'; el.dataset.i = i; gridEl.appendChild(el); return el; });
+        $('mi-face').textContent = '🙂';
+        $('mi-time').textContent = '0.0';
+        status();
+    }
+
+    function toggleFlag(i) {
+        if (!g || g.state === 'won' || g.state === 'lost' || g.num[i] !== undefined) return;
+        g.flags.has(i) ? g.flags.delete(i) : g.flags.add(i);
+        paint(i); status();
+        navigator.vibrate?.(15);
+    }
+
+    function press(i) {
+        if (!g || g.state === 'won' || g.state === 'lost') return;
+        if (g.num[i] !== undefined) {  // 숫자 칸: 깃발 수가 맞으면 주변 열기
+            const around = nb(i), flagged = around.filter((j) => g.flags.has(j)).length;
+            const todo = around.filter((j) => g.num[j] === undefined && !g.flags.has(j));
+            if (g.num[i] > 0 && flagged === g.num[i] && todo.length) send(todo);
+            return;
+        }
+        if (g.flags.has(i)) return;
+        send([i]);
+    }
+
+    function send(cells) {
+        cells.forEach((i) => g.cells[i].classList.add('wait'));
+        $('mi-face').textContent = '😮';
+        g.queue = g.queue.then(async () => {
+            if (g.state === 'won' || g.state === 'lost') return;
+            const token = g.token;
+            const r = await post(URLS.open, { token, cells });
+            if (!g || g.token !== token) return;
+            cells.forEach((i) => g.cells[i].classList.remove('wait'));
+            if (!r.ok) { $('mi-help').textContent = r.error; return; }
+            if (g.state === 'ready' && r.state !== 'ready') { g.started = performance.now(); timer = setInterval(() => { $('mi-time').textContent = ((performance.now() - g.started) / 1000).toFixed(1); }, 100); }
+            for (const [k, n] of Object.entries(r.shown)) { const i = +k; g.num[i] = n; g.flags.delete(i); paint(i); }
+            g.state = r.state;
+            status();
+            $('mi-face').textContent = '🙂';
+            if (r.state === 'won' || r.state === 'lost') finish(r);
+        });
+    }
+
+    function finish(r) {
+        clearInterval(timer);
+        $('mi-time').textContent = (r.ms / 1000).toFixed(1);
+        const mines = new Set(r.mines);
+        if (r.state === 'lost') {
+            $('mi-face').textContent = '😵';
+            navigator.vibrate?.([60, 40, 120]);
+            mines.forEach((i) => { if (!g.flags.has(i)) g.cells[i].textContent = '💣'; });
+            g.flags.forEach((i) => { if (!mines.has(i)) { g.cells[i].classList.add('wrong'); g.cells[i].textContent = '❌'; } });
+            if (r.boom != null) g.cells[r.boom].classList.add('boom');
+            setTimeout(() => overlay(`<p class="text-[40px]">💥</p><p class="text-[18px] font-bold">펑! 지뢰를 밟았어요</p><button class="gm-btn" data-new>다시 하기</button>`), 900);
+        } else {
+            $('mi-face').textContent = '😎';
+            mines.forEach((i) => { g.flags.add(i); paint(i); });
+            status();
+            const msg = r.saved ? (r.best ? '🎉 내 최고 기록!' : '랭킹에 저장했어요') : `<a class="font-semibold text-[#0f9f6e] underline" href="${LOGIN}">로그인하면 랭킹에 올라가요</a>`;
+            setTimeout(() => overlay(`<p class="text-[40px]">😎</p><p class="text-[28px] font-extrabold">${esc(r.text)}</p><p class="text-[14px]">${msg}</p><button class="gm-btn" data-new>새 게임</button>`), 500);
+            if (r.leaderboard) renderBoard(document.querySelector(`.mi-lb[data-level="${level}"]`), r.leaderboard);
+        }
+    }
+
+    // 클릭·오른쪽 클릭·꾹 누르기
+    let hold = null, lastType = 'mouse';
+    gridEl.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        const el = e.target.closest('.mi-cell');
+        if (el && lastType === 'mouse') toggleFlag(+el.dataset.i);  // 터치 꾹 누르기는 아래 타이머가 처리
+    });
+    gridEl.addEventListener('pointerdown', (e) => {
+        lastType = e.pointerType;
+        const el = e.target.closest('.mi-cell');
+        if (!el || e.button !== 0) return;
+        hold = { el, moved: false, fired: false, x: e.clientX, y: e.clientY };
+        if (e.pointerType !== 'mouse') hold.timer = setTimeout(() => { hold.fired = true; toggleFlag(+el.dataset.i); }, 450);
+    });
+    gridEl.addEventListener('pointermove', (e) => { if (hold && Math.hypot(e.clientX - hold.x, e.clientY - hold.y) > 10) { hold.moved = true; clearTimeout(hold.timer); } });
+    gridEl.addEventListener('pointerup', (e) => {
+        if (!hold) return;
+        clearTimeout(hold.timer);
+        const h = hold; hold = null;
+        if (h.fired || h.moved || e.button !== 0) return;
+        const i = +h.el.dataset.i;
+        if (flagMode && g.num[i] === undefined) toggleFlag(i); else press(i);
+    });
+    gridEl.addEventListener('pointercancel', () => { if (hold) clearTimeout(hold.timer); hold = null; });
+
+    $('mi-mode').addEventListener('click', () => {
+        flagMode = !flagMode;
+        $('mi-mode').textContent = flagMode ? '🚩 깃발 모드' : '👆 열기 모드';
+        $('mi-mode').classList.toggle('is-on', flagMode);
+    });
+    $('mi-face').addEventListener('click', start);
+    $('mi-levels').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-level]');
+        if (!b) return;
+        level = b.dataset.level;
+        document.querySelectorAll('#mi-levels [data-level]').forEach((x) => x.classList.toggle('is-on', x === b));
+        document.querySelectorAll('.mi-lb').forEach((x) => x.classList.toggle('hidden', x.dataset.level !== level));
+        $('mi-lb-name').textContent = b.textContent.split(' ')[0];
+        start();
+    });
+    start();
+    window.__mines = { state: () => g, press, toggleFlag };
+})();
+</script>
+{% endblock %}

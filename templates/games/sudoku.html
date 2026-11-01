@@ -1,0 +1,277 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .gm-btn { border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn.is-on { background: #1d1d1f; color: #fff; border-color: #1d1d1f; }
+    .gm-btn:disabled { opacity: 0.4; }
+    .su-wrap { position: relative; width: min(100%, 540px); margin: 0 auto; }
+    .su-grid { display: grid; grid-template-columns: repeat(9, 1fr); aspect-ratio: 1; border: 2px solid #1d1d1f; border-radius: 10px; overflow: hidden; user-select: none; background: #fff; }
+    .su-cell { position: relative; display: flex; align-items: center; justify-content: center; border-right: 1px solid #d2d2d7; border-bottom: 1px solid #d2d2d7; font-size: clamp(18px, 4.6vw, 28px); font-variant-numeric: tabular-nums; color: #0f6fd6; cursor: pointer; }
+    .su-cell:nth-child(9n) { border-right: 0; }
+    .su-cell:nth-child(9n + 3), .su-cell:nth-child(9n + 6) { border-right: 2px solid #1d1d1f; }
+    .su-cell:nth-child(n + 19):nth-child(-n + 27), .su-cell:nth-child(n + 46):nth-child(-n + 54) { border-bottom: 2px solid #1d1d1f; }
+    .su-cell:nth-child(n + 73) { border-bottom: 0; }
+    .su-cell.given { color: #1d1d1f; font-weight: 700; }
+    .su-cell.peer { background: #f2f6fc; }
+    .su-cell.same { background: #dbe8fb; }
+    .su-cell.sel { background: #b9d4f7; }
+    .su-cell.bad { color: #e5484d; }
+    .su-cell.bad.given { background: #fde8e8; }
+    .su-cell.hinted { color: #b7791f; }
+    .su-cell.pop { animation: su-pop 0.25s; }
+    @keyframes su-pop { 50% { transform: scale(1.25); } }
+    .su-notes { position: absolute; inset: 2px; display: grid; grid-template-columns: repeat(3, 1fr); font-size: clamp(8px, 1.7vw, 11px); color: #6e6e73; line-height: 1; }
+    .su-notes span { display: flex; align-items: center; justify-content: center; }
+    .su-pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 6px; }
+    .su-key { border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #f5f5f7; padding: 8px 0; font-size: 22px; font-weight: 600; color: #0f6fd6; position: relative; }
+    .su-key small { position: absolute; right: 5px; top: 2px; font-size: 10px; color: #8e8e93; font-weight: 400; }
+    .su-key.done { opacity: 0.25; }
+    .su-over { position: absolute; inset: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 5; text-align: center; padding: 16px; }
+    .su-time { font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 700; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.is-on { background: #e8e8ea; color: #111; }
+    html.theme-dark .su-grid { background: #111318; border-color: #c7c7cc; }
+    html.theme-dark .su-cell { border-color: #3a3a3c; color: #6aa8ff; }
+    html.theme-dark .su-cell:nth-child(9n + 3), html.theme-dark .su-cell:nth-child(9n + 6) { border-right-color: #c7c7cc; }
+    html.theme-dark .su-cell:nth-child(n + 19):nth-child(-n + 27), html.theme-dark .su-cell:nth-child(n + 46):nth-child(-n + 54) { border-bottom-color: #c7c7cc; }
+    html.theme-dark .su-cell.given { color: #f3f4f6; }
+    html.theme-dark .su-cell.peer { background: #1b2230; }
+    html.theme-dark .su-cell.same { background: #22324d; }
+    html.theme-dark .su-cell.sel { background: #2d4b7a; }
+    html.theme-dark .su-cell.bad { color: #ff6b6b; }
+    html.theme-dark .su-cell.bad.given { background: #4a1f22; }
+    html.theme-dark .su-key { background: #2a2a2e; border-color: rgba(255, 255, 255, 0.14); color: #6aa8ff; }
+    html.theme-dark .su-over { background: rgba(23, 26, 32, 0.92); color: #f3f4f6; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'games:index' %}" class="text-[13px] text-[#0f9f6e]">← Game 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#10b981]">SOLO · PUZZLE</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">스도쿠.</h1>
+        <p class="mt-3 max-w-[760px] text-[15px] leading-relaxed text-[#6e6e73]">가로줄·세로줄·3×3 칸마다 1~9 가 한 번씩. 답이 하나뿐인 문제를 서버가 새로 만들어 주고, 다 채우면 서버가 확인해서 걸린 시간으로 랭킹에 올라가요.</p>
+    </div>
+
+    <div class="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section class="gm-card">
+            <div class="mx-auto flex w-[min(100%,540px)] flex-wrap items-center gap-2" id="su-levels">
+                <button type="button" class="gm-btn" data-level="easy">쉬움</button>
+                <button type="button" class="gm-btn is-on" data-level="normal">보통</button>
+                <button type="button" class="gm-btn" data-level="hard">어려움</button>
+                <span class="su-time ml-auto" id="su-time">0.0초</span>
+            </div>
+            <div class="su-wrap mt-4">
+                <div class="su-grid" id="su-grid"></div>
+            </div>
+            <div class="mx-auto mt-4 w-[min(100%,540px)]">
+                <div class="su-pad" id="su-pad"></div>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" class="gm-btn" id="su-note" title="N">✏️ 메모 <span id="su-note-state">꺼짐</span></button>
+                    <button type="button" class="gm-btn" id="su-erase" title="Delete">⌫ 지우기</button>
+                    <button type="button" class="gm-btn" id="su-undo" title="Ctrl+Z">↩️ 되돌리기</button>
+                    <button type="button" class="gm-btn" id="su-hint">💡 힌트</button>
+                    <button type="button" class="gm-btn ml-auto" id="su-new">새 문제</button>
+                </div>
+                <p class="mt-3 text-[12px] text-[#8e8e93]" id="su-hint-text">키보드: 숫자·방향키·Delete, N 으로 메모 켜고 끄기. 같은 줄·칸에 겹치는 숫자는 빨갛게 보여요.</p>
+            </div>
+        </section>
+
+        <aside class="space-y-4 lg:self-start">
+            <section class="gm-card">
+                <h2 class="text-[15px] font-semibold">🏆 랭킹 <span id="su-lb-name" class="text-[13px] font-normal text-[#8e8e93]">보통</span></h2>
+                {% for key, label, board in boards %}
+                <div class="su-lb mt-3 {% if key != 'normal' %}hidden{% endif %}" data-level="{{ key }}" data-label="{{ label }}">{% include "games/_leaderboard.html" with board=board unit="" %}</div>
+                {% endfor %}
+            </section>
+            <section class="gm-card text-[13px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[15px] font-semibold text-[#1d1d1f]">규칙</h2>
+                <ul class="mt-2 list-disc space-y-1 pl-5">
+                    <li>쉬움 40칸 · 보통 32칸 · 어려움 26칸 정도가 채워져 있어요.</li>
+                    <li>시간은 문제를 받은 순간부터 서버가 재요.</li>
+                    <li>💡 힌트를 쓰면 그 판은 랭킹에 안 올라가요(틀린 칸이 있으면 그 칸부터 고쳐 줘요).</li>
+                </ul>
+            </section>
+        </aside>
+    </div>
+</main>
+
+{% include "games/_solo_js.html" %}
+<script>
+(() => {
+    const URLS = { start: "{% url 'games:sudoku_start' %}", hint: "{% url 'games:sudoku_hint' %}", submit: "{% url 'games:sudoku_submit' %}" };
+    const LOGIN = "{% url 'accounts:login' %}?next={{ request.path|urlencode }}";
+    const { post, esc, renderBoard, clock } = window.mjSolo;
+    const $ = (id) => document.getElementById(id);
+    const gridEl = $('su-grid');
+    const PEERS = [...Array(81)].map((_, i) => {
+        const r = Math.floor(i / 9), c = i % 9, br = r - (r % 3), bc = c - (c % 3), s = new Set();
+        for (let k = 0; k < 9; k++) { s.add(r * 9 + k); s.add(k * 9 + c); s.add((br + Math.floor(k / 3)) * 9 + bc + (k % 3)); }
+        s.delete(i);
+        return [...s];
+    });
+
+    let level = 'normal', g = null, timer = null;
+    // g = { token, given:[bool], vals:[0-9], notes:[Set], sel, noteMode, history:[], hints, started, done, hinted:Set }
+
+    const cells = [...Array(81)].map((_, i) => {
+        const el = document.createElement('div');
+        el.className = 'su-cell'; el.dataset.i = i;
+        el.addEventListener('click', () => { if (g) { g.sel = i; render(); } });
+        gridEl.appendChild(el);
+        return el;
+    });
+    const keys = [...Array(9)].map((_, k) => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'su-key'; b.innerHTML = `${k + 1}<small></small>`;
+        b.addEventListener('click', () => input(k + 1));
+        $('su-pad').appendChild(b);
+        return b;
+    });
+
+    function conflicts() {
+        const bad = new Set();
+        for (let i = 0; i < 81; i++) if (g.vals[i]) for (const j of PEERS[i]) if (g.vals[j] === g.vals[i]) { bad.add(i); bad.add(j); }
+        return bad;
+    }
+
+    function render() {
+        if (!g) return;
+        const bad = conflicts();
+        const selVal = g.sel != null ? g.vals[g.sel] : 0;
+        const peers = g.sel != null ? new Set(PEERS[g.sel]) : new Set();
+        cells.forEach((el, i) => {
+            const v = g.vals[i];
+            el.classList.toggle('given', g.given[i]);
+            el.classList.toggle('sel', i === g.sel);
+            el.classList.toggle('peer', peers.has(i));
+            el.classList.toggle('same', !!selVal && v === selVal && i !== g.sel);
+            el.classList.toggle('bad', bad.has(i));
+            el.classList.toggle('hinted', g.hinted.has(i));
+            if (v) el.textContent = v;
+            else if (g.notes[i].size) el.innerHTML = `<div class="su-notes">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => `<span>${g.notes[i].has(n) ? n : ''}</span>`).join('')}</div>`;
+            else el.textContent = '';
+        });
+        const count = Array(10).fill(0);
+        g.vals.forEach((v) => count[v]++);
+        keys.forEach((b, k) => { b.classList.toggle('done', count[k + 1] >= 9); b.querySelector('small').textContent = 9 - count[k + 1] > 0 ? 9 - count[k + 1] : ''; });
+        $('su-note').classList.toggle('is-on', g.noteMode);
+        $('su-note-state').textContent = g.noteMode ? '켜짐' : '꺼짐';
+        $('su-undo').disabled = !g.history.length;
+    }
+
+    function snapshot(i) { g.history.push({ i, v: g.vals[i], notes: new Set(g.notes[i]), peerNotes: PEERS[i].map((j) => [j, new Set(g.notes[j])]) }); if (g.history.length > 300) g.history.shift(); }
+
+    function input(n) {
+        if (!g || g.done || g.sel == null || g.given[g.sel]) return;
+        const i = g.sel;
+        if (g.noteMode && n) {
+            if (g.vals[i]) return;
+            snapshot(i);
+            g.notes[i].has(n) ? g.notes[i].delete(n) : g.notes[i].add(n);
+        } else {
+            if (g.vals[i] === n) return;
+            snapshot(i);
+            g.vals[i] = n;
+            g.hinted.delete(i);
+            if (n) { g.notes[i].clear(); PEERS[i].forEach((j) => g.notes[j].delete(n)); cells[i].classList.remove('pop'); void cells[i].offsetWidth; cells[i].classList.add('pop'); }
+        }
+        render();
+        if (n && !g.noteMode) maybeSubmit();
+    }
+
+    function undo() {
+        if (!g || g.done || !g.history.length) return;
+        const h = g.history.pop();
+        g.vals[h.i] = h.v; g.notes[h.i] = h.notes;
+        h.peerNotes.forEach(([j, s]) => { g.notes[j] = s; });
+        g.sel = h.i;
+        render();
+    }
+
+    function overlay(html) {
+        document.querySelector('.su-over')?.remove();
+        if (!html) return;
+        const o = document.createElement('div'); o.className = 'su-over'; o.innerHTML = html;
+        document.querySelector('.su-wrap').appendChild(o);
+        o.querySelector('[data-new]')?.addEventListener('click', start);
+    }
+
+    async function maybeSubmit() {
+        if (g.vals.some((v) => !v) || conflicts().size) return;
+        g.done = true;
+        clearInterval(timer);
+        const r = await post(URLS.submit, { token: g.token, grid: g.vals.join('') });
+        if (!r.ok) { g.done = false; tick(); timer = setInterval(tick, 100); $('su-hint-text').textContent = r.error; return; }
+        $('su-time').textContent = r.text;
+        const msg = r.saved ? (r.best ? '🎉 내 최고 기록!' : '랭킹에 저장했어요') : r.reason === 'hint' ? `💡 힌트 ${r.hints}번 — 이번 판은 랭킹에 안 올라가요` : `<a class="font-semibold text-[#0f9f6e] underline" href="${LOGIN}">로그인하면 랭킹에 올라가요</a>`;
+        overlay(`<p class="text-[40px]">🎉</p><p class="text-[28px] font-extrabold">${esc(r.text)}</p><p class="text-[14px]">${{ easy: '쉬움', normal: '보통', hard: '어려움' }[r.level]} 완료!</p><p class="text-[14px]">${msg}</p><button class="gm-btn" data-new>새 문제</button>`);
+        if (r.leaderboard) renderBoard(document.querySelector(`.su-lb[data-level="${r.level}"]`), r.leaderboard);
+    }
+
+    function tick() { if (g && !g.done) $('su-time').textContent = clock(performance.now() - g.started); }
+
+    async function start() {
+        overlay('<p class="text-[15px]">문제 만드는 중…</p>');
+        clearInterval(timer);
+        const s = await post(URLS.start, { level });
+        if (!s.puzzle) { overlay(`<p class="text-[15px]">${esc(s.error || '문제를 받지 못했어요.')}</p><button class="gm-btn" data-new>다시</button>`); return; }
+        const vals = [...s.puzzle].map(Number);
+        g = { token: s.token, given: vals.map(Boolean), vals, notes: vals.map(() => new Set()), sel: vals.indexOf(0), noteMode: false, history: [], started: performance.now(), done: false, hinted: new Set() };
+        overlay('');
+        $('su-hint-text').textContent = '키보드: 숫자·방향키·Delete, N 으로 메모 켜고 끄기. 같은 줄·칸에 겹치는 숫자는 빨갛게 보여요.';
+        render();
+        timer = setInterval(tick, 100);
+    }
+
+    $('su-levels').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-level]');
+        if (!b) return;
+        if (g && !g.done && g.history.length > 3 && !confirm('지금 문제를 그만두고 새 문제를 받을까요?')) return;
+        level = b.dataset.level;
+        document.querySelectorAll('#su-levels [data-level]').forEach((x) => x.classList.toggle('is-on', x === b));
+        document.querySelectorAll('.su-lb').forEach((x) => x.classList.toggle('hidden', x.dataset.level !== level));
+        $('su-lb-name').textContent = b.textContent;
+        start();
+    });
+    $('su-new').addEventListener('click', () => { if (!g || g.done || g.history.length <= 3 || confirm('지금 문제를 그만두고 새 문제를 받을까요?')) start(); });
+    $('su-note').addEventListener('click', () => { if (g) { g.noteMode = !g.noteMode; render(); } });
+    $('su-erase').addEventListener('click', () => input(0));
+    $('su-undo').addEventListener('click', undo);
+    $('su-hint').addEventListener('click', async () => {
+        if (!g || g.done) return;
+        if (!g.hinted.size && !g.usedHint && !confirm('힌트를 쓰면 이번 판은 랭킹에 안 올라가요. 쓸까요?')) return;
+        const r = await post(URLS.hint, { token: g.token, grid: g.vals.join('') });
+        if (!r.ok) { $('su-hint-text').textContent = r.error; return; }
+        g.usedHint = true;
+        snapshot(r.i);
+        g.vals[r.i] = r.v; g.notes[r.i].clear(); PEERS[r.i].forEach((j) => g.notes[j].delete(r.v));
+        g.hinted.add(r.i); g.sel = r.i;
+        $('su-hint-text').textContent = r.wrong ? `💡 틀린 칸을 고쳤어요 (힌트 ${r.hints}번)` : `💡 한 칸을 채웠어요 (힌트 ${r.hints}번)`;
+        render();
+        maybeSubmit();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (!g || e.target.closest('input, textarea')) return;
+        if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo(); return; }
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const move = { ArrowUp: -9, ArrowDown: 9, ArrowLeft: -1, ArrowRight: 1 }[e.key];
+        if (move) {
+            e.preventDefault();
+            const i = g.sel ?? 0, r = Math.floor(i / 9), c = i % 9;
+            g.sel = move === -9 ? ((r + 8) % 9) * 9 + c : move === 9 ? ((r + 1) % 9) * 9 + c : move === -1 ? r * 9 + (c + 8) % 9 : r * 9 + (c + 1) % 9;
+            render();
+        } else if (/^[1-9]$/.test(e.key)) input(+e.key);
+        else if (['Backspace', 'Delete', '0'].includes(e.key)) { e.preventDefault(); input(0); }
+        else if (e.key.toLowerCase() === 'n') { g.noteMode = !g.noteMode; render(); }
+    });
+    start();
+    window.__sudoku = { state: () => g, input, select: (i) => { g.sel = i; render(); } };
+})();
+</script>
+{% endblock %}
