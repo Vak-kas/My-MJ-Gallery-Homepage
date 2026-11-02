@@ -1308,3 +1308,145 @@ class AugOmokResetCardsTestCase(unittest.TestCase):
 		logic.on_message(room, a, {"type": "use", "card": "oracle"})
 		self.assertIsNotNone(logic.snapshot(room, "a")["hint"])
 		self.assertIsNone(logic.snapshot(room, "b")["hint"])  # 상대는 못 봄
+
+
+class BattleshipTestCase(unittest.TestCase):
+	def setup(self, skills=True, again=False):
+		import random
+		from relay import mj_battleship as B
+		self.B = B
+		logic, room = B.BattleshipLogic(rng=random.Random(0)), _ToRoom()
+		a, b = _Peer("a", "가"), _Peer("b", "나")
+		room.peers = {"a": a, "b": b}
+		logic.on_message(room, a, {"type": "sit", "seat": "p1"})
+		logic.on_message(room, b, {"type": "sit", "seat": "p2"})
+		logic.on_message(room, a, {"type": "options", "skills": skills, "again": again})
+		logic.on_message(room, a, {"type": "start"})
+		return logic, room, a, b
+
+	# 둘 다 같은 배치: 맨 윗줄부터 가로로 한 줄씩
+	FLEET = [{"id": "carrier", "x": 0, "y": 0, "dir": "h"}, {"id": "battleship", "x": 0, "y": 1, "dir": "h"}, {"id": "cruiser", "x": 0, "y": 2, "dir": "h"},
+			 {"id": "submarine", "x": 0, "y": 3, "dir": "h"}, {"id": "destroyer", "x": 0, "y": 4, "dir": "v"}]
+
+	def play(self, logic, room, a, b):
+		logic.on_message(room, a, {"type": "place", "ships": self.FLEET})
+		logic.on_message(room, b, {"type": "place", "ships": self.FLEET})
+
+	def fire(self, logic, room, peer, x, y):
+		return logic.on_message(room, peer, {"type": "fire", "x": x, "y": y})
+
+	def test_fleet_validation(self):
+		from relay.mj_battleship import random_fleet, validate_fleet
+		import random
+		self.assertIsNone(validate_fleet([])[0])
+		bad = [dict(s) for s in self.FLEET]; bad[1]["y"] = 0  # 겹침
+		self.assertIn("겹", validate_fleet(bad)[1])
+		bad = [dict(s) for s in self.FLEET]; bad[0]["x"] = 7  # 밖
+		self.assertIn("밖", validate_fleet(bad)[1])
+		fleet, err = validate_fleet(self.FLEET)
+		self.assertIsNone(err)
+		self.assertEqual(len(fleet["carrier"]), 5)
+		for _ in range(20):
+			self.assertIsNone(validate_fleet(random_fleet(random.Random()))[1])
+
+	def test_turns_hits_sink_and_secret_fleet(self):
+		logic, room, a, b = self.setup()
+		self.assertEqual(logic.status, "setup")
+		self.assertIn("5척", logic.on_message(room, a, {"type": "place", "ships": []})[1])
+		self.play(logic, room, a, b)
+		self.assertEqual((logic.status, logic.turn), ("playing", "p1"))
+		snap_b = logic.snapshot(room, "b")
+		self.assertEqual(len(snap_b["fleet"]["p2"]), 5)   # 내 배는 다 보임
+		self.assertEqual(snap_b["fleet"]["p1"], {})        # 상대 배는 가라앉은 것만
+		self.assertEqual(logic.snapshot(room, "x")["fleet"], {"p1": {}, "p2": {}})
+		self.assertIn("차례", self.fire(logic, room, b, 0, 0)[1])
+		self.assertEqual(self.fire(logic, room, a, 9, 9), (True, None))  # 빗나감
+		self.assertEqual(logic.shots["p1"][(9, 9)], "miss")
+		self.assertEqual(logic.turn, "p2")
+		self.fire(logic, room, b, 0, 4); self.fire(logic, room, a, 0, 4); self.fire(logic, room, b, 9, 9)
+		self.assertEqual(logic.turn, "p1")
+		self.assertIn("이미 쏜", self.fire(logic, room, a, 9, 9)[1])
+		self.fire(logic, room, a, 0, 5)  # 구축함 (0,4)-(0,5) 침몰
+		ev = room.events[-1]
+		self.assertEqual((ev["type"], ev["shots"][0]["sunk"]["id"]), ("shots", "destroyer"))
+		self.assertEqual(logic.sunk["p2"], ["destroyer"])
+		self.assertEqual(logic.snapshot(room, "a")["fleet"]["p2"], {"destroyer": [[0, 4], [0, 5]]})
+
+	def test_last_chance_and_draw(self):
+		logic, room, a, b = self.setup(skills=False)
+		self.play(logic, room, a, b)
+		cells = [c for s in self.B.validate_fleet(self.FLEET)[0].values() for c in s]
+		for x, y in cells[:-1]:
+			self.fire(logic, room, a, x, y); self.fire(logic, room, b, x, y)
+		self.fire(logic, room, a, *cells[-1])
+		self.assertTrue(logic.done["p1"])
+		self.assertEqual(logic.status, "playing")  # 후공 마지막 기회
+		self.assertEqual(room.events[-1]["type"], "last-chance")
+		self.fire(logic, room, b, *cells[-1])
+		self.assertEqual((logic.status, logic.winner), ("over", None))
+		self.assertEqual(logic.draws, 1)
+
+	def test_again_option_keeps_turn_on_hit(self):
+		logic, room, a, b = self.setup(skills=False, again=True)
+		self.play(logic, room, a, b)
+		self.fire(logic, room, a, 0, 0)
+		self.assertEqual(logic.turn, "p1")
+		self.fire(logic, room, a, 9, 9)
+		self.assertEqual(logic.turn, "p2")
+
+	def test_skills(self):
+		logic, room, a, b = self.setup()
+		self.play(logic, room, a, b)
+		# 레이더: (1,1) 둘레 3×3 → 윗줄 3 + 둘째 줄 3 + 셋째 줄 3 = 9
+		self.assertEqual(logic.on_message(room, a, {"type": "skill", "id": "radar", "x": 1, "y": 1}), (True, None))
+		intel = [e for e in room.sent if e[0]["type"] == "intel"][-1]
+		self.assertIn("9개", intel[0]["text"]); self.assertEqual(intel[1], "a")
+		self.assertIn("하나만", logic.on_message(room, a, {"type": "skill", "id": "smoke"})[1])
+		self.fire(logic, room, a, 9, 9)
+		# 방패가 연막을 막음
+		logic.on_message(room, b, {"type": "skill", "id": "shield"}); self.fire(logic, room, b, 9, 9)
+		logic.on_message(room, a, {"type": "skill", "id": "smoke"}); self.fire(logic, room, a, 9, 8)
+		self.assertTrue(room.events[-3]["blocked"] if "blocked" in room.events[-3] else any(e.get("blocked") for e in room.events[-4:]))
+		self.assertFalse(logic.smoke["p2"])
+		# 연막: 상대 다음 결과가 상대에게만 가려짐
+		logic.on_message(room, b, {"type": "skill", "id": "smoke"}); self.fire(logic, room, b, 9, 8)
+		self.assertTrue(logic.smoke["p1"])
+		self.fire(logic, room, a, 0, 0)
+		mine = [e for e in room.sent if e[0]["type"] == "shots" and e[2] is None and e[1] == "a"][-1][0]
+		self.assertTrue(mine["hidden"]); self.assertIsNone(mine["shots"][0]["hit"])
+		self.assertEqual([s for s in logic.snapshot(room, "a")["shots"]["p1"] if s["x"] == 0 and s["y"] == 0][0]["r"], "?")
+		self.assertEqual([s for s in logic.snapshot(room, "b")["shots"]["p1"] if s["x"] == 0 and s["y"] == 0][0]["r"], "hit")  # 상대는 봄
+		# 수리: 맞은 칸을 고치면 상대 기록이 repaired 로
+		self.assertIn("맞은 칸", logic.on_message(room, b, {"type": "skill", "id": "repair", "x": 5, "y": 5})[1])
+		self.assertEqual(logic.on_message(room, b, {"type": "skill", "id": "repair", "x": 0, "y": 0}), (True, None))
+		self.assertNotIn((0, 0), logic.hits["p2"]); self.assertEqual(logic.shots["p1"][(0, 0)], "repaired")
+		self.fire(logic, room, b, 9, 7)
+		self.assertEqual(self.fire(logic, room, a, 0, 0), (True, None))  # 다시 쏠 수 있음
+		self.assertEqual(logic.shots["p1"][(0, 0)], "hit")
+		# 일제사격: 3칸 한 번에, 이미 쏜 칸은 빼고
+		self.assertEqual(logic.on_message(room, b, {"type": "skill", "id": "salvo", "x": 1, "y": 0, "dir": "h"}), (True, None))
+		self.assertEqual(sorted(logic.shots["p2"]), sorted([(9, 9), (9, 8), (9, 7), (0, 0), (1, 0), (2, 0)]))
+		self.assertEqual(logic.turn, "p1")
+		self.assertIn("이미 쓴", logic.on_message(room, a, {"type": "skill", "id": "radar", "x": 1, "y": 1})[1])
+
+	def test_bots_finish_games(self):
+		import random
+		from relay import mj_battleship as B
+		for level in B.BOT_LEVELS:
+			logic, room = B.BattleshipLogic(rng=random.Random(1)), _ToRoom()
+			a = _Peer("a", "가"); room.peers = {"a": a}
+			logic.on_message(room, a, {"type": "sit", "seat": "p1"})
+			logic.on_message(room, a, {"type": "add-bot"})
+			logic.on_message(room, a, {"type": "options", "bot_level": level, "skills": True})
+			logic.bots.add("p1"); logic.seats["p1"] = "bot:p1"  # 둘 다 컴퓨터로
+			logic.on_message(room, a, {"type": "start"}) if False else None
+			logic.reset(); logic.status = "setup"
+			for s in logic.SEATS:
+				logic.fleet[s], _ = B.validate_fleet(B.random_fleet(logic.rng))
+			logic._begin_play(room)
+			now = 0
+			while logic.status == "playing" and now < 5000:
+				now += 1; logic.bot_due = 0
+				logic.tick(room, now)
+			self.assertEqual(logic.status, "over", level)
+			self.assertLessEqual(max(logic.turns.values()), 100)

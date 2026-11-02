@@ -29,10 +29,12 @@ try:
 	from catch_words import ALL as CATCH_WORDS  # systemd 에서 relay/ 폴더 기준으로 실행
 	from mj_augomok import AugOmokLogic
 	from mj_baseball import BaseballLogic
+	from mj_battleship import BattleshipLogic
 except ImportError:
 	from relay.catch_words import ALL as CATCH_WORDS
 	from relay.mj_augomok import AugOmokLogic
 	from relay.mj_baseball import BaseballLogic
+	from relay.mj_battleship import BattleshipLogic
 
 log = logging.getLogger("mj-relay.game")
 
@@ -1321,7 +1323,7 @@ class AlkkagiLogic:
 SKILL_NAMES = {"heavy": "💪 무거운 돌", "ice": "🧊 빙판", "shield": "🛡 방패", "bomb": "💥 폭탄", "curve": "↪️ 커브샷"}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic}
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic, "battleship": BattleshipLogic}
 
 
 @dataclass

@@ -174,6 +174,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "battleship",
+		"url_name": "games:battleship",
+		"icon": "🏴‍☠️",
+		"title": "함대 격침",
+		"description": "10×10 바다에 배 5척을 숨기고 번갈아 포격 — 💥 명중·💦 물기둥·⚓ 침몰 연출과 소리! 📡 레이더·💥 일제사격·🌫 연막·🔧 수리·🛡 방패 스킬 5종, 컴퓨터와도. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["1:1", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
