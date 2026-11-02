@@ -30,12 +30,15 @@ try:
 	from mj_augomok import AugOmokLogic
 	from mj_baseball import BaseballLogic
 	from mj_battleship import BattleshipLogic
+	from mj_fishing import FishingLogic
 except ImportError:
 	from relay.catch_words import ALL as CATCH_WORDS
 	from relay.mj_augomok import AugOmokLogic
 	from relay.mj_baseball import BaseballLogic
 	from relay.mj_battleship import BattleshipLogic
+	from relay.mj_fishing import FishingLogic
 
+TICK = 0.25  # 틱 주기(초) — 낚시처럼 타이밍이 있는 게임 때문에 촘촘히
 log = logging.getLogger("mj-relay.game")
 
 MAX_ROOMS = 30
@@ -1323,7 +1326,7 @@ class AlkkagiLogic:
 SKILL_NAMES = {"heavy": "💪 무거운 돌", "ice": "🧊 빙판", "shield": "🛡 방패", "bomb": "💥 폭탄", "curve": "↪️ 커브샷"}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic, "battleship": BattleshipLogic}
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic, "battleship": BattleshipLogic, "fishing": FishingLogic}
 
 
 @dataclass
@@ -1401,7 +1404,7 @@ class GameHub:
 
 	async def _tick_loop(self):
 		while True:
-			await asyncio.sleep(1)
+			await asyncio.sleep(TICK)
 			await self.tick()
 
 	async def tick(self, now=None):

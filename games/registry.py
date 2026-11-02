@@ -183,6 +183,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "fishing",
+		"url_name": "games:fishing",
+		"icon": "🎣",
+		"title": "낚시 대결",
+		"description": "같은 연못에서 제한 시간 동안 낚시 — 입질 순간 챔질, 줄이 안 끊어지게 당겨서 더 무거운 물고기를! 🪱 특제 미끼·🧤 장갑·🪨 돌 던지기·🫧 가짜 입질·🛡 방패로 상대 방해, 컴퓨터와도. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["1:1", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",

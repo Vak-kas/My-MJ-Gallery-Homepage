@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+<style>
+    .apple-display { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #0e7490; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #0e7490; border-color: #0e7490; color: #fff; font-weight: 600; }
+    .tag { display: inline-block; border-radius: 6px; padding: 0 5px; font-size: 10.5px; font-weight: 700; background: rgba(0, 0, 0, 0.08); vertical-align: 1px; }
+    .bar { height: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: #0e7490; transition: width .25s linear; }
+    .bar.warn > i { background: #e0a100; }
+    .bar.hot > i { background: #d6281f; }
+
+    /* ── 연못 ── */
+    .pond { position: relative; width: 100%; aspect-ratio: 16 / 9; max-height: 440px; border-radius: 22px; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+        background: linear-gradient(180deg, #bfe6ff 0%, #d9efff 12%, #8bc8a0 15%, #5ea36e 20%, #2f8fbf 22%, #1f6fa5 60%, #164f80 100%); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.25), 0 10px 30px rgba(20, 60, 100, 0.2); }
+    .pond::before { content: ""; position: absolute; inset: 22% 0 0 0; background: repeating-linear-gradient(180deg, transparent 0 18px, rgba(255, 255, 255, 0.06) 18px 20px); opacity: .8; animation: waves 6s linear infinite; pointer-events: none; }
+    @keyframes waves { from { background-position: 0 0; } to { background-position: 0 40px; } }
+    .pond .shore { position: absolute; left: 0; right: 0; top: 13%; height: 9%; background: linear-gradient(180deg, #7bbd84, #4f9460); border-bottom: 3px solid rgba(255, 235, 170, 0.5); }
+    .pond .shore::after { content: "🌳 🌲 🏕 🌳"; position: absolute; left: 4%; bottom: 55%; font-size: clamp(14px, 3.2vw, 30px); letter-spacing: 1.2em; opacity: .95; }
+    .pond .angler { position: absolute; top: 16%; font-size: clamp(20px, 4vw, 38px); transform: translateX(-50%); filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.25)); transition: left .4s; }
+    .pond .angler.me { left: 28%; }
+    .pond .angler.op { left: 72%; opacity: .9; }
+    .pond .angler .nm { position: absolute; top: -18px; left: 50%; transform: translateX(-50%); font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); white-space: nowrap; }
+    .spot { position: absolute; border-radius: 50%; border: 2px dashed rgba(255, 255, 255, 0.55); background: rgba(255, 255, 255, 0.08); cursor: pointer; transition: transform .2s, background .2s; display: flex; align-items: center; justify-content: center; flex-direction: column; color: #fff; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); font-size: clamp(11px, 1.6vw, 14px); }
+    .spot:hover { background: rgba(255, 255, 255, 0.2); transform: scale(1.04); }
+    .spot small { font-weight: 500; opacity: .9; font-size: .8em; }
+    .spot.shallow { left: 6%; top: 28%; width: 28%; height: 36%; }
+    .spot.weeds { right: 6%; top: 44%; width: 26%; height: 44%; background-image: radial-gradient(circle at 30% 70%, rgba(40, 120, 60, 0.6) 0 12%, transparent 13%), radial-gradient(circle at 70% 40%, rgba(40, 120, 60, 0.55) 0 10%, transparent 11%), radial-gradient(circle at 55% 80%, rgba(40, 120, 60, 0.5) 0 9%, transparent 10%); }
+    .spot.weeds::before { content: "🌿 🪷 🌿"; position: absolute; bottom: 6%; font-size: clamp(12px, 2.4vw, 22px); letter-spacing: .6em; }
+    .spot.deep { left: 36%; top: 50%; width: 30%; height: 42%; background: radial-gradient(circle, rgba(8, 40, 80, 0.55), rgba(8, 40, 80, 0.15) 70%, transparent 72%); border-color: rgba(255, 255, 255, 0.35); }
+    .pond.locked .spot { cursor: default; }
+    .pond.locked .spot:hover { background: rgba(255, 255, 255, 0.08); transform: none; }
+    .pond.armed .spot { cursor: crosshair; }
+    .bob { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #fff 0 38%, #ff3b30 40%); box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); pointer-events: none; z-index: 3; transition: none; }
+    .bob.op { opacity: .75; filter: saturate(.6); }
+    .bob::after { content: ""; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.6); animation: ripple 2.2s ease-out infinite; }
+    @keyframes ripple { 0% { transform: scale(.4); opacity: .9; } 100% { transform: scale(1.6); opacity: 0; } }
+    .bob.dip { animation: dip .4s ease-in-out 3; }
+    @keyframes dip { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(8px) scale(.85); } }
+    .bob .ex { position: absolute; left: 50%; top: -34px; transform: translateX(-50%); font-size: 30px; font-weight: 900; color: #ffd60a; text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6); animation: exclaim .5s ease-out infinite alternate; }
+    @keyframes exclaim { from { transform: translate(-50%, 0) scale(1); } to { transform: translate(-50%, -6px) scale(1.2); } }
+    .bob.reel { animation: tug .25s ease-in-out infinite alternate; }
+    @keyframes tug { from { transform: translate(-3px, 2px); } to { transform: translate(3px, -2px); } }
+    .line { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; z-index: 2; }
+    .line path { fill: none; stroke: rgba(255, 255, 255, 0.85); stroke-width: 1.4; }
+    .line path.op { stroke: rgba(255, 255, 255, 0.45); }
+    .fx { position: absolute; pointer-events: none; z-index: 5; transform: translate(-50%, -50%); }
+    .fx.splash { font-size: 34px; animation: splash .7s ease-out forwards; }
+    @keyframes splash { 0% { transform: translate(-50%, -30%) scale(.4); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(-50%, -110%) scale(1.5); opacity: 0; } }
+    .fx.rock { font-size: 30px; animation: rock .7s ease-in forwards; }
+    @keyframes rock { 0% { transform: translate(-50%, -400%) rotate(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%, -50%) rotate(200deg); opacity: 1; } }
+    .fx.jump { font-size: 44px; animation: jump 1.1s cubic-bezier(.2, .8, .4, 1) forwards; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.4)); }
+    @keyframes jump { 0% { transform: translate(-50%, 0) scale(.6) rotate(-20deg); opacity: 0; } 25% { opacity: 1; } 100% { transform: translate(-50%, -180px) scale(1.3) rotate(15deg); opacity: 1; } }
+    .fx.text { font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); white-space: nowrap; animation: floatup 1.6s ease-out forwards; }
+    @keyframes floatup { 0% { transform: translate(-50%, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%, -60px); opacity: 0; } }
+    .shake { animation: shake .4s; }
+    @keyframes shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-5px, 3px); } 40% { transform: translate(5px, -3px); } 60% { transform: translate(-4px, -2px); } 80% { transform: translate(4px, 2px); } }
+    .flash { animation: flash .35s; }
+    @keyframes flash { 0% { filter: brightness(1); } 30% { filter: brightness(1.8); } 100% { filter: brightness(1); } }
+    .shadowfish { position: absolute; width: 90px; height: 36px; margin: -18px 0 0 -45px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: rgba(5, 25, 50, 0.45); filter: blur(4px); z-index: 1; animation: swim 1.6s ease-in-out infinite alternate; pointer-events: none; }
+    @keyframes swim { from { transform: translate(-16px, 6px) rotate(-8deg); } to { transform: translate(16px, -6px) rotate(8deg); } }
+
+    /* ── 당기기 ── */
+    .reelbox { border-radius: 18px; background: linear-gradient(180deg, #f6fbff, #e9f4fb); border: 1px solid rgba(14, 116, 144, 0.2); padding: 14px 16px; }
+    .reelbox.surge { background: linear-gradient(180deg, #fff1f0, #ffe2df); border-color: rgba(214, 40, 31, 0.4); animation: shake .4s; }
+    .gauge { position: relative; height: 18px; border-radius: 999px; background: linear-gradient(90deg, #34c759 0 55%, #ffd60a 55% 78%, #ff3b30 78%); overflow: visible; }
+    .gauge .pin { position: absolute; top: -5px; width: 6px; height: 28px; margin-left: -3px; border-radius: 3px; background: #1d1d1f; box-shadow: 0 0 0 2px #fff; transition: left .08s linear; }
+    .pullbtn { width: 100%; border-radius: 16px; padding: 18px; font-size: 22px; font-weight: 900; color: #fff; background: linear-gradient(180deg, #0ea5c6, #0e7490); border: 0; box-shadow: 0 6px 0 #0a5466; cursor: pointer; transition: transform .05s, box-shadow .05s; -webkit-tap-highlight-color: transparent; }
+    .pullbtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #0a5466; }
+    .pullbtn.stop { background: linear-gradient(180deg, #ff6b61, #d6281f); box-shadow: 0 6px 0 #8c1a13; }
+    .strikebtn { width: 100%; border-radius: 16px; padding: 18px; font-size: 22px; font-weight: 900; color: #1d1d1f; background: linear-gradient(180deg, #ffe66d, #ffcc00); border: 0; box-shadow: 0 6px 0 #b38f00; cursor: pointer; }
+    .strikebtn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b38f00; }
+
+    /* ── 선수 ── */
+    .pl { border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 10px 12px; min-width: 0; }
+    .pl.lead { border-color: #0e7490; box-shadow: inset 0 0 0 1px #0e7490; }
+    .pl .kg { font-size: 26px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+    .pl .basket { display: flex; flex-wrap: wrap; gap: 2px; min-height: 22px; font-size: 18px; }
+    .pl .basket span { position: relative; }
+    .pl .basket span.best::after { content: "👑"; position: absolute; top: -10px; right: -6px; font-size: 10px; }
+    .pl .st { font-size: 12px; color: #6e6e73; }
+
+    .skill { border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 8px 6px; text-align: center; font-size: 11.5px; line-height: 1.3; cursor: pointer; word-break: keep-all; }
+    .skill:hover { background: #f5f5f7; }
+    .skill .ic { font-size: 22px; display: block; }
+    .skill.used { opacity: .35; cursor: default; text-decoration: line-through; }
+    .skill.off { opacity: .5; cursor: default; }
+    .skill.hostile { border-color: rgba(214, 40, 31, 0.3); }
+    .skill.active { box-shadow: inset 0 0 0 2px #0e7490; }
+
+    #fs-pop { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(3, 25, 40, 0.6); backdrop-filter: blur(2px); cursor: pointer; }
+    #fs-pop.on { display: flex; }
+    #fs-pop .box { text-align: center; color: #fff; animation: popin .45s cubic-bezier(.2, 1.6, .4, 1); }
+    #fs-pop .big { font-size: 70px; font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+    #fs-pop .sub { font-size: 18px; font-weight: 600; opacity: 0.9; }
+    @keyframes popin { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn, html.theme-dark .skill { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go { background: #0e7490; color: #fff; }
+    html.theme-dark .pl { border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .pl .st { color: #a1a1a6; }
+    html.theme-dark .reelbox { background: linear-gradient(180deg, #10232c, #0d1b22); border-color: rgba(14, 165, 198, 0.3); }
+    html.theme-dark .reelbox.surge { background: linear-gradient(180deg, #3a1412, #2a0e0c); }
+    html.theme-dark .gauge .pin { box-shadow: 0 0 0 2px #e8e8ea; }
+    html.theme-dark .tag { background: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:fishing' %}" class="text-[13px] text-[#0e7490]">← 낚시 대결 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🎣 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 1:1 · 제한 시간 안에 더 무거운 물고기를 잡는 쪽이 승리</p>
+        </div>
+        <button type="button" class="gm-btn" id="fs-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="fs-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:fishing_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="fs-name-box" class="gm-card mt-5 hidden">
+        <form id="fs-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="fs-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#0e7490] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section class="gm-card min-w-0">
+            <div class="flex items-center justify-between gap-3">
+                <p id="fs-status" class="min-w-0 flex-1 text-[16px] font-semibold">연결하는 중…</p>
+                <p id="fs-clock" class="font-mono text-[22px] font-bold tabular-nums"></p>
+            </div>
+            <div class="bar mt-2 hidden" id="fs-timer"><i></i></div>
+            <p id="fs-sub" class="mt-1 min-h-[18px] text-[12.5px] text-[#6e6e73]"></p>
+
+            <!-- 선수 -->
+            <div class="mt-3 grid grid-cols-2 gap-3" id="fs-players"></div>
+
+            <!-- 연못 -->
+            <div class="pond mt-4 locked" id="fs-pond">
+                <div class="shore"></div>
+                <div class="angler me" id="fs-angler-me">🧍<span class="nm" id="fs-nm-me"></span></div>
+                <div class="angler op" id="fs-angler-op">🧍<span class="nm" id="fs-nm-op"></span></div>
+                <svg class="line" id="fs-line" viewBox="0 0 1000 562" preserveAspectRatio="none"><path id="fs-line-me" d=""></path><path id="fs-line-op" class="op" d=""></path></svg>
+                <button type="button" class="spot shallow" data-spot="shallow">얕은 물 <span class="tag">1</span><small>작은 물고기 · 입질 빨라요</small></button>
+                <button type="button" class="spot deep" data-spot="deep">깊은 물 <span class="tag">3</span><small>큰 물고기 · 입질 느려요</small></button>
+                <button type="button" class="spot weeds" data-spot="weeds">수초 <span class="tag">2</span><small>골고루</small></button>
+                <div class="bob op hidden" id="fs-bob-op"></div>
+                <div class="bob hidden" id="fs-bob-me"></div>
+            </div>
+
+            <!-- 조작 -->
+            <div id="fs-act" class="mt-3"></div>
+
+            <!-- 스킬 -->
+            <div id="fs-skills-box" class="mt-4 hidden">
+                <h2 class="text-[14px] font-semibold">✨ 스킬 <span class="font-normal text-[12px] text-[#8e8e93]">종류별로 한 판에 한 번 · 상대를 방해하거나 나를 돕거나</span></h2>
+                <div id="fs-skills" class="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5"></div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-black/5 pt-4">
+                <select id="fs-duration" class="gm-btn" aria-label="시간"><option value="60">⏱ 60초</option><option value="90" selected>⏱ 90초</option><option value="120">⏱ 120초</option></select>
+                <select id="fs-mode" class="gm-btn" aria-label="승리 조건"><option value="total">⚖️ 총 무게</option><option value="biggest">👑 가장 큰 한 마리</option></select>
+                <select id="fs-level" class="gm-btn" aria-label="컴퓨터 난이도"><option value="easy">🤖 쉬움</option><option value="normal">🤖 보통</option><option value="hard">🤖 어려움</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="fs-skillopt" type="checkbox" class="h-4 w-4" checked> ✨ 스킬</label>
+                <button type="button" class="gm-btn" id="fs-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="fs-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="fs-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="fs-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="fs-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="fs-seats"></section>
+            <section class="gm-card text-[12.5px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[14px] font-semibold text-[#1d1d1f] dark:text-inherit">하는 법</h2>
+                <p>① 연못의 자리를 눌러 찌를 던져요(얕은 물·수초·깊은 물 — 깊을수록 크지만 느려요). ② 찌가 쑥 들어가며 <b>!</b> 가 뜨면 바로 <b>챔질</b>(Space). 너무 빠르거나 늦으면 도망. ③ 걸리면 <b>당기기</b>를 연타 — 진행이 차면 잡아요. 줄 긴장이 빨간 끝까지 가면 <b>끊어져요</b>. 물고기가 <b>발버둥</b>칠 땐 잠깐 멈춰요. 끝났을 때 총 무게(또는 가장 큰 한 마리)가 큰 쪽이 승리. 장화·깡통은 0kg.</p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="fs-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="fs-chat-form" class="mt-2 flex gap-2"><input id="fs-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+<div id="fs-pop" aria-live="polite"><div class="box" id="fs-pop-box"></div></div>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const DECAY = 0.5;   // 서버와 같은 긴장 감소 속도
+    const SPOT_POS = { shallow: [20, 46], deep: [51, 71], weeds: [81, 66] };   // 찌가 떨어지는 자리 (% 좌표)
+
+    let pid = store.get(`mj-fishing-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-fishing-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, prevStatus = '';
+    let leftAt = 0, leftBase = 0;         // 남은 시간 계산용
+    let reel = null;                       // 내 당기기 예측 상태 {progress, tension, t, surgeUntil}
+    const casting = { me: false, op: false };   // 던지기 연출 중엔 줄을 안 그림
+    let raf = 0;
+    const other = (s) => (s === 'p1' ? 'p2' : 'p1');
+    const me = () => mySeat || 'p1';
+    const P = (s) => S?.players?.[s];
+    const myP = () => (mySeat ? P(mySeat) : null);
+    const playing = () => S && S.status === 'playing';
+    const pond = $('fs-pond');
+
+    // ── 연못 좌표 ──
+    const pct = (p) => ({ x: pond.clientWidth * p[0] / 100, y: pond.clientHeight * p[1] / 100 });
+    const anglerTip = (who) => { const a = $(who === 'me' ? 'fs-angler-me' : 'fs-angler-op'); return { x: a.offsetLeft + a.offsetWidth * 0.75, y: a.offsetTop + 6 }; };
+    function drawLine(who, spot) {
+        const path = $(who === 'me' ? 'fs-line-me' : 'fs-line-op');
+        if (!spot) { path.setAttribute('d', ''); return; }
+        const a = anglerTip(who), b = pct(SPOT_POS[spot]);
+        const sx = 1000 / pond.clientWidth, sy = 562 / pond.clientHeight;
+        const cx = (a.x + b.x) / 2, cy = Math.min(a.y, b.y) - 30;
+        path.setAttribute('d', `M${a.x * sx},${a.y * sy} Q${cx * sx},${cy * sy} ${b.x * sx},${b.y * sy}`);
+    }
+    function placeBob(who, spot) {
+        const bob = $(who === 'me' ? 'fs-bob-me' : 'fs-bob-op');
+        if (!spot) { bob.classList.add('hidden'); bob.className = `bob${who === 'op' ? ' op' : ''} hidden`; bob.innerHTML = ''; drawLine(who, null); return; }
+        const p = pct(SPOT_POS[spot]);
+        bob.style.left = `${p.x}px`; bob.style.top = `${p.y}px`; bob.classList.remove('hidden');
+        if (!casting[who]) drawLine(who, spot);
+    }
+    function fx(cls, text, spot, dx = 0, dy = 0) {
+        const p = pct(SPOT_POS[spot] || SPOT_POS.deep), el = document.createElement('div');
+        el.className = `fx ${cls}`; el.textContent = text; el.style.left = `${p.x + dx}px`; el.style.top = `${p.y + dy}px`;
+        pond.appendChild(el); setTimeout(() => el.remove(), 1800); return el;
+    }
+    function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
+    // ── 던지기 연출: 찌가 포물선으로 날아감 ──
+    async function castFx(who, spot) {
+        const bob = $(who === 'me' ? 'fs-bob-me' : 'fs-bob-op');
+        const a = anglerTip(who), b = pct(SPOT_POS[spot]);
+        bob.className = `bob${who === 'op' ? ' op' : ''}`; bob.innerHTML = '';
+        bob.style.left = `${b.x}px`; bob.style.top = `${b.y}px`;
+        drawLine(who, null); casting[who] = true;
+        const dx = a.x - b.x, dy = a.y - b.y, mid = Math.min(dy, 0) - 90;
+        const anim = bob.animate([
+            { transform: `translate(${dx}px, ${dy}px) scale(.6)`, offset: 0 },
+            { transform: `translate(${dx / 2}px, ${mid}px) scale(1.1)`, offset: 0.5 },
+            { transform: 'translate(0, 0) scale(1)', offset: 1 },
+        ], { duration: 650, easing: 'linear' });
+        if (who === 'me') snd.whoosh();
+        await anim.finished.catch(() => {});
+        casting[who] = false; drawLine(who, spot);
+        fx('splash', '💦', spot); snd.splash(0.5);
+    }
+
+    // ── 그리기 ──
+    function render(spectators = []) {
+        if (!S) return;
+        const m = me(), o = other(m);
+        const seats = S.seats || {};
+        const named = (s) => seats[s]?.name || (s === 'p1' ? '1번 자리' : '2번 자리');
+        $('fs-nm-me').textContent = mySeat ? '나' : named(m);
+        $('fs-nm-op').textContent = named(o);
+        $('fs-angler-op').style.visibility = seats[o] ? 'visible' : 'hidden';
+        $('fs-angler-me').style.visibility = seats[m] ? 'visible' : 'hidden';
+
+        // 상태
+        const st = $('fs-status'), sub = $('fs-sub');
+        if (S.status === 'waiting') {
+            st.textContent = seats.p1 && seats.p2 ? '둘 다 앉았어요. ▶ 시작을 누르세요.' : (mySeat ? '상대를 기다리는 중… 링크를 보내거나 🤖 컴퓨터를 넣어요.' : '빈 자리에 앉으세요.');
+            sub.textContent = `⏱ ${S.duration}초 · ${S.modes.find((x) => x.id === S.mode)?.name} · 스킬 ${S.skills_on ? '있음' : '없음'}`;
+        } else if (S.status === 'playing') {
+            const mp = myP();
+            st.textContent = !mySeat ? '👀 구경 중' : S.overtime ? '⏰ 시간 끝! 당기는 중인 물고기까지만…' :
+                mp.state === 'idle' ? '🎯 자리를 골라 찌를 던지세요' : mp.state === 'waiting' ? '👀 입질을 기다려요… 찌가 들어가면 챔질!' : mp.state === 'bite' ? '‼️ 지금 챔질!' : `🎣 당겨요! ${mp.hint || ''}`;
+            sub.textContent = `${S.modes.find((x) => x.id === S.mode)?.name}로 겨뤄요` + (mp?.shield ? ' · 🛡 방패 켜짐' : '') + (mp?.bait ? ' · 🪱 특제 미끼 달림' : '') + (mp?.glove ? ' · 🧤 장갑 착용' : '');
+        } else {
+            st.textContent = S.winner ? `🏁 ${seats[S.winner]?.name || ''} 님 승리!` : '🏁 무승부';
+            sub.textContent = S.reason || '';
+        }
+        // 시간
+        const timer = $('fs-timer');
+        if (S.status === 'playing') { timer.classList.remove('hidden'); leftBase = S.left; leftAt = performance.now(); } else { timer.classList.add('hidden'); $('fs-clock').textContent = ''; }
+
+        // 선수 패널
+        const lead = S.status !== 'waiting' ? (() => { const a = score('p1'), b = score('p2'); return a === b ? null : a > b ? 'p1' : 'p2'; })() : null;
+        $('fs-players').innerHTML = [m, o].map((s) => {
+            const p = P(s), seat = seats[s];
+            if (!seat) return `<div class="pl text-[13px] text-[#8e8e93]">빈 자리 ${mySeat ? '' : `<button type="button" class="gm-btn ml-1" data-sit="${s}">앉기</button>`}</div>`;
+            const stText = { idle: '던질 준비', waiting: '입질 기다리는 중…', bite: '‼️ 입질!', reeling: `🎣 당기는 중 ${Math.round((p.reel?.progress || 0) * 100)}% — ${p.hint || ''}` }[p.state] || '';
+            const bestKg = p.biggest;
+            return `<div class="pl ${lead === s ? 'lead' : ''}">
+                <div class="flex items-center justify-between gap-2"><b class="truncate text-[14px]">${seat.bot ? '🤖 ' : ''}${esc(seat.name)}${s === mySeat ? ' (나)' : ''}</b><span class="text-[11px] text-[#8e8e93]">${seat.wins}승</span></div>
+                <div class="kg">${S.mode === 'biggest' ? p.biggest.toFixed(2) : p.total.toFixed(2)}<span class="text-[13px] font-semibold"> kg</span>${S.mode === 'total' && bestKg ? `<span class="ml-2 text-[12px] font-semibold text-[#8e8e93]">👑 ${bestKg.toFixed(2)}</span>` : ''}</div>
+                <div class="basket mt-1">${p.basket.length ? p.basket.map((f) => `<span class="${f.kg === bestKg ? 'best' : ''}" title="${esc(f.name)} ${f.kg}kg">${f.emoji}</span>`).join('') : '<span class="text-[12px] text-[#c7c7cc]">아직 없어요</span>'}</div>
+                <div class="st mt-1">${S.status === 'playing' ? stText : ''}</div>
+            </div>`;
+        }).join('');
+        for (const b of $('fs-players').querySelectorAll('[data-sit]')) b.addEventListener('click', () => send({ type: 'sit', seat: b.dataset.sit }));
+
+        // 연못
+        const mp = myP();
+        pond.classList.toggle('locked', !(playing() && mp && mp.state === 'idle' && !S.overtime));
+        if (!mp || mp.state === 'idle' || S.status !== 'playing') placeBob('me', null);
+        else { placeBob('me', mp.spot); const bob = $('fs-bob-me'); bob.classList.toggle('reel', mp.state === 'reeling'); if (mp.state === 'bite' && !bob.querySelector('.ex')) { bob.innerHTML = '<span class="ex">!</span>'; } if (mp.state !== 'bite') bob.innerHTML = ''; }
+        const op = P(o);
+        if (!seats[o] || !op || op.state === 'idle' || S.status !== 'playing') placeBob('op', null);
+        else { placeBob('op', op.spot); $('fs-bob-op').classList.toggle('reel', op.state === 'reeling'); }
+        for (const sh of pond.querySelectorAll('.shadowfish')) sh.remove();
+        if (mp && mp.state === 'reeling' && S.status === 'playing') { const p = pct(SPOT_POS[mp.spot]); const sh = document.createElement('div'); sh.className = 'shadowfish'; sh.style.left = `${p.x}px`; sh.style.top = `${p.y + 26}px`; const big = { '작은 녀석': 0.6, '제법 묵직!': 1, '큰 놈이다!': 1.5, '엄청난 거물!!': 2.2 }[mp.hint] || 0.8; sh.style.width = `${90 * big}px`; sh.style.height = `${36 * big}px`; sh.style.margin = `${-18 * big}px 0 0 ${-45 * big}px`; sh.style.animation = `swim ${1.6 / Math.sqrt(big)}s ease-in-out infinite alternate`; pond.appendChild(sh); }
+
+        // 조작
+        renderAct();
+        // 스킬
+        const box = $('fs-skills-box');
+        box.classList.toggle('hidden', !(S.skills_on && mySeat && S.status === 'playing'));
+        if (!box.classList.contains('hidden')) {
+            $('fs-skills').innerHTML = S.skills.map((k) => {
+                const used = mp.used.includes(k.id), hostile = ['rock', 'fake'].includes(k.id);
+                const active = (k.id === 'shield' && mp.shield) || (k.id === 'bait' && mp.bait) || (k.id === 'glove' && mp.glove);
+                return `<button type="button" class="skill ${used ? 'used' : ''} ${hostile ? 'hostile' : ''} ${active ? 'active' : ''}" data-skill="${k.id}" title="${esc(k.desc)}" ${used ? 'disabled' : ''}><span class="ic">${k.icon}</span>${esc(k.name)}</button>`;
+            }).join('');
+            for (const b of $('fs-skills').querySelectorAll('[data-skill]')) b.addEventListener('click', () => { if (!b.disabled) send({ type: 'skill', id: b.dataset.skill }); });
+        }
+
+        // 옵션·버튼
+        const canOpt = mySeat && S.status !== 'playing';
+        $('fs-duration').value = String(S.duration); $('fs-mode').value = S.mode; $('fs-level').value = S.bot_level; $('fs-skillopt').checked = S.skills_on;
+        for (const id of ['fs-duration', 'fs-mode', 'fs-skillopt']) $(id).disabled = !canOpt;
+        const hasBot = Object.values(seats).some((x) => x && x.bot);
+        $('fs-level').disabled = !canOpt || !hasBot; $('fs-level').classList.toggle('hidden', !hasBot);
+        $('fs-bot').classList.toggle('hidden', !(mySeat && S.status !== 'playing' && (!seats.p1 || !seats.p2)));
+        $('fs-start').classList.toggle('hidden', !(mySeat && S.status !== 'playing' && seats.p1 && seats.p2));
+        $('fs-start').textContent = S.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('fs-resign').classList.toggle('hidden', !(mySeat && S.status === 'playing'));
+        $('fs-stand').classList.toggle('hidden', !(mySeat && S.status !== 'playing'));
+
+        // 자리 목록
+        $('fs-seats').innerHTML = `<h2 class="text-[14px] font-semibold">자리</h2>` + ['p1', 'p2'].map((s) => {
+            const seat = seats[s];
+            if (!seat) return `<div class="flex items-center justify-between text-[13px]"><span>${s === 'p1' ? '1번' : '2번'} 자리 · 비어 있음</span>${!mySeat && S.status !== 'playing' ? `<button type="button" class="gm-btn" data-sit2="${s}">앉기</button>` : ''}</div>`;
+            return `<div class="flex items-center justify-between text-[13px]"><span>${seat.bot ? '🤖' : seat.online ? '🟢' : '⚪'} <b>${esc(seat.name)}</b>${s === mySeat ? ' (나)' : ''} · ${seat.wins}승</span>${seat.bot && mySeat && S.status !== 'playing' ? `<button type="button" class="gm-btn" data-rmbot="${s}">빼기</button>` : ''}</div>`;
+        }).join('') + (S.draws ? `<p class="text-[12px] text-[#8e8e93]">무승부 ${S.draws}</p>` : '') + (spectators.length ? `<p class="text-[12px] text-[#8e8e93]">👀 ${spectators.map(esc).join(', ')}</p>` : '');
+        for (const b of $('fs-seats').querySelectorAll('[data-sit2]')) b.addEventListener('click', () => send({ type: 'sit', seat: b.dataset.sit2 }));
+        for (const b of $('fs-seats').querySelectorAll('[data-rmbot]')) b.addEventListener('click', () => send({ type: 'remove-bot', seat: b.dataset.rmbot }));
+    }
+    const score = (s) => (S.mode === 'biggest' ? P(s).biggest : P(s).total);
+
+    function renderAct() {
+        const box = $('fs-act'), mp = myP();
+        if (!mp || S.status !== 'playing') { box.innerHTML = ''; stopReelLoop(); return; }
+        if (mp.state === 'idle') { box.innerHTML = `<p class="text-center text-[12.5px] text-[#8e8e93]">${S.overtime ? '시간이 끝나 새로 던질 수 없어요' : '연못의 자리를 누르거나 <span class="tag">1</span> <span class="tag">2</span> <span class="tag">3</span> 키로 던져요'}</p>`; stopReelLoop(); return; }
+        if (mp.state === 'waiting' || mp.state === 'bite') {
+            box.innerHTML = `<button type="button" class="strikebtn" id="fs-strike">🎣 챔질! <span class="tag" style="font-size:12px">Space</span></button><p class="mt-1 text-center text-[12px] text-[#8e8e93]">찌가 쑥 들어가면 바로 눌러요 · <button type="button" class="underline" id="fs-reelin">거두기</button></p>`;
+            $('fs-strike').addEventListener('click', strike); $('fs-reelin').addEventListener('click', () => send({ type: 'reel-in' }));
+            stopReelLoop(); return;
+        }
+        // 당기기
+        if (!box.querySelector('.reelbox')) {
+            box.innerHTML = `<div class="reelbox" id="fs-reelbox">
+                <div class="flex items-center justify-between text-[12.5px] font-semibold"><span>줄 긴장 <span class="font-normal text-[#8e8e93]">— 빨간 끝에 닿으면 끊어져요</span></span><span id="fs-surge" class="text-[#d6281f]"></span></div>
+                <div class="gauge mt-1"><div class="pin" id="fs-pin" style="left:25%"></div></div>
+                <div class="mt-3 flex items-center justify-between text-[12.5px] font-semibold"><span>끌어올리기</span><span id="fs-prog-t">0%</span></div>
+                <div class="bar mt-1" style="height:12px"><i id="fs-prog" style="width:0%"></i></div>
+                <button type="button" class="pullbtn mt-3" id="fs-pull">💪 당기기 <span class="tag" style="font-size:12px;background:rgba(255,255,255,.25)">Space</span></button>
+                <p class="mt-1 text-center text-[12px] text-[#8e8e93]">연타할수록 빨리 올라오지만 줄도 팽팽해져요 · 🐟 발버둥칠 땐 멈춰요</p>
+            </div>`;
+            $('fs-pull').addEventListener('pointerdown', (e) => { e.preventDefault(); pull(); });
+        }
+        if (!reel) reel = { progress: mp.reel?.progress || 0, tension: mp.reel?.tension ?? 0.25, t: performance.now(), surgeUntil: performance.now() + (mp.reel?.surge || 0) * 1000 };
+        startReelLoop();
+    }
+
+    // ── 당기기 예측 그리기 ──
+    function startReelLoop() { if (!raf) raf = requestAnimationFrame(reelFrame); }
+    function stopReelLoop() { if (raf) cancelAnimationFrame(raf); raf = 0; reel = null; }
+    function reelFrame() {
+        raf = 0;
+        if (!reel || !$('fs-pin')) return;
+        const now = performance.now();
+        reel.tension = Math.max(0, reel.tension - DECAY * (now - reel.t) / 1000); reel.t = now;
+        const surging = reel.surgeUntil > now;
+        $('fs-pin').style.left = `${Math.min(100, reel.tension * 100)}%`;
+        $('fs-prog').style.width = `${Math.min(100, reel.progress * 100)}%`; $('fs-prog-t').textContent = `${Math.round(reel.progress * 100)}%`;
+        $('fs-reelbox').classList.toggle('surge', surging);
+        $('fs-surge').textContent = surging ? '🐟 발버둥! 잠깐 멈춰요!' : '';
+        const btn = $('fs-pull'); if (btn) { btn.classList.toggle('stop', surging); btn.firstChild.textContent = surging ? '✋ 버텨요 ' : '💪 당기기 '; }
+        raf = requestAnimationFrame(reelFrame);
+    }
+    function pull() {
+        const mp = myP(); if (!mp || mp.state !== 'reeling') return;
+        send({ type: 'pull' });
+        if (reel) { const now = performance.now(); reel.tension = Math.min(1, Math.max(0, reel.tension - DECAY * (now - reel.t) / 1000) + (reel.surgeUntil > now ? 0.42 : 0.2)); reel.t = now; }
+        snd.click(); shake($('fs-bob-me'));
+    }
+    function strike() { const mp = myP(); if (!mp || !['waiting', 'bite'].includes(mp.state)) return; send({ type: 'strike' }); snd.whoosh(0.5); }
+    function cast(spot) { const mp = myP(); if (!playing() || !mp || mp.state !== 'idle' || S.overtime) return; send({ type: 'cast', spot }); }
+
+    pond.addEventListener('click', (e) => {
+        const spot = e.target.closest('.spot')?.dataset.spot;
+        const mp = myP(); if (!mp || !playing()) return;
+        if (mp.state === 'idle' && spot) cast(spot);
+        else if (mp.state === 'waiting' || mp.state === 'bite') strike();
+        else if (mp.state === 'reeling') pull();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, select')) return;
+        const mp = myP(); if (!mp || !playing()) return;
+        if (e.code === 'Space') { e.preventDefault(); if (e.repeat) return; if (mp.state === 'reeling') pull(); else if (mp.state !== 'idle') strike(); }
+        const spot = { Digit1: 'shallow', Digit2: 'weeds', Digit3: 'deep' }[e.code];
+        if (spot) cast(spot);
+    });
+
+    // 시계
+    setInterval(() => {
+        if (!S || S.status !== 'playing') return;
+        const left = Math.max(0, leftBase - (performance.now() - leftAt) / 1000);
+        $('fs-clock').textContent = `${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}`;
+        const t = $('fs-timer'); t.firstElementChild.style.width = `${left / S.duration * 100}%`; t.classList.toggle('hot', left <= 10); t.classList.toggle('warn', left > 10 && left <= 25);
+    }, 200);
+
+    // ── 옵션 ──
+    $('fs-duration').addEventListener('change', () => send({ type: 'options', duration: Number($('fs-duration').value) }));
+    $('fs-mode').addEventListener('change', () => send({ type: 'options', mode: $('fs-mode').value }));
+    $('fs-level').addEventListener('change', () => send({ type: 'options', bot_level: $('fs-level').value }));
+    $('fs-skillopt').addEventListener('change', () => send({ type: 'options', skills: $('fs-skillopt').checked }));
+    $('fs-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('fs-start').addEventListener('click', () => { ctx(); send({ type: S?.status === 'over' ? 'rematch' : 'start' }); });
+    $('fs-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('fs-stand').addEventListener('click', () => send({ type: 'stand' }));
+    window.addEventListener('resize', () => { const mp = myP(), op = P(other(me())); if (mp && mp.state !== 'idle') placeBob('me', mp.spot); if (op && op.state !== 'idle') placeBob('op', op.spot); });
+
+    // ── 큰 연출 큐 ──
+    const POP = $('fs-pop');
+    let popTimer = null, popping = false; const popQueue = [];
+    function pop(html, ms, sound) { popQueue.push([html, ms, sound]); if (!popping) nextPop(); }
+    function nextPop() {
+        const item = popQueue.shift(); popping = !!item;
+        if (!item) { POP.classList.remove('on'); return; }
+        const [html, ms, sound] = item;
+        $('fs-pop-box').innerHTML = html + `<div class="sub mt-3" style="font-size:12px;opacity:.6">눌러서 넘기기${popQueue.length ? ` · 다음 ${popQueue.length}개` : ''}</div>`;
+        POP.classList.remove('on'); void POP.offsetWidth; POP.classList.add('on');
+        if (sound) sound();
+        clearTimeout(popTimer); popTimer = setTimeout(closePop, ms);
+    }
+    function closePop() { clearTimeout(popTimer); POP.classList.remove('on'); setTimeout(nextPop, 200); }
+    POP.addEventListener('click', closePop);
+
+    // ── 소리 (WebAudio 합성) ──
+    let audio = null;
+    const ctx = () => { if (!$('fs-sound').checked) return null; try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); return audio; } catch (e) { return null; } };
+    function noise(len, vol, filterType, freq, decay) {
+        const a = ctx(); if (!a) return;
+        const buf = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, decay);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const f = a.createBiquadFilter(); f.type = filterType; f.frequency.value = freq;
+        const g = a.createGain(); g.gain.value = vol;
+        src.connect(f).connect(g).connect(a.destination); src.start();
+    }
+    function tone(freq, len, type = 'triangle', vol = 0.1, slide) {
+        const a = ctx(); if (!a) return;
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = type; o.frequency.setValueAtTime(freq, a.currentTime); if (slide) o.frequency.exponentialRampToValueAtTime(slide, a.currentTime + len);
+        g.gain.setValueAtTime(vol, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + len);
+        o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + len + 0.02);
+    }
+    const snd = {
+        whoosh(v = 1) { noise(0.35, 0.12 * v, 'bandpass', 900, 1.2); },
+        splash(v = 1) { noise(0.5, 0.25 * v, 'bandpass', 1600, 1.6); tone(220, 0.15, 'sine', 0.08 * v, 90); },
+        bite() { tone(1200, 0.08, 'sine', 0.18); setTimeout(() => tone(1600, 0.12, 'sine', 0.18), 80); noise(0.2, 0.15, 'bandpass', 2200, 2); },
+        click() { noise(0.05, 0.12, 'highpass', 2500, 1.5); tone(300, 0.04, 'square', 0.04); },
+        surge() { tone(120, 0.5, 'sawtooth', 0.09, 70); noise(0.4, 0.1, 'lowpass', 400, 1.5); },
+        snap() { noise(0.08, 0.35, 'highpass', 3000, 3); tone(500, 0.35, 'sawtooth', 0.12, 60); },
+        catchIt(big) { [523, 659, 784, big ? 1047 : 988].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.14), i * 100)); noise(0.5, 0.2, 'bandpass', 1500, 1.5); },
+        junk() { tone(300, 0.25, 'square', 0.06, 180); },
+        fail() { tone(330, 0.18, 'triangle', 0.1); setTimeout(() => tone(240, 0.3, 'triangle', 0.1), 150); },
+        rock() { noise(0.3, 0.3, 'lowpass', 500, 1.2); tone(160, 0.2, 'sine', 0.2, 60); },
+        skill(ok) { tone(ok ? 740 : 300, 0.2, 'sine', 0.14); },
+    };
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('fs-chat'), div = document.createElement('div');
+        div.innerHTML = m.system ? `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>` : `<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+    $('fs-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('fs-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('fs-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+
+    // ── 연결 ──
+    let lastSpectators = [];
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function handle(m) {
+        if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('fs-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+        else if (m.type === 'state') {
+            const prevSt = S?.status;
+            S = m.state; mySeat = m.you || null;
+            if (S.status === 'playing' && prevSt !== 'playing') { stopReelLoop(); tone(660, 0.15); }
+            const mp = myP();
+            if (reel && mp?.state === 'reeling' && mp.reel) { reel.progress = mp.reel.progress; }   // 서버 값으로 맞추기
+            if (mp?.state !== 'reeling') stopReelLoop();
+            lastSpectators = m.peers.filter((p) => !p.seat).map((p) => p.name);
+            render(lastSpectators);
+        } else if (m.type === 'cast') {
+            if (m.seat !== mySeat && m.seat !== other(me())) return;
+            castFx(m.seat === me() ? 'me' : 'op', m.spot);
+        } else if (m.type === 'bite') {
+            const bob = $('fs-bob-me'); bob.classList.remove('dip'); void bob.offsetWidth; bob.classList.add('dip'); bob.innerHTML = '<span class="ex">!</span>';
+            snd.bite(); shake(pond);
+        } else if (m.type === 'hooked') {
+            const mine = m.seat === me();
+            fx('text', mine ? `🎣 걸렸다! ${m.hint}` : `${esc(S?.seats?.[m.seat]?.name || '상대')}: 걸렸다!`, P(m.seat)?.spot || 'deep', 0, -30);
+            if (mine) { snd.splash(0.8); reel = null; }
+        } else if (m.type === 'reel') {
+            if (m.seat !== mySeat) return;
+            if (!reel) reel = { progress: 0, tension: 0, t: performance.now(), surgeUntil: 0 };
+            reel.progress = m.progress; reel.tension = m.tension; reel.t = performance.now();
+            if (m.surge) reel.surgeUntil = performance.now() + m.surge * 1000;
+            if (m.surge_hit) { snd.surge(); shake(pond); fx('text', '🐟 발버둥!', myP()?.spot || 'deep', 0, -24); }
+            if (m.rock) { snd.rock(); fx('rock', '🪨', myP()?.spot || 'deep', 18, 0); fx('text', '🪨 돌 맞음! 줄이 팽팽!', myP()?.spot || 'deep', 0, -40); }
+        } else if (m.type === 'escape') {
+            const mine = m.seat === mySeat, spot = P(m.seat)?.spot || 'deep';
+            if (m.why === 'rock') { fx('rock', '🪨', spot, 14, 0); fx('splash', '💦', spot, 14, 0); if (mine) snd.rock(); }
+            if (mine) {
+                if (m.why === 'snap') { pop(`<div class="big" style="font-size:56px">💥 줄이 끊어졌어요!</div><div class="sub">${esc(m.text)}${m.fish ? `<br><span style="opacity:.8">${m.fish.emoji} ${esc(m.fish.name)} ${m.fish.kg}kg 이었어요…</span>` : ''}</div>`, 2600, snd.snap); shake(pond); }
+                else if (m.why !== 'reel-in') { toast(m.text); fx('text', m.text, spot, 0, -30); if (!m.keep) { fx('splash', '💦', spot); snd.fail(); } }
+                stopReelLoop();
+            } else if (m.why === 'snap') { fx('text', `${esc(S?.seats?.[m.seat]?.name || '상대')}: 줄이 끊어졌어요!`, spot, 0, -30); fx('splash', '💦', spot); }
+        } else if (m.type === 'catch') {
+            const mine = m.seat === mySeat, who = mine ? '내가' : `${esc(S?.seats?.[m.seat]?.name || '상대')} 님이`, spot = P(m.seat)?.spot || 'deep';
+            fx('jump', m.fish.emoji, spot); fx('splash', '💦', spot); if (mine) stopReelLoop();
+            if (m.junk) { if (mine) { toast(`${m.fish.emoji} ${m.fish.name}을(를) 건졌어요… 0kg`); snd.junk(); fx('text', `${m.fish.emoji} ${m.fish.name}… 0kg`, spot, 0, -50); } }
+            else pop(`<div class="big">${m.fish.emoji}</div><div class="sub"><b>${esc(m.fish.name)}</b> ${m.fish.kg.toFixed(2)}kg${m.best && mine ? ' · 👑 내 최고 기록!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${who} 잡았어요!</div>`, m.fish.kg >= 10 ? 2800 : 1900, () => snd.catchIt(m.fish.kg >= 5));
+            if (m.fish.kg >= 10) { pond.classList.remove('flash'); void pond.offsetWidth; pond.classList.add('flash'); }
+        } else if (m.type === 'skill') {
+            const mine = m.seat === mySeat, who = mine ? '내가' : `${esc(S?.seats?.[m.seat]?.name || '')} 님이`;
+            if (m.secret && !mine) return;   // 가짜 입질은 당하는 쪽이 모르게
+            const desc = S?.skills?.find((k) => k.id === m.id)?.desc || '';
+            pop(`<div class="big" style="font-size:64px">${m.icon}</div><div class="sub">${who} <b>${esc(m.name)}</b> 스킬!${m.blocked ? '<br>🛡 하지만 방패에 막혔어요!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${esc(desc)}</div>`, 2200, () => snd.skill(!m.blocked));
+        } else if (m.type === 'over') {
+            stopReelLoop();
+            pop(`<div class="big" style="font-size:54px">${m.winner ? (m.winner === mySeat ? '🏆 승리!' : mySeat ? '😢 패배…' : '🏁 끝!') : '🤝 무승부'}</div><div class="sub">${esc(m.reason)}</div>`, 4000, () => { if (m.winner === mySeat) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.25, 'triangle', 0.16), i * 110)); else tone(160, 0.5, 'square', 0.08); });
+        }
+        else if (m.type === 'chat') chatLine(m);
+        else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+        else if (m.type === 'end') { ended = true; $('fs-status').textContent = `🚪 ${m.reason}`; }
+    }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => {
+            if (ended) return;
+            $('fs-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) { store.set('mj-game-name', name); $('fs-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved); else { $('fs-name-box').classList.remove('hidden'); $('fs-name').focus(); }
+    $('fs-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('fs-name').value.trim()); });
+
+    $('fs-copy').addEventListener('click', async () => {
+        const url = $('fs-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('fs-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('fs-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('fs-kakao').addEventListener('click', () => mjShare({ title: `🎣 낚시 대결 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('fs-copy').dataset.url, button: '낚시 대결 하러 가기' }));
+    window.__fishing = { state: () => S, seat: () => mySeat, send, feed: handle };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}
