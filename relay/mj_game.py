@@ -31,12 +31,14 @@ try:
 	from mj_baseball import BaseballLogic
 	from mj_battleship import BattleshipLogic
 	from mj_fishing import FishingLogic
+	from mj_shell import ShellLogic
 except ImportError:
 	from relay.catch_words import ALL as CATCH_WORDS
 	from relay.mj_augomok import AugOmokLogic
 	from relay.mj_baseball import BaseballLogic
 	from relay.mj_battleship import BattleshipLogic
 	from relay.mj_fishing import FishingLogic
+	from relay.mj_shell import ShellLogic
 
 TICK = 0.25  # 틱 주기(초) — 낚시처럼 타이밍이 있는 게임 때문에 촘촘히
 log = logging.getLogger("mj-relay.game")
@@ -1326,7 +1328,7 @@ class AlkkagiLogic:
 SKILL_NAMES = {"heavy": "💪 무거운 돌", "ice": "🧊 빙판", "shield": "🛡 방패", "bomb": "💥 폭탄", "curve": "↪️ 커브샷"}
 
 
-LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic, "battleship": BattleshipLogic, "fishing": FishingLogic}
+LOGICS = {"omok": OmokLogic, "othello": OthelloLogic, "catchmind": CatchLogic, "dots": DotsLogic, "alkkagi": AlkkagiLogic, "augomok": AugOmokLogic, "baseball": BaseballLogic, "battleship": BattleshipLogic, "fishing": FishingLogic, "shell": ShellLogic}
 
 
 @dataclass

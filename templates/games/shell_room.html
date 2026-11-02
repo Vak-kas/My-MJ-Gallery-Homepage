@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+<style>
+    .apple-display { font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, "Helvetica Neue", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #0e7490; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #0e7490; border-color: #0e7490; color: #fff; font-weight: 600; }
+    .gm-btn.on { background: #0e7490; border-color: #0e7490; color: #fff; }
+    .tag { display: inline-block; border-radius: 6px; padding: 0 5px; font-size: 10.5px; font-weight: 700; background: rgba(0, 0, 0, 0.08); vertical-align: 1px; }
+    .bar { height: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: #0e7490; transition: width .25s linear; }
+    .bar.hot > i { background: #d6281f; }
+
+    /* ── 탁자 ── */
+    .table { position: relative; width: 100%; height: 300px; border-radius: 22px; overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: manipulation;
+        background: radial-gradient(ellipse at 50% 30%, #2f8f5a 0%, #1f6f45 55%, #164f33 100%); box-shadow: inset 0 0 0 10px #5b3a1e, inset 0 0 0 12px rgba(255, 220, 150, 0.35), 0 10px 30px rgba(0, 0, 0, 0.25); }
+    .table::before { content: ""; position: absolute; inset: 10px; border-radius: 16px; background: repeating-linear-gradient(45deg, transparent 0 14px, rgba(255, 255, 255, 0.025) 14px 16px); pointer-events: none; }
+    .table .dealer-lbl, .table .guesser-lbl { position: absolute; left: 50%; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.85); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); white-space: nowrap; }
+    .table .dealer-lbl { top: 8px; } .table .guesser-lbl { bottom: 16px; }
+    .cup { position: absolute; top: 50%; width: 92px; height: 110px; margin: -70px 0 0 -46px; cursor: pointer; z-index: 2; transition: filter .15s; }
+    .cup .body { position: absolute; left: 6px; right: 6px; top: 10px; bottom: 0; border-radius: 14px 14px 30px 30px / 10px 10px 26px 26px; background: linear-gradient(90deg, #a8321f 0%, #e05a3a 35%, #ff7a55 50%, #e05a3a 65%, #a8321f 100%); box-shadow: 0 10px 18px rgba(0, 0, 0, 0.35), inset 0 -8px 0 rgba(0, 0, 0, 0.15); transition: transform .35s cubic-bezier(.2, 1.2, .4, 1); }
+    .cup .body::before { content: ""; position: absolute; left: -6px; right: -6px; top: -10px; height: 22px; border-radius: 50%; background: linear-gradient(180deg, #ff9a7a, #c84a2c); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); }
+    .cup .body::after { content: ""; position: absolute; left: 20px; width: 12px; top: 20px; bottom: 20px; border-radius: 8px; background: rgba(255, 255, 255, 0.25); }
+    .cup .ball { position: absolute; left: 50%; bottom: 2px; width: 30px; height: 30px; margin-left: -15px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff 0 10%, #ffd60a 12% 45%, #d99a00 100%); box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4); opacity: 0; transform: scale(.4); transition: opacity .2s, transform .3s; z-index: 0; }
+    .cup .num { position: absolute; left: 50%; bottom: -24px; transform: translateX(-50%); font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.75); }
+    .cup .mark { position: absolute; left: 50%; top: -26px; transform: translateX(-50%); font-size: 22px; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5)); }
+    .cup.lift .body { transform: translateY(-62px) rotate(-6deg); }
+    .cup.lift .ball.on { opacity: 1; transform: scale(1); }
+    .cup.hint .ball { opacity: .9; transform: scale(1); filter: drop-shadow(0 0 6px #ffd60a); }   /* 사기꾼 눈에만 */
+    .cup.sel .body { filter: brightness(1.25); outline: 3px solid #ffd60a; outline-offset: 2px; }
+    .cup.pick .body { outline: 3px solid #fff; outline-offset: 2px; }
+    .cup.lens .body { filter: grayscale(.7) brightness(.8); }
+    .cup.hit .body { outline: 4px solid #34c759; outline-offset: 2px; }
+    .cup.miss .body { outline: 4px solid #ff3b30; outline-offset: 2px; }
+    .table.locked .cup { cursor: default; }
+    .table.locked .cup:hover .body { filter: none; }
+    .cup:hover .body { filter: brightness(1.12); }
+    .smoke { position: absolute; inset: 0; z-index: 5; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, rgba(220, 220, 225, 0.98) 0 45%, rgba(220, 220, 225, 0.6) 70%, transparent 100%); opacity: 0; transition: opacity .25s; }
+    .smoke.on { opacity: 1; }
+    .smoke::after { content: "🌫 연막!"; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); font-size: 26px; font-weight: 900; color: #444; }
+    .hand { position: absolute; z-index: 6; font-size: 54px; pointer-events: none; transform: translate(-50%, -50%); animation: hand .7s ease-out forwards; filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.5)); }
+    @keyframes hand { 0% { opacity: 0; transform: translate(-50%, -20%) scale(.6); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -80%) scale(1.2); } }
+    .fx { position: absolute; z-index: 6; pointer-events: none; transform: translate(-50%, -50%); font-size: 15px; font-weight: 800; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7); white-space: nowrap; animation: floatup 1.5s ease-out forwards; }
+    @keyframes floatup { 0% { transform: translate(-50%, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(-50%, -50px); opacity: 0; } }
+    .shake { animation: shake .4s; }
+    @keyframes shake { 0%, 100% { transform: translate(0, 0); } 20% { transform: translate(-5px, 3px); } 40% { transform: translate(5px, -3px); } 60% { transform: translate(-4px, -2px); } 80% { transform: translate(4px, 2px); } }
+    .table.rewind::after { content: "⏪ 되감기"; position: absolute; right: 16px; top: 14px; font-size: 13px; font-weight: 800; color: #ffd60a; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); z-index: 7; }
+
+    .pl { border-radius: 16px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 10px 12px; min-width: 0; }
+    .pl.lead { border-color: #0e7490; box-shadow: inset 0 0 0 1px #0e7490; }
+    .pl .pts { font-size: 28px; font-weight: 900; letter-spacing: -0.02em; line-height: 1.1; }
+    .pl .role { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 700; background: rgba(0, 0, 0, 0.06); }
+    .pl .role.dealer { background: #fde7e2; color: #a8321f; } .pl .role.guesser { background: #e0f2f6; color: #0e7490; }
+
+    .skill { border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 8px 4px; text-align: center; font-size: 11.5px; line-height: 1.3; cursor: pointer; word-break: keep-all; }
+    .skill:hover { background: #f5f5f7; }
+    .skill .ic { font-size: 22px; display: block; }
+    .skill.used { opacity: .35; cursor: default; text-decoration: line-through; }
+    .skill.na { opacity: .45; cursor: default; }
+    .skill.hostile { border-color: rgba(214, 40, 31, 0.3); }
+    .skill.active, .skill.armed { box-shadow: inset 0 0 0 2px #0e7490; }
+
+    #sh-pop { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(3, 25, 20, 0.6); backdrop-filter: blur(2px); cursor: pointer; }
+    #sh-pop.on { display: flex; }
+    #sh-pop .box { text-align: center; color: #fff; animation: popin .45s cubic-bezier(.2, 1.6, .4, 1); }
+    #sh-pop .big { font-size: 66px; font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+    #sh-pop .sub { font-size: 18px; font-weight: 600; opacity: 0.9; }
+    @keyframes popin { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn, html.theme-dark .skill { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go, html.theme-dark .gm-btn.on { background: #0e7490; color: #fff; }
+    html.theme-dark .pl { border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .pl .role { background: rgba(255, 255, 255, 0.1); }
+    html.theme-dark .tag { background: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:shell' %}" class="text-[13px] text-[#0e7490]">← 야바위 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🥤 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 1:1 · 사기꾼은 섞고, 맞히는 사람은 고르고 — 라운드마다 역할 교대</p>
+        </div>
+        <button type="button" class="gm-btn" id="sh-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="sh-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:shell_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="sh-name-box" class="gm-card mt-5 hidden">
+        <form id="sh-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="sh-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#0e7490] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section class="gm-card min-w-0">
+            <div class="flex items-center justify-between gap-3">
+                <p id="sh-status" class="min-w-0 flex-1 text-[16px] font-semibold">연결하는 중…</p>
+                <p id="sh-clock" class="font-mono text-[20px] font-bold tabular-nums"></p>
+            </div>
+            <div class="bar mt-2 hidden" id="sh-timer"><i></i></div>
+            <p id="sh-sub" class="mt-1 min-h-[18px] text-[12.5px] text-[#6e6e73]"></p>
+
+            <div class="mt-3 grid grid-cols-2 gap-3" id="sh-players"></div>
+
+            <div class="table mt-4 locked" id="sh-table">
+                <span class="dealer-lbl" id="sh-lbl-d"></span>
+                <span class="guesser-lbl" id="sh-lbl-g"></span>
+                <div class="smoke" id="sh-smoke"></div>
+            </div>
+
+            <div id="sh-act" class="mt-3"></div>
+
+            <div id="sh-skills-box" class="mt-4 hidden">
+                <h2 class="text-[14px] font-semibold">✨ 스킬 <span class="font-normal text-[12px] text-[#8e8e93]">종류별로 한 판에 한 번 · 역할에 맞는 것만</span></h2>
+                <div id="sh-skills" class="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7"></div>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-black/5 pt-4">
+                <select id="sh-cups" class="gm-btn" aria-label="컵 수"><option value="3">🥤 컵 3개</option><option value="4">🥤 컵 4개</option><option value="5">🥤 컵 5개</option></select>
+                <select id="sh-rounds" class="gm-btn" aria-label="라운드"><option value="4">🎲 4라운드</option><option value="6" selected>🎲 6라운드</option><option value="8">🎲 8라운드</option></select>
+                <select id="sh-level" class="gm-btn" aria-label="컴퓨터 난이도"><option value="easy">🤖 쉬움</option><option value="normal">🤖 보통</option><option value="hard">🤖 어려움</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="sh-skillopt" type="checkbox" class="h-4 w-4" checked> ✨ 스킬</label>
+                <button type="button" class="gm-btn" id="sh-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="sh-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="sh-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="sh-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="sh-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="sh-seats"></section>
+            <section class="gm-card text-[12.5px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[14px] font-semibold text-[#1d1d1f] dark:text-inherit">하는 법</h2>
+                <p><b>사기꾼</b>: 구슬을 넣을 컵을 누르고 → 컵 두 개를 차례로 눌러 섞어요. <b>힘 10</b> — 보통 섞기 1, <b>빠른 섞기</b>(F 키·버튼) 2. 적어도 3번 섞고 '다 섞었어요'. <b>맞히는 사람</b>: 섞는 걸 눈으로 따라가다 구슬이 든 컵을 골라요. 섞는 동안 <b>판돈 2배</b>를 걸 수 있어요. 맞히면 맞히는 사람 +판돈, 틀리면 사기꾼 +판돈. 라운드마다 역할을 바꾸고 점수가 높은 쪽이 승리.</p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="sh-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="sh-chat-form" class="mt-2 flex gap-2"><input id="sh-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+<div id="sh-pop" aria-live="polite"><div class="box" id="sh-pop-box"></div></div>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+    let pid = store.get(`mj-shell-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-shell-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0;
+    let leftAt = 0, leftBase = 0, lastSpectators = [];
+    let sel = null;            // 사기꾼: 먼저 고른 컵
+    let fast = false;          // 빠른 섞기
+    let picks = [];            // 맞히는 사람: 두 개 고르기 때 첫 선택
+    let armed = null;          // 컵을 골라야 하는 스킬 (palm)
+    let pendingFx = Promise.resolve();
+    let slots = [];            // slot → cup element (섞을 때 자리 바꿈)
+    let built = 0;
+    const other = (s) => (s === 'p1' ? 'p2' : 'p1');
+    const me = () => mySeat || 'p1';
+    const role = () => (!S || !mySeat ? null : S.dealer === mySeat ? 'dealer' : 'guesser');
+    const table = $('sh-table');
+
+    // ── 컵 ──
+    function slotX(i, n) { return table.clientWidth * (0.5 + (i - (n - 1) / 2) * Math.min(0.2, 0.86 / n)); }
+    function buildCups(n) {
+        for (const c of table.querySelectorAll('.cup')) c.remove();
+        slots = [];
+        for (let i = 0; i < n; i++) {
+            const c = document.createElement('div');
+            c.className = 'cup'; c.dataset.slot = i;
+            c.innerHTML = `<div class="ball"></div><div class="body"></div><span class="num">${i + 1}</span><span class="mark"></span>`;
+            c.style.left = `${slotX(i, n)}px`;
+            c.addEventListener('click', () => onCup(Number(c.dataset.slot)));
+            table.appendChild(c); slots.push(c);
+        }
+        built = n;
+    }
+    const cupAt = (slot) => slots[slot];
+    function layout() { const n = slots.length; slots.forEach((c, i) => { c.style.left = `${slotX(i, n)}px`; }); }
+    async function swapFx(a, b, isFast, smoke) {
+        const A = cupAt(a), B = cupAt(b);
+        if (!A || !B) return;
+        const len = (isFast ? S.swap_len_fast : S.swap_len) * 1000;
+        if (smoke) $('sh-smoke').classList.add('on');
+        snd.swap(isFast);
+        if (A && B) {
+            const xa = slotX(a, slots.length), xb = slotX(b, slots.length), lift = 18;
+            const ka = A.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${(xb - xa) / 2}px, -${lift}px)` }, { transform: `translate(${xb - xa}px, 0)` }], { duration: len, easing: 'ease-in-out' });
+            const kb = B.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${(xa - xb) / 2}px, ${lift}px)` }, { transform: `translate(${xa - xb}px, 0)` }], { duration: len, easing: 'ease-in-out' });
+            A.style.zIndex = 3; B.style.zIndex = 2;
+            await Promise.all([ka.finished, kb.finished]).catch(() => {});
+            slots[a] = B; slots[b] = A; A.dataset.slot = b; B.dataset.slot = a;
+            A.querySelector('.num').textContent = b + 1; B.querySelector('.num').textContent = a + 1;
+            layout();
+        }
+        if (smoke) { await wait(150); $('sh-smoke').classList.remove('on'); }
+    }
+    async function smokeOnlyFx(isFast) {
+        // 어느 컵인지 모르는 섞기: 연막 속에서 컵들이 살짝 흔들림
+        $('sh-smoke').classList.add('on'); snd.swap(isFast);
+        for (const c of slots) c.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px, -4px)' }, { transform: 'translate(6px, 2px)' }, { transform: 'translate(0,0)' }], { duration: (isFast ? S.swap_len_fast : S.swap_len) * 1000 });
+        await wait((isFast ? S.swap_len_fast : S.swap_len) * 1000 + 150);
+        $('sh-smoke').classList.remove('on');
+    }
+    function fx(text, slot, dy = -70) { const el = document.createElement('div'); el.className = 'fx'; el.textContent = text; el.style.left = `${slot == null ? table.clientWidth / 2 : slotX(slot, slots.length)}px`; el.style.top = `${table.clientHeight / 2 + dy}px`; table.appendChild(el); setTimeout(() => el.remove(), 1600); }
+    function shake(el) { el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+
+    function paintCups() {
+        if (!S) return;
+        const r = role();
+        for (const c of slots) {
+            const slot = Number(c.dataset.slot), ball = c.querySelector('.ball'), mark = c.querySelector('.mark');
+            c.classList.remove('lift', 'hint', 'sel', 'pick', 'lens', 'hit', 'miss'); ball.classList.remove('on'); mark.textContent = '';
+            if (S.phase === 'reveal' && S.result) {
+                c.classList.add('lift'); if (S.result.ball === slot) ball.classList.add('on');
+                if (S.result.picks.includes(slot)) c.classList.add(S.result.ball === slot ? 'hit' : 'miss');
+                if (S.result.picks.includes(slot)) mark.textContent = S.result.ball === slot ? '🎯' : '❌';
+            } else if (S.phase === 'place' && S.status === 'playing') { c.classList.add('lift'); }
+            else {
+                if (S.ball === slot && r === 'dealer' && S.phase !== 'guess') { c.classList.add('hint'); mark.textContent = '🟡'; }
+                if (sel === slot) c.classList.add('sel');
+                if (picks.includes(slot)) { c.classList.add('pick'); mark.textContent = '👆'; }
+                if (S.lens === slot) { c.classList.add('lens'); mark.textContent = '🔍❌'; }
+            }
+        }
+        const canClick = S.status === 'playing' && ((r === 'dealer' && ['place', 'shuffle'].includes(S.phase)) || (r === 'guesser' && S.phase === 'guess'));
+        table.classList.toggle('locked', !canClick);
+    }
+
+    function onCup(slot) {
+        if (!S || S.status !== 'playing') return;
+        const r = role();
+        if (armed === 'palm') { send({ type: 'skill', id: 'palm', cup: slot }); armed = null; paintCups(); renderSkills(); return; }
+        if (r === 'dealer' && S.phase === 'place') { send({ type: 'place', cup: slot }); return; }
+        if (r === 'dealer' && S.phase === 'shuffle') {
+            if (sel === null) { sel = slot; paintCups(); return; }
+            if (sel === slot) { sel = null; paintCups(); return; }
+            send({ type: 'swap', a: sel, b: slot, fast }); sel = null; paintCups(); return;
+        }
+        if (r === 'guesser' && S.phase === 'guess') {
+            if (S.double) {
+                if (picks.includes(slot)) picks = picks.filter((p) => p !== slot); else picks.push(slot);
+                if (picks.length === 2) { send({ type: 'pick', cups: picks }); picks = []; }
+                paintCups(); return;
+            }
+            send({ type: 'pick', cup: slot });
+        }
+    }
+
+    // ── 그리기 ──
+    function render(spectators = []) {
+        if (!S) return;
+        if (built !== S.cups && S.phase !== 'shuffle') buildCups(S.cups);
+        const seats = S.seats || {}, m = me(), o = other(m), r = role();
+        const name = (s) => seats[s]?.name || (s === 'p1' ? '1번 자리' : '2번 자리');
+        const st = $('sh-status'), sub = $('sh-sub');
+        if (S.status === 'waiting') {
+            st.textContent = seats.p1 && seats.p2 ? '둘 다 앉았어요. ▶ 시작을 누르세요.' : (mySeat ? '상대를 기다리는 중… 링크를 보내거나 🤖 컴퓨터를 넣어요.' : '빈 자리에 앉으세요.');
+            sub.textContent = `🥤 컵 ${S.cups}개 · 🎲 ${S.rounds}라운드 · 스킬 ${S.skills_on ? '있음' : '없음'}`;
+        } else if (S.status === 'playing') {
+            const roleTxt = r === 'dealer' ? '😈 내가 사기꾼' : r === 'guesser' ? '🧐 내가 맞히는 사람' : '👀 구경 중';
+            const phaseTxt = {
+                place: r === 'dealer' ? '구슬을 넣을 컵을 누르세요' : `${name(S.dealer)} 님이 구슬을 숨기는 중…`,
+                shuffle: r === 'dealer' ? `컵 두 개를 차례로 눌러 섞어요 (힘 ${S.power}) · 적어도 ${S.min_swaps}번` : '눈 크게 뜨고 구슬을 따라가세요!',
+                guess: r === 'guesser' ? (S.double ? '컵 두 개를 고르세요' : '구슬이 든 컵을 고르세요!') : `${name(S.guesser || o)} 님이 고르는 중…`,
+                reveal: S.result ? (S.result.hit ? `🎯 ${name(S.result.winner)} 님이 맞혔어요! +${S.result.points}` : `😈 ${name(S.result.winner)} 님이 속였어요! +${S.result.points}`) : '',
+            }[S.phase] || '';
+            st.textContent = `${S.round}/${S.rounds}R · ${roleTxt} — ${phaseTxt}`;
+            sub.textContent = `판돈 ${S.bet}${S.double ? ' · ✌️ 두 개 고르기' : ''}${S.my_shield ? ' · 🛡 방패 켜짐' : ''}${S.smoke_armed ? ' · 🌫 다음 섞기 연막' : ''} · 섞은 횟수 ${S.swaps}`;
+        } else {
+            st.textContent = S.winner ? `🏁 ${name(S.winner)} 님 승리!` : '🏁 무승부';
+            sub.textContent = S.reason || '';
+        }
+        $('sh-lbl-d').textContent = S.status === 'playing' && S.dealer ? `😈 사기꾼 ${name(S.dealer)}` : '';
+        $('sh-lbl-g').textContent = S.status === 'playing' && S.dealer ? `🧐 맞히는 사람 ${name(other(S.dealer))}` : '';
+        const timer = $('sh-timer');
+        if (S.status === 'playing' && S.left != null) { timer.classList.remove('hidden'); leftBase = S.left; leftAt = performance.now(); } else { timer.classList.add('hidden'); $('sh-clock').textContent = ''; }
+
+        const lead = S.score.p1 === S.score.p2 ? null : S.score.p1 > S.score.p2 ? 'p1' : 'p2';
+        $('sh-players').innerHTML = [m, o].map((s) => {
+            const seat = seats[s];
+            if (!seat) return `<div class="pl text-[13px] text-[#8e8e93]">빈 자리 ${mySeat ? '' : `<button type="button" class="gm-btn ml-1" data-sit="${s}">앉기</button>`}</div>`;
+            const rl = S.status === 'playing' ? (S.dealer === s ? '<span class="role dealer">😈 사기꾼</span>' : '<span class="role guesser">🧐 맞히는 사람</span>') : '';
+            return `<div class="pl ${lead === s ? 'lead' : ''}"><div class="flex items-center justify-between gap-2"><b class="truncate text-[14px]">${seat.bot ? '🤖 ' : ''}${esc(seat.name)}${s === mySeat ? ' (나)' : ''}</b><span class="text-[11px] text-[#8e8e93]">${seat.wins}승</span></div><div class="mt-1 flex items-center gap-2"><span class="pts">${S.score[s]}</span><span class="text-[12px] text-[#8e8e93]">점</span>${rl}</div></div>`;
+        }).join('');
+        for (const b of $('sh-players').querySelectorAll('[data-sit]')) b.addEventListener('click', () => send({ type: 'sit', seat: b.dataset.sit }));
+
+        if (S.phase !== 'shuffle' && S.phase !== 'guess') { sel = null; picks = []; armed = null; }
+        paintCups();
+        renderAct();
+        renderSkills();
+
+        const canOpt = mySeat && S.status !== 'playing';
+        $('sh-cups').value = String(S.cups); $('sh-rounds').value = String(S.rounds); $('sh-level').value = S.bot_level; $('sh-skillopt').checked = S.skills_on;
+        for (const id of ['sh-cups', 'sh-rounds', 'sh-skillopt']) $(id).disabled = !canOpt;
+        const hasBot = Object.values(seats).some((x) => x && x.bot);
+        $('sh-level').disabled = !canOpt || !hasBot; $('sh-level').classList.toggle('hidden', !hasBot);
+        $('sh-bot').classList.toggle('hidden', !(mySeat && S.status !== 'playing' && (!seats.p1 || !seats.p2)));
+        $('sh-start').classList.toggle('hidden', !(mySeat && S.status !== 'playing' && seats.p1 && seats.p2));
+        $('sh-start').textContent = S.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('sh-resign').classList.toggle('hidden', !(mySeat && S.status === 'playing'));
+        $('sh-stand').classList.toggle('hidden', !(mySeat && S.status !== 'playing'));
+
+        $('sh-seats').innerHTML = `<h2 class="text-[14px] font-semibold">자리</h2>` + ['p1', 'p2'].map((s) => {
+            const seat = seats[s];
+            if (!seat) return `<div class="flex items-center justify-between text-[13px]"><span>${s === 'p1' ? '1번' : '2번'} 자리 · 비어 있음</span>${!mySeat && S.status !== 'playing' ? `<button type="button" class="gm-btn" data-sit2="${s}">앉기</button>` : ''}</div>`;
+            return `<div class="flex items-center justify-between text-[13px]"><span>${seat.bot ? '🤖' : seat.online ? '🟢' : '⚪'} <b>${esc(seat.name)}</b>${s === mySeat ? ' (나)' : ''} · ${seat.wins}승</span>${seat.bot && mySeat && S.status !== 'playing' ? `<button type="button" class="gm-btn" data-rmbot="${s}">빼기</button>` : ''}</div>`;
+        }).join('') + (S.draws ? `<p class="text-[12px] text-[#8e8e93]">무승부 ${S.draws}</p>` : '') + (spectators.length ? `<p class="text-[12px] text-[#8e8e93]">👀 ${spectators.map(esc).join(', ')}</p>` : '');
+        for (const b of $('sh-seats').querySelectorAll('[data-sit2]')) b.addEventListener('click', () => send({ type: 'sit', seat: b.dataset.sit2 }));
+        for (const b of $('sh-seats').querySelectorAll('[data-rmbot]')) b.addEventListener('click', () => send({ type: 'remove-bot', seat: b.dataset.rmbot }));
+    }
+
+    function renderAct() {
+        const box = $('sh-act'), r = role();
+        if (!mySeat || S.status !== 'playing') { box.innerHTML = ''; return; }
+        if (r === 'dealer' && S.phase === 'shuffle') {
+            box.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">
+                <div class="flex items-center gap-2 text-[13px] font-semibold">💪 힘 <div class="bar w-[120px]"><i style="width:${Math.min(100, S.power / 10 * 100)}%"></i></div> <span>${S.power}</span></div>
+                <button type="button" class="gm-btn ${fast ? 'on' : ''}" id="sh-fast">⚡ 빠른 섞기 (힘 2) <span class="tag">F</span></button>
+                <button type="button" class="gm-btn go" id="sh-done" ${S.swaps < S.min_swaps ? 'disabled' : ''}>✅ 다 섞었어요 (${S.swaps}번)</button>
+            </div><p class="mt-1 text-center text-[12px] text-[#8e8e93]">${sel === null ? '컵 하나를 누르고, 바꿀 컵을 누르면 섞여요' : `${sel + 1}번 컵과 바꿀 컵을 누르세요`}</p>`;
+            $('sh-fast').addEventListener('click', () => { fast = !fast; renderAct(); });
+            $('sh-done').addEventListener('click', () => send({ type: 'done' }));
+            return;
+        }
+        if (r === 'guesser' && (S.phase === 'shuffle' || S.phase === 'guess')) {
+            box.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2"><span class="text-[13px] font-semibold">💰 판돈</span>
+                <button type="button" class="gm-btn ${S.bet === 1 ? 'on' : ''}" data-bet="1">1점</button><button type="button" class="gm-btn ${S.bet === 2 ? 'on' : ''}" data-bet="2">2점 (더블)</button>
+                <span class="text-[12px] text-[#8e8e93]">맞히면 내가 +${S.double ? 1 : S.bet}, 틀리면 상대가 +${S.bet}</span></div>`;
+            for (const b of box.querySelectorAll('[data-bet]')) b.addEventListener('click', () => send({ type: 'bet', bet: Number(b.dataset.bet) }));
+            return;
+        }
+        box.innerHTML = '';
+    }
+    function renderSkills() {
+        const box = $('sh-skills-box'), r = role();
+        box.classList.toggle('hidden', !(S.skills_on && mySeat && S.status === 'playing'));
+        if (box.classList.contains('hidden')) return;
+        const used = S.used[mySeat] || [];
+        $('sh-skills').innerHTML = S.skills.map((k) => {
+            const u = used.includes(k.id), na = k.who !== 'both' && k.who !== r;
+            const hostile = ['palm', 'smoke', 'lens', 'rewind'].includes(k.id);
+            const active = (k.id === 'shield' && S.my_shield) || (k.id === 'smoke' && S.smoke_armed) || (k.id === 'double' && S.double);
+            return `<button type="button" class="skill ${u ? 'used' : ''} ${na ? 'na' : ''} ${hostile ? 'hostile' : ''} ${active ? 'active' : ''} ${armed === k.id ? 'armed' : ''}" data-skill="${k.id}" title="${esc(k.desc)}${na ? ` (${k.who === 'dealer' ? '사기꾼' : '맞히는 사람'}일 때)` : ''}" ${u || na ? 'disabled' : ''}><span class="ic">${k.icon}</span>${esc(k.name)}</button>`;
+        }).join('');
+        for (const b of $('sh-skills').querySelectorAll('[data-skill]')) b.addEventListener('click', () => {
+            if (b.disabled) return;
+            const id = b.dataset.skill;
+            if (id === 'palm') { if (S.phase !== 'shuffle') { toast('⚠️ 섞는 동안 쓸 수 있어요.'); return; } armed = armed === 'palm' ? null : 'palm'; sel = null; paintCups(); renderSkills(); toast(armed ? '🫳 구슬을 옮길 옆 컵을 누르세요 (Esc 취소)' : '취소했어요'); return; }
+            send({ type: 'skill', id });
+        });
+    }
+    document.addEventListener('keydown', (e) => {
+        if (e.target.matches('input, textarea, select')) return;
+        if (e.key === 'Escape') { armed = null; sel = null; picks = []; paintCups(); renderSkills(); }
+        if (e.code === 'KeyF' && role() === 'dealer' && S?.phase === 'shuffle') { fast = !fast; renderAct(); }
+        const n = Number(e.key); if (n >= 1 && n <= (S?.cups || 0)) onCup(n - 1);
+    });
+    setInterval(() => {
+        if (!S || S.status !== 'playing' || S.left == null) return;
+        const left = Math.max(0, leftBase - (performance.now() - leftAt) / 1000);
+        $('sh-clock').textContent = `${Math.ceil(left)}`;
+        const t = $('sh-timer'); t.firstElementChild.style.width = `${left / (S.phase_time || 1) * 100}%`; t.classList.toggle('hot', left <= 3);
+    }, 200);
+    window.addEventListener('resize', layout);
+
+    // ── 옵션 ──
+    $('sh-cups').addEventListener('change', () => send({ type: 'options', cups: Number($('sh-cups').value) }));
+    $('sh-rounds').addEventListener('change', () => send({ type: 'options', rounds: Number($('sh-rounds').value) }));
+    $('sh-level').addEventListener('change', () => send({ type: 'options', bot_level: $('sh-level').value }));
+    $('sh-skillopt').addEventListener('change', () => send({ type: 'options', skills: $('sh-skillopt').checked }));
+    $('sh-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('sh-start').addEventListener('click', () => { ctx(); send({ type: S?.status === 'over' ? 'rematch' : 'start' }); });
+    $('sh-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('sh-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    // ── 큰 연출 큐 ──
+    const POP = $('sh-pop');
+    let popTimer = null, popping = false; const popQueue = [];
+    function pop(html, ms, sound) { popQueue.push([html, ms, sound]); if (!popping) nextPop(); }
+    function nextPop() {
+        const item = popQueue.shift(); popping = !!item;
+        if (!item) { POP.classList.remove('on'); return; }
+        const [html, ms, sound] = item;
+        $('sh-pop-box').innerHTML = html + `<div class="sub mt-3" style="font-size:12px;opacity:.6">눌러서 넘기기${popQueue.length ? ` · 다음 ${popQueue.length}개` : ''}</div>`;
+        POP.classList.remove('on'); void POP.offsetWidth; POP.classList.add('on');
+        if (sound) sound();
+        clearTimeout(popTimer); popTimer = setTimeout(closePop, ms);
+    }
+    function closePop() { clearTimeout(popTimer); POP.classList.remove('on'); setTimeout(nextPop, 200); }
+    POP.addEventListener('click', closePop);
+
+    // ── 소리 ──
+    let audio = null;
+    const ctx = () => { if (!$('sh-sound').checked) return null; try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); return audio; } catch (e) { return null; } };
+    function noise(len, vol, filterType, freq, decay) {
+        const a = ctx(); if (!a) return;
+        const buf = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, decay);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const f = a.createBiquadFilter(); f.type = filterType; f.frequency.value = freq;
+        const g = a.createGain(); g.gain.value = vol;
+        src.connect(f).connect(g).connect(a.destination); src.start();
+    }
+    function tone(freq, len, type = 'triangle', vol = 0.1, slide) {
+        const a = ctx(); if (!a) return;
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = type; o.frequency.setValueAtTime(freq, a.currentTime); if (slide) o.frequency.exponentialRampToValueAtTime(slide, a.currentTime + len);
+        g.gain.setValueAtTime(vol, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + len);
+        o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + len + 0.02);
+    }
+    const snd = {
+        swap(f) { noise(f ? 0.12 : 0.22, 0.12, 'bandpass', f ? 1400 : 900, 1.5); },
+        place() { tone(600, 0.1, 'sine', 0.12); noise(0.1, 0.1, 'highpass', 2000, 2); },
+        hit() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.14), i * 100)); },
+        miss() { tone(330, 0.2, 'triangle', 0.1); setTimeout(() => tone(220, 0.35, 'triangle', 0.1), 160); },
+        lift() { noise(0.2, 0.15, 'bandpass', 1200, 1.5); tone(800, 0.1, 'sine', 0.06, 1200); },
+        hand() { noise(0.15, 0.2, 'bandpass', 700, 1.5); },
+        skill(ok) { tone(ok ? 740 : 300, 0.2, 'sine', 0.14); },
+        tick() { tone(880, 0.05, 'sine', 0.06); },
+    };
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('sh-chat'), div = document.createElement('div');
+        div.innerHTML = m.system ? `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>` : `<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+    $('sh-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('sh-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('sh-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function handle(m) {
+        if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('sh-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+        else if (m.type === 'state') {
+            S = m.state; mySeat = m.you || null;
+            lastSpectators = m.peers.filter((p) => !p.seat).map((p) => p.name);
+            pendingFx = pendingFx.then(() => render(lastSpectators));   // 섞기 연출이 끝난 뒤에 그림
+        } else if (m.type === 'round') {
+            pendingFx = pendingFx.then(() => { buildCups(S?.cups || built || 3); const mine = m.dealer === mySeat; pop(`<div class="big" style="font-size:54px">${m.round}라운드</div><div class="sub">${mine ? '😈 내가 사기꾼! 구슬을 숨기고 섞어요' : mySeat ? '🧐 내가 맞히는 사람! 눈 크게 뜨세요' : `😈 사기꾼: ${esc(S?.seats?.[m.dealer]?.name || '')}`}</div>`, 1500, () => tone(660, 0.15)); });
+        } else if (m.type === 'placed') {
+            pendingFx = pendingFx.then(async () => { snd.place(); for (const c of slots) c.classList.remove('lift'); await wait(350); });
+        } else if (m.type === 'ball') { /* 내 눈에만: state 에 들어옴 */ }
+        else if (m.type === 'swap') {
+            pendingFx = pendingFx.then(() => (m.a == null ? smokeOnlyFx(m.fast) : swapFx(m.a, m.b, m.fast, m.smoke)));
+        } else if (m.type === 'guess-start') {
+            pendingFx = pendingFx.then(() => { if (role() === 'guesser') { snd.tick(); fx('👆 구슬이 든 컵은?', null, -110); } });
+        } else if (m.type === 'reveal') {
+            pendingFx = pendingFx.then(async () => {
+                snd.lift();
+                for (const c of slots) { const slot = Number(c.dataset.slot); c.classList.add('lift'); if (slot === m.ball) c.querySelector('.ball').classList.add('on'); }
+                await wait(500);
+                const mine = m.winner === mySeat;
+                const hit = m.hit;
+                pop(`<div class="big" style="font-size:60px">${hit ? '🎯' : '😈'}</div><div class="sub">${hit ? `${esc(S?.seats?.[m.winner]?.name || '')} 님이 맞혔어요!` : `${esc(S?.seats?.[m.winner]?.name || '')} 님이 속였어요!`} <b>+${m.points}</b>${mySeat ? `<br>${mine ? '내 점수!' : '상대 점수…'}` : ''}</div>`, 1800, () => (mine || (!mySeat && hit) ? snd.hit() : snd.miss()));
+                if (!hit && role() === 'guesser') shake(table);
+            });
+        } else if (m.type === 'lens') {
+            pendingFx = pendingFx.then(() => { fx(`🔍 ${m.cup + 1}번 컵은 비었어요`, m.cup, -80); });
+        } else if (m.type === 'rewind') {
+            pendingFx = pendingFx.then(async () => {
+                table.classList.add('rewind');
+                // 지금 자리 순서로 거꾸로 돌렸다가 천천히 다시 섞어 보여 줌
+                const sw = m.swaps;
+                const save = S.swap_len, saveF = S.swap_len_fast; S.swap_len = 0.05; S.swap_len_fast = 0.05;
+                for (const [a, b] of [...sw].reverse()) await swapFx(a, b, false, false);
+                S.swap_len = 1.4; S.swap_len_fast = 1.4;
+                await wait(400);
+                for (const [a, b] of sw) { fx('⏪', null, -110); await swapFx(a, b, false, false); await wait(200); }
+                S.swap_len = save; S.swap_len_fast = saveF;
+                table.classList.remove('rewind');
+            });
+        } else if (m.type === 'skill') {
+            const mine = m.seat === mySeat, who = mine ? '내가' : `${esc(S?.seats?.[m.seat]?.name || '')} 님이`;
+            if (m.secret && !mine) {
+                if (m.id === 'palm') pendingFx = pendingFx.then(async () => { const h = document.createElement('div'); h.className = 'hand'; h.textContent = '✋'; h.style.left = `${table.clientWidth / 2}px`; h.style.top = `${table.clientHeight / 2}px`; table.appendChild(h); snd.hand(); await wait(700); h.remove(); });
+                return;
+            }
+            const desc = S?.skills?.find((k) => k.id === m.id)?.desc || '';
+            pop(`<div class="big" style="font-size:60px">${m.icon}</div><div class="sub">${who} <b>${esc(m.name)}</b> 스킬!${m.blocked ? '<br>🛡 하지만 방패에 막혔어요!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${esc(desc)}</div>`, 1500, () => snd.skill(!m.blocked));   // 연출보다 먼저 알림
+        } else if (m.type === 'bet') { if (role() === 'dealer') toast(`💰 상대가 판돈을 ${m.bet}점으로 걸었어요`); }
+        else if (m.type === 'over') {
+            pendingFx = pendingFx.then(() => pop(`<div class="big" style="font-size:54px">${m.winner ? (m.winner === mySeat ? '🏆 승리!' : mySeat ? '😢 패배…' : '🏁 끝!') : '🤝 무승부'}</div><div class="sub">${esc(m.reason)}</div>`, 4000, () => { if (m.winner === mySeat) snd.hit(); else tone(160, 0.5, 'square', 0.08); }));
+        }
+        else if (m.type === 'chat') chatLine(m);
+        else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+        else if (m.type === 'end') { ended = true; $('sh-status').textContent = `🚪 ${m.reason}`; }
+    }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => {
+            if (ended) return;
+            $('sh-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) { store.set('mj-game-name', name); $('sh-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved); else { $('sh-name-box').classList.remove('hidden'); $('sh-name').focus(); }
+    $('sh-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('sh-name').value.trim()); });
+
+    $('sh-copy').addEventListener('click', async () => {
+        const url = $('sh-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('sh-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('sh-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('sh-kakao').addEventListener('click', () => mjShare({ title: `🥤 야바위 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('sh-copy').dataset.url, button: '야바위 하러 가기' }));
+    buildCups(3);
+    window.__shell = { state: () => S, seat: () => mySeat, send, feed: handle, fxDone: () => pendingFx, slots: () => slots.map((c) => c.dataset.slot) };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}

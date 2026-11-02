@@ -192,6 +192,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "shell",
+		"url_name": "games:shell",
+		"icon": "🥤",
+		"title": "야바위",
+		"description": "사기꾼은 구슬을 숨기고 손기술로 섞고(빠른 섞기·연막·손바닥), 맞히는 사람은 눈으로 따라가다 고르기(돋보기·되감기·더블). 라운드마다 역할 교대, 컵 3~5개, 컴퓨터와도. 링크로 초대, 로그인 없이 닉네임만.",
+		"tags": ["1:1", "실시간", "컴퓨터"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
