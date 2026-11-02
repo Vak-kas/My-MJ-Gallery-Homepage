@@ -55,6 +55,12 @@ KINDS = {
 		"invite": "님이 숫자 야구 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.",
 		"placeholder": "방 이름 (예: 커피 내기 숫자 야구)",
 	},
+	"battleship": {
+		"title": "함대 격침", "icon": "🏴‍☠️", "eyebrow": "VERSUS · BATTLESHIP", "template": "games/battleship_room.html",
+		"intro": "10×10 바다에 배 5척을 숨기고 번갈아 포격! 💥 명중·💦 물기둥·⚓ 침몰. 📡 레이더·💥 일제사격·🌫 연막·🔧 수리·🛡 방패 스킬. 혼자면 컴퓨터와.",
+		"invite": "님이 함대 격침 한 판 하자고 해요. 링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.",
+		"placeholder": "방 이름 (예: 해적왕은 나야)",
+	},
 	"catchmind": {
 		"title": "그림 맞추기", "icon": "🎨", "eyebrow": "VERSUS · DRAW & GUESS", "template": "games/catchmind_room.html",
 		"intro": "방을 만들고 링크를 보내면 다 같이 들어와요. 차례대로 한 명이 제시어를 그리고, 나머지는 채팅으로 맞혀요. 빨리 맞힐수록 점수가 커요. (2~10명)",

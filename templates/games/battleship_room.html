@@ -1,0 +1,627 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #0e7490; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-btn:disabled { opacity: 0.4; cursor: default; }
+    .gm-btn.go { background: #0e7490; border-color: #0e7490; color: #fff; font-weight: 600; }
+    .seat { border-radius: 16px; border: 2px solid transparent; background: #f5f5f7; padding: 9px 12px; }
+    .seat.turn { border-color: #0e7490; background: #ecfeff; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 999px; flex: none; }
+    .tag { border-radius: 6px; background: #ececf0; padding: 0 6px; font-size: 11px; color: #6e6e73; }
+    #bs-chat { height: 180px; overflow-y: auto; }
+    .bar { height: 6px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }
+    .bar > i { display: block; height: 100%; background: #0e7490; transition: width .25s linear; }
+
+    /* ── 바다 지도 ── */
+    .map { position: relative; border-radius: 18px; padding: 10px; background: linear-gradient(135deg, #e8d5a8, #d9bf86); box-shadow: inset 0 0 0 2px rgba(120, 80, 20, 0.25), 0 6px 20px rgba(0, 0, 0, 0.08); }
+    .map::before { content: "🧭"; position: absolute; right: 10px; top: 6px; font-size: 18px; opacity: 0.6; }
+    .map h3 { font-size: 13px; font-weight: 700; color: #5b3d12; margin: 0 0 6px 2px; letter-spacing: 0.04em; }
+    .sea-wrap { display: grid; grid-template-columns: 18px 1fr; grid-template-rows: 18px 1fr; gap: 2px; }
+    .coords { display: grid; font-size: 10px; color: #5b3d12; font-weight: 700; }
+    .coords.x { grid-template-columns: repeat(10, 1fr); align-items: center; text-align: center; }
+    .coords.y { grid-template-rows: repeat(10, 1fr); align-items: center; text-align: center; }
+    .sea { position: relative; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(10, 1fr); aspect-ratio: 1; gap: 2px; border-radius: 10px; overflow: hidden;
+        background: radial-gradient(ellipse at 30% 20%, #4cc3e6 0%, #1f8fbf 45%, #0f5f8f 100%); user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .sea::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-linear-gradient(180deg, transparent 0 11px, rgba(255, 255, 255, 0.06) 11px 13px); animation: waves 6s linear infinite; }
+    @keyframes waves { to { background-position: 0 26px; } }
+    .sea.shake { animation: shake .45s; }
+    @keyframes shake { 0%, 100% { transform: none; } 20% { transform: translate(-5px, 3px) rotate(-.6deg); } 40% { transform: translate(5px, -3px) rotate(.6deg); } 60% { transform: translate(-4px, -2px); } 80% { transform: translate(3px, 2px); } }
+    .c { position: relative; border-radius: 3px; background: rgba(255, 255, 255, 0.07); display: flex; align-items: center; justify-content: center; font-size: clamp(12px, 2.4vw, 20px); line-height: 1; cursor: pointer; transition: background .15s; }
+    .c:hover { background: rgba(255, 255, 255, 0.25); }
+    .sea.locked .c { cursor: default; }
+    .sea.locked .c:hover { background: rgba(255, 255, 255, 0.07); }
+    .c.ship { background: #6b5a44; box-shadow: inset 0 0 0 2px #4a3b2a, inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+    .c.ship.h-start { border-radius: 50% 3px 3px 50%; } .c.ship.h-end { border-radius: 3px 50% 50% 3px; }
+    .c.ship.v-start { border-radius: 50% 50% 3px 3px; } .c.ship.v-end { border-radius: 3px 3px 50% 50%; }
+    .c.ship.ghost { background: rgba(107, 90, 68, 0.55); box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.6); }
+    .c.ship.ghost.bad { background: rgba(220, 38, 38, 0.55); }
+    .c.ship.picked { outline: 3px solid #fde047; outline-offset: -3px; }
+    .c.miss::after { content: "•"; color: rgba(255, 255, 255, 0.75); font-size: 1.1em; }
+    .c.hit { background: #c2410c; box-shadow: inset 0 0 0 2px #7c2d12; }
+    .c.hit::after { content: "🔥"; filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.8)); animation: flame 1.1s ease-in-out infinite alternate; }
+    @keyframes flame { from { transform: scale(.9) translateY(1px); } to { transform: scale(1.12) translateY(-1px); } }
+    .c.sunk { background: #1f2937; box-shadow: inset 0 0 0 2px #0b1220; }
+    .c.sunk::after { content: "☠️"; opacity: 0.9; }
+    .c.unknown::after { content: "?"; color: #fff; font-weight: 900; }
+    .c.repaired::after { content: "🔧"; }
+    .c.radar { box-shadow: inset 0 0 0 2px #a3e635; }
+    .c.aim { box-shadow: inset 0 0 0 3px #fde047; }
+    .c.sink-anim { animation: sink 1.1s forwards; }
+    @keyframes sink { 0% { transform: none; } 60% { transform: translateY(2px) rotate(2deg); } 100% { transform: translateY(6px) scale(.85); opacity: .85; } }
+    /* 포탄·물기둥·폭발 */
+    .fx { position: fixed; z-index: 70; pointer-events: none; font-size: 22px; line-height: 1; will-change: transform; }
+    .fx.ball { font-size: 18px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5)); }
+    .fx.splash { animation: splash .8s ease-out forwards; }
+    @keyframes splash { 0% { transform: translate(-50%, -30%) scale(.3); opacity: 1; } 50% { transform: translate(-50%, -110%) scale(1.4); opacity: 1; } 100% { transform: translate(-50%, -160%) scale(1.1); opacity: 0; } }
+    .fx.boom { animation: boom .7s ease-out forwards; }
+    @keyframes boom { 0% { transform: translate(-50%, -50%) scale(.2); opacity: 1; } 40% { transform: translate(-50%, -50%) scale(2.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(2.8); opacity: 0; } }
+    .fx.flash { position: fixed; inset: 0; background: rgba(255, 180, 60, 0.35); animation: flash .35s ease-out forwards; }
+    @keyframes flash { to { opacity: 0; } }
+    .fx.scan { position: fixed; border: 3px solid #a3e635; border-radius: 10px; box-shadow: 0 0 20px #a3e635; animation: scan 1.2s ease-out forwards; }
+    @keyframes scan { 0% { opacity: 0; transform: scale(.6); } 30% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0; transform: scale(1); } }
+
+    /* 배치 트레이 */
+    .tray { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .tray button { display: flex; align-items: center; gap: 6px; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 6px 10px; font-size: 12.5px; font-weight: 600; }
+    .tray button.on { border-color: #0e7490; background: #ecfeff; }
+    .tray button.done { opacity: 0.45; text-decoration: line-through; }
+    .tray i { display: flex; gap: 2px; } .tray i b { width: 10px; height: 10px; border-radius: 2px; background: #6b5a44; }
+    .skill { display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 14px; padding: 8px 4px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; font-size: 12px; font-weight: 600; min-width: 0; }
+    .skill .ic { font-size: 22px; }
+    .skill:disabled { opacity: 0.35; }
+    .skill.used { text-decoration: line-through; }
+    .skill.armed { border-color: #0e7490; background: #ecfeff; box-shadow: 0 0 0 3px rgba(14, 116, 144, 0.2); }
+    .fleetbar { display: flex; flex-wrap: wrap; gap: 6px; font-size: 11.5px; }
+    .fleetbar span { border-radius: 8px; padding: 2px 7px; background: rgba(255, 255, 255, 0.5); color: #5b3d12; font-weight: 600; }
+    .fleetbar span.sunk { text-decoration: line-through; opacity: 0.6; }
+
+    /* 큰 연출 */
+    #bs-pop { position: fixed; inset: 0; z-index: 80; display: none; align-items: center; justify-content: center; background: rgba(3, 20, 30, 0.6); backdrop-filter: blur(2px); cursor: pointer; }
+    #bs-pop.on { display: flex; }
+    #bs-pop .box { text-align: center; color: #fff; animation: popin .45s cubic-bezier(.2, 1.6, .4, 1); }
+    #bs-pop .big { font-size: 70px; font-weight: 900; letter-spacing: -0.02em; text-shadow: 0 6px 30px rgba(0, 0, 0, 0.5); }
+    #bs-pop .sub { font-size: 18px; font-weight: 600; opacity: 0.9; }
+    @keyframes popin { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn, html.theme-dark .skill, html.theme-dark .tray button { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .gm-btn.go { background: #0e7490; color: #fff; }
+    html.theme-dark .seat { background: #111318; color: #e8e8ea; }
+    html.theme-dark .seat.turn { background: #082f3a; }
+    html.theme-dark .tag { background: #2c2c30; color: #a1a1a6; }
+    html.theme-dark .map { background: linear-gradient(135deg, #5a4a2e, #3f3420); box-shadow: inset 0 0 0 2px rgba(255, 220, 150, 0.15); }
+    html.theme-dark .map h3, html.theme-dark .coords, html.theme-dark .fleetbar span { color: #ead9b0; }
+    html.theme-dark .fleetbar span { background: rgba(0, 0, 0, 0.25); }
+    html.theme-dark .tray button.on, html.theme-dark .skill.armed { background: #082f3a; }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:battleship' %}" class="text-[13px] text-[#0e7490]">← 함대 격침 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🏴‍☠️ {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 1:1 · 배 5척을 숨기고 번갈아 포격, 먼저 전멸시키면 승리</p>
+        </div>
+        <button type="button" class="gm-btn" id="bs-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="bs-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:battleship_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="bs-name-box" class="gm-card mt-5 hidden">
+        <form id="bs-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="bs-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#0e7490] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section class="gm-card min-w-0">
+            <p id="bs-status" class="text-center text-[16px] font-semibold">연결하는 중…</p>
+            <div class="bar mx-auto mt-2 max-w-[360px] hidden" id="bs-timer"><i></i></div>
+            <p id="bs-sub" class="mt-1 min-h-[18px] text-center text-[12.5px] text-[#6e6e73]"></p>
+
+            <!-- 배치 -->
+            <div id="bs-setup" class="mt-3 hidden">
+                <div class="tray" id="bs-tray"></div>
+                <div class="mt-2 flex flex-wrap justify-center gap-2">
+                    <button type="button" class="gm-btn" id="bs-rotate">🔄 방향 바꾸기 <span class="tag">R</span></button>
+                    <button type="button" class="gm-btn" id="bs-random">🎲 무작위 배치</button>
+                    <button type="button" class="gm-btn" id="bs-clear">지우기</button>
+                    <button type="button" class="gm-btn go" id="bs-ready" disabled>⚓ 배치 완료</button>
+                </div>
+                <p class="mt-1 text-center text-[11.5px] text-[#8e8e93]">배를 고르고 내 바다의 칸을 누르면 놓여요 · 놓인 배를 누르면 다시 들어요</p>
+            </div>
+
+            <!-- 두 바다 -->
+            <div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div class="map" id="bs-map-enemy">
+                    <h3 id="bs-h-enemy">☠️ 적의 바다</h3>
+                    <div class="sea-wrap"><div></div><div class="coords x" id="bs-cx-e"></div><div class="coords y" id="bs-cy-e"></div><div class="sea locked" id="bs-sea-enemy"></div></div>
+                    <div class="fleetbar mt-2" id="bs-fleet-enemy"></div>
+                </div>
+                <div class="map" id="bs-map-mine">
+                    <h3 id="bs-h-mine">⚓ 내 바다</h3>
+                    <div class="sea-wrap"><div></div><div class="coords x" id="bs-cx-m"></div><div class="coords y" id="bs-cy-m"></div><div class="sea locked" id="bs-sea-mine"></div></div>
+                    <div class="fleetbar mt-2" id="bs-fleet-mine"></div>
+                </div>
+            </div>
+
+            <!-- 스킬 -->
+            <div id="bs-skills-box" class="mt-4 hidden">
+                <h2 class="text-[14px] font-semibold">✨ 스킬 <span class="font-normal text-[12px] text-[#8e8e93]">종류별로 한 판에 한 번 · 한 턴에 하나</span></h2>
+                <div id="bs-skills" class="mt-2 grid grid-cols-5 gap-2"></div>
+                <p id="bs-intel" class="mt-2 text-[13px] font-semibold text-[#0e7490]"></p>
+            </div>
+
+            <div class="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-black/5 pt-4">
+                <select id="bs-level" class="gm-btn" aria-label="컴퓨터 난이도"><option value="easy">🤖 쉬움</option><option value="normal">🤖 보통</option><option value="hard">🤖 어려움</option></select>
+                <label class="flex items-center gap-1.5 text-[13px]"><input id="bs-skillopt" type="checkbox" class="h-4 w-4" checked> ✨ 스킬</label>
+                <label class="flex items-center gap-1.5 text-[13px]" title="명중하면 이어서 한 번 더 쏴요"><input id="bs-again" type="checkbox" class="h-4 w-4"> 💥 명중하면 한 번 더</label>
+                <button type="button" class="gm-btn" id="bs-bot">🤖 컴퓨터 넣기</button>
+                <button type="button" class="gm-btn go" id="bs-start">▶ 시작</button>
+                <button type="button" class="gm-btn" id="bs-resign">🏳 기권</button>
+                <button type="button" class="gm-btn" id="bs-stand">자리에서 일어나기</button>
+                <label class="ml-1 flex items-center gap-1.5 text-[13px]"><input id="bs-sound" type="checkbox" class="h-4 w-4" checked> 🔊</label>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card space-y-2" id="bs-seats"></section>
+            <section class="gm-card text-[12.5px] leading-6 text-[#6e6e73]">
+                <h2 class="text-[14px] font-semibold text-[#1d1d1f] dark:text-inherit">규칙</h2>
+                <p>10×10 바다에 기함 5·전함 4·순양함 3·잠수함 3·구축함 2칸을 가로·세로로 숨겨요. 번갈아 적의 바다를 한 칸씩 포격 — <b>💥 명중</b>, 배의 칸을 다 맞히면 <b>⚓ 침몰</b>, 빗나가면 <b>💦 물기둥</b>. 상대 배 5척을 다 가라앉히면 승리! 선공이 먼저 끝내면 후공에게 마지막 기회. 한 턴 45초.</p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="bs-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="bs-chat-form" class="mt-2 flex gap-2"><input id="bs-chat-in" class="gm-in" maxlength="200" placeholder="메시지" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+<div id="bs-pop" aria-live="polite"><div class="box" id="bs-pop-box"></div></div>
+
+{% if not relay_error %}
+<script>
+(() => {
+    const WS_URL = '{{ ws_url|escapejs }}';
+    const ROOM = '{{ room.id|escapejs }}';
+    const DEFAULT_NAME = '{{ default_name|escapejs }}';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* 무시 */ } } };
+    const COLS = 'ABCDEFGHIJ';
+    const key = (x, y) => `${x},${y}`;
+
+    let pid = store.get(`mj-battleship-pid-${ROOM}`);
+    if (!pid) { pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join(''); store.set(`mj-battleship-pid-${ROOM}`, pid); }
+
+    let ws = null, S = null, mySeat = null, ended = false, retry = 0, turnStart = 0, prevKey = '';
+    let placing = { ships: {}, pick: null, dir: 'h', hover: null };   // 배치 중: id → {x,y,dir}
+    let armed = null;        // 칸을 골라야 하는 스킬 id (radar / salvo / repair)
+    let salvoDir = 'h';
+    let radarCells = [];     // 레이더로 본 칸 (내 화면)
+    let pendingFx = Promise.resolve();
+    const other = (s) => (s === 'p1' ? 'p2' : 'p1');
+    const myTurn = () => S && S.status === 'playing' && mySeat && S.turn === mySeat;
+    const me = () => mySeat || 'p1';
+    const shipLen = (id) => S?.ships?.find((s) => s.id === id)?.len || 2;
+    const shipName = (id) => S?.ships?.find((s) => s.id === id)?.name || id;
+
+    // ── 바다 만들기 ──
+    function buildSea(sea, cx, cy) {
+        sea.innerHTML = '';
+        for (let y = 0; y < 10; y++) for (let x = 0; x < 10; x++) { const c = document.createElement('div'); c.className = 'c'; c.dataset.x = x; c.dataset.y = y; sea.appendChild(c); }
+        cx.innerHTML = COLS.split('').map((c) => `<span>${c}</span>`).join('');
+        cy.innerHTML = Array.from({ length: 10 }, (_, i) => `<span>${i + 1}</span>`).join('');
+    }
+    const seaE = $('bs-sea-enemy'), seaM = $('bs-sea-mine');
+    buildSea(seaE, $('bs-cx-e'), $('bs-cy-e')); buildSea(seaM, $('bs-cx-m'), $('bs-cy-m'));
+    const cellEl = (sea, x, y) => sea.children[y * 10 + x];
+    const cellsOf = (x, y, n, d) => Array.from({ length: n }, (_, i) => (d === 'h' ? [x + i, y] : [x, y + i]));
+    const inBoard = (x, y) => x >= 0 && x < 10 && y >= 0 && y < 10;
+
+    function paintShips(sea, fleet, cls = '') {
+        for (const [id, cells] of Object.entries(fleet || {})) {
+            const d = cells.length > 1 && cells[0][1] === cells[1][1] ? 'h' : 'v';
+            cells.forEach(([x, y], i) => {
+                const el = cellEl(sea, x, y); if (!el) return;
+                el.classList.add('ship'); if (cls) el.classList.add(...cls.split(' '));
+                el.dataset.ship = id;
+                if (i === 0) el.classList.add(`${d}-start`); if (i === cells.length - 1) el.classList.add(`${d}-end`);
+            });
+        }
+    }
+    function renderSeas() {
+        for (const sea of [seaE, seaM]) for (const el of sea.children) { el.className = 'c'; delete el.dataset.ship; }
+        if (!S) return;
+        const m = me(), o = other(m), setup = S.status === 'setup' && mySeat;
+        // 내 바다: 내 배 + 상대가 쏜 것
+        if (setup) {
+            const taken = new Set();
+            const placed = {};
+            for (const [id, p] of Object.entries(placing.ships)) { placed[id] = cellsOf(p.x, p.y, shipLen(id), p.dir); placed[id].forEach(([x, y]) => taken.add(key(x, y))); }
+            paintShips(seaM, placed);
+            if (placing.pick) for (const el of seaM.querySelectorAll(`[data-ship="${placing.pick}"]`)) el.classList.add('picked');
+            if (placing.pick && placing.hover) {
+                const cells = cellsOf(placing.hover[0], placing.hover[1], shipLen(placing.pick), placing.dir);
+                const bad = cells.some(([x, y]) => !inBoard(x, y) || (taken.has(key(x, y)) && placed[placing.pick]?.every(([a, b]) => key(a, b) !== key(x, y))));
+                cells.forEach(([x, y]) => { const el = cellEl(seaM, x, y); if (el) el.classList.add('ship', 'ghost', bad ? 'bad' : 'ok'); });
+            }
+        } else {
+            paintShips(seaM, S.fleet[m]);
+            for (const s of S.shots[o]) {
+                const el = cellEl(seaM, s.x, s.y);
+                if (s.r === 'hit') el.classList.add('hit'); else if (s.r === 'miss') el.classList.add('miss'); else if (s.r === 'repaired') el.classList.add('repaired');
+            }
+            for (const id of S.sunk[m]) for (const [x, y] of S.fleet[m][id] || []) cellEl(seaM, x, y).classList.replace('hit', 'sunk') || cellEl(seaM, x, y).classList.add('sunk');
+            if (armed === 'repair') for (const [x, y] of S.hits[m]) { const el = cellEl(seaM, x, y); if (!el.classList.contains('sunk')) el.classList.add('aim'); }
+        }
+        // 적의 바다: 내가 쏜 것 + 가라앉은 배
+        paintShips(seaE, S.fleet[o]);
+        for (const s of S.shots[m]) {
+            const el = cellEl(seaE, s.x, s.y);
+            if (s.r === 'hit') el.classList.add('hit'); else if (s.r === 'miss') el.classList.add('miss'); else if (s.r === '?') el.classList.add('unknown'); else if (s.r === 'repaired') el.classList.add('repaired');
+        }
+        for (const id of S.sunk[o]) for (const [x, y] of S.fleet[o][id] || []) { const el = cellEl(seaE, x, y); el.classList.remove('hit'); el.classList.add('sunk'); }
+        for (const [x, y] of radarCells) cellEl(seaE, x, y)?.classList.add('radar');
+        seaE.classList.toggle('locked', !(myTurn() && armed !== 'repair'));
+        seaM.classList.toggle('locked', !(setup || armed === 'repair'));
+        $('bs-h-enemy').textContent = mySeat ? `☠️ 적의 바다 — ${esc(S.seats[o]?.name || '상대')}` : `☠️ ${esc(S.seats.p2?.name || '2번')} 의 바다`;
+        $('bs-h-mine').textContent = mySeat ? '⚓ 내 바다' : `⚓ ${esc(S.seats.p1?.name || '1번')} 의 바다`;
+        const bar = (s) => (S.ships || []).map((sh) => `<span class="${S.sunk[s].includes(sh.id) ? 'sunk' : ''}">${esc(sh.name)} ${sh.len}</span>`).join('');
+        $('bs-fleet-enemy').innerHTML = bar(o); $('bs-fleet-mine').innerHTML = bar(m);
+    }
+
+    // ── 배치 ──
+    function renderTray() {
+        const on = S?.status === 'setup' && mySeat;
+        $('bs-setup').classList.toggle('hidden', !on);
+        if (!on) return;
+        $('bs-tray').innerHTML = S.ships.map((s) => `<button type="button" data-ship="${s.id}" class="${placing.pick === s.id ? 'on' : ''} ${placing.ships[s.id] ? 'done' : ''}">${esc(s.name)} <i>${'<b></b>'.repeat(s.len)}</i></button>`).join('');
+        const complete = Object.keys(placing.ships).length === S.ships.length;
+        $('bs-ready').disabled = !complete;
+        $('bs-ready').textContent = S.ready[mySeat] ? '⚓ 다시 보내기' : '⚓ 배치 완료';
+    }
+    $('bs-tray').addEventListener('click', (e) => { const b = e.target.closest('[data-ship]'); if (!b) return; placing.pick = placing.pick === b.dataset.ship ? null : b.dataset.ship; if (placing.pick && placing.ships[placing.pick]) placing.dir = placing.ships[placing.pick].dir; renderTray(); renderSeas(); });
+    function rotate() { placing.dir = placing.dir === 'h' ? 'v' : 'h'; if (placing.pick && placing.ships[placing.pick]) tryPlace(placing.ships[placing.pick].x, placing.ships[placing.pick].y, true); renderSeas(); }
+    $('bs-rotate').addEventListener('click', rotate);
+    function tryPlace(x, y, silent) {
+        const id = placing.pick; if (!id) return false;
+        const cells = cellsOf(x, y, shipLen(id), placing.dir);
+        if (cells.some(([a, b]) => !inBoard(a, b))) { if (!silent) toast('바다 밖으로 나가요.'); return false; }
+        for (const [oid, p] of Object.entries(placing.ships)) {
+            if (oid === id) continue;
+            const oc = new Set(cellsOf(p.x, p.y, shipLen(oid), p.dir).map(([a, b]) => key(a, b)));
+            if (cells.some(([a, b]) => oc.has(key(a, b)))) { if (!silent) toast('다른 배와 겹쳐요.'); return false; }
+        }
+        placing.ships[id] = { x, y, dir: placing.dir };
+        tick(420, 0.08);
+        const next = S.ships.find((s) => !placing.ships[s.id]);
+        placing.pick = next ? next.id : null;
+        return true;
+    }
+    seaM.addEventListener('click', (e) => {
+        const c = e.target.closest('.c'); if (!c) return;
+        const x = +c.dataset.x, y = +c.dataset.y;
+        if (armed === 'repair') { send({ type: 'skill', id: 'repair', x, y }); armed = null; renderAll(); return; }
+        if (!(S?.status === 'setup' && mySeat)) return;
+        if (c.dataset.ship && !placing.pick) { placing.pick = c.dataset.ship; placing.dir = placing.ships[c.dataset.ship].dir; delete placing.ships[c.dataset.ship]; placing.hover = [x, y]; }
+        else if (placing.pick) tryPlace(x, y);
+        renderTray(); renderSeas();
+    });
+    seaM.addEventListener('mousemove', (e) => { const c = e.target.closest('.c'); if (!c || !placing.pick) return; const h = [+c.dataset.x, +c.dataset.y]; if (!placing.hover || h[0] !== placing.hover[0] || h[1] !== placing.hover[1]) { placing.hover = h; renderSeas(); } });
+    seaM.addEventListener('mouseleave', () => { if (placing.hover) { placing.hover = null; renderSeas(); } });
+    function randomPlace() {
+        for (let tries = 0; tries < 200; tries++) {
+            const ships = {}, taken = new Set(); let ok = true;
+            for (const s of S.ships) {
+                let put = false;
+                for (let k = 0; k < 100 && !put; k++) {
+                    const d = Math.random() < 0.5 ? 'h' : 'v', x = Math.floor(Math.random() * (d === 'h' ? 11 - s.len : 10)), y = Math.floor(Math.random() * (d === 'v' ? 11 - s.len : 10));
+                    const cells = cellsOf(x, y, s.len, d);
+                    if (cells.some(([a, b]) => taken.has(key(a, b)))) continue;
+                    cells.forEach(([a, b]) => taken.add(key(a, b))); ships[s.id] = { x, y, dir: d }; put = true;
+                }
+                if (!put) { ok = false; break; }
+            }
+            if (ok) { placing.ships = ships; placing.pick = null; return; }
+        }
+    }
+    $('bs-random').addEventListener('click', () => { randomPlace(); tick(520, 0.1); renderTray(); renderSeas(); });
+    $('bs-clear').addEventListener('click', () => { placing.ships = {}; placing.pick = S.ships[0].id; renderTray(); renderSeas(); });
+    $('bs-ready').addEventListener('click', () => send({ type: 'place', ships: Object.entries(placing.ships).map(([id, p]) => ({ id, ...p })) }));
+
+    // ── 포격 ──
+    seaE.addEventListener('click', (e) => {
+        const c = e.target.closest('.c'); if (!c || !myTurn()) return;
+        const x = +c.dataset.x, y = +c.dataset.y;
+        if (armed === 'radar') { send({ type: 'skill', id: 'radar', x, y }); armed = null; renderAll(); return; }
+        if (armed === 'salvo') { send({ type: 'skill', id: 'salvo', x, y, dir: salvoDir }); armed = null; renderAll(); return; }
+        if (c.classList.contains('hit') || c.classList.contains('miss') || c.classList.contains('sunk')) { toast('이미 쏜 칸이에요.'); return; }
+        send({ type: 'fire', x, y });
+    });
+    seaE.addEventListener('mousemove', (e) => {
+        if (!armed || !myTurn()) return;
+        const c = e.target.closest('.c'); if (!c) return;
+        for (const el of seaE.querySelectorAll('.aim')) el.classList.remove('aim');
+        const x = +c.dataset.x, y = +c.dataset.y;
+        const cells = armed === 'radar' ? [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => [x + dx, y + dy])) : armed === 'salvo' ? [-1, 0, 1].map((i) => (salvoDir === 'h' ? [x + i, y] : [x, y + i])) : [];
+        cells.forEach(([a, b]) => { if (inBoard(a, b)) cellEl(seaE, a, b).classList.add('aim'); });
+    });
+    seaE.addEventListener('mouseleave', () => { for (const el of seaE.querySelectorAll('.aim')) el.classList.remove('aim'); });
+    document.addEventListener('keydown', (e) => {
+        if (e.target.closest('input, textarea, select')) return;
+        if (e.key === 'r' || e.key === 'R') { if (S?.status === 'setup' && mySeat) rotate(); else if (armed === 'salvo') { salvoDir = salvoDir === 'h' ? 'v' : 'h'; $('bs-sub').textContent = `💥 일제사격 — ${salvoDir === 'h' ? '가로' : '세로'} 3칸, 가운데 칸을 누르세요 (R 로 방향 바꾸기)`; } }
+        if (e.key === 'Escape' && armed) { armed = null; renderAll(); }
+    });
+
+    // ── 스킬 ──
+    function renderSkills() {
+        const show = S && S.skills_on && S.status !== 'waiting';
+        $('bs-skills-box').classList.toggle('hidden', !show);
+        if (!show) return;
+        const used = mySeat ? S.used[mySeat] : [];
+        const can = myTurn() && !S.skill_this_turn;
+        $('bs-skills').innerHTML = S.skills.map((k) => {
+            const u = used.includes(k.id), on = armed === k.id || (k.id === 'shield' && S.my_shield);
+            return `<button type="button" class="skill ${u ? 'used' : ''} ${on ? 'armed' : ''}" data-skill="${k.id}" title="${esc(k.desc)}" ${!mySeat || u || !can ? 'disabled' : ''}><span class="ic">${k.icon}</span>${esc(k.name)}</button>`;
+        }).join('');
+        const opUsed = mySeat && S.used[other(mySeat)].length ? `상대가 쓴 스킬: ${S.used[other(mySeat)].map((id) => S.skills.find((k) => k.id === id)?.icon).join(' ')}` : '';
+        if (!$('bs-intel').dataset.keep) $('bs-intel').textContent = opUsed;
+    }
+    $('bs-skills').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-skill]'); if (!b || b.disabled) return;
+        const k = S.skills.find((x) => x.id === b.dataset.skill);
+        if (armed === k.id) { armed = null; renderAll(); return; }
+        if (k.cell) {
+            armed = k.id;
+            if (k.id === 'repair' && !S.hits[mySeat].some(([x, y]) => !S.sunk[mySeat].some((id) => S.fleet[mySeat][id].some(([a, b]) => a === x && b === y)))) { armed = null; toast('고칠 칸이 없어요 — 아직 안 가라앉은 내 배의 맞은 칸이 있어야 해요.'); return; }
+            renderAll();
+            $('bs-sub').textContent = k.id === 'radar' ? '📡 레이더 — 적의 바다에서 살펴볼 가운데 칸을 누르세요 (Esc 취소)' : k.id === 'salvo' ? `💥 일제사격 — ${salvoDir === 'h' ? '가로' : '세로'} 3칸, 가운데 칸을 누르세요 (R 로 방향 바꾸기)` : '🔧 수리 — 내 바다에서 🔥 맞은 칸을 누르세요';
+            return;
+        }
+        if (confirm(`${k.icon} ${k.name}\n${k.desc}\n\n지금 쓸까요?`)) send({ type: 'skill', id: k.id });
+    });
+
+    // ── 자리·상태 ──
+    function seatHTML(s) {
+        const p = S?.seats?.[s], label = s === 'p1' ? '1번' : '2번';
+        const turn = S?.status === 'playing' && S.turn === s, win = S?.status === 'over' && S.winner === s;
+        if (!p) return `<div class="seat flex items-center gap-2"><b class="text-[14px]">⚓ ${label}</b><span class="text-[13px] text-[#8e8e93]">빈 자리</span>${!mySeat && !['setup', 'playing'].includes(S?.status) ? `<button type="button" class="gm-btn ml-auto" data-sit="${s}">여기 앉기</button>` : ''}</div>`;
+        const extra = S.status === 'setup' ? (S.ready[s] ? '🔒 배치 완료' : '✍️ 배치 중…') : S.status === 'playing' || S.status === 'over' ? `포격 ${S.turns[s]}번 · 남은 배 ${5 - S.sunk[s].length}척${S.first === s ? ' · 선공' : ''}` : '';
+        return `<div class="seat ${turn ? 'turn' : ''}"><div class="flex items-center gap-2"><b class="min-w-0 truncate text-[14px]">${win ? '🏆 ' : ''}${esc(p.name)}${mySeat === s ? ' (나)' : ''}</b>
+            ${p.bot ? '<span class="tag">컴퓨터</span>' : `<span class="dot" style="background:${p.online ? '#10b981' : '#c7c7cc'}"></span>`}
+            ${p.bot && mySeat && !['setup', 'playing'].includes(S.status) ? `<button type="button" class="text-[12px] text-[#c4271d]" data-unbot="${s}">빼기</button>` : ''}
+            <span class="ml-auto text-[12px] text-[#6e6e73]">${p.wins}승</span></div>
+            ${extra ? `<p class="mt-1 text-[12.5px] text-[#6e6e73]">${extra}</p>` : ''}</div>`;
+    }
+    function render(spectators) {
+        $('bs-seats').innerHTML = seatHTML('p1') + seatHTML('p2') + `<p class="pt-1 text-[12px] text-[#8e8e93]">${S?.draws ? `무승부 ${S.draws}번 · ` : ''}${spectators?.length ? `구경 ${spectators.length}명: ${esc(spectators.join(', '))}` : ''}</p>`;
+        const both = S && S.seats.p1 && S.seats.p2;
+        let status = '', sub = '';
+        if (!S) status = '연결하는 중…';
+        else if (S.status === 'setup') { status = mySeat ? (S.ready[mySeat] ? '상대가 배를 숨기는 중…' : '⚓ 내 바다에 배 5척을 숨기세요') : '두 사람이 배를 숨기는 중…'; }
+        else if (S.status === 'playing') {
+            const lc = S.last_chance ? '🔥 마지막 기회! ' : '';
+            status = lc + (myTurn() ? '🟢 내 차례! 적의 바다를 눌러 포격하세요' : `${S.seats[S.turn]?.name || ''} 차례${S.seats[S.turn]?.bot ? ' (조준 중…)' : ''}`);
+            if (myTurn() && S.smoked) sub = '🌫 연막 속이라 이번 포격 결과는 나에게 안 보여요';
+            if (S.my_shield) sub = (sub ? sub + ' · ' : '') + '🛡 방패 준비됨';
+        } else if (S.status === 'over') status = `🏁 ${S.reason}`;
+        else status = !mySeat ? '빈 자리에 앉아요' : both ? '둘 다 앉았어요! ▶ 시작' : '친구를 초대하거나 🤖 컴퓨터를 넣고 ▶ 시작';
+        $('bs-status').textContent = status;
+        if (!armed) $('bs-sub').textContent = sub;
+        const idle = S && !['setup', 'playing'].includes(S.status);
+        $('bs-level').value = S?.bot_level || 'normal'; $('bs-level').disabled = !(idle && mySeat);
+        $('bs-skillopt').checked = S ? S.skills_on : true; $('bs-skillopt').disabled = !(idle && mySeat);
+        $('bs-again').checked = !!S?.again; $('bs-again').disabled = !(idle && mySeat);
+        $('bs-bot').disabled = !(idle && mySeat && !both);
+        $('bs-start').disabled = !(idle && mySeat && both);
+        $('bs-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
+        $('bs-resign').classList.toggle('hidden', !(S && !idle && mySeat));
+        $('bs-stand').disabled = !(mySeat && idle);
+        document.title = myTurn() ? '🟢 내 차례 · {{ room.title|escapejs }}' : '🏴‍☠️ {{ room.title|escapejs }} · 함대 격침';
+        renderTray(); renderSkills(); renderSeas();
+    }
+    const renderAll = () => render(lastSpectators);
+    let lastSpectators = [];
+    $('bs-seats').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit });
+        const u = e.target.closest('[data-unbot]'); if (u) send({ type: 'remove-bot', seat: u.dataset.unbot });
+    });
+    const opts = () => send({ type: 'options', skills: $('bs-skillopt').checked, again: $('bs-again').checked, bot_level: $('bs-level').value });
+    $('bs-level').addEventListener('change', opts); $('bs-skillopt').addEventListener('change', opts); $('bs-again').addEventListener('change', opts);
+    $('bs-bot').addEventListener('click', () => send({ type: 'add-bot' }));
+    $('bs-start').addEventListener('click', () => send({ type: S?.status === 'over' ? 'rematch' : 'start' }));
+    $('bs-resign').addEventListener('click', () => { if (confirm('기권할까요?')) send({ type: 'resign' }); });
+    $('bs-stand').addEventListener('click', () => send({ type: 'stand' }));
+
+    setInterval(() => {
+        const on = S && S.status === 'playing';
+        $('bs-timer').classList.toggle('hidden', !on);
+        if (!on) return;
+        const left = Math.max(0, S.turn_limit - (performance.now() - turnStart) / 1000);
+        const bar = $('bs-timer').firstElementChild;
+        bar.style.width = `${(left / S.turn_limit) * 100}%`;
+        bar.style.background = left < 10 ? '#ef4444' : '#0e7490';
+    }, 250);
+
+    // ── 연출: 포탄 → 물기둥/폭발 ──
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    function center(el) { const r = el.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; }
+    function fx(cls, text, x, y, w, h) {
+        const el = document.createElement('div'); el.className = `fx ${cls}`; el.textContent = text || '';
+        if (x != null) { el.style.left = `${x}px`; el.style.top = `${y}px`; }
+        if (w) { el.style.width = `${w}px`; el.style.height = `${h}px`; }
+        document.body.appendChild(el);
+        return el;
+    }
+    async function cannon(fromSea, toSea, x, y, hit, sunk) {
+        const target = cellEl(toSea, x, y);
+        const [fx0, fy0] = center(fromSea), [tx, ty] = center(target);
+        const ball = fx('ball', '⚫', fx0, fy0);
+        ball.style.transform = 'translate(-50%,-50%)';
+        snd.cannon();
+        const anim = ball.animate([
+            { transform: 'translate(-50%,-50%) scale(.6)', offset: 0 },
+            { transform: `translate(calc(-50% + ${(tx - fx0) / 2}px), calc(-50% + ${(ty - fy0) / 2 - 120}px)) scale(1.6)`, offset: 0.5 },
+            { transform: `translate(calc(-50% + ${tx - fx0}px), calc(-50% + ${ty - fy0}px)) scale(.7)`, offset: 1 },
+        ], { duration: 650, easing: 'ease-in' });
+        await anim.finished.catch(() => {});
+        ball.remove();
+        if (hit === null) { const q = fx('splash', '🌫', tx, ty); snd.splash(); setTimeout(() => q.remove(), 900); return; }
+        if (hit) {
+            const b = fx('boom', '💥', tx, ty); snd.boom(sunk);
+            toSea.classList.remove('shake'); void toSea.offsetWidth; toSea.classList.add('shake');
+            if (sunk) { const f = fx('flash'); setTimeout(() => f.remove(), 400); }
+            target.classList.add('hit');
+            setTimeout(() => b.remove(), 800);
+        } else {
+            const s = fx('splash', '💦', tx, ty); snd.splash();
+            target.classList.add('miss');
+            setTimeout(() => s.remove(), 900);
+        }
+    }
+    function queueShots(m) {
+        const mine = m.seat === me(), fromSea = mine ? seaM : seaE, toSea = mine ? seaE : seaM;
+        pendingFx = pendingFx.then(async () => {
+            for (const s of m.shots) {
+                await cannon(fromSea, toSea, s.x, s.y, s.hit, !!s.sunk);
+                if (s.sunk) {
+                    for (const [x, y] of s.sunk.cells) { const el = cellEl(toSea, x, y); el.classList.add('sink-anim'); }
+                    pop(`<div class="big">⚓ 침몰!</div><div class="sub">${mine ? '적의' : `${esc(S?.seats?.[m.seat]?.name || '')} 님이 내`} <b>${esc(s.sunk.name)}</b>${mine ? '을(를) 가라앉혔어요!' : '을(를) 가라앉혔어요…'}</div>`, 2600);
+                    await wait(700);
+                } else await wait(m.shots.length > 1 ? 250 : 350);
+            }
+            if (m.hidden && m.shots.some((s) => s.hit === null)) toast('🌫 연막 때문에 결과가 가려졌어요. 상대 배를 다 가라앉히면 드러나요.');
+            renderSeas();
+        });
+    }
+
+    // ── 큰 연출 큐 ──
+    const POP = $('bs-pop');
+    let popTimer = null, popping = false; const popQueue = [];
+    function pop(html, ms, sound) { popQueue.push([html, ms, sound]); if (!popping) nextPop(); }
+    function nextPop() {
+        const item = popQueue.shift(); popping = !!item;
+        if (!item) { POP.classList.remove('on'); return; }
+        const [html, ms, sound] = item;
+        $('bs-pop-box').innerHTML = html + `<div class="sub mt-3" style="font-size:12px;opacity:.6">눌러서 넘기기${popQueue.length ? ` · 다음 ${popQueue.length}개` : ''}</div>`;
+        POP.classList.remove('on'); void POP.offsetWidth; POP.classList.add('on');
+        if (sound) sound();
+        clearTimeout(popTimer); popTimer = setTimeout(closePop, ms);
+    }
+    function closePop() { clearTimeout(popTimer); POP.classList.remove('on'); setTimeout(nextPop, 200); }
+    POP.addEventListener('click', closePop);
+
+    // ── 소리 (WebAudio 합성) ──
+    let audio = null;
+    const ctx = () => { if (!$('bs-sound').checked) return null; try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); return audio; } catch (e) { return null; } };
+    function noise(len, vol, filterType, freq, decay) {
+        const a = ctx(); if (!a) return;
+        const buf = a.createBuffer(1, a.sampleRate * len, a.sampleRate), d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, decay);
+        const src = a.createBufferSource(); src.buffer = buf;
+        const f = a.createBiquadFilter(); f.type = filterType; f.frequency.value = freq;
+        const g = a.createGain(); g.gain.value = vol;
+        src.connect(f).connect(g).connect(a.destination); src.start();
+    }
+    function tick(freq, len, type = 'triangle', vol = 0.1) {
+        const a = ctx(); if (!a) return;
+        const o = a.createOscillator(), g = a.createGain();
+        o.type = type; o.frequency.value = freq;
+        g.gain.setValueAtTime(vol, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + len);
+        o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + len + 0.02);
+    }
+    const snd = {
+        cannon() { noise(0.25, 0.35, 'lowpass', 600, 2); tick(90, 0.25, 'sine', 0.25); },
+        splash() { noise(0.6, 0.2, 'bandpass', 1800, 1.5); },
+        boom(big) { noise(big ? 1.2 : 0.7, big ? 0.6 : 0.45, 'lowpass', 300, 1.2); const a = ctx(); if (!a) return; const o = a.createOscillator(), g = a.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(140, a.currentTime); o.frequency.exponentialRampToValueAtTime(30, a.currentTime + 0.6); g.gain.setValueAtTime(0.4, a.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, a.currentTime + 0.7); o.connect(g).connect(a.destination); o.start(); o.stop(a.currentTime + 0.75); },
+        radar() { [600, 900, 1200].forEach((f, i) => setTimeout(() => tick(f, 0.2, 'sine', 0.08), i * 150)); },
+    };
+
+    // ── 채팅 ──
+    function chatLine(m) {
+        const box = $('bs-chat'), div = document.createElement('div');
+        div.innerHTML = m.system ? `<span class="text-[#8e8e93]">· ${esc(m.text)}</span>` : `<b>${esc(m.name)}</b> ${esc(m.text)}`;
+        box.appendChild(div); box.scrollTop = box.scrollHeight;
+    }
+    $('bs-chat-form').addEventListener('submit', (e) => { e.preventDefault(); const v = $('bs-chat-in').value.trim(); if (v) { send({ type: 'chat', text: v }); $('bs-chat-in').value = ''; } });
+    function toast(text) { chatLine({ system: true, text }); }
+
+    // ── 연결 ──
+    function send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); }
+    function handle(m) {
+        if (m.type === 'hello') { retry = 0; mySeat = m.seat; $('bs-chat').innerHTML = ''; (m.chat || []).forEach(chatLine); }
+        else if (m.type === 'state') {
+            const prevStatus = S?.status;
+            S = m.state; mySeat = m.you || null;
+            if (S.status === 'setup' && prevStatus !== 'setup') { placing = { ships: {}, pick: S.ships[0].id, dir: 'h', hover: null }; radarCells = []; $('bs-intel').textContent = ''; delete $('bs-intel').dataset.keep; }
+            if (S.status !== 'playing') armed = null;
+            const k = `${S.status}|${S.turn}|${S.turns?.p1}|${S.turns?.p2}`;
+            if (k !== prevKey) { turnStart = performance.now() - (S.elapsed || 0) * 1000; if (myTurn() && prevKey) tick(660, 0.15); prevKey = k; }
+            lastSpectators = m.peers.filter((p) => !p.seat).map((p) => p.name);
+            // 포격 연출이 진행 중이면 끝난 뒤에 그림
+            pendingFx = pendingFx.then(() => render(lastSpectators));
+        } else if (m.type === 'shots') queueShots(m);
+        else if (m.type === 'skill') {
+            const who = m.seat === mySeat ? '내가' : `${S?.seats?.[m.seat]?.name || ''} 님이`;
+            const desc = S?.skills?.find((k) => k.id === m.id)?.desc || '';
+            if (m.id === 'salvo') { pendingFx = pendingFx.then(() => { snd.radar(); toast(`${m.icon} ${who} 일제사격!`); }); return; }
+            if (m.id === 'radar' && m.cell && !m.blocked) {
+                pendingFx = pendingFx.then(async () => {
+                    const sea = m.seat === me() ? seaE : seaM, el = cellEl(sea, m.cell[0], m.cell[1]);
+                    const r = el.getBoundingClientRect(), s = fx('scan', '', r.left - r.width - 4, r.top - r.height - 4, r.width * 3 + 8, r.height * 3 + 8);
+                    snd.radar(); await wait(1200); s.remove();
+                });
+            }
+            pop(`<div class="big" style="font-size:64px">${m.icon}</div><div class="sub">${esc(who)} <b>${esc(m.name)}</b> 스킬!${m.blocked ? '<br>🛡 하지만 방패에 막혔어요!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${esc(desc)}</div>`, 3000, () => tick(m.blocked ? 300 : 740, 0.2, 'sine', 0.14));
+        } else if (m.type === 'intel') {
+            toast(m.text); $('bs-intel').textContent = m.text; $('bs-intel').dataset.keep = '1';
+            if (m.cell) { radarCells = [-1, 0, 1].flatMap((dx) => [-1, 0, 1].map((dy) => [m.cell[0] + dx, m.cell[1] + dy])).filter(([x, y]) => inBoard(x, y)); }
+        } else if (m.type === 'last-chance') { if (m.seat === mySeat) pop('<div class="big" style="font-size:54px">🔥 마지막 기회!</div><div class="sub">상대가 내 함대를 전멸시켰어요. 이번에 남은 배를 다 맞히면 무승부!</div>', 3500); }
+        else if (m.type === 'over') { pendingFx = pendingFx.then(() => pop(`<div class="big" style="font-size:54px">${m.winner ? (m.winner === mySeat ? '🏆 승리!' : mySeat ? '💀 패배…' : '🏁 끝!') : '🤝 무승부'}</div><div class="sub">${esc(m.reason)}</div>`, 4000, () => { if (m.winner === mySeat) [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tick(f, 0.25, 'triangle', 0.16), i * 110)); else tick(160, 0.5, 'square', 0.08); })); }
+        else if (m.type === 'chat') chatLine(m);
+        else if (m.type === 'error') toast(`⚠️ ${m.text}`);
+        else if (m.type === 'end') { ended = true; $('bs-status').textContent = `🚪 ${m.reason}`; }
+    }
+    function connect(name) {
+        ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+        ws.onclose = () => {
+            if (ended) return;
+            $('bs-status').textContent = '연결이 끊겼어요. 다시 연결하는 중…';
+            setTimeout(() => connect(name), Math.min(8000, 800 * 2 ** retry++));
+        };
+    }
+    function begin(name) { store.set('mj-game-name', name); $('bs-name-box').classList.add('hidden'); connect(name); }
+    const saved = DEFAULT_NAME || store.get('mj-game-name');
+    if (saved) begin(saved); else { $('bs-name-box').classList.remove('hidden'); $('bs-name').focus(); }
+    $('bs-name-form').addEventListener('submit', (e) => { e.preventDefault(); begin($('bs-name').value.trim()); });
+
+    $('bs-copy').addEventListener('click', async () => {
+        const url = $('bs-copy').dataset.url;
+        try { await navigator.clipboard.writeText(url); $('bs-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('bs-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
+    });
+    $('bs-kakao').addEventListener('click', () => mjShare({ title: `🏴‍☠️ 함대 격침 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bs-copy').dataset.url, button: '함대 격침 하러 가기' }));
+    render();
+    window.__battleship = { state: () => S, seat: () => mySeat, send, feed: handle, placing: () => placing, randomPlace, fxDone: () => pendingFx };
+})();
+</script>
+{% endif %}
+{% include "components/share.html" %}
+{% endblock %}
