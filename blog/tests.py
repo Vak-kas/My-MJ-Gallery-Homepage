@@ -314,6 +314,22 @@ class SeriesTests(TestCase):
 		draft.refresh_from_db()
 		self.assertEqual((draft.series.name, draft.series_order), ("HackRF 입문", 1))
 
+	def test_drafts_are_not_listed_in_series_even_for_author(self):
+		p1 = self.write("1편 준비물")
+		self.client.post(reverse("blog:post_create"), {
+			"title": "2편 초안", "category": "tech", "content": "", "series_name": "HackRF 입문", "submit_action": "draft",
+		})
+		draft = Post.objects.get(title="2편 초안")
+		self.assertFalse(draft.is_published)
+		res = self.client.get(reverse("blog:post_detail", args=[p1.slug]))   # 작성자(관리자)로 봐도
+		self.assertEqual([p.title for p in res.context["series_parts"]], ["1편 준비물"])
+		self.assertIsNone(res.context["series_next"])
+		page = self.client.get(reverse("blog:series", args=[p1.series.slug]))
+		self.assertNotContains(page, "2편 초안")
+		self.client.logout()
+		res = self.client.get(reverse("blog:post_detail", args=[p1.slug]))
+		self.assertNotContains(res, "2편 초안")
+
 	def test_explicit_order_and_remove(self):
 		p = self.write("번외편", order="10")
 		self.assertEqual(p.series_order, 10)
@@ -377,8 +393,8 @@ class TagTests(TestCase):
 		p = self.post("1편", "")
 		Post.objects.filter(pk=p.pk).update(series=s, series_order=1)
 		res = self.client.get(reverse("blog:post_create"))
-		self.assertEqual(res.context["my_series"], [{"name": "HackRF 입문", "post_count": 1}])
-		self.assertContains(res, "HackRF 입문 (지금 1편)")
+		self.assertEqual(res.context["my_series"], [{"name": "HackRF 입문", "post_count": 1, "published_count": 1, "draft_count": 0, "next_order": 2}])
+		self.assertContains(res, "HackRF 입문 — 발행 1편")
 		self.assertContains(res, "새 시리즈 만들기")
 		# 목록 카드에 시리즈 표시
 		res = self.client.get(reverse("blog:tech"))
