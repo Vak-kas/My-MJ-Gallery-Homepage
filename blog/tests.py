@@ -313,3 +313,56 @@ class SeriesTests(TestCase):
 		self.client.logout()
 		res = self.client.get(reverse("blog:post_detail", args=[p1.slug]))
 		self.assertEqual([p.title for p in res.context["series_parts"]], ["공개 편"])
+
+
+class TagTests(TestCase):
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		self.user = get_user_model().objects.create_superuser("tagger", "t@example.com", "pw")
+		self.client.force_login(self.user)
+
+	def post(self, title, tags):
+		self.client.post(reverse("blog:post_create"), {
+			"title": title, "category": "tech", "content": '{"format":"tiptap","version":1,"doc":{"type":"doc","content":[]}}',
+			"tags": tags, "submit_action": "publish", "is_published": "1",
+		})
+		return Post.objects.get(title=title)
+
+	def test_leading_hash_is_stripped_and_deduped(self):
+		from blog.models import Tag
+		p = self.post("글", "#3GPP, ##5G, 5G , #, 3gpp")
+		self.assertEqual(sorted(t.name for t in p.tags.all()), ["3GPP", "5G"])
+		self.assertFalse(Tag.objects.filter(name__startswith="#").exists())
+		res = self.client.get(reverse("blog:tech"))
+		self.assertNotContains(res, "##")
+		# 수정 화면에는 # 없는 이름으로 채워짐
+		res = self.client.get(reverse("blog:post_edit", args=[p.slug]))
+		self.assertEqual(res.context["form_data"]["tags"], "3GPP, 5G")
+
+	def test_migration_merges_hashed_tags(self):
+		import importlib
+		from django.apps import apps
+		from blog.models import Tag
+		good = Tag.objects.create(name="5G", slug="5g")
+		bad = Tag.objects.create(name="#5G", slug="5g-2")
+		lone = Tag.objects.create(name="#NGRAN", slug="ngran-x")
+		p = self.post("글", "")
+		p.tags.add(bad, lone)
+		importlib.import_module("blog.migrations.0012_strip_hash_from_tags").strip_hashes(apps, None)
+		self.assertEqual(sorted(t.name for t in p.tags.all()), ["5G", "NGRAN"])
+		self.assertEqual(Tag.objects.filter(name__in=["5G", "NGRAN"]).count(), 2)
+		self.assertFalse(Tag.objects.filter(pk=bad.pk).exists())
+		self.assertEqual(Tag.objects.get(pk=lone.pk).slug, "ngran")
+
+	def test_series_picker_lists_my_series_with_counts(self):
+		from blog.models import Series
+		s = Series.objects.create(author=self.user, name="HackRF 입문", slug="hackrf")
+		p = self.post("1편", "")
+		Post.objects.filter(pk=p.pk).update(series=s, series_order=1)
+		res = self.client.get(reverse("blog:post_create"))
+		self.assertEqual(res.context["my_series"], [{"name": "HackRF 입문", "post_count": 1}])
+		self.assertContains(res, "HackRF 입문 (1편)")
+		self.assertContains(res, "새 시리즈 만들기")
+		# 목록 카드에 시리즈 표시
+		res = self.client.get(reverse("blog:tech"))
+		self.assertContains(res, "📚 HackRF 입문 · 1편")

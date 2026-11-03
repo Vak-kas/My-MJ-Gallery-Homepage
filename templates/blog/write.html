@@ -307,10 +307,16 @@
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
             <div class="flex flex-wrap items-end gap-3">
                 <div class="min-w-[220px] flex-1">
-                    <label for="series_name" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">📚 시리즈 <span class="font-normal text-[#8e8e93]">(선택 — 예: HackRF 입문)</span></label>
-                    <input id="series_name" name="series_name" list="my-series" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 이름을 적으면 시리즈가 만들어져요"
-                        class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" autocomplete="off" />
-                    <datalist id="my-series">{% for name in my_series %}<option value="{{ name }}">{% endfor %}</datalist>
+                    <label for="series_pick" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">📚 시리즈 <span class="font-normal text-[#8e8e93]">(선택)</span></label>
+                    <div class="flex flex-wrap gap-2">
+                        <select id="series_pick" class="min-w-[200px] flex-1 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
+                            <option value="">시리즈 없음</option>
+                            {% for s in my_series %}<option value="{{ s.name }}">{{ s.name }} ({{ s.post_count }}편)</option>{% endfor %}
+                            <option value="__new__">➕ 새 시리즈 만들기…</option>
+                        </select>
+                        <input id="series_name" name="series_name" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 시리즈 이름 (예: HackRF 입문)"
+                            class="hidden min-w-[200px] flex-1 rounded-xl border border-[#0066cc]/50 bg-white px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" autocomplete="off" />
+                    </div>
                 </div>
                 <div class="w-[120px]">
                     <label for="series_order" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">몇 편</label>
@@ -415,6 +421,28 @@ window.addEventListener('DOMContentLoaded', () => {
         onChange: queueAutosave,
     });
 
+    // 시리즈: 목록에서 고르거나 "새 시리즈 만들기" 를 고르면 이름 칸이 열림. 서버로는 series_name 하나만 감
+    const seriesPick = document.getElementById('series_pick');
+    const seriesName = document.getElementById('series_name');
+    const syncSeriesPick = () => {
+        const current = seriesName.value.trim();
+        const known = [...seriesPick.options].some((o) => o.value === current && o.value !== '__new__');
+        seriesPick.value = current ? (known ? current : '__new__') : '';
+        seriesName.classList.toggle('hidden', seriesPick.value !== '__new__');
+    };
+    seriesPick.addEventListener('change', () => {
+        if (seriesPick.value === '__new__') {
+            seriesName.value = '';
+            seriesName.classList.remove('hidden');
+            seriesName.focus();
+        } else {
+            seriesName.value = seriesPick.value;
+            seriesName.classList.add('hidden');
+        }
+        queueAutosave();
+    });
+    syncSeriesPick();
+
     const collectSnapshot = () => ({
         title: document.getElementById('title')?.value || '',
         summary: document.getElementById('summary')?.value || '',
@@ -448,6 +476,7 @@ window.addEventListener('DOMContentLoaded', () => {
             });
             const categoryEl = document.querySelector('select[name="category"]');
             if (categoryEl && typeof snapshot.category === 'string') categoryEl.value = snapshot.category;
+            syncSeriesPick();
             mj.setContent(JSON.stringify(snapshot.content));
             isDirty = true;
         } catch (_) {

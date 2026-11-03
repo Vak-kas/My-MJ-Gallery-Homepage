@@ -170,7 +170,7 @@ def _clear_unlock_failure(request, post: Post):
 
 
 def _published_posts_qs():
-	return Post.objects.filter(is_published=True).prefetch_related("tags")
+	return Post.objects.filter(is_published=True).select_related("series").prefetch_related("tags")
 
 
 def _accessible_posts_qs(request):
@@ -215,15 +215,21 @@ def _serialize_post_form_data(post: Post):
 
 
 def _apply_post_tags(post: Post, tags_raw: str):
+	"""쉼표로 나눈 태그를 붙임. 앞의 # 은 떼고(#3GPP → 3GPP), 같은 태그는 한 번만."""
 	post.tags.clear()
-	if tags_raw:
-		for tag_name in [t.strip() for t in tags_raw.split(",") if t.strip()]:
-			tag_slug = slugify(tag_name, allow_unicode=True) or tag_name[:60]
-			tag, _ = Tag.objects.get_or_create(
-				slug=tag_slug,
-				defaults={"name": tag_name[:40]},
-			)
-			post.tags.add(tag)
+	seen = set()
+	for raw in (tags_raw or "").split(","):
+		tag_name = Tag.clean_name(raw)
+		if not tag_name:
+			continue
+		tag_slug = slugify(tag_name, allow_unicode=True) or tag_name[:60]
+		if tag_slug in seen:
+			continue
+		seen.add(tag_slug)
+		tag = Tag.objects.filter(slug=tag_slug).first() or Tag.objects.filter(name=tag_name).first()
+		if not tag:
+			tag = Tag.objects.create(slug=tag_slug, name=tag_name)
+		post.tags.add(tag)
 
 
 def _apply_series(post: Post, user, name: str, order_raw: str):
@@ -289,7 +295,12 @@ def _write_page_context(request, form_data=None, selected_draft=None, editing_po
 		draft_posts_qs = draft_posts_qs.exclude(id=editing_post.id)
 
 	return {
-		"my_series": list(Series.objects.filter(author=request.user).values_list("name", flat=True)[:50]),
+		"my_series": list(
+			Series.objects.filter(author=request.user)
+			.annotate(post_count=Count("posts"))
+			.order_by("name")
+			.values("name", "post_count")[:100]
+		),
 		"categories": Post.CATEGORY_CHOICES,
 		"form_data": form_data or {},
 		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
