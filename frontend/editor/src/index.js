@@ -14,6 +14,7 @@ import { Image, finalizeImageAttrs, waitForImageUploads } from './extensions/ima
 import { LinkCard } from './extensions/link-card.js';
 import { createMathExtensions } from './extensions/math.js';
 import { SlashMenu } from './extensions/slash-menu.js';
+import { Divider } from './extensions/divider.js';
 import { BlockHandle } from './extensions/block-handle.js';
 import { createBubbleToolbar } from './extensions/bubble-toolbar.js';
 
@@ -49,7 +50,9 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
                 heading: { levels: [1, 2, 3] },
                 link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
                 dropcursor: { color: '#2383e2', width: 3 },
+                horizontalRule: false,
             }),
+            Divider,
             Placeholder.configure({
                 includeChildren: true,
                 placeholder: ({ node }) => {
