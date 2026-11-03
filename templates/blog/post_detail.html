@@ -17,7 +17,8 @@
         </div>
     </div>
 
-    <article class="overflow-hidden rounded-[28px] border border-black/[0.08] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
+    <div class="xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-8">
+    <article class="min-w-0 overflow-hidden rounded-[28px] border border-black/[0.08] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
         {% with cover_from_content=post.content|editorjs_cover_image %}
         <div class="border-b border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff]">
             {% if cover_from_content %}
@@ -126,12 +127,24 @@
                 </details>
             </section>
             {% endif %}
-            <div class="prose max-w-none prose-p:leading-[1.9] prose-headings:tracking-[-0.03em] prose-h1:text-[2.1rem] prose-h2:text-[1.65rem] prose-h3:text-[1.3rem] prose-table:w-full prose-img:rounded-2xl">
+            <details id="post-toc-mobile" class="mb-8 hidden rounded-[18px] border border-black/[0.08] bg-[#fafafa] px-4 py-3 xl:!hidden">
+                <summary class="cursor-pointer select-none text-[14px] font-semibold text-[#1d1d1f]">📑 이 글의 목차</summary>
+                <ol class="toc-mobile-list mt-2 space-y-1 text-[14px]"></ol>
+            </details>
+            <div id="post-body" class="prose max-w-none prose-p:leading-[1.9] prose-headings:tracking-[-0.03em] prose-h1:text-[2.1rem] prose-h2:text-[1.65rem] prose-h3:text-[1.3rem] prose-table:w-full prose-img:rounded-2xl">
                 {{ post.content|render_editorjs }}
             </div>
             {% endif %}
         </div>
     </article>
+    <aside id="post-toc" class="post-toc hidden xl:sticky xl:top-24" aria-label="이 글의 목차">
+        <div class="post-toc-bars" aria-hidden="true"></div>
+        <nav class="post-toc-panel">
+            <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">목차</p>
+            <ol class="post-toc-list"></ol>
+        </nav>
+    </aside>
+    </div>
 
     {% if series and not is_locked_post %}
     <nav class="mt-8 grid gap-3 sm:grid-cols-2">
@@ -237,6 +250,102 @@
     </section>
     {% endif %}
 </main>
+<style>
+#post-body :is(h1, h2, h3, h4)[id] { scroll-margin-top: 96px; }
+.post-toc { width: 36px; height: 1px; z-index: 30; }   /* 위치는 xl:sticky 가 맡음 */
+@media (min-width: 1280px) { .post-toc.is-on { display: block; } }   /* 좁은 화면은 본문 위 접이식 목차만 */
+.post-toc-bars { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; padding: 6px 4px; }
+.post-toc-bars span { display: block; height: 3px; border-radius: 2px; background: #c7c7cc; transition: background .15s, width .15s; }
+.post-toc-bars span[data-l="1"] { width: 20px; }
+.post-toc-bars span[data-l="2"] { width: 14px; }
+.post-toc-bars span[data-l="3"] { width: 9px; }
+.post-toc-bars span.on { background: #0066cc; }
+.post-toc-panel { position: absolute; top: -10px; right: -8px; width: 248px; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.96); box-shadow: 0 12px 40px rgba(0,0,0,.08); backdrop-filter: blur(8px); opacity: 0; visibility: hidden; transform: translateX(8px); transition: opacity .18s, transform .18s, visibility .18s; }
+.post-toc:hover .post-toc-panel, .post-toc:focus-within .post-toc-panel, .post-toc.is-pinned .post-toc-panel { opacity: 1; visibility: visible; transform: none; }
+.post-toc:hover .post-toc-bars, .post-toc:focus-within .post-toc-bars, .post-toc.is-pinned .post-toc-bars { opacity: 0; }
+.post-toc-list { max-height: calc(100vh - 180px); overflow-y: auto; }
+.post-toc-list a, .toc-mobile-list a { display: block; padding: 4px 8px; border-radius: 8px; font-size: 13px; line-height: 1.45; color: #6e6e73; text-decoration: none; word-break: keep-all; overflow-wrap: anywhere; }
+.post-toc-list a:hover, .toc-mobile-list a:hover { background: #f2f2f7; color: #1d1d1f; }
+.post-toc-list a.on, .toc-mobile-list a.on { color: #0066cc; font-weight: 600; background: #eef4ff; }
+.post-toc-list a[data-l="2"], .toc-mobile-list a[data-l="2"] { padding-left: 20px; }
+.post-toc-list a[data-l="3"], .toc-mobile-list a[data-l="3"] { padding-left: 32px; font-size: 12.5px; }
+.post-toc-list a[data-l="4"], .toc-mobile-list a[data-l="4"] { padding-left: 44px; font-size: 12px; }
+</style>
+<script>
+(() => {
+    // 본문의 h1~h4 를 모아 노션처럼 옆에 떠 있는 목차를 만든다.
+    const body = document.getElementById('post-body');
+    const aside = document.getElementById('post-toc');
+    const mobile = document.getElementById('post-toc-mobile');
+    if (!body || !aside || !mobile) return;
+    const heads = [...body.querySelectorAll('h1, h2, h3, h4')].filter((h) => h.textContent.trim());
+    if (heads.length < 2) return;
+    const levels = [...new Set(heads.map((h) => +h.tagName[1]))].sort();
+    const used = new Set();
+    const items = heads.map((h, i) => {
+        const text = h.textContent.trim();
+        let id = h.id || text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'h';
+        if (used.has(id)) id = `${id}-${i + 1}`;
+        used.add(id);
+        h.id = id;
+        return { h, id, text, l: levels.indexOf(+h.tagName[1]) + 1 };   // 쓰인 단계만 세어 1부터
+    });
+    const bars = aside.querySelector('.post-toc-bars');
+    const list = aside.querySelector('.post-toc-list');
+    const mlist = mobile.querySelector('.toc-mobile-list');
+    for (const it of items) {
+        const bar = document.createElement('span');
+        bar.dataset.l = Math.min(it.l, 3);
+        bars.appendChild(bar);
+        for (const ol of [list, mlist]) {
+            const li = document.createElement('li');
+            const a = document.createElement('a');
+            a.href = `#${it.id}`;
+            a.textContent = it.text;
+            a.dataset.l = it.l;
+            a.addEventListener('click', (e) => {
+                e.preventDefault();
+                it.h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                history.replaceState(null, '', `#${it.id}`);
+                if (ol === mlist) mobile.open = false;
+            });
+            li.appendChild(a);
+            ol.appendChild(li);
+        }
+    }
+    aside.classList.add('is-on');
+    mobile.classList.remove('hidden');
+    // 스크롤 위치에 맞춰 현재 항목 표시
+    let current = -1;
+    const mark = () => {
+        const line = 120;
+        let idx = 0;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].h.getBoundingClientRect().top - line <= 0) idx = i; else break;
+        }
+        if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) idx = items.length - 1;
+        if (idx === current) return;
+        current = idx;
+        bars.querySelectorAll('span').forEach((b, i) => b.classList.toggle('on', i === idx));
+        for (const ol of [list, mlist]) ol.querySelectorAll('a').forEach((a, i) => a.classList.toggle('on', i === idx));
+        // 목차 목록 안에서만 스크롤 (scrollIntoView 는 창까지 끌어와서 안 씀)
+        const on = list.querySelectorAll('a')[idx];
+        if (on) {
+            const d = on.getBoundingClientRect(), r = list.getBoundingClientRect();
+            if (d.top < r.top || d.bottom > r.bottom) list.scrollTop += d.top - r.top - r.height / 2;
+        }
+    };
+    let raf = 0;
+    window.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; mark(); }); }, { passive: true });
+    window.addEventListener('resize', mark);
+    mark();
+    // 처음 들어올 때 #id 가 있으면 그 제목으로
+    if (location.hash) {
+        const t = document.getElementById(decodeURIComponent(location.hash.slice(1)));
+        if (t && body.contains(t)) setTimeout(() => t.scrollIntoView({ block: 'start' }), 50);
+    }
+})();
+</script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script>
 (() => {

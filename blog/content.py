@@ -177,6 +177,34 @@ def _render_blocks(nodes, tight=False):
 	return "".join(_render_block(node, tight) for node in nodes)
 
 
+# ── 구분선 모양 (에디터 frontend/editor/src/extensions/divider.js 와 같은 id) ──
+
+_DIV_SIDE_L = '<span class="h-px flex-1 bg-gradient-to-r from-transparent to-[#b4b4b8]"></span>'
+_DIV_SIDE_R = '<span class="h-px flex-1 bg-gradient-to-l from-transparent to-[#b4b4b8]"></span>'
+_DIV_WAVE = (
+	"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='8' viewBox='0 0 24 8'%3E"
+	"%3Cpath d='M0 4c3-4 6-4 9 0s6 4 9 0' fill='none' stroke='%238e8e93' stroke-width='1.2'/%3E%3C/svg%3E\")"
+)
+DIVIDER_STYLES = {
+	"line": '<hr class="w-full border-t border-[#d2d2d7]" />',
+	"circle": f'{_DIV_SIDE_L}<span class="h-2 w-2 rounded-full bg-[#1d1d1f]"></span>{_DIV_SIDE_R}',
+	"diamond": f'{_DIV_SIDE_L}<span class="h-2 w-2 rotate-45 bg-[#1d1d1f]"></span>{_DIV_SIDE_R}',
+	"star": f'{_DIV_SIDE_L}<span class="text-[14px] leading-none text-[#1d1d1f]">✦</span>{_DIV_SIDE_R}',
+	"dots": '<span class="text-[13px] leading-none tracking-[0.6em] text-[#8e8e93]">•••</span>',
+	"asterism": '<span class="text-[22px] leading-none text-[#1d1d1f]">⁂</span>',
+	"fade": '<span class="h-px w-full bg-gradient-to-r from-transparent via-[#8e8e93] to-transparent"></span>',
+	"double": '<hr class="w-full border-t-[3px] border-double border-[#b4b4b8]" />',
+	"dashed": '<hr class="w-full border-t border-dashed border-[#a1a1a6]" />',
+	"wave": f'<span class="h-2 w-full bg-repeat-x" style="background-image:{_DIV_WAVE};background-size:18px 8px"></span>',
+}
+
+
+def render_divider(style):
+	"""구분선 HTML. 모르는 모양은 기본 선."""
+	inner = DIVIDER_STYLES.get(str(style or "line"), DIVIDER_STYLES["line"])
+	return f'<div class="my-10 flex items-center justify-center gap-4" data-divider="{escape(str(style or "line"))}">{inner}</div>'
+
+
 def _render_block(node, tight=False):
 	node_type = node.get("type")
 	attrs = _attrs(node)
@@ -241,7 +269,7 @@ def _render_block(node, tight=False):
 		)
 
 	if node_type == "horizontalRule":
-		return '<div class="my-10 flex items-center justify-center"><hr class="w-full border-t border-[#d2d2d7]" /></div>'
+		return render_divider(attrs.get("style"))
 
 	if node_type == "image":
 		src = safe_url(attrs.get("src"))

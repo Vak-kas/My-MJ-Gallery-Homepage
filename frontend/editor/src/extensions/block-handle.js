@@ -5,6 +5,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 import { NodeSelection, Plugin, PluginKey, Selection, TextSelection } from '@tiptap/pm/state';
 import { dismissOnOutside, h, placeFloating } from '../dom.js';
 import { BLOCK_ITEMS, runBlockItem } from './slash-menu.js';
+import { DIVIDER_STYLES } from './divider.js';
 
 const HANDLE_KEY = new PluginKey('mjBlockHandle');
 
@@ -68,6 +69,12 @@ const openBlockMenu = (editor, anchor, pos) => {
                 return true;
             }).focus(undefined, { scrollIntoView: false }).run();
         }) }, [h('span', { class: 'mj-pop__icon', text: '⧉' }), h('b', { text: '복제' })]),
+        node.type.name === 'horizontalRule' ? h('div', { class: 'mj-pop__group', text: '모양' }) : null,
+        ...(node.type.name === 'horizontalRule' ? DIVIDER_STYLES.map((d) => h('button', {
+            type: 'button',
+            class: `mj-pop__item${node.attrs.style === d.id ? ' is-active' : ''}`,
+            onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { style: d.id }); return true; }).run()),
+        }, [h('span', { class: 'mj-pop__icon', text: d.icon }), h('b', { text: d.title })])) : []),
         canTurn ? h('div', { class: 'mj-pop__group', text: '전환' }) : null,
         ...(canTurn ? BLOCK_ITEMS.filter((item) => TURN_INTO.includes(item.id)).map((item) => h('button', {
             type: 'button',
