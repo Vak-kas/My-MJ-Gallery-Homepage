@@ -5,6 +5,7 @@ import Suggestion from '@tiptap/suggestion';
 import { h, placeFloating } from '../dom.js';
 import { insertImageFiles } from './image.js';
 import { insertMath } from './math.js';
+import { DIVIDER_STYLES, insertDivider } from './divider.js';
 
 const pickImageFiles = (editor) => {
     const input = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true });
@@ -26,12 +27,15 @@ export const BLOCK_ITEMS = [
     { id: 'todo', group: '기본 블록', icon: '☑', title: '할 일 목록', desc: '[] 로도 시작 가능', keys: 'todo task check checklist 할일 체크 투두', run: (c) => c.toggleTaskList() },
     { id: 'toggle', group: '기본 블록', icon: '▸', title: '토글', desc: '접고 펼치는 블록', keys: 'toggle details 토글 접기', run: (c) => c.setDetails() },
     { id: 'quote', group: '기본 블록', icon: '❝', title: '인용', desc: '> 로도 시작 가능', keys: 'quote blockquote 인용', run: (c) => c.setBlockquote() },
-    { id: 'divider', group: '기본 블록', icon: '—', title: '구분선', desc: '--- 로도 가능', keys: 'divider hr line 구분선 선', run: (c) => c.setHorizontalRule() },
+    { id: 'divider', group: '기본 블록', icon: '—', title: '구분선', desc: '--- 로도 가능 · 모양은 블록 메뉴에서', keys: 'divider hr line 구분선 선', run: (c) => c.setHorizontalRule() },
     { id: 'code', group: '기본 블록', icon: '</>', title: '코드', desc: '``` 로도 시작 가능', keys: 'code codeblock 코드', run: (c) => c.setCodeBlock() },
     { id: 'table', group: '기본 블록', icon: '▦', title: '표', desc: '3×3 표', keys: 'table 표 테이블', run: (c) => c.insertTable({ rows: 3, cols: 3, withHeaderRow: true }) },
     { id: 'image', group: '미디어', icon: '🖼', title: '이미지', desc: '파일 선택 (붙여넣기·끌어놓기도 가능)', keys: 'image picture photo img 이미지 사진 그림', after: (editor) => pickImageFiles(editor) },
     { id: 'linkcard', group: '미디어', icon: '🔗', title: '링크 카드', desc: '웹페이지 북마크', keys: 'link bookmark card url 링크 카드 북마크', run: (c) => c.insertContent({ type: 'linkCard' }) },
     { id: 'math', group: '수식', icon: '∑', title: '블록 수식', desc: '빈 줄에서 $$ + 스페이스', keys: 'math equation latex block 수식 블록 방정식', after: (editor) => insertMath(editor, 'block') },
+    ...DIVIDER_STYLES.filter((d) => d.id !== 'line').map((d) => ({
+        id: `divider-${d.id}`, group: '구분선', icon: d.icon, title: `구분선 · ${d.title}`, desc: d.desc, keys: `divider hr line 구분선 선 ${d.id} ${d.title}`, run: (c) => insertDivider(c, d.id),
+    })),
     { id: 'inline-math', group: '수식', icon: '𝑥', title: '인라인 수식', desc: '문장 안에서 $x^2$', keys: 'inline math latex 인라인 수식', after: (editor) => insertMath(editor, 'inline') },
 ];
 

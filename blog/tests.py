@@ -51,6 +51,20 @@ class TiptapRenderTests(SimpleTestCase):
 		self.assertIn("&lt;b&gt;x&lt;/b&gt;", html)
 		self.assertIn("<hr", html)
 
+	def test_divider_styles(self):
+		html = self.render({"type": "horizontalRule", "attrs": {"style": "circle"}})
+		self.assertIn('data-divider="circle"', html)
+		self.assertIn("rounded-full", html)
+		self.assertIn("⁂", self.render({"type": "horizontalRule", "attrs": {"style": "asterism"}}))
+		# 모르는 모양·없는 모양은 기본 선, 속성값은 이스케이프
+		for bad in ({"style": "<script>"}, {"style": None}, None):
+			node = {"type": "horizontalRule"}
+			if bad is not None:
+				node["attrs"] = bad
+			out = self.render(node)
+			self.assertIn('<hr class="w-full border-t border-[#d2d2d7]"', out)
+			self.assertNotIn("<script>", out)
+
 	def test_math_uses_katex_placeholder(self):
 		html = self.render(
 			para(text("식 "), {"type": "inlineMath", "attrs": {"latex": "x^2"}}),
