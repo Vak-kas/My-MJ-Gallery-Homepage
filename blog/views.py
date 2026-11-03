@@ -971,19 +971,8 @@ def post_create(request):
 			messages.success(request, f'"{post.title}" 글이 등록되었습니다.')
 		return redirect("blog:index")
 
-	if selected_draft:
-		form_data = {
-			"draft_id": str(selected_draft.id),
-			"title": selected_draft.title,
-			"category": selected_draft.category,
-			"summary": selected_draft.summary,
-			"content": selected_draft.content,
-			"cover_image": selected_draft.cover_image.url if selected_draft.cover_image else "",
-			"tags": ", ".join(tag.name for tag in selected_draft.tags.all()),
-			"is_published": "0",
-		}
-	else:
-		form_data = {}
+	# 초안을 다시 열 때 시리즈·순서까지 채움 (비우면 다음 저장에서 시리즈가 풀림)
+	form_data = _serialize_post_form_data(selected_draft) if selected_draft else {}
 
 	return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 

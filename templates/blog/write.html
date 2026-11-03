@@ -311,7 +311,7 @@
                     <div class="flex flex-wrap gap-2">
                         <select id="series_pick" class="min-w-[200px] flex-1 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
                             <option value="">시리즈 없음</option>
-                            {% for s in my_series %}<option value="{{ s.name }}">{{ s.name }} ({{ s.post_count }}편)</option>{% endfor %}
+                            {% for s in my_series %}<option value="{{ s.name }}">{{ s.name }} (지금 {{ s.post_count }}편)</option>{% endfor %}
                             <option value="__new__">➕ 새 시리즈 만들기…</option>
                         </select>
                         <input id="series_name" name="series_name" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 시리즈 이름 (예: HackRF 입문)"
@@ -320,7 +320,7 @@
                 </div>
                 <div class="w-[120px]">
                     <label for="series_order" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">몇 편</label>
-                    <input id="series_order" name="series_order" type="number" min="1" max="999" value="{{ form_data.series_order|default:'' }}" placeholder="자동"
+                    <input id="series_order" name="series_order" type="number" min="1" max="999" value="{{ form_data.series_order|default:'' }}" placeholder="자동(마지막 편 다음)"
                         class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" />
                 </div>
             </div>

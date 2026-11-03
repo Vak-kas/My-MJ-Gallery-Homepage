@@ -297,6 +297,23 @@ class SeriesTests(TestCase):
 		page = self.client.get(reverse("blog:series", args=[p1.series.slug]))
 		self.assertEqual([p.title for p in page.context["series_parts"]], ["1편 준비물", "2편 설치", "3편 첫 수신"])
 
+	def test_draft_keeps_series_when_reopened_and_saved_again(self):
+		self.client.post(reverse("blog:post_create"), {
+			"title": "초안 2편", "category": "tech", "content": "", "series_name": "HackRF 입문", "submit_action": "draft",
+		})
+		draft = Post.objects.get(title="초안 2편")
+		self.assertEqual(draft.series.name, "HackRF 입문")
+		res = self.client.get(f"{reverse('blog:post_create')}?draft={draft.id}")
+		self.assertEqual(res.context["form_data"]["series_name"], "HackRF 입문")
+		self.assertEqual(res.context["form_data"]["series_order"], 1)
+		# 다시 열린 화면 그대로 저장해도 시리즈가 남아야 함
+		self.client.post(reverse("blog:post_create"), {
+			"draft_id": str(draft.id), "title": "초안 2편", "category": "tech", "content": "",
+			"series_name": res.context["form_data"]["series_name"], "series_order": res.context["form_data"]["series_order"], "submit_action": "draft",
+		})
+		draft.refresh_from_db()
+		self.assertEqual((draft.series.name, draft.series_order), ("HackRF 입문", 1))
+
 	def test_explicit_order_and_remove(self):
 		p = self.write("번외편", order="10")
 		self.assertEqual(p.series_order, 10)
@@ -361,7 +378,7 @@ class TagTests(TestCase):
 		Post.objects.filter(pk=p.pk).update(series=s, series_order=1)
 		res = self.client.get(reverse("blog:post_create"))
 		self.assertEqual(res.context["my_series"], [{"name": "HackRF 입문", "post_count": 1}])
-		self.assertContains(res, "HackRF 입문 (1편)")
+		self.assertContains(res, "HackRF 입문 (지금 1편)")
 		self.assertContains(res, "새 시리즈 만들기")
 		# 목록 카드에 시리즈 표시
 		res = self.client.get(reverse("blog:tech"))
