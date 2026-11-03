@@ -399,3 +399,14 @@ class TagTests(TestCase):
 		# 목록 카드에 시리즈 표시
 		res = self.client.get(reverse("blog:tech"))
 		self.assertContains(res, "📚 HackRF 입문 · 1편")
+
+
+class WritePageMarkupTests(TestCase):
+	def test_sections_are_balanced(self):
+		from django.contrib.auth import get_user_model
+		self.client.force_login(get_user_model().objects.create_superuser("w", "w@example.com", "pw"))
+		html = self.client.get(reverse("blog:post_create")).content.decode()
+		self.assertEqual(html.count("<section"), html.count("</section>"))
+		# 태그 상자는 시리즈 상자 밖에 있어야 함
+		self.assertLess(html.index('id="series_hint"'), html.index('for="tags"'))
+		self.assertIn("</section>", html[html.index('id="series_hint"'):html.index('for="tags"')])
