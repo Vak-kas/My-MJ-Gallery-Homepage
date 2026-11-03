@@ -14,7 +14,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Max, Q
 from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -262,7 +262,8 @@ def _series_context(request, post: Post):
 	"""글 상세의 시리즈 상자: 같은 시리즈 글 목록(보이는 것만)과 이전·다음 편."""
 	if not post.series_id:
 		return {}
-	parts = list(_single_post_qs(request).filter(series_id=post.series_id).order_by("series_order", "published_at", "id"))
+	# 임시글은 작성자가 봐도 목차에 안 넣음 (발행해야 편으로 셈). 지금 보는 글이 임시글이면 자기만 덧붙임
+	parts = list(_single_post_qs(request).filter(series_id=post.series_id, is_published=True).order_by("series_order", "published_at", "id"))
 	if post not in parts:
 		parts.append(post)
 	index = parts.index(post)
@@ -277,7 +278,7 @@ def _series_context(request, post: Post):
 
 def series_detail(request, slug: str):
 	series = get_object_or_404(Series, slug=slug)
-	parts = list(_single_post_qs(request).filter(series=series).order_by("series_order", "published_at", "id"))
+	parts = list(_single_post_qs(request).filter(series=series, is_published=True).order_by("series_order", "published_at", "id"))
 	if not parts:
 		raise Http404("Not found")
 	from main import og_cards
@@ -295,12 +296,23 @@ def _write_page_context(request, form_data=None, selected_draft=None, editing_po
 		draft_posts_qs = draft_posts_qs.exclude(id=editing_post.id)
 
 	return {
-		"my_series": list(
-			Series.objects.filter(author=request.user)
-			.annotate(post_count=Count("posts"))
+		"my_series": [
+			{
+				"name": s["name"],
+				"post_count": s["post_count"],
+				"published_count": s["published_count"],
+				"draft_count": s["post_count"] - s["published_count"],
+				"next_order": (s["last_order"] or 0) + 1,
+			}
+			for s in Series.objects.filter(author=request.user)
+			.annotate(
+				post_count=Count("posts"),
+				published_count=Count("posts", filter=Q(posts__is_published=True)),
+				last_order=Max("posts__series_order"),
+			)
 			.order_by("name")
-			.values("name", "post_count")[:100]
-		),
+			.values("name", "post_count", "published_count", "last_order")[:100]
+		],
 		"categories": Post.CATEGORY_CHOICES,
 		"form_data": form_data or {},
 		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
@@ -971,19 +983,8 @@ def post_create(request):
 			messages.success(request, f'"{post.title}" 글이 등록되었습니다.')
 		return redirect("blog:index")
 
-	if selected_draft:
-		form_data = {
-			"draft_id": str(selected_draft.id),
-			"title": selected_draft.title,
-			"category": selected_draft.category,
-			"summary": selected_draft.summary,
-			"content": selected_draft.content,
-			"cover_image": selected_draft.cover_image.url if selected_draft.cover_image else "",
-			"tags": ", ".join(tag.name for tag in selected_draft.tags.all()),
-			"is_published": "0",
-		}
-	else:
-		form_data = {}
+	# 초안을 다시 열 때 시리즈·순서까지 채움 (비우면 다음 저장에서 시리즈가 풀림)
+	form_data = _serialize_post_form_data(selected_draft) if selected_draft else {}
 
 	return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 

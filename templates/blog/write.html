@@ -289,6 +289,13 @@
                 </div>
             </div>
             <div id="editor-shell" class="editor-shell">
+                <div id="restore-bar" class="mb-3 hidden items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-[13px] text-amber-900">
+                    <span>저장하지 않은 편집 내용이 이 브라우저에 남아 있어요.</span>
+                    <span class="flex shrink-0 gap-2">
+                        <button type="button" id="restore-yes" class="rounded-lg bg-amber-600 px-3 py-1 font-semibold text-white hover:bg-amber-700">불러오기</button>
+                        <button type="button" id="restore-no" class="rounded-lg border border-amber-300 px-3 py-1 hover:bg-amber-100">지우기</button>
+                    </span>
+                </div>
                 <div id="editor" class="editor-holder"></div>
             </div>
             <div class="editor-help">
@@ -305,28 +312,22 @@
         </section>
 
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
-            <div class="flex flex-wrap items-end gap-3">
-                <div class="min-w-[220px] flex-1">
-                    <label for="series_pick" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">📚 시리즈 <span class="font-normal text-[#8e8e93]">(선택)</span></label>
-                    <div class="flex flex-wrap gap-2">
-                        <select id="series_pick" class="min-w-[200px] flex-1 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
-                            <option value="">시리즈 없음</option>
-                            {% for s in my_series %}<option value="{{ s.name }}">{{ s.name }} ({{ s.post_count }}편)</option>{% endfor %}
-                            <option value="__new__">➕ 새 시리즈 만들기…</option>
-                        </select>
-                        <input id="series_name" name="series_name" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 시리즈 이름 (예: HackRF 입문)"
-                            class="hidden min-w-[200px] flex-1 rounded-xl border border-[#0066cc]/50 bg-white px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" autocomplete="off" />
-                    </div>
-                </div>
-                <div class="w-[120px]">
-                    <label for="series_order" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">몇 편</label>
+            <label for="series_pick" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">📚 시리즈 <span class="font-normal text-[#8e8e93]">(선택)</span></label>
+            <div class="flex flex-wrap items-center gap-2">
+                <select id="series_pick" class="min-w-[220px] flex-1 rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
+                    <option value="">시리즈 없음</option>
+                    {% for s in my_series %}<option value="{{ s.name }}" data-next="{{ s.next_order }}">{{ s.name }} — 발행 {{ s.published_count }}편{% if s.draft_count %} · 임시 {{ s.draft_count }}편{% endif %}</option>{% endfor %}
+                    <option value="__new__">➕ 새 시리즈 만들기…</option>
+                </select>
+                <input id="series_name" name="series_name" maxlength="80" value="{{ form_data.series_name|default:'' }}" placeholder="새 시리즈 이름 (예: HackRF 입문)"
+                    class="hidden min-w-[220px] flex-1 rounded-xl border border-[#0066cc]/50 bg-white px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" autocomplete="off" />
+                <div id="series_order_wrap" class="hidden items-center gap-2">
                     <input id="series_order" name="series_order" type="number" min="1" max="999" value="{{ form_data.series_order|default:'' }}" placeholder="자동"
-                        class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]" />
+                        class="w-[88px] rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-3 py-3 text-center text-[14px] outline-none focus:border-[#0066cc]" />
+                    <span class="text-[13px] text-[#6e6e73]">편</span>
                 </div>
             </div>
-            <p class="mt-2 text-[12px] text-[#8e8e93]">같은 시리즈 이름을 쓴 글끼리 묶여서, 글 아래에 목차와 이전·다음 편 버튼이 생겨요. "몇 편"을 비우면 마지막 편 다음 번호가 붙어요.</p>
-        </section>
-
+            <p id="series_hint" class="mt-2 text-[12px] text-[#8e8e93]">시리즈를 고르면 자동으로 마지막 편 다음 번호가 붙어요. 글 아래에 목차와 이전·다음 편 버튼이 생겨요.</p>
         <section class="rounded-[20px] border border-black/[0.08] bg-white p-6">
             <label for="tags" class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]"># 태그</label>
             <input id="tags" name="tags" value="{{ form_data.tags|default:'' }}" placeholder="#Django, #Python, #개발일지 또는 쉼표로 구분"
@@ -430,6 +431,32 @@ window.addEventListener('DOMContentLoaded', () => {
         seriesPick.value = current ? (known ? current : '__new__') : '';
         seriesName.classList.toggle('hidden', seriesPick.value !== '__new__');
     };
+    // 편 번호는 자동. 안내 문구에 "n편으로 들어가요" 를 보여 주고, 직접 정하고 싶을 때만 번호 칸을 엶
+    const seriesOrder = document.getElementById('series_order');
+    const seriesOrderWrap = document.getElementById('series_order_wrap');
+    const seriesHint = document.getElementById('series_hint');
+    const savedOrder = seriesOrder.value;   // 이미 시리즈에 들어 있는 글(수정·초안)의 번호
+    const showSeriesHint = () => {
+        const opt = seriesPick.selectedOptions[0];
+        if (!seriesName.value.trim()) {
+            seriesOrderWrap.classList.add('hidden');
+            seriesHint.textContent = '시리즈를 고르면 자동으로 마지막 편 다음 번호가 붙어요. 글 아래에 목차와 이전·다음 편 버튼이 생겨요.';
+            return;
+        }
+        const manual = seriesOrder.value.trim();
+        const next = (seriesPick.value === '__new__') ? 1 : Number(opt?.dataset.next || 1);
+        const n = manual || (savedOrder && seriesName.value.trim() === seriesName.defaultValue.trim() ? savedOrder : next);
+        seriesHint.innerHTML = '';
+        seriesHint.append(`이 글은 「${seriesName.value.trim()}」 ${n}편으로 들어가요. `);
+        if (seriesOrderWrap.classList.contains('hidden')) {
+            const a = document.createElement('button');
+            a.type = 'button';
+            a.className = 'underline underline-offset-2 hover:text-[#0066cc]';
+            a.textContent = '번호 직접 정하기';
+            a.addEventListener('click', () => { seriesOrderWrap.classList.remove('hidden'); seriesOrderWrap.classList.add('flex'); seriesOrder.focus(); showSeriesHint(); });
+            seriesHint.append(a);
+        }
+    };
     seriesPick.addEventListener('change', () => {
         if (seriesPick.value === '__new__') {
             seriesName.value = '';
@@ -439,9 +466,14 @@ window.addEventListener('DOMContentLoaded', () => {
             seriesName.value = seriesPick.value;
             seriesName.classList.add('hidden');
         }
+        if (seriesPick.value === '__new__' || seriesName.value.trim() !== seriesName.defaultValue.trim()) seriesOrder.value = '';   // 다른 시리즈로 옮기면 번호는 다시 자동
+        showSeriesHint();
         queueAutosave();
     });
+    seriesName.addEventListener('input', showSeriesHint);
+    seriesOrder.addEventListener('input', showSeriesHint);
     syncSeriesPick();
+    showSeriesHint();
 
     const collectSnapshot = () => ({
         title: document.getElementById('title')?.value || '',
@@ -462,13 +494,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const tryRestoreSnapshot = () => {
+    const applySnapshot = (snapshot) => {
         try {
-            const raw = localStorage.getItem(storageScope);
-            if (!raw) return;
-            const snapshot = JSON.parse(raw);
-            if (!snapshot || !snapshot.content) return;
-            if (!window.confirm('이전 편집 내용이 있습니다. 복구할까요?')) return;
             const fields = { title: 'title', summary: 'summary', tags: 'tags', series_name: 'series_name', series_order: 'series_order' };
             Object.entries(fields).forEach(([key, id]) => {
                 const el = document.getElementById(id);
@@ -477,6 +504,7 @@ window.addEventListener('DOMContentLoaded', () => {
             const categoryEl = document.querySelector('select[name="category"]');
             if (categoryEl && typeof snapshot.category === 'string') categoryEl.value = snapshot.category;
             syncSeriesPick();
+            showSeriesHint();
             mj.setContent(JSON.stringify(snapshot.content));
             isDirty = true;
         } catch (_) {
@@ -484,9 +512,35 @@ window.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // 서버에 저장된 내용(지금 화면)과 같은 자동저장본이면 물어보지 않고 버림. 다를 때만 작은 띠로 "불러오기 / 지우기"
+    const tryRestoreSnapshot = () => {
+        let snapshot = null;
+        try {
+            snapshot = JSON.parse(localStorage.getItem(storageScope) || 'null');
+        } catch (_) { snapshot = null; }
+        if (!snapshot || !snapshot.content) return;
+        const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+        const current = collectSnapshot();
+        if (same(snapshot.content, current.content) && snapshot.title === current.title && snapshot.summary === current.summary && snapshot.tags === current.tags) {
+            try { localStorage.removeItem(storageScope); } catch (_) {}
+            return;
+        }
+        const bar = document.getElementById('restore-bar');
+        bar.classList.remove('hidden');
+        bar.classList.add('flex');
+        const hide = () => { bar.classList.add('hidden'); bar.classList.remove('flex'); };
+        document.getElementById('restore-yes').addEventListener('click', () => { applySnapshot(snapshot); hide(); showToast('저장 안 된 편집 내용을 불러왔어요'); });
+        document.getElementById('restore-no').addEventListener('click', () => { try { localStorage.removeItem(storageScope); } catch (_) {} hide(); });
+    };
+
     // 저장 성공이 확인될 때까지 자동저장본을 지우지 않음 (base.html 에서 다른 페이지로 이동 확인 후 삭제)
     const PENDING_CLEAR_KEY = 'mj:writer:pendingClear';
-    try { sessionStorage.removeItem(PENDING_CLEAR_KEY); } catch (_) {}
+    try {
+        // 직전 화면에서 저장 버튼을 눌러 여기로 왔다면(임시저장 뒤 write/?draft=… 포함) 서버에 저장된 것이므로 그 자동저장본은 지움
+        const pending = JSON.parse(sessionStorage.getItem(PENDING_CLEAR_KEY) || 'null');
+        if (pending && pending.scope) localStorage.removeItem(pending.scope);
+        sessionStorage.removeItem(PENDING_CLEAR_KEY);
+    } catch (_) {}
     const markPendingClear = () => {
         try {
             sessionStorage.setItem(PENDING_CLEAR_KEY, JSON.stringify({ scope: storageScope, path: location.pathname }));
@@ -565,6 +619,7 @@ window.addEventListener('DOMContentLoaded', () => {
         if (draftBtn.dataset.unpublish === '1' && !confirm('이 글은 지금 발행된 상태예요.\n임시저장으로 돌리면 블로그에서 내려가고 나만 볼 수 있어요. 계속할까요?\n(고친 내용만 반영하려면 취소 후 "수정 완료"를 누르세요)')) return;
         if (!(await syncContentOrWarn())) return;
         persistSnapshot();
+        markPendingClear();
         publishConfirmed = false;
         submitAction.value = 'draft';
         showToast('임시저장 중...');
@@ -586,10 +641,8 @@ window.addEventListener('DOMContentLoaded', () => {
         }
         if (!(await syncContentOrWarn())) return;
         persistSnapshot();
-        if (submitAction.value !== 'draft') {
-            markPendingClear();
-            isDirty = false;
-        }
+        markPendingClear();
+        isDirty = false;
         form.submit();
     });
 });
