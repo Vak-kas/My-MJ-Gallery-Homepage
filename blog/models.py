@@ -14,6 +14,12 @@ class Tag(models.Model):
 	def __str__(self):
 		return self.name
 
+	@staticmethod
+	def clean_name(raw) -> str:
+		"""입력한 태그 이름 정리: 양끝 공백·앞의 # 떼기, 공백 하나로, 40자."""
+		name = " ".join(str(raw or "").strip().lstrip("#").split())
+		return name[:40]
+
 
 class Series(models.Model):
 	"""글 묶음 (예: HackRF 입문 1~5편)."""
