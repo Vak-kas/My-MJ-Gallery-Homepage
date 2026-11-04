@@ -6,7 +6,9 @@ import { NodeSelection, Plugin, PluginKey, Selection, TextSelection } from '@tip
 import { dismissOnOutside, h, placeFloating } from '../dom.js';
 import { BLOCK_ITEMS, runBlockItem } from './slash-menu.js';
 import { DIVIDER_STYLES } from './divider.js';
-import { CALLOUT_KINDS, calloutIcon } from './callout.js';
+import { CALLOUT_KINDS, calloutIcon, hasCalloutAside } from './callout.js';
+import { openMathEditor } from './math.js';
+import { TABLE_ACTIONS } from './table-tools.js';
 
 const HANDLE_KEY = new PluginKey('mjBlockHandle');
 
@@ -76,6 +78,43 @@ const openBlockMenu = (editor, anchor, pos) => {
             class: `mj-pop__item${node.attrs.style === d.id ? ' is-active' : ''}`,
             onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { style: d.id }); return true; }).run()),
         }, [h('span', { class: 'mj-pop__icon', text: d.icon }), h('b', { text: d.title })])) : []),
+        // ── 블록 종류별 메뉴 ──
+        ...(node.type.name === 'blockMath' ? [
+            h('div', { class: 'mj-pop__group', text: '수식' }),
+            h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => openMathEditor(editor, pos)) }, [h('span', { class: 'mj-pop__icon', text: '∑' }), h('b', { text: '수식 편집' })]),
+            h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => {
+                editor.chain().insertContentAt({ from: pos, to: pos + node.nodeSize }, { type: 'paragraph', content: [{ type: 'inlineMath', attrs: { latex: node.attrs.latex || '' } }] }).focus().run();
+            }) }, [h('span', { class: 'mj-pop__icon', text: '𝑥' }), h('b', { text: '인라인 수식으로 바꾸기' })]),
+        ] : []),
+        ...(node.type.name === 'table' ? [
+            h('div', { class: 'mj-pop__group', text: '표 · 안을 클릭하면 위에 도구 모음이 떠요' }),
+            ...['rowAfter', 'colAfter', 'headerRow', 'headerCol'].map((id) => TABLE_ACTIONS.find((a) => a.id === id)).map((a) => h('button', {
+                type: 'button', class: 'mj-pop__item',
+                onclick: act(() => a.run(editor.chain().focus(pos + 4)).run()),
+            }, [h('span', { class: 'mj-pop__icon', text: a.icon }), h('b', { text: a.title })])),
+        ] : []),
+        ...(node.type.name === 'image' ? [
+            h('div', { class: 'mj-pop__group', text: '이미지' }),
+            h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => editor.chain().command(({ tr }) => {
+                // 대표 이미지는 하나만: 다른 이미지의 표시는 지움
+                const makeCover = !node.attrs.isCover;
+                tr.doc.descendants((child, childPos) => {
+                    if (child.type.name !== 'image') return;
+                    const want = childPos === pos ? makeCover : false;
+                    if (child.attrs.isCover !== want) tr.setNodeMarkup(childPos, undefined, { ...child.attrs, isCover: want });
+                });
+                return true;
+            }).run()) },
+                [h('span', { class: 'mj-pop__icon', text: '★' }), h('b', { text: node.attrs.isCover ? '대표 이미지 해제' : '대표 이미지로' })]),
+        ] : []),
+        ...(node.type.name === 'details' ? [
+            h('div', { class: 'mj-pop__group', text: '토글' }),
+            h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { ...node.attrs, open: !node.attrs.open }); return true; }).run()) },
+                [h('span', { class: 'mj-pop__icon', text: node.attrs.open ? '▾' : '▸' }), h('b', { text: node.attrs.open ? '접힌 상태로 저장' : '펼친 상태로 저장' })]),
+        ] : []),
+        node.type.name === 'callout' ? h('div', { class: 'mj-pop__group', text: '콜아웃' }) : null,
+        node.type.name === 'callout' ? h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => editor.chain().toggleCalloutAside(pos).focus().run()) },
+            [h('span', { class: 'mj-pop__icon', text: '▥' }), h('b', { text: hasCalloutAside(node) ? '오른쪽 칸 없애기' : '오른쪽 칸 추가 (수식·표 등)' })]) : null,
         node.type.name === 'callout' ? h('div', { class: 'mj-pop__group', text: '종류' }) : null,
         ...(node.type.name === 'callout' ? CALLOUT_KINDS.map((k) => h('button', {
             type: 'button',

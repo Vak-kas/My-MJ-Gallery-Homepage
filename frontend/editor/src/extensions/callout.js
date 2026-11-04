@@ -1,5 +1,5 @@
 // 콜아웃(알림 상자): 아이콘 + 제목 + 본문. 종류(kind)에 따라 색이 다르고 아이콘은 바꿀 수 있음
-// 저장 구조: callout(kind, icon) > calloutTitle(inline*) + calloutBody(block+)
+// 저장 구조: callout(kind, icon) > calloutTitle(inline*) + calloutBody(block+) + calloutAside(block+, 선택: 오른쪽 칸)
 import { Node, mergeAttributes } from '@tiptap/core';
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state';
 
@@ -33,10 +33,19 @@ export const CalloutBody = Node.create({
     renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'calloutBody', class: 'mj-callout__body' }), 0],
 });
 
+export const CalloutAside = Node.create({
+    name: 'calloutAside',
+    content: 'block+',
+    defining: true,
+    selectable: false,
+    parseHTML: () => [{ tag: 'div[data-type="calloutAside"]' }],
+    renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-type': 'calloutAside', class: 'mj-callout__aside' }), 0],
+});
+
 export const Callout = Node.create({
     name: 'callout',
     group: 'block',
-    content: 'calloutTitle calloutBody',
+    content: 'calloutTitle calloutBody calloutAside?',
     defining: true,
     isolating: true,
     draggable: true,
@@ -90,6 +99,22 @@ export const Callout = Node.create({
             },
             setCalloutKind: (kind) => ({ commands }) => commands.updateAttributes(this.name, { kind: CALLOUT_IDS.includes(kind) ? kind : 'info' }),
             setCalloutIcon: (icon) => ({ commands }) => commands.updateAttributes(this.name, { icon: cleanIcon(icon) }),
+            // pos 위치 콜아웃의 오른쪽 칸을 켜고 끔
+            toggleCalloutAside: (pos) => ({ tr, dispatch }) => {
+                const node = tr.doc.nodeAt(pos);
+                if (!node || node.type.name !== this.name) return false;
+                const aside = node.lastChild?.type.name === 'calloutAside' ? node.lastChild : null;
+                if (dispatch) {
+                    const end = pos + node.nodeSize - 1;
+                    if (aside) tr.delete(end - aside.nodeSize, end);
+                    else {
+                        const asideType = tr.doc.type.schema.nodes.calloutAside;
+                        tr.insert(end, asideType.createAndFill());
+                        tr.setSelection(TextSelection.create(tr.doc, end + 2));
+                    }
+                }
+                return true;
+            },
         };
     },
 
@@ -115,7 +140,7 @@ export const Callout = Node.create({
                 const found = inCallout(state);
                 if (!found || parent.type.name !== 'paragraph' || parent.content.size !== 0) return false;
                 const body = $from.node($from.depth - 1);
-                if (body.type.name !== 'calloutBody' || body.childCount < 2 || $from.index($from.depth - 1) !== body.childCount - 1) return false;
+                if (!['calloutBody', 'calloutAside'].includes(body.type.name) || body.childCount < 2 || $from.index($from.depth - 1) !== body.childCount - 1) return false;
                 const after = found.pos + found.node.nodeSize;
                 return editor.chain().deleteRange({ from: $from.before(), to: $from.after() }).insertContentAt(after - 1, { type: 'paragraph' }).focus(after).run();
             },
@@ -157,4 +182,6 @@ export const Callout = Node.create({
     },
 });
 
-export const createCalloutExtensions = () => [Callout, CalloutTitle, CalloutBody];
+export const hasCalloutAside = (node) => node.lastChild?.type.name === 'calloutAside';
+
+export const createCalloutExtensions = () => [Callout, CalloutTitle, CalloutBody, CalloutAside];
