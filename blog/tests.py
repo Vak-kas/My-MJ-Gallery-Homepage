@@ -452,6 +452,15 @@ class TagTests(TestCase):
 		self.assertContains(res, "📚 HackRF 입문 · 1편")
 
 
+class StaticVersionTagTests(SimpleTestCase):
+	def test_appends_content_hash(self):
+		from blog.templatetags.blog_extras import static_v
+		url = static_v("editor/mj-editor.js")
+		self.assertRegex(url, r"/static/editor/mj-editor\.js\?v=[0-9a-f]{10}$")
+		self.assertEqual(url, static_v("editor/mj-editor.js"))
+		self.assertEqual(static_v("editor/does-not-exist.js"), "/static/editor/does-not-exist.js")
+
+
 class WritePageMarkupTests(TestCase):
 	def test_sections_are_balanced(self):
 		from django.contrib.auth import get_user_model
