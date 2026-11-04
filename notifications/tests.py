@@ -297,3 +297,27 @@ class AlertMailTests(TestCase):
             self.assertEqual(pref.email, "me@example.com")
             page = self.client.get(reverse("notifications:list"))
             self.assertContains(page, "메일 알림")
+
+
+class ToastApiTests(TestCase):
+    def test_recent_returns_new_unread_since(self):
+        from django.contrib.auth import get_user_model
+
+        from notifications.models import Notification
+
+        admin = get_user_model().objects.create_superuser("toast-admin", "a@example.com", "pw")
+        a = Notification.objects.create(kind="signup", title="첫 알림")
+        self.assertEqual(self.client.get(reverse("notifications:recent")).status_code, 302)
+        self.client.force_login(admin)
+        data = self.client.get(reverse("notifications:recent")).json()
+        self.assertEqual((data["latest"], data["unread"], data["items"]), (a.id, 1, []))  # since 없으면 목록은 비움(처음 열 때)
+        b = Notification.objects.create(kind="security", title="새 IP", body="203.0.113.9")
+        Notification.objects.create(kind="comment", title="읽은 것", is_read=True)
+        data = self.client.get(reverse("notifications:recent"), {"since": a.id}).json()
+        self.assertEqual([i["title"] for i in data["items"]], ["새 IP"])
+        self.assertEqual(data["items"][0]["icon"], "🛡")
+        self.assertEqual(data["latest"], Notification.objects.order_by("-id").first().id)
+        self.assertEqual(data["unread"], 2)
+        page = self.client.get("/")
+        self.assertContains(page, 'id="notif-toasts"')
+        self.assertGreater(b.id, a.id)

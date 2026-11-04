@@ -154,3 +154,20 @@ def kakao_disconnect(request):
     KakaoLink.objects.all().delete()
     messages.success(request, "카카오톡 연결을 해제했어요.")
     return redirect("notifications:list")
+
+
+@admin_view
+def notification_recent(request):
+    """사이트 이용 중 토스트용: since(알림 id) 뒤에 생긴 안 읽은 알림 + 안 읽은 수."""
+    from django.http import JsonResponse
+
+    try:
+        since = int(request.GET.get("since") or 0)
+    except ValueError:
+        since = 0
+    qs = Notification.objects.filter(is_read=False)
+    latest = Notification.objects.order_by("-id").values_list("id", flat=True).first() or 0
+    items = []
+    if since:
+        items = [{"id": n.id, "icon": n.icon, "title": n.title, "body": n.body, "kind": n.get_kind_display()} for n in qs.filter(id__gt=since).order_by("id")[:5]]
+    return JsonResponse({"ok": True, "latest": latest, "unread": qs.count(), "items": items})
