@@ -242,7 +242,7 @@ class WebmailViewTests(TestCase):
 		self.client.force_login(self.admin)
 		data = self.client.get(reverse("webmail:api_list"), {"folder": "inbox"}).json()
 		self.assertEqual(data["total"], 2)
-		self.assertIn(data["items"][0]["group"], ("오늘", "이전"))
+		self.assertIn(data["items"][0]["group"], ("오늘", "어제", "이번 주", "이번 달", "이전"))  # 가짜 메일 시각이 시간대·자정에 걸려 달라짐
 		self.assertTrue(data["items"][0]["has_attachment"])
 		data = self.client.get(reverse("webmail:api_list"), {"folder": "inbox", "filter": "flagged"}).json()
 		self.assertEqual([m["uid"] for m in data["items"]], [5])

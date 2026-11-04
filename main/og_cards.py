@@ -15,7 +15,7 @@ PAGES = {
     "blog": {"title": "Blog", "subtitle": "기술 글 · 자유게시판 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
     "all": {"title": "All Posts", "subtitle": "기술 · 자유게시판 · 일상 — 모든 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
     "tech": {"title": "Tech Blog", "subtitle": "트러블슈팅 · 네트워크 · 보안", "pill": "TECH", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
-    "board": {"title": "자유게시판", "subtitle": "공지 · 소통 · 자유 글", "pill": "BOARD", "accent": ORANGE, "eyebrow": "SMJ GALLERY · BLOG"},
+    "board": {"title": "자유게시판", "subtitle": "공지 · 소통 · 자유 글", "pill": "FREE", "accent": ORANGE, "eyebrow": "SMJ GALLERY · BLOG"},
     "life": {"title": "Life", "subtitle": "일상 메모 · 생각 기록 · 회고", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
     "gallery": {"title": "Gallery", "subtitle": "사진으로 남긴 순간들", "pill": "PHOTO", "accent": GOLD, "eyebrow": "SMJ GALLERY"},
     "games": {"title": "Game", "subtitle": "사다리타기 · 돌림판 · 2048 · 한글 타자 연습", "pill": "GAME", "accent": GREEN, "eyebrow": "SMJ GALLERY"},

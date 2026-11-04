@@ -249,7 +249,7 @@
                     <label class="mb-2 block text-[13px] font-semibold text-[#1d1d1f]">카테고리</label>
                     <select name="category" class="w-full rounded-xl border border-black/[0.1] bg-[#f9f9fb] px-4 py-3 text-[14px] outline-none focus:border-[#0066cc]">
                         {% for value, label in categories %}
-                        <option value="{{ value }}" {% if form_data.category == value %}selected{% elif not form_data.category and value == 'tech' %}selected{% endif %}>{{ label }}</option>
+                        <option value="{{ value }}" {% if form_data.category == value %}selected{% elif not form_data.category and forloop.first %}selected{% endif %}>{{ label }}</option>
                         {% endfor %}
                     </select>
                 </div>

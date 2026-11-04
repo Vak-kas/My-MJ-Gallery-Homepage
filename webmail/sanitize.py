@@ -31,11 +31,13 @@ _STYLE_BAD = re.compile(r"(expression\s*\(|javascript:|url\s*\(|@import|behavior
 
 
 class _Cleaner(HTMLParser):
-	def __init__(self, show_images):
+	def __init__(self, show_images, tags=None, attrs=None):
 		super().__init__(convert_charrefs=True)
 		self.out = []
 		self.skip = 0  # DROP_WITH_CONTENT 안에 있는 깊이
 		self.show_images = show_images
+		self.tags = tags if tags is not None else ALLOWED_TAGS
+		self.attrs = attrs if attrs is not None else ALLOWED_ATTRS
 
 	def handle_starttag(self, tag, attrs):
 		tag = tag.lower()
@@ -45,13 +47,13 @@ class _Cleaner(HTMLParser):
 			return
 		if self.skip:
 			return
-		if tag not in ALLOWED_TAGS:
+		if tag not in self.tags:
 			return  # 모르는 태그는 껍데기만 버리고 내용은 둠
 		cleaned = []
 		for name, value in attrs:
 			name = name.lower()
 			value = value or ""
-			if name.startswith("on") or name not in ALLOWED_ATTRS:
+			if name.startswith("on") or name not in self.attrs:
 				continue
 			if name == "href":
 				if not _URL_OK.match(value.strip()):
@@ -79,7 +81,7 @@ class _Cleaner(HTMLParser):
 			return
 		if self.skip:
 			return
-		if tag in ALLOWED_TAGS and tag not in VOID_TAGS:
+		if tag in self.tags and tag not in VOID_TAGS:
 			self.out.append(f"</{tag}>")
 
 	def handle_data(self, data):
@@ -98,8 +100,13 @@ class _Cleaner(HTMLParser):
 		pass
 
 
-def sanitize_html(source: str, show_images=False) -> str:
-	cleaner = _Cleaner(show_images)
+# 블로그 글의 옛 Editor.js 인라인 서식용: 글자 꾸밈과 링크만 (img·style·class 없음)
+INLINE_TAGS = {"a", "b", "strong", "i", "em", "u", "s", "strike", "del", "code", "mark", "sup", "sub", "br", "span"}
+INLINE_ATTRS = {"href", "title"}
+
+
+def sanitize_html(source: str, show_images=False, tags=None, attrs=None) -> str:
+	cleaner = _Cleaner(show_images, tags, attrs)
 	cleaner.feed(source or "")
 	cleaner.close()
 	return "".join(cleaner.out)

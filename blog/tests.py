@@ -1,4 +1,7 @@
 import json
+from unittest import mock
+
+from django.contrib.auth import get_user_model
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
@@ -240,7 +243,7 @@ class GuestbookTests(TestCase):
 	def test_anonymous_sees_login_prompt_not_form(self):
 		resp = self.client.get(self.url)
 		self.assertContains(resp, "방명록은 로그인 후 남길 수 있어요")
-		self.assertNotContains(resp, 'name="message"')
+		self.assertNotContains(resp, 'placeholder="메시지를 남겨주세요"')  # 💬 문의 위젯에도 message 입력란이 있어 방명록 입력란만 확인
 
 	def test_logged_in_post_uses_account_name(self):
 		self.client.force_login(self.user)
@@ -561,3 +564,135 @@ class CategoryPageTests(TestCase):
 		res2 = self.client.get(reverse("blog:all") + "?page=2")
 		self.assertEqual(res2.status_code, 200)
 		self.assertGreater(len(res2.context["posts"]), 0)
+
+
+class LegacyEditorJsXssTests(SimpleTestCase):
+	"""옛 Editor.js 형식(블록 JSON)에 박힌 HTML 은 서식만 남기고 스크립트·이벤트 속성은 제거해야 함"""
+
+	def test_onerror_img_is_removed(self):
+		content = json.dumps({"blocks": [{"type": "paragraph", "data": {
+			"html": "<img src=\"/xss-test-missing.png\" onerror=\"alert('x')\"> 글 <b>굵게</b>"}}]})
+		out = str(render_editorjs(content))
+		self.assertNotIn("onerror", out)
+		self.assertNotIn("<img", out)
+		self.assertIn("<b>굵게</b>", out)
+
+	def test_script_and_handlers_everywhere(self):
+		content = json.dumps({"blocks": [
+			{"type": "header", "data": {"text": "<script>alert(1)</script>제목", "level": 2}},
+			{"type": "list", "data": {"style": "unordered", "items": ["<a href=\"javascript:alert(1)\" onclick=\"x()\">링크</a>", {"content": "<span onclick=alert(1) style=\"color:red\">둘</span>"}]}},
+			{"type": "checklist", "data": {"items": [{"text": "<iframe src=//evil></iframe>할 일", "checked": False}]}},
+			{"type": "quote", "data": {"text": "<u onmouseover=alert(1)>인용</u>", "caption": "<img src=x onerror=alert(1)>출처"}},
+		]})
+		out = str(render_editorjs(content))
+		for bad in ("<script", "onclick", "onmouseover", "onerror", "<iframe", "style=", "javascript:"):
+			self.assertNotIn(bad, out)
+		for good in ("제목", "링크", "둘", "할 일", "<u>인용</u>", "출처"):
+			self.assertIn(good, out)
+
+
+class UrlPreviewSsrfTests(TestCase):
+	def setUp(self):
+		self.user = get_user_model().objects.create_user(username="previewer", password="pw-for-tests-only")
+		self.url = reverse("blog:url_preview")
+
+	def test_requires_login(self):
+		self.assertEqual(self.client.get(self.url, {"url": "https://example.com/"}).status_code, 302)
+
+	def test_blocks_internal_targets_without_fetching(self):
+		from blog import views
+		self.client.force_login(self.user)
+		with mock.patch.object(views._requests, "get") as fake_get:
+			for bad in (
+				"http://127.0.0.1/", "http://localhost:8000/", "http://[::1]/", "http://169.254.169.254/latest/meta-data/",
+				"http://10.0.0.5/", "http://192.168.1.1/", "http://0.0.0.0/", "file:///etc/passwd", "ftp://example.com/",
+				"http://user:pw@example.com/", "http://[::ffff:127.0.0.1]/",
+			):
+				res = self.client.get(self.url, {"url": bad})
+				self.assertEqual(res.status_code, 400, bad)
+				self.assertEqual(res.json()["error"], "미리보기를 만들 수 없는 주소예요")
+		fake_get.assert_not_called()
+
+	def test_hostname_resolving_to_private_ip_is_blocked(self):
+		from blog import views
+		self.client.force_login(self.user)
+		with mock.patch("blog.views.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("10.1.2.3", 80))]), \
+				mock.patch.object(views._requests, "get") as fake_get:
+			res = self.client.get(self.url, {"url": "http://internal.example.com/"})
+		self.assertEqual(res.status_code, 400)
+		fake_get.assert_not_called()
+
+	def test_redirect_to_internal_is_blocked_and_errors_are_generic(self):
+		from blog import views
+		self.client.force_login(self.user)
+		redirect = mock.Mock(is_redirect=True, is_permanent_redirect=False, headers={"Location": "http://127.0.0.1:8000/admin/"})
+		with mock.patch("blog.views.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 80))]), \
+				mock.patch.object(views._requests, "get", return_value=redirect) as fake_get:
+			res = self.client.get(self.url, {"url": "http://example.com/"})
+		self.assertEqual(res.status_code, 400)
+		self.assertEqual(fake_get.call_count, 1)
+		self.assertFalse(fake_get.call_args.kwargs["allow_redirects"])
+		# 예외 내용이 응답으로 새지 않음
+		with mock.patch("blog.views.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 80))]), \
+				mock.patch.object(views._requests, "get", side_effect=RuntimeError("secret internals")):
+			res = self.client.get(self.url, {"url": "http://example.com/"})
+		self.assertEqual(res.status_code, 400)
+		self.assertNotIn("secret", res.content.decode())
+
+	def test_public_page_metadata_is_parsed_with_byte_cap(self):
+		from blog import views
+		self.client.force_login(self.user)
+		body = "<html><head><title>T</title><meta property='og:title' content='OG 제목'><meta name='description' content='설명'></head><body>".encode() + b"x" * (views.PREVIEW_MAX_BYTES * 2)
+		ok = mock.Mock(is_redirect=False, is_permanent_redirect=False, status_code=200, encoding="utf-8",
+			headers={"Content-Type": "text/html; charset=utf-8"})
+		ok.iter_content = lambda n: (body[i:i + n] for i in range(0, len(body), n))
+		with mock.patch("blog.views.socket.getaddrinfo", return_value=[(2, 1, 6, "", ("93.184.216.34", 443))]), \
+				mock.patch.object(views._requests, "get", return_value=ok):
+			res = self.client.get(self.url, {"url": "https://example.com/a"})
+		self.assertEqual(res.status_code, 200)
+		data = res.json()
+		self.assertEqual(data["title"], "OG 제목")
+		self.assertEqual(data["description"], "설명")
+		self.assertEqual(data["site_name"], "example.com")
+
+
+class MemberCategoryTests(TestCase):
+	"""일반 회원은 Free(자유게시판)에만, 관리자는 모든 카테고리에 글을 씀"""
+
+	def setUp(self):
+		self.member = get_user_model().objects.create_user(username="member", password="pw-for-tests-only")
+		self.admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+
+	def _post(self, category):
+		return self.client.post(reverse("blog:post_create"), {
+			"title": f"{category} 글", "category": category, "content": "본문", "submit_action": "publish",
+		})
+
+	def test_member_only_board(self):
+		self.client.force_login(self.member)
+		for cat in ("tech", "life", "secret"):
+			self._post(cat)
+			self.assertFalse(Post.objects.filter(category=cat).exists(), cat)
+		self._post("board")
+		self.assertTrue(Post.objects.filter(category="board", author=self.member).exists())
+
+	def test_member_form_shows_only_board(self):
+		self.client.force_login(self.member)
+		res = self.client.get(reverse("blog:post_create"))
+		self.assertEqual(res.context["categories"], [("board", "Free")])
+
+	def test_member_cannot_move_post_to_other_category(self):
+		self.client.force_login(self.member)
+		self._post("board")
+		post = Post.objects.get(author=self.member)
+		self.client.post(reverse("blog:post_edit", args=[post.slug]), {
+			"title": post.title, "category": "tech", "content": "본문", "submit_action": "publish",
+		})
+		post.refresh_from_db()
+		self.assertEqual(post.category, "board")
+
+	def test_admin_all_categories(self):
+		self.client.force_login(self.admin)
+		for cat in ("tech", "board", "life", "secret"):
+			self._post(cat)
+			self.assertTrue(Post.objects.filter(category=cat).exists(), cat)

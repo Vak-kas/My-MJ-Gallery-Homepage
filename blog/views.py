@@ -1,4 +1,8 @@
+import ipaddress
+import logging
+import socket
 from datetime import timedelta
+from html.parser import HTMLParser
 from io import BytesIO
 from uuid import uuid4
 
@@ -10,6 +14,7 @@ from PIL import Image, ImageOps
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.paginator import Paginator
@@ -21,7 +26,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 from django.utils import timezone
 from django.utils.text import slugify
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urljoin, urlparse
 
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Series, Tag
 from security.utils import client_ip, user_agent
@@ -313,7 +318,7 @@ def _write_page_context(request, form_data=None, selected_draft=None, editing_po
 			.order_by("name")
 			.values("name", "post_count", "published_count", "last_order")[:100]
 		],
-		"categories": Post.CATEGORY_CHOICES,
+		"categories": [(v, l) for v, l in Post.CATEGORY_CHOICES if v in Post.allowed_categories(request.user)],
 		"form_data": form_data or {},
 		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
 		"selected_draft": selected_draft,
@@ -380,7 +385,7 @@ CATEGORY_PAGES = {
 	# 탭 → (URL 이름, 제목, 설명). None 은 모든 카테고리
 	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
 	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
-	Post.CATEGORY_BOARD: ("blog:board", "Board", "자유롭게 이야기하는 게시판입니다."),
+	Post.CATEGORY_BOARD: ("blog:board", "Free", "자유게시판 · 회원 누구나 글을 쓸 수 있는 공간입니다."),
 	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상/라이프 블로그 목록입니다."),
 	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
 }
@@ -583,53 +588,126 @@ def index(request):
 	return render(request, "blog/index.html", context)
 
 
-@require_GET
-def url_preview(request):
-	"""URL OG 메타데이터를 JSON으로 반환하는 내부 API"""
-	url = (request.GET.get("url") or "").strip()
-	if not url or not _re.match(r'^https?://', url):
-		return JsonResponse({"error": "invalid url"}, status=400)
-
+def _url_target_is_public(url):
+	"""http(s) 이고 호스트가 공개 IP 로만 풀리면 True. 루프백·사설·링크로컬·예약 대역(IPv4/IPv6) 과 IP 직접 지정, 자격증명 포함 URL 은 거부."""
+	p = urlparse(url)
+	if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
+		return False
+	host = p.hostname.lower().rstrip(".")
+	if host == "localhost" or host.endswith((".localhost", ".local", ".internal", ".arpa")):
+		return False
 	try:
-		headers = {
-			"User-Agent": "Mozilla/5.0 (compatible; MjGalleryBot/1.0)",
-			"Accept": "text/html,application/xhtml+xml",
-		}
-		resp = _requests.get(url, headers=headers, timeout=6, allow_redirects=True)
-		resp.raise_for_status()
-		html = resp.text
-		resp.encoding = resp.apparent_encoding or "utf-8"
+		ipaddress.ip_address(host)
+		return False  # IP 를 직접 적은 주소는 받지 않음
+	except ValueError:
+		pass
+	try:
+		infos = socket.getaddrinfo(host, p.port or (443 if p.scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+	except (socket.gaierror, UnicodeError, OverflowError):
+		return False
+	if not infos:
+		return False
+	for info in infos:
+		ip = ipaddress.ip_address(info[4][0])
+		if getattr(ip, "ipv4_mapped", None):
+			ip = ip.ipv4_mapped
+		if not ip.is_global or ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+			return False
+	return True
 
-		def _meta(prop):
-			m = _re.search(
-				r'<meta[^>]+(?:property|name)=["\']' + _re.escape(prop) + r'["\'][^>]+content=["\']([^"\']*)["\']',
-				html, _re.I
-			) or _re.search(
-				r'<meta[^>]+content=["\']([^"\']*)["\'][^>]+(?:property|name)=["\']' + _re.escape(prop) + r'["\']',
-				html, _re.I
-			)
-			return m.group(1).strip() if m else ""
 
-		title_m = _re.search(r'<title[^>]*>([^<]+)</title>', html, _re.I)
-		title = _meta("og:title") or _meta("twitter:title") or (title_m.group(1).strip() if title_m else "")
-		desc = _meta("og:description") or _meta("twitter:description") or _meta("description")
-		image = _meta("og:image") or _meta("twitter:image")
-		site_name = _meta("og:site_name")
+class _MetaParser(HTMLParser):
+	"""<title> 과 <meta property|name … content> 만 뽑는 작은 파서 (정규식 대신 — ReDoS 없음)."""
 
-		from urllib.parse import urlparse
-		parsed = urlparse(url)
-		favicon = f"{parsed.scheme}://{parsed.netloc}/favicon.ico"
+	def __init__(self):
+		super().__init__(convert_charrefs=True)
+		self.meta, self.title, self._in_title, self.done = {}, "", False, False
 
+	def handle_starttag(self, tag, attrs):
+		if self.done:
+			return
+		if tag == "title":
+			self._in_title = True
+		elif tag == "meta":
+			a = dict(attrs)
+			key = (a.get("property") or a.get("name") or "").lower()
+			if key and key not in self.meta and a.get("content"):
+				self.meta[key] = a["content"].strip()
+		elif tag == "body":
+			self.done = True  # head 만 보면 충분
+
+	def handle_endtag(self, tag):
+		if tag == "title":
+			self._in_title = False
+
+	def handle_data(self, data):
+		if self._in_title and len(self.title) < 300:
+			self.title += data
+
+
+PREVIEW_MAX_BYTES = 512 * 1024
+PREVIEW_MAX_REDIRECTS = 3
+PREVIEW_ERROR = {"error": "미리보기를 만들 수 없는 주소예요"}
+
+
+@require_GET
+@login_required
+def url_preview(request):
+	"""에디터 링크 카드용 OG 메타데이터. 로그인 회원만, 공개 주소만, 리다이렉트는 매 단계 재검사, 512KB 까지만 읽고, 오류 내용은 로그에만."""
+	url = (request.GET.get("url") or "").strip()[:2000]
+	if not url or not _url_target_is_public(url):
+		return JsonResponse(PREVIEW_ERROR, status=400)
+	key = f"url_preview:{request.user.id}"
+	hits = cache.get(key) or 0
+	if hits >= 60:
+		return JsonResponse({"error": "잠시 뒤 다시 시도해 주세요"}, status=429)
+	cache.set(key, hits + 1, 60)
+
+	headers = {"User-Agent": "Mozilla/5.0 (compatible; MjGalleryBot/1.0)", "Accept": "text/html,application/xhtml+xml"}
+	try:
+		current = url
+		for _ in range(PREVIEW_MAX_REDIRECTS + 1):
+			resp = _requests.get(current, headers=headers, timeout=5, allow_redirects=False, stream=True)
+			if resp.is_redirect or resp.is_permanent_redirect:
+				nxt = urljoin(current, resp.headers.get("Location") or "")
+				resp.close()
+				if not _url_target_is_public(nxt):
+					return JsonResponse(PREVIEW_ERROR, status=400)
+				current = nxt
+				continue
+			break
+		else:
+			return JsonResponse(PREVIEW_ERROR, status=400)
+		if resp.status_code >= 400 or "html" not in (resp.headers.get("Content-Type") or "").lower():
+			resp.close()
+			return JsonResponse(PREVIEW_ERROR, status=400)
+		chunks, total = [], 0
+		for chunk in resp.iter_content(16384):
+			chunks.append(chunk)
+			total += len(chunk)
+			if total >= PREVIEW_MAX_BYTES:
+				break
+		resp.close()
+		html = b"".join(chunks).decode(resp.encoding or "utf-8", "replace")
+		parser = _MetaParser()
+		parser.feed(html)
+		m = parser.meta
+		parsed = urlparse(current)
+		title = m.get("og:title") or m.get("twitter:title") or parser.title.strip()
+		image = m.get("og:image") or m.get("twitter:image") or ""
+		if image and not image.startswith(("http://", "https://")):
+			image = urljoin(current, image)
 		return JsonResponse({
-			"url": url,
+			"url": current,
 			"title": title[:200],
-			"description": desc[:400],
-			"image": image,
-			"site_name": site_name or parsed.netloc,
-			"favicon": favicon,
+			"description": (m.get("og:description") or m.get("twitter:description") or m.get("description") or "")[:400],
+			"image": image[:1000] if image.startswith(("http://", "https://")) else "",
+			"site_name": (m.get("og:site_name") or parsed.netloc)[:100],
+			"favicon": f"{parsed.scheme}://{parsed.netloc}/favicon.ico",
 		})
-	except Exception as e:
-		return JsonResponse({"error": str(e)[:120]}, status=200)
+	except Exception:  # noqa: BLE001 — 자세한 건 로그에만
+		logging.getLogger(__name__).info("url_preview 실패: %s", url, exc_info=True)
+		return JsonResponse(PREVIEW_ERROR, status=400)
 
 
 @login_required
@@ -954,8 +1032,8 @@ def post_create(request):
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
-		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
-			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
+		if category not in Post.allowed_categories(request.user):
+			messages.error(request, "일반 회원은 Free(자유게시판)에만 글을 쓸 수 있습니다.")
 			form_data = dict(request.POST)
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
@@ -1039,8 +1117,8 @@ def post_edit(request, slug: str):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
-		if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
-			messages.error(request, "Secret 카테고리는 관리자만 작성할 수 있습니다.")
+		if category not in Post.allowed_categories(request.user):
+			messages.error(request, "일반 회원은 Free(자유게시판)에만 글을 쓸 수 있습니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
 		if cover_image and getattr(cover_image, "size", 0) > COVER_IMAGE_MAX_BYTES:

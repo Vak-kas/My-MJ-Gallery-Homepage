@@ -56,12 +56,19 @@ class Post(models.Model):
 
 	CATEGORY_CHOICES = [
 		(CATEGORY_TECH, "Tech"),
-		(CATEGORY_BOARD, "Board"),
+		(CATEGORY_BOARD, "Free"),
 		(CATEGORY_LIFE, "Life"),
 		(CATEGORY_SECRET, "Secret"),
 	]
 
 	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+
+	@classmethod
+	def allowed_categories(cls, user):
+		"""글을 쓸 수 있는 카테고리 — 관리자는 전부, 일반 회원은 Free(자유게시판)만"""
+		if getattr(user, "is_superuser", False):
+			return {value for value, _ in cls.CATEGORY_CHOICES}
+		return {cls.CATEGORY_BOARD}
 	title = models.CharField(max_length=200)
 	cover_image = models.ImageField(upload_to="blog/covers/", blank=True, null=True)
 	author = models.ForeignKey(
