@@ -1,373 +1,90 @@
 {% extends "base.html" %}
 
 {% block content %}
-
 <div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
-    <main class="mx-auto max-w-[1280px] px-6 py-16">
+    <main class="mx-auto max-w-[1180px] px-6 py-12 lg:py-16">
 
-        <div class="mb-8">
-            <a href="{% url 'main:home' %}"
-               class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
-                <span class="text-[18px]">←</span>
-                <span>Go to Main Page</span>
+        <div class="mb-6">
+            <a href="{% url 'main:home' %}" class="inline-flex items-center gap-2 text-[14px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span><span>메인으로</span>
             </a>
         </div>
 
-        <section class="mb-14">
-            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">
-                MJGALLERY STUDIO
-            </p>
-
-            <h1 class="apple-display mt-5 text-[64px] font-semibold leading-[1.05] tracking-[-0.04em]">
-                Studio
-            </h1>
-
-            <p class="mt-5 max-w-[720px] text-[19px] leading-[1.5] tracking-[-0.022em] text-[#6e6e73]">
-                포트폴리오에 표시될 주요 영역을 관리합니다. 각 카드를 선택하면 해당 영역의 세부 데이터를 추가, 수정, 삭제할 수 있습니다.
-            </p>
+        <section class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">MJGALLERY STUDIO</p>
+                <h1 class="apple-display mt-3 text-[48px] font-semibold leading-[1.05] tracking-[-0.04em] lg:text-[56px]">Studio</h1>
+                <p class="mt-3 text-[15px] text-[#6e6e73]">포트폴리오 · 콘텐츠 · 운영을 한곳에서. 왼쪽 메뉴와 같은 순서예요.</p>
+            </div>
+            {# 오늘 할 일: 숫자가 있는 것만 강조 #}
+            <div class="flex flex-wrap gap-2">
+                <a href="{% url 'studio:users' %}?state=pending" class="rounded-full border px-3.5 py-1.5 text-[13px] {% if todo.pending %}border-[#b26a00]/40 bg-[#fff6e8] font-semibold text-[#b26a00]{% else %}border-black/[0.08] bg-white text-[#6e6e73]{% endif %}">🙋 승인 대기 {{ todo.pending }}</a>
+                {% if todo.unverified %}<a href="{% url 'studio:users' %}?state=unverified" class="rounded-full border border-black/[0.08] bg-white px-3.5 py-1.5 text-[13px] text-[#6e6e73]">📧 미인증 {{ todo.unverified }}</a>{% endif %}
+                <a href="{% url 'studio:community' %}" class="rounded-full border px-3.5 py-1.5 text-[13px] {% if todo.comments or todo.guestbook %}border-[#0066cc]/30 bg-[#f0f7ff] text-[#0066cc]{% else %}border-black/[0.08] bg-white text-[#6e6e73]{% endif %}">💬 이번 주 댓글 {{ todo.comments }} · 방명록 {{ todo.guestbook }}</a>
+                {% if todo.drafts %}<a href="{% url 'studio:posts' %}?status=draft" class="rounded-full border border-black/[0.08] bg-white px-3.5 py-1.5 text-[13px] text-[#6e6e73]">📝 내 임시글 {{ todo.drafts }}</a>{% endif %}
+            </div>
         </section>
 
-        <section class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-
-            <!-- About Me
-            <a href="{% url 'studio:skill' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">00</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        About Me
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        메인 자기소개, 핵심 소개 문구, 포트폴리오 첫인상을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a> -->
-
-            <!-- Profile -->
-            <a href="{% url 'studio:profile' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">01</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Profile
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        기본 정보, 연락처, 링크, 이력서 파일을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Career -->
-            <a href="{% url 'studio:career' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">02</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Career
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        학력, 인턴십, 연구, 리더십, 조교 및 교재개발 이력을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Activity -->
-            <a href="{% url 'studio:activity' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">03</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Activity
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        대외 프로그램, 세미나, 커뮤니티, 봉사 활동을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Awards -->
-            <a href="{% url 'studio:award' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">04</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Awards
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        수상명, 주최기관, 수상일, 상장 파일을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Publications -->
-            <a href="{% url 'studio:publication' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">05</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Publications
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        논문, 학회 발표, 초록, PDF 파일, DOI/링크를 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Certifications -->
-            <a href="{% url 'studio:certification' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">06</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Certifications
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        자격증명, 발급기관, 취득일, 인증서 파일을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Skills -->
-            <a href="{% url 'studio:skill' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">07</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Skills
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        Cloud, DevOps, Backend, Security, Network, AI/Data 기술을 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Projects -->
-            <a href="{% url 'studio:project' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">08</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Projects
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        프로젝트 소개, 기술스택, 썸네일, GitHub/배포 링크를 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Posts -->
-            <a href="{% url 'studio:posts' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">09</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Posts
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        게시 상태와 공개 범위(전체공개/비공개/일부공개)를 관리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Community -->
-            <a href="{% url 'studio:community' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">10</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Community
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        방명록·댓글을 숨기거나 지우고, 키워드로 스팸을 한 번에 정리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Analytics -->
-            <a href="{% url 'studio:analytics' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">11</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Analytics
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        오늘 방문자, 인기 글과 Tool, 어디서 들어왔는지(검색·카톡·깃허브)를 봅니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Server -->
-            <a href="{% url 'studio:server' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">12</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Server
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        서버 자원·이번 달 트래픽·서비스 상태를 보고, 사이트가 죽으면 카톡으로 알려줘요.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Users -->
-            <a href="{% url 'studio:users' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">13</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Users
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        회원 검색, 정지·가입 승인, 스팸 계정과 그 글을 정리합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Security -->
-            <a href="{% url 'studio:security' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">14</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Security
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        로그인·작성 기록을 IP 와 함께 남기고, 문제 있는 IP 를 차단합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
-            <!-- Settings -->
-            <a href="{% url 'studio:settings' %}" class="group relative min-h-[260px] overflow-hidden rounded-[30px] border border-black/[0.06] bg-white p-9 transition-all duration-300 hover:-translate-y-1 hover:border-[#0066cc]/30 hover:bg-[#fbfbfd] active:scale-[0.98]">
-                <div class="absolute inset-0 opacity-0 transition duration-300 group-hover:opacity-100 bg-[radial-gradient(circle_at_top_right,rgba(0,102,204,0.12),transparent_42%)]"></div>
-
-                <div class="relative flex h-full flex-col">
-                    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">15</p>
-
-                    <h2 class="mt-5 text-[36px] font-semibold tracking-[-0.035em]">
-                        Settings
-                    </h2>
-
-                    <p class="mt-4 text-[17px] leading-[1.47] tracking-[-0.022em] text-[#6e6e73]">
-                        메뉴(Blog·Tool·Gallery) 공개 범위와 순서, 홈 화면 섹션 켜기/끄기와 순서를 정합니다.
-                    </p>
-
-                    <div class="mt-auto pt-8">
-                        <span class="text-[15px] text-[#0066cc]">Manage →</span>
-                    </div>
-                </div>
-            </a>
-
+        {# ── 포트폴리오 ── #}
+        <section class="mt-12">
+            <div class="flex items-baseline gap-3">
+                <h2 class="text-[20px] font-semibold tracking-[-0.02em]">포트폴리오</h2>
+                <p class="text-[13px] text-[#8e8e93]">메인 페이지에 보이는 내 소개 자료</p>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <a href="{% url 'studio:profile' %}" class="studio-card"><span class="studio-ico">👤</span><span><b>Profile</b><small>기본 정보 · 연락처 · 링크 · 이력서</small></span></a>
+                <a href="{% url 'studio:career' %}" class="studio-card"><span class="studio-ico">🎓</span><span><b>Career</b><small>학력 · 인턴십 · 연구 · 리더십 · 조교</small></span></a>
+                <a href="{% url 'studio:activity' %}" class="studio-card"><span class="studio-ico">🏃</span><span><b>Activity</b><small>대외활동 · 세미나 · 커뮤니티 · 봉사</small></span></a>
+                <a href="{% url 'studio:award' %}" class="studio-card"><span class="studio-ico">🏆</span><span><b>Awards</b><small>수상 · 대회 성과 · 상장</small></span></a>
+                <a href="{% url 'studio:publication' %}" class="studio-card"><span class="studio-ico">📄</span><span><b>Publications</b><small>논문 · 학회 발표 · DOI</small></span></a>
+                <a href="{% url 'studio:certification' %}" class="studio-card"><span class="studio-ico">📜</span><span><b>Certifications</b><small>자격증 · 인증서</small></span></a>
+                <a href="{% url 'studio:skill' %}" class="studio-card"><span class="studio-ico">🛠</span><span><b>Skills</b><small>기술 스택 · 숙련도</small></span></a>
+                <a href="{% url 'studio:project' %}" class="studio-card"><span class="studio-ico">🧩</span><span><b>Projects</b><small>프로젝트 설명 · 이미지 · 스택</small></span></a>
+            </div>
         </section>
 
+        {# ── 콘텐츠 ── #}
+        <section class="mt-10">
+            <div class="flex items-baseline gap-3">
+                <h2 class="text-[20px] font-semibold tracking-[-0.02em]">콘텐츠</h2>
+                <p class="text-[13px] text-[#8e8e93]">블로그 글과 방문자가 남긴 것</p>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <a href="{% url 'studio:posts' %}" class="studio-card"><span class="studio-ico">✍️</span><span><b>Posts</b><small>글 검색 · 발행/임시 · 공개 범위 · 일괄 작업</small></span></a>
+                <a href="{% url 'studio:community' %}" class="studio-card"><span class="studio-ico">💬</span><span><b>Community</b><small>방명록 · 댓글 숨김/삭제 · 스팸 정리</small></span></a>
+                <a href="{% url 'blog:post_create' %}" class="studio-card studio-card--ghost"><span class="studio-ico">➕</span><span><b>새 글 쓰기</b><small>블로그 에디터로 바로</small></span></a>
+            </div>
+        </section>
+
+        {# ── 운영 ── #}
+        <section class="mt-10">
+            <div class="flex items-baseline gap-3">
+                <h2 class="text-[20px] font-semibold tracking-[-0.02em]">운영</h2>
+                <p class="text-[13px] text-[#8e8e93]">방문자 · 서버 · 회원 · 보안 · 설정</p>
+            </div>
+            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <a href="{% url 'studio:analytics' %}" class="studio-card"><span class="studio-ico">📈</span><span><b>Analytics</b><small>방문자 · 인기 글/Tool · 유입 경로</small></span></a>
+                <a href="{% url 'studio:server' %}" class="studio-card"><span class="studio-ico">🖥</span><span><b>Server</b><small>CPU · 메모리 · 디스크 · 서비스 · 로그 · 백업</small></span></a>
+                <a href="{% url 'studio:ai' %}" class="studio-card"><span class="studio-ico">✨</span><span><b>AI</b><small>사용량 · 비용 · 하루 예산 · 등급별 한도</small></span></a>
+                <a href="{% url 'studio:users' %}" class="studio-card"><span class="studio-ico">🧑‍🤝‍🧑</span><span><b>Users</b><small>승인 · VIP · 정지 · 비밀번호 초기화</small></span></a>
+                <a href="{% url 'studio:security' %}" class="studio-card"><span class="studio-ico">🛡</span><span><b>Security</b><small>로그인 기록 · IP 차단 · 새 IP 알림</small></span></a>
+                <a href="{% url 'studio:settings' %}" class="studio-card"><span class="studio-ico">⚙️</span><span><b>Settings</b><small>메뉴 공개/순서 · 홈 섹션</small></span></a>
+            </div>
+        </section>
+
+        <p class="mt-12 text-[13px] text-[#8e8e93]">관리자에게만 보이는 화면이에요. 각 화면 왼쪽 메뉴(폰은 왼쪽 아래 ☰)로도 이동할 수 있어요.</p>
     </main>
 </div>
 
+<style>
+    .studio-card { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: #fff; border: 1px solid rgba(0,0,0,.08); transition: transform .15s, box-shadow .15s, border-color .15s; }
+    .studio-card:hover { transform: translateY(-1px); border-color: rgba(0,102,204,.35); box-shadow: 0 8px 24px rgba(0,0,0,.06); }
+    .studio-card--ghost { background: transparent; border-style: dashed; }
+    .studio-card .studio-ico { display: flex; width: 40px; height: 40px; flex: none; align-items: center; justify-content: center; border-radius: 12px; background: #f0f7ff; font-size: 19px; }
+    .studio-card b { display: block; font-size: 15px; font-weight: 600; letter-spacing: -.01em; color: #1d1d1f; }
+    .studio-card small { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.45; color: #6e6e73; word-break: keep-all; }
+    html.theme-dark .studio-card { background: #171a20; border-color: rgba(255,255,255,.1); }
+    html.theme-dark .studio-card--ghost { background: transparent; }
+    html.theme-dark .studio-card b { color: #e8e8ed; }
+</style>
 {% endblock %}
