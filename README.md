@@ -488,7 +488,7 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 ---
 
 ### 7.x 메일 서버 (보내기 전용)
-가입 인증·비밀번호 재설정 메일은 서버의 Postfix + DKIM 으로 직접 보낸다. 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 확인은 `manage.py send_test_mail 주소`.
+서버에 메일함 하나(`mjseo@smjgallery.kr`): Postfix(받기·보내기) + Dovecot(IMAP 993) + Roundcube 웹메일(`mail.smjgallery.kr`) + OpenDKIM + rspamd. 사이트의 가입 인증·비밀번호 재설정 메일도 여기로 나간다. 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 메일함은 `.env` `MAIL_BACKUP_DIR` 로 S3 백업에 포함. 확인은 `manage.py send_test_mail 주소`.
 
 ## 8) 라이선스
 
