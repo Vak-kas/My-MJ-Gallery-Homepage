@@ -86,6 +86,36 @@ class TiptapRenderTests(SimpleTestCase):
 		self.assertNotIn("font-bold", plain)
 		self.assertIn("only", self.render({"type": "callout", "content": [{"type": "calloutBody", "content": [para(text("only"))]}]}))
 
+	def test_callout_aside_and_table_widths(self):
+		html = self.render({
+			"type": "callout", "attrs": {"kind": "warn"},
+			"content": [
+				{"type": "calloutTitle", "content": [text("표기법")]},
+				{"type": "calloutBody", "content": [para(text("본문"))]},
+				{"type": "calloutAside", "content": [{"type": "blockMath", "attrs": {"latex": "N^{cell}_{ID}"}}]},
+			],
+		})
+		self.assertIn("data-callout-aside", html)
+		self.assertIn('data-latex="N^{cell}_{ID}"', html)
+		self.assertLess(html.index("본문"), html.index("data-callout-aside"))
+
+		def cell(width=None, **attrs):
+			node = {"type": "tableCell", "attrs": dict(attrs), "content": [para(text("c"))]}
+			if width is not None:
+				node["attrs"]["colwidth"] = width
+			return node
+		table = self.render({"type": "table", "content": [
+			{"type": "tableRow", "content": [cell([120]), cell([None]), cell(["x"])]},
+		]})
+		self.assertIn('<colgroup><col style="width:120px"><col><col></colgroup>', table)
+		self.assertIn('style="min-width:120px"', table)
+		# 너비 없는 표는 colgroup 없음, 병합 셀(colspan)은 열 수만큼 자리 차지
+		plain = self.render({"type": "table", "content": [{"type": "tableRow", "content": [cell(), cell()]}]})
+		self.assertNotIn("colgroup", plain)
+		merged = self.render({"type": "table", "content": [{"type": "tableRow", "content": [cell([100, 50], colspan=2)]}]})
+		self.assertIn('<col style="width:100px"><col style="width:50px">', merged)
+		self.assertIn('colspan="2"', merged)
+
 	def test_math_uses_katex_placeholder(self):
 		html = self.render(
 			para(text("식 "), {"type": "inlineMath", "attrs": {"latex": "x^2"}}),

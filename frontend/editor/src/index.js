@@ -16,6 +16,7 @@ import { createMathExtensions } from './extensions/math.js';
 import { SlashMenu } from './extensions/slash-menu.js';
 import { Divider } from './extensions/divider.js';
 import { createCalloutExtensions } from './extensions/callout.js';
+import { TableTools } from './extensions/table-tools.js';
 import { BlockHandle } from './extensions/block-handle.js';
 import { createBubbleToolbar } from './extensions/bubble-toolbar.js';
 
@@ -65,7 +66,8 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
             }),
             TaskList,
             TaskItem.configure({ nested: true }),
-            TableKit.configure({ table: { resizable: false } }),
+            TableKit.configure({ table: { resizable: true, cellMinWidth: 60, lastColumnResizable: true } }),
+            TableTools,
             Details.configure({ persist: true, HTMLAttributes: { class: 'mj-details' } }),
             DetailsSummary,
             DetailsContent,

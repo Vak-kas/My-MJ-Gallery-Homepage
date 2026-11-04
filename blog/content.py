@@ -215,19 +215,51 @@ CALLOUT_KINDS = {
 }
 
 
-def render_callout(kind, icon, title_html, body_html):
-	"""콜아웃 HTML. 모르는 종류는 info, 아이콘은 4글자까지(이모지 하나)."""
+def render_callout(kind, icon, title_html, body_html, aside_html=""):
+	"""콜아웃 HTML. 모르는 종류는 info, 아이콘은 4글자까지(이모지 하나). aside 는 오른쪽 칸(수식·표 등)."""
 	kind = str(kind or "info")
 	if kind not in CALLOUT_KINDS:
 		kind = "info"
 	default_icon, box_cls, title_cls = CALLOUT_KINDS[kind]
 	icon = escape(str(icon or "").strip()[:4] or default_icon)
 	title = f'<p class="mb-1 font-bold leading-snug {title_cls}">{title_html}</p>' if title_html else ""
+	border_cls = box_cls.split()[-1]
+	body = f'<div class="min-w-0 flex-1 [&>*:last-child]:mb-0">{body_html}</div>'
+	if aside_html:
+		body = (
+			f'<div class="sm:flex sm:items-center sm:gap-4">{body}'
+			f'<div class="mt-3 sm:mt-0 sm:max-w-[45%] sm:min-w-[150px] rounded-lg border bg-white/60 px-4 py-2.5 {border_cls} '
+			f'[&>*:last-child]:mb-0 [&>*]:my-0" data-callout-aside>{aside_html}</div></div>'
+		)
 	return (
 		f'<div class="my-6 flex items-start gap-3 rounded-xl border px-4 py-3.5 {box_cls}" data-callout="{kind}">'
 		f'<span class="flex h-7 w-7 flex-shrink-0 items-center justify-center text-[18px] leading-none" aria-hidden="true">{icon}</span>'
-		f'<div class="min-w-0 flex-1 leading-[1.8] [&>*:last-child]:mb-0">{title}{body_html}</div></div>'
+		f'<div class="min-w-0 flex-1 leading-[1.8]">{title}{body}</div></div>'
 	)
+
+
+def _table_colgroup(rows):
+	"""첫 행의 셀 colwidth(에디터에서 끌어서 정한 열 너비) → <colgroup>. 너비가 하나도 없으면 빈 문자열."""
+	first = next((r for r in rows if r.get("type") == "tableRow"), None)
+	if not first:
+		return "", 0
+	widths = []
+	for cell in _children(first):
+		raw = _attrs(cell).get("colwidth") or []
+		try:
+			span = max(1, int(_attrs(cell).get("colspan") or 1))
+		except (TypeError, ValueError):
+			span = 1
+		for i in range(span):
+			try:
+				value = int(raw[i]) if isinstance(raw, list) and i < len(raw) and raw[i] else 0
+			except (TypeError, ValueError):
+				value = 0
+			widths.append(max(0, min(value, 4000)))
+	if not any(widths):
+		return "", 0
+	cols = "".join(f'<col style="width:{w}px">' if w else "<col>" for w in widths)
+	return f"<colgroup>{cols}</colgroup>", sum(widths)
 
 
 def _render_block(node, tight=False):
@@ -310,9 +342,11 @@ def _render_block(node, tight=False):
 		)
 
 	if node_type == "table":
+		colgroup, min_width = _table_colgroup(children)
+		style = f' style="min-width:{min_width}px"' if min_width else ""
 		return (
-			f'<div class="overflow-x-auto mb-4"><table class="w-full border-collapse">'
-			f'{_render_blocks(children)}</table></div>'
+			f'<div class="overflow-x-auto mb-4"><table class="w-full border-collapse"{style}>'
+			f'{colgroup}{_render_blocks(children)}</table></div>'
 		)
 
 	if node_type == "tableRow":
@@ -350,11 +384,13 @@ def _render_block(node, tight=False):
 	if node_type == "callout":
 		title = next((c for c in children if c.get("type") == "calloutTitle"), None)
 		body = next((c for c in children if c.get("type") == "calloutBody"), None)
+		aside = next((c for c in children if c.get("type") == "calloutAside"), None)
 		return render_callout(
 			attrs.get("kind"),
 			attrs.get("icon"),
 			_render_inline(_children(title or {})),
 			_render_blocks(_children(body or {}), tight=True),
+			_render_blocks(_children(aside or {}), tight=True) if aside else "",
 		)
 
 	if node_type == "blockMath":
