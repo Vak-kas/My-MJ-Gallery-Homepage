@@ -11,7 +11,7 @@ from django.views.decorators.http import require_POST
 from studio.view_handlers.common import admin_view
 
 from . import kakao
-from .models import KakaoLink, Notification
+from .models import AlertMail, KakaoLink, Notification
 
 
 @admin_view
@@ -31,7 +31,44 @@ def notification_list(request):
         "unread_total": Notification.objects.filter(is_read=False).count(),
         "kakao_configured": kakao.is_configured(),
         "kakao_link": KakaoLink.objects.select_related("connected_by").first(),
+        "alert_mail": AlertMail.get(),
+        "mail_enabled": settings.MAIL_ENABLED,
     })
+
+
+@admin_view
+@require_POST
+def alert_mail_save(request):
+    """메일 알림 설정: 주소 · 종류 · 켜기/끄기."""
+    pref = AlertMail.get()
+    email = (request.POST.get("email") or "").strip()[:254]
+    kinds = [k for k in request.POST.getlist("kinds") if k in dict(Notification.KIND_CHOICES)]
+    enabled = request.POST.get("enabled") == "1"
+    if enabled and not email:
+        messages.error(request, "받을 메일 주소를 적어 주세요.")
+        return redirect("notifications:list")
+    pref.email, pref.kinds, pref.enabled = email, kinds, enabled
+    pref.save(update_fields=["email", "kinds", "enabled", "updated_at"])
+    messages.success(request, "메일 알림을 켰어요." if enabled else "메일 알림 설정을 저장했어요 (꺼짐).")
+    return redirect("notifications:list")
+
+
+@admin_view
+@require_POST
+def alert_mail_test(request):
+    from .service import _push_mail
+
+    pref = AlertMail.get()
+    if not pref.email:
+        messages.error(request, "받을 메일 주소를 먼저 저장해 주세요.")
+        return redirect("notifications:list")
+    item = Notification(kind=Notification.KIND_MONITOR, title="메일 알림 테스트", body="이 메일이 보이면 알림 메일이 잘 가요.", url="/notifications/")
+    try:
+        _push_mail(item, pref)
+        messages.success(request, f"{pref.email} 로 테스트 메일을 보냈어요.")
+    except Exception as exc:  # noqa: BLE001
+        messages.error(request, f"보내지 못했어요: {exc}")
+    return redirect("notifications:list")
 
 
 @admin_view

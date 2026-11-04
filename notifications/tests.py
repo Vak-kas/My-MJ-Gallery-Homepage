@@ -244,3 +244,56 @@ class KakaoTests(TestCase):
         self.client.force_login(self.member)
         res = self.client.post(reverse("notifications:kakao_connect"))
         self.assertNotIn("kauth.kakao.com", res.get("Location", ""))
+
+
+class AlertMailTests(TestCase):
+    def setUp(self):
+        from django.contrib.auth import get_user_model
+
+        self.admin = get_user_model().objects.create_superuser("alert-admin", "a@example.com", "pw")
+        self.client.force_login(self.admin)
+
+    def test_notify_sends_mail_for_selected_kinds(self):
+        import time
+
+        from django.core import mail
+        from django.test import override_settings
+
+        from notifications.models import AlertMail, Notification
+        from notifications.service import notify
+
+        pref = AlertMail.get()
+        self.assertEqual(pref.kinds, ["signup", "security", "monitor"])
+        self.assertFalse(pref.enabled)
+        with override_settings(MAIL_ENABLED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", KAKAO_REST_API_KEY=""):
+            notify(Notification.KIND_SECURITY, "꺼져 있을 땐 안 감")
+            time.sleep(0.3)
+            self.assertEqual(len(mail.outbox), 0)
+            res = self.client.post(reverse("notifications:alert_mail_save"), {"email": "me@example.com", "kinds": ["security", "signup"], "enabled": "1"})
+            self.assertEqual(res.status_code, 302)
+            pref.refresh_from_db()
+            self.assertTrue(pref.enabled)
+            # 백그라운드 스레드는 테스트 DB 를 못 보니 직접 호출
+            from notifications.service import _push_mail
+
+            item = Notification.objects.create(kind=Notification.KIND_SECURITY, title="새 IP 로그인", body="203.0.113.9", url="/studio/security/")
+            _push_mail(item, pref)
+            self.assertEqual(len(mail.outbox), 1)
+            sent = mail.outbox[0]
+            self.assertEqual(sent.to, ["me@example.com"])
+            self.assertIn("[MJ 알림] 🛡 새 IP 로그인", sent.subject)
+            self.assertIn("https://smjgallery.kr/studio/security/", sent.body)
+            self.assertFalse(pref.wants("comment"))
+            self.assertTrue(pref.wants("signup"))
+            pref.refresh_from_db()
+            self.assertIsNotNone(pref.last_sent_at)
+            # 테스트 버튼
+            res = self.client.post(reverse("notifications:alert_mail_test"))
+            self.assertEqual(res.status_code, 302)
+            self.assertEqual(len(mail.outbox), 2)
+            # 주소 없이 켜기 거부
+            self.client.post(reverse("notifications:alert_mail_save"), {"email": "", "enabled": "1"})
+            pref.refresh_from_db()
+            self.assertEqual(pref.email, "me@example.com")
+            page = self.client.get(reverse("notifications:list"))
+            self.assertContains(page, "메일 알림")
