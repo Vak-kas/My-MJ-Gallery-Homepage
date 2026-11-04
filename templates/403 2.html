@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}볼 수 없는 페이지 — 서민재 갤러리{% endblock %}
+
+{% block content %}
+{% include "components/main_nav.html" %}
+<main class="mx-auto flex min-h-[60vh] max-w-[720px] flex-col items-center justify-center px-6 py-20 text-center">
+    <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">403</p>
+    <h1 class="apple-display mt-4 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f]">볼 수 없는 페이지예요</h1>
+    <p class="mt-4 text-[16px] leading-[1.8] text-[#6e6e73]">권한이 없거나, 로그인 세션이 만료됐거나, 폼을 너무 오래 열어 두었을 수 있어요.<br>다시 로그인하거나 새로고침한 뒤 시도해 보세요.</p>
+    <div class="mt-8 flex flex-wrap justify-center gap-2">
+        <a href="{% url 'main:home' %}" class="rounded-full bg-[#0066cc] px-5 py-2.5 text-[14px] font-semibold text-white">홈으로</a>
+        <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] bg-white px-5 py-2.5 text-[14px] text-[#1d1d1f]">로그인</a>
+    </div>
+    <p class="mt-10 text-[13px] text-[#8e8e93]">자세한 건 관리자 메일 <a href="mailto:{{ contact_email }}" class="font-semibold text-[#0066cc] hover:underline">{{ contact_email }}</a> 로 보내 주세요.</p>
+</main>
+{% endblock %}

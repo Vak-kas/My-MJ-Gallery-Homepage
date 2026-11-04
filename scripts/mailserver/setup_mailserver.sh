@@ -122,6 +122,39 @@ R
 cat > /etc/rspamd/local.d/milter_headers.conf <<'R'
 use = ["x-spamd-result", "x-spam-status"];
 R
+# AWS 공용 리졸버에서는 DNS 기반 평판 목록(SenderScore 등) 조회가 막혀 점수가 엉뚱하게 붙음 → 끔
+cat > /etc/rspamd/local.d/rbl.conf <<'R'
+rbls {
+  senderscore { enabled = false; }
+}
+R
+# 큰 메일 서비스(네이버·구글·다음·카카오 …)가 DKIM 으로 서명한 메일은 점수를 깎아 스팸함으로 안 가게
+# (네이버는 짧은 제목을 base64 로 보내는 버릇이 있어 테스트 메일이 6점을 넘기기 쉬움)
+cat > /etc/rspamd/local.d/trusted_dkim.map <<'R'
+naver.com
+gmail.com
+google.com
+daum.net
+hanmail.net
+kakao.com
+kakaocorp.com
+outlook.com
+hotmail.com
+live.com
+icloud.com
+apple.com
+github.com
+amazon.com
+amazonaws.com
+R
+cat > /etc/rspamd/local.d/multimap.conf <<'R'
+TRUSTED_DKIM_DOMAIN {
+  type = "dkim";
+  map = "/etc/rspamd/local.d/trusted_dkim.map";
+  score = -4.0;
+  description = "큰 메일 서비스의 유효한 DKIM 서명";
+}
+R
 systemctl enable --now redis-server rspamd >/dev/null; systemctl restart rspamd
 
 echo "▶ 6/8 Dovecot (IMAP 993 · LMTP · 587 로그인)"
