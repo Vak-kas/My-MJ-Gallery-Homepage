@@ -7,14 +7,14 @@
             <p class="text-[48px]">📮</p>
             {% if verify %}
             <h1 class="mt-4 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">이메일을 확인해 주세요</h1>
-            <p class="mt-4 text-[16px] leading-7 text-[#6e6e73]">
+            <p class="mt-4 text-[16px] leading-7 text-[#6e6e73] [word-break:keep-all]">
                 <b class="text-[#1d1d1f]">{{ pending_user.email }}</b> 로 인증 메일을 보냈어요.<br>
                 메일의 링크를 누르면 가입 신청이 접수되고, 관리자가 승인하면 로그인할 수 있어요.
             </p>
-            <p class="mt-4 text-[13px] text-[#8e8e93]">메일이 안 오면 스팸함을 보고, <a href="{% url 'accounts:verify_resend' %}" class="text-[#0066cc]">다시 보내기</a>. {{ pending_user.email }} 가 틀렸다면 7일 뒤 임시 계정이 지워지니 그때 다시 가입하면 돼요.</p>
+            <p class="mt-4 text-[13px] text-[#8e8e93] [word-break:keep-all]">메일이 안 오면 스팸함을 보고, <a href="{% url 'accounts:verify_resend' %}" class="text-[#0066cc]">다시 보내기</a>. {{ pending_user.email }} 가 틀렸다면 7일 뒤 임시 계정이 지워지니 그때 다시 가입하면 돼요.</p>
             {% else %}
             <h1 class="mt-4 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">가입 신청이 접수됐어요</h1>
-            <p class="mt-4 text-[16px] leading-7 text-[#6e6e73]">
+            <p class="mt-4 text-[16px] leading-7 text-[#6e6e73] [word-break:keep-all]">
                 <b class="text-[#1d1d1f]">{{ pending_user.username }}</b> 님, 관리자가 확인한 뒤 승인하면<br>
                 같은 아이디와 비밀번호로 로그인할 수 있어요.
             </p>

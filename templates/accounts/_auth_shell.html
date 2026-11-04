@@ -5,10 +5,10 @@
         <div class="w-full max-w-[520px]">
             <div class="mb-10 text-center">
                 <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">MJGALLERY</p>
-                <h1 class="apple-display mt-4 text-[40px] font-semibold leading-[1.1] tracking-[-0.04em] text-[#1d1d1f]">{% block auth_title %}{% endblock %}</h1>
-                <p class="mt-4 text-[16px] leading-[1.6] text-[#6e6e73]">{% block auth_sub %}{% endblock %}</p>
+                <h1 class="apple-display mt-4 text-[40px] font-semibold leading-[1.1] tracking-[-0.04em] text-[#1d1d1f] [word-break:keep-all]">{% block auth_title %}{% endblock %}</h1>
+                <p class="mt-4 text-[16px] leading-[1.6] text-[#6e6e73] [word-break:keep-all]">{% block auth_sub %}{% endblock %}</p>
             </div>
-            <div class="rounded-[28px] border border-black/[0.06] bg-white p-8 sm:p-10">
+            <div class="rounded-[28px] border border-black/[0.06] bg-white p-8 [word-break:keep-all] sm:p-10">
                 {% if messages %}{% for m in messages %}<div class="mb-5 rounded-[16px] border {% if m.tags == 'error' %}border-red-200 bg-red-50 text-red-600{% else %}border-[#0066cc]/20 bg-[#f0f7ff] text-[#1d1d1f]{% endif %} px-5 py-4 text-[14px]">{{ m }}</div>{% endfor %}{% endif %}
                 {% block auth_card %}{% endblock %}
             </div>
