@@ -174,6 +174,18 @@ class RecoveryTests(TestCase):
         self.assertFalse(Post.objects.filter(slug="my-post").exists())
         self.assertEqual(self.client.get(reverse("accounts:index")).status_code, 302)   # 로그아웃됨
 
+    def test_profile_edit_needs_password_and_unique_email(self):
+        User.objects.create_user("other", "taken@example.com", "pw")
+        self.client.login(username="minjae", password="Old-pw-12345")
+        res = self.client.post(reverse("accounts:profile_edit"), {"real_name": "서 민재", "email": "new@example.com", "password": "wrong"})
+        self.assertContains(res, "비밀번호가 맞지 않아요")
+        res = self.client.post(reverse("accounts:profile_edit"), {"real_name": "서 민재", "email": "TAKEN@example.com", "password": "Old-pw-12345"})
+        self.assertContains(res, "이미 다른 계정이 쓰는 이메일")
+        res = self.client.post(reverse("accounts:profile_edit"), {"real_name": "서  민재", "email": "new@example.com", "password": "Old-pw-12345"})
+        self.assertRedirects(res, reverse("accounts:index"))
+        self.u.refresh_from_db()
+        self.assertEqual((self.u.first_name, self.u.email), ("서 민재", "new@example.com"))
+
     def test_superuser_cannot_self_delete(self):
         User.objects.create_superuser("boss", "b@example.com", "pw")
         self.client.login(username="boss", password="pw")
@@ -183,7 +195,10 @@ class RecoveryTests(TestCase):
     def test_admin_temp_password_forces_change(self):
         admin = User.objects.create_superuser("boss", "b@example.com", "pw")
         self.client.login(username="boss", password="pw")
-        res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(self.u.id)}, follow=True)
+        res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(self.u.id)}, follow=True)   # 확인 없이 → 거부
+        self.assertTrue(any("아이디(minjae)를 똑같이" in str(m) for m in res.context["messages"]))
+        self.assertFalse(MustChangePassword.objects.filter(user=self.u).exists())
+        res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(self.u.id), "confirm": "minjae"}, follow=True)
         msg = [str(m) for m in res.context["messages"] if "임시 비밀번호" in str(m)][0]
         temp = msg.split("임시 비밀번호: ")[1].split()[0]
         self.assertTrue(MustChangePassword.objects.filter(user=self.u, issued_by=admin).exists())
@@ -198,7 +213,7 @@ class RecoveryTests(TestCase):
         self.assertEqual(self.client.get(reverse("tools:index")).status_code, 200)
         # 관리자 자신·다른 관리자는 초기화 불가
         self.client.login(username="boss", password="pw")
-        res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(admin.id)}, follow=True)
+        res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(admin.id), "confirm": "boss"}, follow=True)
         self.assertTrue(any("초기화할 수 없어요" in str(m) for m in res.context["messages"]))
 
 
