@@ -48,6 +48,7 @@ urlpatterns = [
     path('accounts/', include('accounts.urls')),
     path('studio/', include('studio.urls')),
     path('notifications/', include('notifications.urls')),
+    path('mail/', include('webmail.urls')),
 ]
 
 if settings.DEBUG:

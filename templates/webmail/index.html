@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% load static blog_extras %}
+
+{% block title %}메일 — 서민재 갤러리{% endblock %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="mail" %}
+<meta name="mj-csrf" content="{{ csrf_token }}">
+<link rel="stylesheet" href="{% static_v 'mail/mail.css' %}">
+
+<main class="mx-auto max-w-[1320px] px-4 py-8 sm:px-6">
+    <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+            <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MJ MAIL</p>
+            <h1 class="apple-display mt-2 text-[34px] font-semibold tracking-[-0.04em]">메일함</h1>
+            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ mail_user }} · 같은 서버의 메일함을 사이트 안에서 봐요. 폰은 메일 앱(IMAP 993 · SMTP 587)으로.</p>
+        </div>
+        <a href="{% url 'studio:mail' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[12px] text-[#1d1d1f] hover:bg-white">사이트가 보낸 메일 기록 →</a>
+    </div>
+
+    {% if enabled %}
+    <div id="mail-app" data-user="{{ mail_user }}"></div>
+    {% else %}
+    <div class="rounded-2xl border border-[#f2d58a] bg-[#fff8e6] p-6 text-[14px] leading-[1.8] text-[#8a5a00]">
+        웹메일이 꺼져 있어요. 서버 <code>.env</code> 에 <code>WEBMAIL_PASSWORD=(mjseo@ 메일 비밀번호)</code> 를 넣고 gunicorn 을 재시작하면 켜져요.
+        같은 서버의 Dovecot(127.0.0.1:993)에 <code>WEBMAIL_USER</code>(기본 mjseo@smjgallery.kr)로 붙어요.
+    </div>
+    {% endif %}
+</main>
+
+{% if enabled %}
+<script src="{% static_v 'mail/mail.js' %}"></script>
+<script>
+    MjMail.create(document.getElementById('mail-app'), { mode: 'full' });
+</script>
+{% endif %}
+{% endblock %}

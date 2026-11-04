@@ -217,7 +217,17 @@
   - **관리자 계정이 처음 보는 IP 에서 로그인하면 🔔 + 카톡 알림**
   - 글·댓글·방명록 작성 IP·브라우저 기록, IP 로 검색, **증거 CSV 내보내기**
   - IP·대역 차단(기간 지정, 내 IP·너무 넓은 대역은 막지 않음) → 차단된 IP 는 사이트 전체 403
+- **Mail** (`/studio/mail/`): 사이트가 회원에게 보낸 메일(가입 인증·비밀번호 재설정·아이디 찾기·웹메일에서 직접) 기록 — 시각·받는 사람·제목·성공/실패 이유, 종류·실패만 필터, 오늘·7일 통계, 보내기/메일함 연결 상태. 모든 발송이 `webmail.backend.LoggingEmailBackend` 를 거쳐 `SentMail` 에 남고 180일 뒤 정리. 메일함 관리는 여기가 아니라 `/mail/`
 - 삭제 작업은 모두 `DELETE` 확인 문구 입력 필요
+
+### 1.10 메일함 (`/mail/`, 관리자 전용)
+`mjseo@smjgallery.kr` 메일함을 사이트 디자인(다크모드 포함) 안에서 본다. Django 가 같은 서버의 Dovecot(IMAP 993, `127.0.0.1` 로 붙되 인증서는 `mail.<도메인>` 이름으로 확인)에 붙고, 보내기는 Postfix(25)로.
+- 받은·보낸·임시·스팸·휴지통, 검색(보낸 사람·제목·본문, UTF-8), 30통씩 페이지, 읽기·안 읽음·⭐·스팸 이동·삭제(휴지통에서 지우면 완전 삭제), 여러 통 선택
+- 본문: HTML 메일은 정화기(`webmail/sanitize.py`: 스크립트·폼·iframe·on* 속성·javascript: 제거, 허용 태그만)로 걸러 **스크립트 금지 sandbox iframe + CSP** 안에서 표시. 외부 그림은 추적 방지로 기본 차단("그림 보기"로 허용), 본문 안 그림(cid:)은 첨부로 연결. 첨부 다운로드(이미지 외엔 `application/octet-stream`, nosniff)
+- 답장(In-Reply-To·References·원문 인용, 원본에 ↩ 표시)·전달·새 메일(첨부 모두 20MB), 보낸 메일은 보낸 편지함에 사본
+- **오른쪽 아래 떠 있는 ✉ 버튼**(관리자, 다크모드 버튼 위): 누르면 작은 패널에서 받은편지함·읽기·답장·쓰기, 닫으면 하던 작업 계속. 열림 상태 기억. 글 보기 화면에선 맨 위/아래 버튼 위로 올라감
+- navbar 🔔 옆 **✉ 아이콘** + 안 읽은 수 배지(1분마다·탭 돌아올 때 `/mail/api/unread/`). 안 읽은 수가 바뀌면 받은편지함 자동 갱신
+- 설정: 서버 `.env` 에 `WEBMAIL_PASSWORD=(메일 비밀번호)` (없으면 웹메일·버튼 모두 꺼짐), 선택 `WEBMAIL_USER`(기본 mjseo@smjgallery.kr)·`WEBMAIL_IMAP_HOST`(127.0.0.1)·`WEBMAIL_IMAP_TLS_NAME`(mail.smjgallery.kr)·`WEBMAIL_FROM_NAME`(서민재)
 
 ---
 
@@ -454,6 +464,7 @@ python -m unittest discover -s relay/tests -t .
 | `/tools/` | Tool 메뉴 (`qrcode/`, `pdf/`, `image/`, `ocr/`, `gpa/`, `charcount/`, `diff/`, `meet/`, `json/`, `regex/`, `keygen/`, `myip/`, `encode/`, `duplex/`, `subnet/`, `wifi/`, `linkbudget/`, `time/`, `units/`, `cite/`, `papers/`, `stdlib/`, `github/`, `clipboard/`, `speedtest/`, `netcheck/`, `shortlink/`, `secret/`, `live/`, `stream/`, `share/`) |
 | `/studio/` | 관리자 CMS (`posts/`, `community/`, `analytics/`, `server/`, `ai/`, `users/`, `security/`, `settings/` 등) |
 | `/notifications/` | 관리자 알림 · 카카오톡 연결 |
+| `/mail/` | 관리자 메일함 (웹메일, IMAP/SMTP 는 같은 서버) |
 | `/accounts/signup/`, `/accounts/login/` | 가입 신청 / 로그인 |
 | `/admin/` | Django Admin |
 
@@ -497,8 +508,8 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 
 ---
 
-### 7.x 메일 서버 (보내기 전용)
-서버에 메일함 하나(`mjseo@smjgallery.kr`): Postfix(받기·보내기) + Dovecot(IMAP 993) + Roundcube 웹메일(`mail.smjgallery.kr`) + OpenDKIM + rspamd. 사이트의 가입 인증·비밀번호 재설정 메일도 여기로 나간다. 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 메일함은 `.env` `MAIL_BACKUP_DIR` 로 S3 백업에 포함. 확인은 `manage.py send_test_mail 주소`.
+### 7.x 메일 서버
+서버에 메일함 하나(`mjseo@smjgallery.kr`): Postfix(받기·보내기) + Dovecot(IMAP 993) + OpenDKIM + rspamd (+ Roundcube `mail.smjgallery.kr`, 예비용 — 평소엔 사이트 안 `/mail/` 웹메일을 씀). 사이트의 가입 인증·비밀번호 재설정 메일도 여기로 나간다(`.env` `EMAIL_HOST=localhost`, `EMAIL_PORT=25`, `EMAIL_USE_TLS=False`). 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 메일함은 `.env` `MAIL_BACKUP_DIR` 로 S3 백업에 포함. 확인은 `manage.py send_test_mail 주소`.
 
 ## 8) 라이선스
 

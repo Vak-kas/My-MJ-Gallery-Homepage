@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'security',
     'analytics',
     'monitor',
+    'webmail',
 ]
 
 MIDDLEWARE = [
@@ -112,6 +113,7 @@ TEMPLATES = [
                 'main.context_processors.seo_meta',
                 'tools.context_processors.user_tier',
                 'main.context_processors.share',
+                'webmail.context_processors.webmail',
             ],
         },
     },
@@ -130,10 +132,12 @@ CACHES = {
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
 
 # 메일 (아이디 찾기·비밀번호 재설정). EMAIL_HOST 를 비우면 실제로 보내지 않고 서버 로그(console)에 찍음
+# 보내는 메일은 모두 webmail.backend.LoggingEmailBackend 를 거쳐 SentMail 에 기록(Studio › Mail)
 EMAIL_HOST = os.getenv("EMAIL_HOST", "").strip()
 MAIL_ENABLED = bool(EMAIL_HOST)
+EMAIL_BACKEND = "webmail.backend.LoggingEmailBackend"
 if MAIL_ENABLED:
-    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    WEBMAIL_INNER_EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587") or 587)
     EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", "True")
     EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
@@ -141,7 +145,7 @@ if MAIL_ENABLED:
     EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
     EMAIL_TIMEOUT = 10
 else:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    WEBMAIL_INNER_EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "MJ Gallery <noreply@smjgallery.kr>")
 # 관리자 알림 카카오톡 '나에게 보내기' (선택)
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
@@ -231,6 +235,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # 비공개 파일(클립보드·맡겨둔 파일): nginx 가 서빙하지 않고 Django 가 권한 확인 후 내려줌
 PRIVATE_MEDIA_ROOT = BASE_DIR / 'private_media'
 MAIL_BACKUP_DIR = os.getenv("MAIL_BACKUP_DIR", "")  # 메일 서버 메일함(/var/mail/vhosts) — 비어 있으면 백업 안 함
+
+# 웹메일(/mail/, 관리자 전용): 같은 서버의 Dovecot(IMAP) 에 이 계정으로 붙음. 비밀번호가 비어 있으면 웹메일 꺼짐
+WEBMAIL_IMAP_HOST = os.getenv("WEBMAIL_IMAP_HOST", "127.0.0.1")
+WEBMAIL_IMAP_PORT = int(os.getenv("WEBMAIL_IMAP_PORT", "993") or 993)
+WEBMAIL_IMAP_TLS_NAME = os.getenv("WEBMAIL_IMAP_TLS_NAME", "mail.smjgallery.kr")  # 127.0.0.1 로 붙어도 인증서 이름은 이걸로 확인
+WEBMAIL_USER = os.getenv("WEBMAIL_USER", "mjseo@smjgallery.kr")
+WEBMAIL_PASSWORD = os.getenv("WEBMAIL_PASSWORD", "")
+WEBMAIL_FROM_NAME = os.getenv("WEBMAIL_FROM_NAME", "서민재")
+WEBMAIL_ENABLED = bool(WEBMAIL_PASSWORD)
+WEBMAIL_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
 
 if USE_S3:
     INSTALLED_APPS.append('storages')
