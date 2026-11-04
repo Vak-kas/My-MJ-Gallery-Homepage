@@ -1,3 +1,5 @@
+from django.conf import settings
+
 from . import og_cards, seo
 
 
@@ -51,7 +53,7 @@ def seo_meta(request):
 	meta = meta or seo.build(path=request.path)
 	meta["url"] = seo.absolute(request.path)
 	meta["noindex"] = request.path.startswith(seo.NOINDEX_PREFIXES)
-	return {"default_meta": meta}
+	return {"default_meta": meta, "contact_email": settings.CONTACT_EMAIL}
 
 
 def share(request):
