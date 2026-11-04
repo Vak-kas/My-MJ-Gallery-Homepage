@@ -1,3 +1,4 @@
+{% load main_extras %}
 <section data-section="profile" class="page-section profile-section mx-auto flex min-h-[85vh] max-w-[1320px] flex-col justify-center pt-6 is-active">
     <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
         <div class="reveal">
@@ -106,7 +107,8 @@
                     <p class="mt-1 text-[14px] text-[#6e6e73]">{{ link.get_platform_display }}</p>
 
                     <p class="mt-3 line-clamp-2 text-[14px] leading-[1.45] text-[#6e6e73]">
-                        {% if link.platform == 'github' %}
+                        {% if link.description %}{{ link.description }}
+                        {% elif link.platform == 'github' %}
                         GitHub 저장소와 코드 활동을 확인할 수 있습니다.
                         {% elif link.platform == 'velog' or link.platform == 'tistory' %}
                         작성한 글과 기술 기록을 볼 수 있는 블로그 링크입니다.
@@ -138,7 +140,7 @@
                             {% else %}bg-[#0f766e] text-white{% endif %}">
                             {% if link.platform == 'github' %}G{% elif link.platform == 'velog' %}V{% elif link.platform == 'tistory' %}T{% elif link.platform == 'linkedin' %}in{% elif link.platform == 'notion' %}N{% elif link.platform == 'youtube' %}▶{% elif link.platform == 'instagram' %}◎{% elif link.platform == 'x' %}X{% else %}W{% endif %}
                         </span>
-                        <span class="truncate">{{ link.url }}</span>
+                        <span class="truncate" title="{{ link.url }}">{{ link.url|urldecode }}</span>
                     </div>
                 </a>
                 {% empty %}
