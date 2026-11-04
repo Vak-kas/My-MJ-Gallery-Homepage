@@ -310,6 +310,15 @@ class PublicationStatusTests(TestCase):
         self.assertEqual(res.status_code, 302)
         pub = Publication.objects.get(title="심사중 논문")
         self.assertEqual(pub.status, "under_review")
+        # 심사중이면 발행일을 보내도 비워짐
+        self.client.post(reverse("studio:publication_update", args=[pub.id]), {"publication_type": "international", "publication_kind": "journal",
+                                                                             "status": "under_review", "date": "2026-05", "title": "심사중 논문", "is_visible": "true"})
+        pub.refresh_from_db()
+        self.assertIsNone(pub.date)
+        self.client.post(reverse("studio:publication_update", args=[pub.id]), {"publication_type": "international", "publication_kind": "journal",
+                                                                             "status": "accepted", "date": "2026-05", "title": "심사중 논문", "is_visible": "true"})
+        pub.refresh_from_db()
+        self.assertEqual(str(pub.date), "2026-05-01")
         self.assertTrue(pub.is_pending)
         page = self.client.get(reverse("studio:publication"))
         self.assertContains(page, "심사중")

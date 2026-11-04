@@ -114,6 +114,8 @@ def publication_create(request):
         venue = request.POST.get("venue", "").strip()
         authors = request.POST.get("authors", "").strip()
         date = parse_month_input(request.POST.get("date", "").strip())
+        if status in Publication.PENDING_STATUSES:  # 아직 안 나온 글은 발행일 없음
+            date = None
         doi = request.POST.get("doi", "").strip()
         url = request.POST.get("url", "").strip()
         abstract = request.POST.get("abstract", "").strip()
@@ -169,6 +171,8 @@ def publication_update(request, id):
         venue = request.POST.get("venue", "").strip()
         authors = request.POST.get("authors", "").strip()
         date = parse_month_input(request.POST.get("date", "").strip())
+        if status in Publication.PENDING_STATUSES:  # 아직 안 나온 글은 발행일 없음
+            date = None
         doi = request.POST.get("doi", "").strip()
         url = request.POST.get("url", "").strip()
         abstract = request.POST.get("abstract", "").strip()

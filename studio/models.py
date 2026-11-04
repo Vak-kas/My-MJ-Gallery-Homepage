@@ -425,6 +425,8 @@ class Publication(models.Model):
         ("in_prep", "준비중"),
     ]
 
+    PENDING_STATUSES = ("under_review", "submitted", "in_prep")  # 발행일을 안 받는 상태
+
     publication_type = models.CharField(max_length=20, choices=PUBLICATION_TYPE_CHOICES, default="international")
     publication_kind = models.CharField(max_length=20, choices=PUBLICATION_KIND_CHOICES, default="journal")
     status = models.CharField("상태", max_length=20, choices=PUBLICATION_STATUS_CHOICES, default="published")
