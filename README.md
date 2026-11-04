@@ -487,6 +487,9 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 
 ---
 
+### 7.x 메일 서버 (보내기 전용)
+가입 인증·비밀번호 재설정 메일은 서버의 Postfix + DKIM 으로 직접 보낸다. 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 확인은 `manage.py send_test_mail 주소`.
+
 ## 8) 라이선스
 
 개인 포트폴리오 프로젝트 용도입니다. 필요 시 별도 라이선스를 추가하세요.
