@@ -192,7 +192,7 @@
 - 화면 1024px 미만(폰·태블릿)에서는 왼쪽 사이드바가 서랍으로 바뀌고 왼쪽 아래 ☰ 버튼으로 엶 (`components/studio_sidebar.html`), 본문은 전체 너비
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
   - Profile › Contact 도 종류(이메일·전화·주소) 안에서 행을 드래그해 순서 변경(`profile_contact_reorder`), Basic Info 의 자기소개는 내용만큼 자동으로 늘어나고 관심 분야·대표 키워드 상자는 칩이 두 줄이어도 안 넘침
-  - Publication 에 **상태**(게재됨 · 게재 확정 · 심사중 · 제출 완료 · 준비중): 게재됨이 아니면 Studio 카드와 메인 Publications 카드에 상태 배지
+  - Publication 에 **상태**(게재됨 · 게재 확정 · 심사중 · 제출 완료 · 준비중): 게재됨이 아니면 Studio 카드와 메인 Publications 카드에 상태 배지. 심사중·제출 완료·준비중이면 발행일 칸이 잠기고 서버에서도 날짜를 비움
 - **Posts**: 검색·작성자·기간·**제목 포함(예: 555)** 필터, 발행/임시저장 상태 필터, 공개 범위 변경
   - 일괄 작업(발행, 발행 취소, 공개 범위, 삭제)을 체크한 글 또는 **필터 결과 전체(모든 페이지)** 에 적용
 - **Community**: 방명록 · 댓글 검색, 숨기기 / 다시 보이기 / 삭제, 필터 결과 전체 처리

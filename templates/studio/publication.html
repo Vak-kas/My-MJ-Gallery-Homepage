@@ -217,7 +217,8 @@
 
                         <div>
                             <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">발행일</label>
-                            <input type="month" name="date" value="{{ editing_publication.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]">
+                            <input type="month" name="date" value="{{ editing_publication.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] disabled:cursor-not-allowed disabled:bg-[#f2f2f7] disabled:text-[#8e8e93]" data-pub-date>
+                            <p class="mt-1 hidden text-[11px] text-[#b26a00]" data-pub-date-hint>심사중·제출 완료·준비중에는 발행일을 안 받아요. 게재되면 상태를 바꾸고 넣어 주세요.</p>
                         </div>
 
                         <div>
@@ -315,6 +316,21 @@
 </div>
 
 <script>
+    // 상태가 심사중·제출 완료·준비중이면 발행일 칸을 잠금 (서버도 그 상태면 날짜를 비움)
+    (() => {
+        const status = document.querySelector('select[name="status"]');
+        const date = document.querySelector('[data-pub-date]');
+        const hint = document.querySelector('[data-pub-date-hint]');
+        if (!status || !date) return;
+        const sync = () => {
+            const pending = ['under_review', 'submitted', 'in_prep'].includes(status.value);
+            date.disabled = pending;
+            if (pending) date.value = '';
+            if (hint) hint.classList.toggle('hidden', !pending);
+        };
+        status.addEventListener('change', sync);
+        sync();
+    })();
     const SCROLL_KEY = 'studio_publication_scroll_y';
     const PANEL_MODE_KEY = 'studio_publication_panel_mode';
 
