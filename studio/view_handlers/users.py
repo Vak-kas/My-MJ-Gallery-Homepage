@@ -312,4 +312,5 @@ def user_detail(request, id):
         "recent_comments": list(Comment.objects.filter(author=target).select_related("post").order_by("-id")[:8]),
         "recent_guestbook": list(GuestbookEntry.objects.filter(author=target).order_by("-id")[:5]),
         "login_events": login_events, "ips": sorted(ips.values(), key=lambda r: r["last"], reverse=True)[:10],
+        "recent_views": list(__import__("analytics.models", fromlist=["PageView"]).PageView.objects.filter(user=target).order_by("-created_at")[:20]),
     })

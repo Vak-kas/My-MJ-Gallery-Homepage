@@ -99,7 +99,7 @@ from .community import community
 from .users import users, user_detail
 from .security import security, security_ip
 from .settings import site_settings_view
-from .analytics import analytics
+from .analytics import analytics, analytics_live
 from .server import server, server_logs
 from .ai_usage import ai_usage
 from .mail_log import mail_log  # noqa: E402

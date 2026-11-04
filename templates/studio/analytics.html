@@ -23,6 +23,7 @@
                 {% for value, label in ranges %}
                 <a href="?days={{ value }}" class="rounded-full px-4 py-1.5 {% if days == value %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">{{ label }}</a>
                 {% endfor %}
+                <a href="{% url 'studio:analytics_live' %}" class="rounded-full border border-[#0066cc]/30 bg-[#f0f7ff] px-4 py-1.5 font-semibold text-[#0066cc]">🟢 실시간</a>
             </div>
         </section>
 

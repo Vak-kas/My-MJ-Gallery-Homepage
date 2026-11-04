@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.db import models
 
 
@@ -24,6 +25,8 @@ class PageView(models.Model):
     referrer_host = models.CharField(max_length=120, blank=True)
     device = models.CharField(max_length=10, choices=DEVICE_CHOICES)
     is_member = models.BooleanField(default=False)
+    # 회원이면 누구인지 (실시간 현황·회원 상세용). 비회원은 비어 있고 visitor 해시만 남음
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="page_views")
 
     class Meta:
         indexes = [models.Index(fields=["day", "section"])]

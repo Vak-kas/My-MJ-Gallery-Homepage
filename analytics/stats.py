@@ -96,3 +96,24 @@ def summary(days):
         "sources": sources, "referrers": referrers, "devices": devices, "hourly": hourly,
         "short_clicks": qs.filter(section="short").count(),
     }
+
+
+
+def live(minutes=5, limit=60):
+    """실시간 현황: 최근 n분 활동한 사람(방문자 해시 단위)과 최근 활동 흐름."""
+    now = timezone.now()
+    since = now - timedelta(minutes=minutes)
+    recent = PageView.objects.filter(created_at__gte=since).select_related("user").order_by("-created_at")
+    people = {}
+    for v in recent:
+        p = people.setdefault(v.visitor, {"visitor": v.visitor[:6], "user": v.user.username if v.user else "", "first_name": (v.user.first_name if v.user else ""),
+                                          "last_path": v.path, "last_at": v.created_at, "device": v.get_device_display(), "source": v.get_source_display(), "views": 0, "user_id": v.user_id})
+        p["views"] += 1
+    online = sorted(people.values(), key=lambda x: x["last_at"], reverse=True)
+    stream = [{"at": v.created_at, "who": v.user.username if v.user else f"익명 {v.visitor[:4]}", "user_id": v.user_id, "path": v.path, "section": v.section,
+               "device": v.get_device_display(), "source": v.get_source_display(), "referrer": v.referrer_host}
+              for v in PageView.objects.filter(created_at__gte=now - timedelta(hours=24)).select_related("user").order_by("-created_at")[:limit]]
+    return {
+        "minutes": minutes, "online": online, "online_total": len(online), "online_members": sum(1 for p in online if p["user"]),
+        "stream": stream, "today_views": PageView.objects.filter(day=timezone.localdate()).count(),
+    }
