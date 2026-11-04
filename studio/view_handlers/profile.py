@@ -1,10 +1,11 @@
 from django.contrib import messages
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
 from studio.models import BasicInfo, Contact, Link
 
-from .common import admin_view
+from .common import admin_view, apply_reorder, parse_reorder_payload
 
 
 @admin_view
@@ -288,3 +289,16 @@ def profile_link_toggle_primary(request, link_id):
 @admin_view
 def profile_resume(request):
     return render(request, "studio/profile_resume.html")
+
+
+@admin_view
+def profile_contact_reorder(request):
+    """연락처 드래그 정렬 저장 (같은 종류 안에서). body: {"ordered_ids": [...]}"""
+    if request.method != "POST":
+        return JsonResponse({"ok": False}, status=405)
+    ordered_ids, error = parse_reorder_payload(request)
+    if error:
+        return error
+    if not apply_reorder(Contact, ordered_ids):
+        return JsonResponse({"ok": False, "message": "정렬 저장에 실패했습니다."}, status=400)
+    return JsonResponse({"ok": True})

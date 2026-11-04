@@ -417,8 +417,17 @@ class Publication(models.Model):
         ("conference", "학술지"),
     ]
 
+    PUBLICATION_STATUS_CHOICES = [
+        ("published", "게재됨"),
+        ("accepted", "게재 확정"),
+        ("under_review", "심사중"),
+        ("submitted", "제출 완료"),
+        ("in_prep", "준비중"),
+    ]
+
     publication_type = models.CharField(max_length=20, choices=PUBLICATION_TYPE_CHOICES, default="international")
     publication_kind = models.CharField(max_length=20, choices=PUBLICATION_KIND_CHOICES, default="journal")
+    status = models.CharField("상태", max_length=20, choices=PUBLICATION_STATUS_CHOICES, default="published")
     title = models.CharField(max_length=255)
     venue = models.CharField(max_length=255, blank=True)
     authors = models.CharField(max_length=255, blank=True)
@@ -440,6 +449,11 @@ class Publication(models.Model):
 
     def __str__(self):
         return self.title
+
+    @property
+    def is_pending(self):
+        """아직 게재되지 않은 글(심사중·제출·준비) — 화면에 상태 배지를 붙임"""
+        return self.status != "published"
 
 
 class Skill(models.Model):

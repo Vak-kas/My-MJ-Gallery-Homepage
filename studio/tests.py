@@ -274,3 +274,49 @@ class SiteSettingsTests(TestCase):
     def test_tampered_post_rejected(self):
         self.save(nav=["home", "blog"])  # 항목 누락
         self.assertEqual(self.nav_labels(), ["Home", "Blog", "Tool", "Gallery", "Game"])
+
+
+class ContactReorderTests(TestCase):
+    def test_reorder_saves_order_and_rejects_bad_ids(self):
+        import json
+
+        from studio.models import Contact
+
+        User = get_user_model()
+        admin = User.objects.create_superuser("contact-admin", "a@example.com", "pw")
+        a = Contact.objects.create(contact_type="email", label="A", value="a@x.kr", order=0)
+        b = Contact.objects.create(contact_type="email", label="B", value="b@x.kr", order=1)
+        url = reverse("studio:profile_contact_reorder")
+        self.assertEqual(self.client.post(url, json.dumps({"ordered_ids": [b.id, a.id]}), content_type="application/json").status_code, 302)
+        self.client.force_login(admin)
+        res = self.client.post(url, json.dumps({"ordered_ids": [b.id, a.id]}), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([c.label for c in Contact.objects.all()], ["B", "A"])
+        self.assertEqual(self.client.post(url, json.dumps({"ordered_ids": [b.id, 9999]}), content_type="application/json").status_code, 400)
+        page = self.client.get(reverse("studio:profile_contact"))
+        self.assertContains(page, 'data-sortable-list')
+        self.assertContains(page, f'data-item-id="{b.id}"')
+
+
+class PublicationStatusTests(TestCase):
+    def test_status_saved_and_badge_shown_when_pending(self):
+        from studio.models import Publication
+
+        User = get_user_model()
+        admin = User.objects.create_superuser("pub-admin", "a@example.com", "pw")
+        self.client.force_login(admin)
+        res = self.client.post(reverse("studio:publication_create"), {"publication_type": "international", "publication_kind": "journal",
+                                                                      "status": "under_review", "title": "심사중 논문", "is_visible": "true"})
+        self.assertEqual(res.status_code, 302)
+        pub = Publication.objects.get(title="심사중 논문")
+        self.assertEqual(pub.status, "under_review")
+        self.assertTrue(pub.is_pending)
+        page = self.client.get(reverse("studio:publication"))
+        self.assertContains(page, "심사중")
+        home = self.client.get(reverse("main:home"))
+        self.assertContains(home, "pub-type-badge-status")
+        # 모르는 값은 게재됨으로
+        self.client.post(reverse("studio:publication_update", args=[pub.id]), {"publication_type": "international", "publication_kind": "journal",
+                                                                             "status": "weird", "title": "심사중 논문", "is_visible": "true"})
+        pub.refresh_from_db()
+        self.assertEqual(pub.status, "published")

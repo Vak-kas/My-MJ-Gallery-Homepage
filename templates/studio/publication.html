@@ -191,6 +191,16 @@
                         </div>
 
                         <div>
+                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">상태</label>
+                            <select name="status" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
+                                {% for value, label in publication_statuses %}
+                                <option value="{{ value }}"{% if editing_publication %}{% if editing_publication.status == value %} selected{% endif %}{% else %}{% if value == 'published' %} selected{% endif %}{% endif %}>{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                            <p class="mt-1 text-[11px] text-[#8e8e93]">게재됨이 아니면 메인 화면 카드에 상태 배지가 붙어요 (심사중·제출 완료·게재 확정·준비중)</p>
+                        </div>
+
+                        <div>
                             <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">제목 *</label>
                             <input type="text" name="title" value="{{ editing_publication.title|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: Efficient ...">
                         </div>
@@ -266,6 +276,7 @@
                                         <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ publication_item.title }}</p>
                                         <span class="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[11px] font-semibold text-[#1d4ed8]">{{ publication_item.get_publication_type_display }}</span>
                                         <span class="rounded-full bg-[#f8f3ff] px-2.5 py-1 text-[11px] font-semibold text-[#7c3aed]">{{ publication_item.get_publication_kind_display }}</span>
+                                        {% if publication_item.is_pending %}<span class="rounded-full bg-[#fff6e8] px-2.5 py-1 text-[11px] font-semibold text-[#b26a00]">{{ publication_item.get_status_display }}</span>{% endif %}
                                     </div>
                                     {% if publication_item.authors %}
                                     <p class="mt-1 text-[12px] text-[#8e8e93]">{{ publication_item.authors }}</p>
