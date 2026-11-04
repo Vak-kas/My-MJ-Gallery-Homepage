@@ -1,3 +1,4 @@
+import unicodedata
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -185,7 +186,8 @@ def login_view(request):
     next_url = _safe_next_url(request)
 
     if request.method == "POST":
-        username = request.POST.get('username')
+        # 가입 폼(UsernameField)이 아이디를 NFKC 로 정규화해 저장하므로 로그인도 똑같이 — 'ㅎㅇ'(호환 자모) 와 'ᄒᄋ'(조합형) 가 같은 계정이 되게
+        username = unicodedata.normalize("NFKC", (request.POST.get('username') or "").strip())
         password = request.POST.get('password')
         ip = client_ip(request)
         if is_locked(ip, username):
