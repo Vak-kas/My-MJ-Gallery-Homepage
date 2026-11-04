@@ -211,7 +211,7 @@
                     {% endif %}
                     {% include "components/notif_bell.html" %}
                     {% include "components/mail_nav.html" %}
-                    <a href="{% url 'accounts:index' %}" title="내 계정" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">👤</a>
+                    <a href="{% url 'accounts:index' %}" title="내 계정" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">My</a>
                     <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
                 {% else %}
                     <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
