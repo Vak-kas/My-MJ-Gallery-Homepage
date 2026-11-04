@@ -175,3 +175,44 @@ html.theme-dark .mail-panel__head { color: #f3f4f6; border-color: rgba(255,255,2
 .mail-panel__head .mail-panel__close { margin-left: auto; width: 26px; height: 26px; border-radius: 999px; color: #8e8e93; font-size: 16px; }
 .mail-panel__body { flex: 1; min-height: 0; }
 .mail-panel__body .mjm { height: 100%; }
+
+/* 서식 편집기 · 설정 (3차) */
+.mjm__quicklinks { display: flex; gap: 6px; margin: -6px 0 10px; justify-content: center; }
+.mjm__mini--inline { margin-left: 8px; vertical-align: middle; }
+.mjm__fmt { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 16px; padding: 6px 8px; border: 1px solid var(--mjm-line); border-bottom: 0; border-radius: 10px 10px 0 0; background: var(--mjm-bg2); }
+.mjm__fmt button { min-width: 28px; height: 26px; padding: 0 8px; border-radius: 6px; border: 1px solid transparent; background: transparent; color: var(--mjm-text); font-size: 12px; }
+.mjm__fmt button:hover { background: var(--mjm-bg); border-color: var(--mjm-line); }
+.mjm__fmt input[type="color"] { width: 26px; height: 26px; padding: 0; border: 1px solid var(--mjm-line); border-radius: 6px; background: transparent; }
+.mjm__fmt .mjm__selmenu { height: 26px; }
+.mjm__fmt-sep { width: 1px; height: 18px; background: var(--mjm-line); margin: 0 2px; }
+.mjm__editor { min-height: 220px; max-height: 60vh; overflow-y: auto; margin: 0 16px; padding: 12px 14px; border: 1px solid var(--mjm-line); border-radius: 0 0 10px 10px; background: var(--mjm-bg); color: var(--mjm-text); font-size: 14px; line-height: 1.6; outline: none; word-break: break-word; }
+.mjm__editor:focus { border-color: var(--mjm-accent); }
+.mjm__editor:empty::before { content: attr(data-placeholder); color: var(--mjm-dim); }
+.mjm__editor a { color: var(--mjm-accent); }
+.mjm__editor blockquote { border-left: 3px solid #ddd; margin: 8px 0; padding-left: 10px; color: #777; }
+.mjm__editor .mjm-sig { color: var(--mjm-dim); font-size: 13px; }
+.mjm__editor .mjm-quote-head { color: var(--mjm-dim); font-size: 12px; }
+.mjm__settings .mjm__editor, .mjm__tpl-edit .mjm__editor { min-height: 140px; border-radius: 0 0 10px 10px; }
+.mjm__settings .mjm__fmt, .mjm__tpl-edit .mjm__fmt { margin: 0 16px; }
+.mjm__settings-body { padding: 10px 0 20px; display: flex; flex-direction: column; gap: 10px; }
+.mjm__settings-body > p { margin: 0 16px; font-size: 12px; }
+.mjm__settings .mjm__chips { border-bottom: 1px solid var(--mjm-line); }
+.mjm__previewbox { margin: 0 16px; }
+.mjm__previewbox p { margin: 0 0 6px; font-size: 12px; }
+.mjm__previewbox .mjm__body { border: 1px solid var(--mjm-line); border-radius: 10px; }
+.mjm__schedulebox { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 16px; padding: 10px 12px; border: 1px dashed var(--mjm-line); border-radius: 10px; font-size: 12px; }
+.mjm__schedulebox input { height: 30px; padding: 0 8px; border: 1px solid var(--mjm-line); border-radius: 8px; background: var(--mjm-bg); color: var(--mjm-text); font: inherit; }
+.mjm__tpl-list, .mjm__contacts { display: flex; flex-direction: column; gap: 6px; padding: 0 16px; }
+.mjm__tpl, .mjm__contact { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border: 1px solid var(--mjm-line); border-radius: 12px; font-size: 13px; }
+.mjm__tpl-main, .mjm__contact-main { flex: 1; min-width: 0; }
+.mjm__tpl-sub { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mjm__tpl button, .mjm__contact button { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--mjm-line); background: var(--mjm-bg); color: var(--mjm-text); font-size: 12px; }
+.mjm__tpl button.is-danger, .mjm__contact button.is-danger { color: #c4271d; border-color: rgba(255,59,48,.35); }
+.mjm__tpl-edit { display: flex; flex-direction: column; gap: 8px; padding: 10px 0; border: 1px solid var(--mjm-line); border-radius: 12px; }
+.mjm__tpl-edit .mjm__field input { padding: 6px 10px; }
+.mjm__contact-add { display: grid; grid-template-columns: 1.4fr 1fr 1fr auto; gap: 6px; margin: 0 16px; }
+.mjm__contact-add input { height: 32px; padding: 0 10px; border: 1px solid var(--mjm-line); border-radius: 8px; background: var(--mjm-bg); color: var(--mjm-text); font-size: 13px; }
+.mjm__chip--pending { color: #b26a00; border-color: rgba(178,106,0,.4); }
+.mjm__chip--sent { color: #1e7a35; border-color: rgba(52,199,89,.4); }
+.mjm__chip--failed { color: #c4271d; border-color: rgba(255,59,48,.4); }
+@media (max-width: 640px) { .mjm__contact-add { grid-template-columns: 1fr 1fr; } }

@@ -336,3 +336,97 @@ class StudioMailLogTests(TestCase):
 		self.assertEqual([r.to for r in res.context["rows"]], ["b@example.com"])
 		res = self.client.get(reverse("studio:mail"), {"kind": "verify"})
 		self.assertEqual([r.to for r in res.context["rows"]], ["a@example.com"])
+
+
+@override_settings(WEBMAIL_ENABLED=True, WEBMAIL_PASSWORD="x", WEBMAIL_USER="mjseo@smjgallery.kr",
+                   EMAIL_BACKEND="webmail.backend.LoggingEmailBackend",
+                   WEBMAIL_INNER_EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class WebmailV3Tests(TestCase):
+	"""서명·템플릿·주소록·예약 발송·HTML 메일"""
+
+	def setUp(self):
+		from .models import MailTemplate
+
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("v3-admin", "a@example.com", "pw")
+		self.client.force_login(self.admin)
+		FakeMailbox.reset()
+		patcher = mock.patch("webmail.views.imap.Mailbox", FakeMailbox)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		patcher2 = mock.patch("webmail.scheduled.imap.Mailbox", FakeMailbox)
+		patcher2.start()
+		self.addCleanup(patcher2.stop)
+		self.assertGreaterEqual(MailTemplate.objects.count(), 6)  # 기본 템플릿이 마이그레이션으로 들어옴
+
+	def post_json(self, name, body):
+		return self.client.post(reverse(name), json.dumps(body), content_type="application/json")
+
+	def test_state_has_signature_templates_contacts(self):
+		data = self.client.get(reverse("webmail:api_state")).json()
+		self.assertIn("<b>Minjae Seo", data["signature"])
+		self.assertIn("mjseo@smjgallery.kr", data["signature"])
+		self.assertTrue(any(t["name"] == "미팅 요청" for t in data["templates"]))
+		self.assertEqual(data["contacts"], {})
+
+	def test_signature_saved_sanitized(self):
+		res = self.post_json("webmail:api_prefs", {"signature": "<b>민재</b><script>x</script>"})
+		self.assertEqual(res.json()["signature"], "<b>민재</b>")
+		self.assertEqual(self.client.get(reverse("webmail:api_state")).json()["signature"], "<b>민재</b>")
+
+	def test_templates_crud(self):
+		res = self.post_json("webmail:api_templates", {"action": "create", "name": "테스트", "subject": "제목", "body": "<p>본문</p><script>x</script>"})
+		tpl = next(t for t in res.json()["templates"] if t["name"] == "테스트")
+		self.assertEqual(tpl["body"], "<p>본문</p>")
+		self.post_json("webmail:api_templates", {"action": "update", "id": tpl["id"], "name": "테스트2", "subject": "", "body": "<i>x</i>"})
+		res = self.post_json("webmail:api_templates", {"action": "delete", "id": tpl["id"]})
+		self.assertFalse(any(t["id"] == tpl["id"] for t in res.json()["templates"]))
+		self.assertEqual(self.post_json("webmail:api_templates", {"action": "create", "name": ""}).status_code, 400)
+
+	def test_contacts(self):
+		res = self.post_json("webmail:api_contacts", {"action": "set", "email": "Hey_minj@naver.com", "name": "서민재", "note": "본인"})
+		self.assertEqual(res.json()["contacts"]["hey_minj@naver.com"]["name"], "서민재")
+		self.assertEqual(self.post_json("webmail:api_contacts", {"action": "set", "email": "bad", "name": "x"}).status_code, 400)
+		res = self.post_json("webmail:api_contacts", {"action": "delete", "email": "hey_minj@naver.com"})
+		self.assertEqual(res.json()["contacts"], {})
+
+	def test_send_html_has_text_and_html_parts(self):
+		res = self.client.post(reverse("webmail:api_send"), {"to": "hong@example.com", "subject": "서식", "body": "굵게 본문", "html": "<p><b>굵게</b> 본문</p><script>x</script>"})
+		self.assertEqual(res.status_code, 200, res.content)
+		sent = mail.outbox[0]
+		self.assertEqual(sent.body, "굵게 본문")
+		html = sent.alternatives[0][0]
+		self.assertIn("<b>굵게</b>", html)
+		self.assertNotIn("<script", html)
+
+	def test_schedule_and_send_due(self):
+		from datetime import timedelta
+
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		from django.utils import timezone
+
+		from .models import ScheduledMail
+		from .scheduled import send_due
+
+		past = (timezone.localtime() - timedelta(minutes=1)).strftime("%Y-%m-%dT%H:%M")
+		self.assertEqual(self.client.post(reverse("webmail:api_schedule"), {"to": "hong@example.com", "subject": "예약", "body": "x", "send_at": past}).status_code, 400)
+		future = (timezone.localtime() + timedelta(hours=1)).strftime("%Y-%m-%dT%H:%M")
+		res = self.client.post(reverse("webmail:api_schedule"), {"to": "hong@example.com", "subject": "예약", "body": "글자", "html": "<p>글자</p>", "send_at": future,
+		                                                         "attachments": SimpleUploadedFile("a.txt", b"hello", content_type="text/plain"), "draft_uid": "9"})
+		self.assertEqual(res.status_code, 200, res.content)
+		item = ScheduledMail.objects.get()
+		self.assertEqual((item.status, item.attachments.count()), ("pending", 1))
+		self.assertIn(("delete", "drafts", (9,)), FakeMailbox.calls)
+		self.assertEqual(send_due(timezone.now()), 0)  # 아직 때가 아님
+		self.assertEqual(send_due(timezone.now() + timedelta(hours=2)), 1)
+		item.refresh_from_db()
+		self.assertEqual(item.status, "sent")
+		self.assertEqual(len(mail.outbox), 1)
+		self.assertEqual(mail.outbox[0].attachments[0][0], "a.txt")
+		self.assertIn(("append", "sent", "(\\Seen)"), FakeMailbox.calls)
+		# 취소
+		res = self.client.post(reverse("webmail:api_schedule"), {"to": "hong@example.com", "subject": "둘", "body": "x", "send_at": future})
+		sid = res.json()["id"]
+		self.assertEqual(self.post_json("webmail:api_schedule", {"action": "cancel", "id": sid}).status_code, 200)
+		self.assertEqual(ScheduledMail.objects.get(id=sid).status, "cancelled")
+		self.assertEqual(self.post_json("webmail:api_schedule", {"action": "cancel", "id": sid}).status_code, 400)

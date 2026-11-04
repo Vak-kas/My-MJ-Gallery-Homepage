@@ -14,6 +14,10 @@ urlpatterns = [
 	path("api/send/", views.api_send, name="api_send"),
 	path("api/draft/", views.api_draft, name="api_draft"),
 	path("api/labels/", views.api_labels, name="api_labels"),
+	path("api/prefs/", views.api_prefs, name="api_prefs"),
+	path("api/templates/", views.api_templates, name="api_templates"),
+	path("api/contacts/", views.api_contacts, name="api_contacts"),
+	path("api/schedule/", views.api_schedule, name="api_schedule"),
 	path("attachment/", views.attachment, name="attachment"),
 	path("raw/", views.raw, name="raw"),
 ]
