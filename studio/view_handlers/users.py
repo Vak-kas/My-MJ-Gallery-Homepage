@@ -6,7 +6,9 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.models import SignupRequest
+import secrets
+
+from accounts.models import MustChangePassword, SignupRequest
 from blog.models import Comment, GuestbookEntry, Post
 from tools.models import SecretNote, ShortLink
 from tools.permissions import VIP_GROUP, set_vip
@@ -59,6 +61,17 @@ def users(request):
             from .security import _add_block
 
             _add_block(request, request.POST.get("ip"), f"가입 봇 의심 ({request.POST.get('username', '')[:40]})", "30d")
+            return back
+        if action == "reset_password":  # 임시 비밀번호 발급 — 한 번만 보여 주고, 그 회원은 다음 로그인 때 바로 바꿔야 함
+            target = User.objects.filter(id=(request.POST.get("ids") or "0"), is_superuser=False).exclude(id=request.user.id).first()
+            if not target:
+                messages.error(request, "본인·관리자 계정의 비밀번호는 여기서 초기화할 수 없어요.")
+                return back
+            temp = secrets.token_urlsafe(9)   # 12자 정도, 영숫자·-_
+            target.set_password(temp)
+            target.save(update_fields=["password"])
+            MustChangePassword.objects.update_or_create(user=target, defaults={"issued_by": request.user})
+            messages.success(request, f"{target.username} 님 임시 비밀번호: {temp}  — 본인에게만 전해 주세요. 로그인하면 바로 새 비밀번호를 정하게 돼요. (이 화면을 닫으면 다시 볼 수 없어요)")
             return back
         ids = [int(v) for v in request.POST.getlist("ids") if v.isdigit()]
         # 나 자신과 관리자 계정은 일괄 작업 대상에서 제외

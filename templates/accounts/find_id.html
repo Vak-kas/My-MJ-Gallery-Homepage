@@ -1,0 +1,33 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block auth_title %}아이디 찾기{% endblock %}
+{% block auth_sub %}가입할 때 쓴 이름과 이메일을 적으면 아이디를 알려 드려요.{% endblock %}
+{% block auth_card %}
+{% if found %}
+<div class="rounded-[16px] bg-[#f0f7ff] px-5 py-5 text-center">
+    <p class="text-[13px] text-[#6e6e73]">찾은 아이디</p>
+    {% for u in found %}<p class="mt-1 font-mono text-[26px] font-semibold tracking-wide text-[#1d1d1f]">{{ u }}</p>{% endfor %}
+    <p class="mt-3 text-[13px] text-[#6e6e73]">{% if mail_enabled %}가려지지 않은 전체 아이디를 이메일로 보냈어요.{% else %}가운데는 가려서 보여 드려요. 기억이 안 나면 관리자에게 문의해 주세요.{% endif %}</p>
+</div>
+<div class="mt-6 flex gap-3">
+    <a href="{% url 'accounts:login' %}" class="flex-1 rounded-full bg-[#0066cc] py-3 text-center text-[15px] text-white">로그인</a>
+    <a href="{% url 'accounts:password_reset' %}" class="flex-1 rounded-full border border-black/[0.1] py-3 text-center text-[15px] text-[#1d1d1f]">비밀번호도 모르겠어요</a>
+</div>
+{% else %}
+<form method="post" class="space-y-6">{% csrf_token %}
+    {% if limited %}<div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-600">시도가 너무 많아요. 1시간 뒤에 다시 해 주세요.</div>{% endif %}
+    {% if form.non_field_errors %}<div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-600">{{ form.non_field_errors.0 }}</div>{% endif %}
+    <div>
+    <label class="mb-2 block text-[14px] font-semibold text-[#1d1d1f]">이름</label>
+    <input type="text" name="real_name" placeholder="가입할 때 쓴 이름" autocomplete="name" value="{{ form.real_name.value|default:'' }}" class="h-[52px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+    {% if form.real_name.errors %}<p class="mt-2 text-[13px] text-red-600">{{ form.real_name.errors.0 }}</p>{% endif %}
+</div>
+    <div>
+    <label class="mb-2 block text-[14px] font-semibold text-[#1d1d1f]">이메일</label>
+    <input type="email" name="email" placeholder="you@example.com" autocomplete="email" value="{{ form.email.value|default:'' }}" class="h-[52px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+    {% if form.email.errors %}<p class="mt-2 text-[13px] text-red-600">{{ form.email.errors.0 }}</p>{% endif %}
+</div>
+    <button type="submit" class="h-[52px] w-full rounded-full bg-[#0066cc] text-[16px] text-white transition active:scale-[0.97]">아이디 찾기</button>
+</form>
+{% endif %}
+{% endblock %}
+{% block auth_foot %}<a href="{% url 'accounts:login' %}" class="text-[#0066cc]">로그인</a> · <a href="{% url 'accounts:password_reset' %}" class="text-[#0066cc]">비밀번호 찾기</a>{% endblock %}

@@ -37,3 +37,14 @@ class SignupRequest(models.Model):
     @property
     def flag_list(self):
         return [f for f in self.flags.split(" · ") if f]
+
+
+class MustChangePassword(models.Model):
+    """관리자가 임시 비밀번호를 발급한 회원 — 다음 로그인 때 비밀번호를 바꿀 때까지 다른 화면을 못 씀."""
+
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="must_change_password")
+    issued_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user} 임시 비밀번호 ({self.created_at:%Y-%m-%d})"
