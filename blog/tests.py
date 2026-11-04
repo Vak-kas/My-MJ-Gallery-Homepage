@@ -484,3 +484,33 @@ class WritePageMarkupTests(TestCase):
 		# 태그 상자는 시리즈 상자 밖에 있어야 함
 		self.assertLess(html.index('id="series_hint"'), html.index('for="tags"'))
 		self.assertIn("</section>", html[html.index('id="series_hint"'):html.index('for="tags"')])
+
+
+class EditedBadgeTests(SimpleTestCase):
+	"""(수정됨) 표시: 임시저장 글을 처음 발행한 건 수정이 아니고, 발행 뒤에 고친 것만 수정"""
+
+	def _post(self, created, published, updated):
+		return Post(created_at=created, published_at=published, updated_at=updated)
+
+	def test_draft_published_later_is_not_edited(self):
+		from datetime import timedelta
+		from django.utils import timezone
+
+		created = timezone.now() - timedelta(days=3)
+		published = timezone.now()
+		self.assertFalse(self._post(created, published, published + timedelta(seconds=1)).is_edited)
+
+	def test_edit_after_publish_is_edited(self):
+		from datetime import timedelta
+		from django.utils import timezone
+
+		published = timezone.now() - timedelta(hours=2)
+		self.assertTrue(self._post(published - timedelta(days=1), published, timezone.now()).is_edited)
+
+	def test_unpublished_draft_uses_created_at(self):
+		from datetime import timedelta
+		from django.utils import timezone
+
+		created = timezone.now() - timedelta(hours=1)
+		self.assertFalse(self._post(created, None, created + timedelta(seconds=5)).is_edited)
+		self.assertTrue(self._post(created, None, timezone.now()).is_edited)

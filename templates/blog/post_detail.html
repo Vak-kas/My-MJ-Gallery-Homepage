@@ -50,14 +50,14 @@
             {% if is_locked_post %}
             <p class="mt-4 max-w-3xl text-[17px] leading-[1.75] text-[#8e8e93]">이 글은 보호글입니다. 아래에서 비밀번호를 입력하면 내용을 확인할 수 있습니다.</p>
             {% elif post.summary %}
-            <p class="mt-4 max-w-3xl text-[17px] leading-[1.75] text-[#6e6e73]">{{ post.summary }}</p>
+            <p class="mt-4 break-keep text-[17px] leading-[1.75] text-[#6e6e73]">{{ post.summary }}</p>
             {% endif %}
 
             <div class="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[#8e8e93]">
                 <span>작성자 {{ post.author|default:"익명" }}</span>
                 <span>·</span>
                 <span>{{ post.published_at|default:post.created_at|date:"Y.m.d H:i" }}</span>
-                {% if post.updated_at|date:"U" > post.created_at|date:"U" %}
+                {% if post.is_edited %}
                 <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">(수정됨)</span>
                 {% endif %}
                 <span>·</span>

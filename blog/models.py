@@ -98,6 +98,14 @@ class Post(models.Model):
 	def __str__(self):
 		return f"[{self.get_category_display()}] {self.title}"
 
+	@property
+	def is_edited(self):
+		"""발행(없으면 작성) 시각보다 1분 넘게 뒤에 저장됐으면 '수정됨'. 임시저장 글을 처음 발행한 건 수정이 아님."""
+		base = self.published_at or self.created_at
+		if not base or not self.updated_at:
+			return False
+		return (self.updated_at - base).total_seconds() > 60
+
 	def set_access_password(self, raw_password: str):
 		raw_password = (raw_password or "").strip()
 		if raw_password:
