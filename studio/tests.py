@@ -329,3 +329,64 @@ class PublicationStatusTests(TestCase):
                                                                              "status": "weird", "title": "심사중 논문", "is_visible": "true"})
         pub.refresh_from_db()
         self.assertEqual(pub.status, "published")
+
+
+class UserDetailTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser("detail-admin", "a@example.com", "pw")
+        self.member = User.objects.create_user("detail-member", "m@example.com", "pw", first_name="민재")
+        self.client.force_login(self.admin)
+
+    def test_page_shows_info_and_links_from_list(self):
+        from accounts.models import SignupRequest
+
+        SignupRequest.objects.create(user=self.member, status="approved", message="안녕하세요", ip="203.0.113.9")
+        Post.objects.create(category="tech", title="회원 글", slug="member-post", author=self.member, published_at=timezone.now())
+        res = self.client.get(reverse("studio:user_detail", args=[self.member.id]))
+        self.assertEqual(res.status_code, 200)
+        self.assertContains(res, "detail-member")
+        self.assertContains(res, "안녕하세요")
+        self.assertContains(res, "203.0.113.9")
+        self.assertContains(res, "회원 글")
+        lst = self.client.get(reverse("studio:users"))
+        self.assertContains(lst, reverse("studio:user_detail", args=[self.member.id]))
+        self.assertEqual(self.client.get(reverse("studio:user_detail", args=[99999])).status_code, 302)
+
+    def test_actions(self):
+        from accounts.models import MustChangePassword
+        from tools.permissions import is_vip
+
+        url = reverse("studio:user_detail", args=[self.member.id])
+        self.client.post(url, {"action": "edit", "first_name": "새이름", "email": "new@example.com"})
+        self.member.refresh_from_db()
+        self.assertEqual((self.member.first_name, self.member.email), ("새이름", "new@example.com"))
+        self.client.post(url, {"action": "edit", "first_name": "x", "email": "a@example.com"})  # 관리자 이메일과 중복
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.email, "new@example.com")
+        self.client.post(url, {"action": "vip_on"})
+        self.assertTrue(is_vip(self.member))
+        self.client.post(url, {"action": "suspend"})
+        self.member.refresh_from_db()
+        self.assertFalse(self.member.is_active)
+        self.client.post(url, {"action": "activate"})
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.is_active)
+        self.client.post(url, {"action": "reset_password", "confirm": "wrong"})
+        self.assertFalse(MustChangePassword.objects.filter(user=self.member).exists())
+        self.client.post(url, {"action": "reset_password", "confirm": "detail-member"})
+        self.assertTrue(MustChangePassword.objects.filter(user=self.member).exists())
+        # 본인·관리자는 보호
+        res = self.client.post(reverse("studio:user_detail", args=[self.admin.id]), {"action": "suspend"})
+        self.admin.refresh_from_db()
+        self.assertTrue(self.admin.is_active)
+        # 삭제는 DELETE 확인
+        self.client.post(url, {"action": "delete", "confirm": "nope"})
+        self.assertTrue(get_user_model().objects.filter(id=self.member.id).exists())
+        res = self.client.post(url, {"action": "delete", "confirm": "DELETE"})
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(get_user_model().objects.filter(id=self.member.id).exists())
+
+    def test_member_cannot_open(self):
+        self.client.force_login(self.member)
+        self.assertEqual(self.client.get(reverse("studio:user_detail", args=[self.member.id])).status_code, 302)
