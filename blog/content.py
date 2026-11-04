@@ -262,6 +262,14 @@ def _table_colgroup(rows):
 	return f"<colgroup>{cols}</colgroup>", sum(widths)
 
 
+_ALIGN_CLASSES = {"center": " text-center", "right": " text-right", "justify": " text-justify"}
+
+
+def _align_cls(attrs):
+	"""에디터 정렬(textAlign) → Tailwind 클래스. 왼쪽/모르는 값은 빈 문자열."""
+	return _ALIGN_CLASSES.get(str(attrs.get("textAlign") or ""), "")
+
+
 def _render_block(node, tight=False):
 	node_type = node.get("type")
 	attrs = _attrs(node)
@@ -270,14 +278,14 @@ def _render_block(node, tight=False):
 	if node_type == "paragraph":
 		inner = _render_inline(children) or "<br />"
 		cls = "leading-[1.85]" if tight else "mb-4 leading-[1.85]"
-		return f'<p class="{cls}">{inner}</p>'
+		return f'<p class="{cls}{_align_cls(attrs)}">{inner}</p>'
 
 	if node_type == "heading":
 		try:
 			level = max(1, min(3, int(attrs.get("level") or 2)))
 		except (TypeError, ValueError):
 			level = 2
-		return f'<h{level} class="{_HEADING_CLASSES[level]}">{_render_inline(children)}</h{level}>'
+		return f'<h{level} class="{_HEADING_CLASSES[level]}{_align_cls(attrs)}">{_render_inline(children)}</h{level}>'
 
 	if node_type in {"bulletList", "orderedList"}:
 		tag = "ol" if node_type == "orderedList" else "ul"
@@ -398,7 +406,7 @@ def _render_block(node, tight=False):
 		if not latex:
 			return ""
 		return (
-			f'<div class="my-4 overflow-x-auto rounded-xl border border-[#e5e5ea] bg-[#fafafa] px-4 py-3">'
+			f'<div class="my-4 overflow-x-auto rounded-xl border border-[#e5e5ea] bg-[#fafafa] px-4 py-3{_align_cls(attrs)}">'
 			f'<span class="mj-katex" data-latex="{latex}" data-display="1">{latex}</span></div>'
 		)
 

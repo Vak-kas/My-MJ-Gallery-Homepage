@@ -11,6 +11,12 @@ export const BG_COLORS = [
     ['기본', null], ['회색', '#f1f1ef'], ['갈색', '#f4eeee'], ['주황', '#fbecdd'], ['노랑', '#fbf3db'],
     ['초록', '#edf3ec'], ['파랑', '#e7f3f8'], ['보라', '#f6f3f9'], ['분홍', '#faf1f5'], ['빨강', '#fdebec'],
 ];
+export const ALIGNMENTS = [
+    ['left', '⇤', '왼쪽 정렬 (기본)'],
+    ['center', '≡', '가운데 정렬'],
+    ['right', '⇥', '오른쪽 정렬'],
+    ['justify', '☰', '양쪽 정렬'],
+];
 export const FONTS = [
     ['기본 글꼴', null],
     ['Noto Sans KR', "'Noto Sans KR', sans-serif"],
@@ -70,12 +76,36 @@ const createToolbar = (getEditor) => {
         }
     });
 
-    const colorBtn = btn('A', '글자색 / 배경색', () => {
+    // 글자색/배경색: 버튼에 마우스를 올리면 패널이 열리고, 색을 골라도 닫히지 않음.
+    // 마우스가 버튼·패널 밖으로 나가거나(잠깐 뒤) 바깥 클릭/Esc 때 닫힘
+    let colorPanel = null;
+    let colorCleanup = () => {};
+    let colorLeaveTimer = 0;
+    const closeColors = () => {
+        clearTimeout(colorLeaveTimer);
+        colorCleanup();
+        colorPanel?.remove();
+        colorPanel = null;
+    };
+    const refreshSwatches = () => {
+        if (!colorPanel) return;
+        const editor = getEditor();
+        const current = editor.getAttributes('textStyle');
+        colorPanel.querySelectorAll('.mj-swatch').forEach((el) => {
+            const want = el.dataset.kind === 'text' ? (current.color || '') : (current.backgroundColor || '');
+            el.classList.toggle('is-active', (el.dataset.color || '').toLowerCase() === String(want).toLowerCase());
+        });
+    };
+    const openColors = () => {
+        clearTimeout(colorLeaveTimer);
+        if (colorPanel) return;
         const editor = getEditor();
         const swatch = (list, kind) => h('div', { class: 'mj-swatches' }, list.map(([name, color]) => h('button', {
             type: 'button',
             class: 'mj-swatch',
             title: name,
+            'data-kind': kind,
+            'data-color': color || '',
             style: kind === 'text' ? `color:${color || 'inherit'}` : `background:${color || 'transparent'}`,
             text: 'A',
             onmousedown: (e) => e.preventDefault(),
@@ -83,22 +113,30 @@ const createToolbar = (getEditor) => {
                 const chain = editor.chain().focus();
                 if (kind === 'text') (color ? chain.setColor(color) : chain.unsetColor()).run();
                 else (color ? chain.setBackgroundColor(color) : chain.unsetBackgroundColor()).run();
-                close();
+                refreshSwatches();
             },
         })));
-        const panel = h('div', { class: 'mj-pop mj-colors' }, [
+        colorPanel = h('div', { class: 'mj-pop mj-colors' }, [
             h('div', { class: 'mj-pop__group', text: '글자색' }), swatch(TEXT_COLORS, 'text'),
             h('div', { class: 'mj-pop__group', text: '배경색' }), swatch(BG_COLORS, 'bg'),
+            h('div', { class: 'mj-pop__hint', text: '여러 색을 이어서 골라도 돼요 · 밖을 클릭하면 닫힘' }),
         ]);
-        let cleanup = () => {};
-        const close = () => {
-            cleanup();
-            panel.remove();
-        };
-        document.body.append(panel);
-        placeFloating(colorBtn, panel, 'bottom-start');
-        cleanup = dismissOnOutside(panel, close);
-    }, 'is-color');
+        colorPanel.addEventListener('mouseenter', () => clearTimeout(colorLeaveTimer));
+        colorPanel.addEventListener('mouseleave', scheduleCloseColors);
+        document.body.append(colorPanel);
+        placeFloating(colorBtn, colorPanel, 'bottom-start');
+        refreshSwatches();
+        colorCleanup = dismissOnOutside(colorPanel, closeColors);
+    };
+    const scheduleCloseColors = () => {
+        clearTimeout(colorLeaveTimer);
+        colorLeaveTimer = setTimeout(() => {
+            if (colorPanel && !colorPanel.matches(':hover') && !colorBtn.matches(':hover')) closeColors();
+        }, 350);
+    };
+    const colorBtn = btn('A', '글자색 / 배경색 (마우스를 올리면 열림)', () => (colorPanel ? closeColors() : openColors()), 'is-color');
+    colorBtn.addEventListener('mouseenter', openColors);
+    colorBtn.addEventListener('mouseleave', scheduleCloseColors);
 
     const fontSelect = h('select', { class: 'mj-bubble__font', title: '글꼴' }, FONTS.map(([name, value]) => h('option', { value: value || '', text: name })));
     fontSelect.addEventListener('change', () => {
@@ -107,6 +145,8 @@ const createToolbar = (getEditor) => {
     });
 
     const clearBtn = btn('⌫', '서식 지우기', run((c) => c.unsetAllMarks()));
+
+    const alignButtons = ALIGNMENTS.map(([id, label, title]) => btn(label, title, run((c) => (id === 'left' ? c.unsetTextAlign() : c.setTextAlign(id)))));
 
     // 선택한 글자를 그대로 LaTeX 로 삼아 인라인 수식으로 바꿈 (앞뒤 $ 는 떼어냄)
     const mathBtn = btn('∑', '선택한 글자를 수식으로', () => {
@@ -120,6 +160,7 @@ const createToolbar = (getEditor) => {
     const mainRow = h('div', { class: 'mj-bubble__row' }, [
         buttons.bold, buttons.italic, buttons.underline, buttons.strike, buttons.code,
         h('span', { class: 'mj-bubble__sep' }), linkBtn, mathBtn, colorBtn, fontSelect,
+        h('span', { class: 'mj-bubble__sep' }), ...alignButtons,
         h('span', { class: 'mj-bubble__sep' }), clearBtn,
     ]);
     const element = h('div', { class: 'mj-bubble' }, [mainRow, linkRow]);
@@ -129,11 +170,16 @@ const createToolbar = (getEditor) => {
         if (!editor) return;
         Object.entries(buttons).forEach(([name, el]) => el.classList.toggle('is-active', editor.isActive(name)));
         linkBtn.classList.toggle('is-active', editor.isActive('link'));
+        ALIGNMENTS.forEach(([id], i) => alignButtons[i].classList.toggle('is-active', id !== 'left' && editor.isActive({ textAlign: id })));
+        refreshSwatches();
+        // 선택이 사라지면(툴바가 숨으면) 색 패널도 닫음
+        if (colorPanel && editor.state.selection.empty) closeColors();
         fontSelect.value = editor.getAttributes('textStyle').fontFamily || '';
     };
     const reset = () => {
         linkRow.hidden = true;
         mainRow.hidden = false;
+        closeColors();
     };
     return { element, refresh, reset };
 };

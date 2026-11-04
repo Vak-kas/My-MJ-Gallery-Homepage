@@ -7,6 +7,7 @@ import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
 import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
 import { TextStyleKit } from '@tiptap/extension-text-style';
+import TextAlign from '@tiptap/extension-text-align';
 
 import { createApi } from './api.js';
 import { parseStoredContent } from './legacy.js';
@@ -72,6 +73,8 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
             DetailsSummary,
             DetailsContent,
             TextStyleKit.configure({ fontSize: false, lineHeight: false }),
+            // 정렬: 문단·제목·블록 수식 (서식 툴바와 블록 메뉴 "정렬" 에서)
+            TextAlign.configure({ types: ['heading', 'paragraph', 'blockMath'], alignments: ['left', 'center', 'right', 'justify'] }),
             Image.configure({ api, notify }),
             LinkCard.configure({ api, notify }),
             ...createMathExtensions({ api, notify }),
