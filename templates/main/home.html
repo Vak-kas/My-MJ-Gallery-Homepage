@@ -16,7 +16,7 @@
                 <a href="{% url 'studio:index' %}" id="studio-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Studio</a>
                 {% endif %}
                 {% include "components/notif_bell.html" with bell_class="border border-white/20 bg-white/10 text-white hover:bg-white/20 h-[34px]" %}
-                {% include "components/mail_nav.html" with mail_class="border border-white/20 bg-white/10 text-white hover:bg-white/20 py-2" %}
+                {% include "components/mail_nav.html" with mail_class="quick-nav-link border border-white/20 bg-white/10 text-white hover:bg-white/20 py-2" %}
                 <a href="{% url 'accounts:index' %}" id="account-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">My</a>
                 <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
             {% else %}
