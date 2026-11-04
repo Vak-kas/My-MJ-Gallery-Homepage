@@ -200,3 +200,98 @@ class RecoveryTests(TestCase):
         self.client.login(username="boss", password="pw")
         res = self.client.post(reverse("studio:users"), {"action": "reset_password", "ids": str(admin.id)}, follow=True)
         self.assertTrue(any("초기화할 수 없어요" in str(m) for m in res.context["messages"]))
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend", MAIL_ENABLED=True)
+class EmailVerificationTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.push = mock.patch("notifications.service._run_background")
+        self.push.start()
+        self.addCleanup(self.push.stop)
+        self.admin = User.objects.create_superuser("admin", "a@example.com", "pw")
+
+    def signup(self, username="newbie"):
+        data = {
+            "username": username, "email": f"{username}@example.com", "real_name": "김 철수",
+            "password1": "Very-strong-pw-123", "password2": "Very-strong-pw-123", "message": "안녕하세요", "privacy_agree": "on",
+            **human_fields(),
+        }
+        return self.client.post(reverse("accounts:signup"), data, HTTP_USER_AGENT=HUMAN_UA)
+
+    def test_signup_sends_link_and_only_verified_become_pending(self):
+        from notifications.models import Notification
+        res = self.signup()
+        self.assertContains(res, "이메일을 확인해 주세요")
+        sr = User.objects.get(username="newbie").signup_request
+        self.assertTrue(sr.needs_verification)
+        self.assertEqual(Notification.objects.filter(kind=Notification.KIND_SIGNUP).count(), 0)   # 인증 전엔 관리자 알림 없음
+        self.assertEqual(len(mail.outbox), 1)
+        link = [w for w in mail.outbox[0].body.split() if "/accounts/verify/" in w][0].replace("https://smjgallery.kr", "")
+        # 인증 전 로그인 시도 → 안내 + 다시 보내기 링크
+        res = self.client.post(reverse("accounts:login"), {"username": "newbie", "password": "Very-strong-pw-123"})
+        self.assertContains(res, "이메일 인증이 아직")
+        self.assertContains(res, "인증 메일 다시 받기")
+        # Studio: 미인증 칸에 보이고 승인 대기엔 안 셈
+        self.client.force_login(self.admin)
+        res = self.client.get(reverse("studio:users"))
+        self.assertContains(res, "📧 이메일 미인증")
+        self.assertEqual(res.context["pending_count"], 0)
+        self.client.logout()
+        # 링크 → 인증 완료 → 관리자 알림, 승인 대기
+        res = self.client.get(link)
+        self.assertContains(res, "이메일 인증 완료")
+        sr.refresh_from_db()
+        self.assertFalse(sr.needs_verification)
+        self.assertIsNotNone(sr.email_verified_at)
+        self.assertEqual(Notification.objects.filter(kind=Notification.KIND_SIGNUP).count(), 1)
+        self.assertContains(self.client.get(link), "이미 인증됐어요")
+        res = self.client.post(reverse("accounts:login"), {"username": "newbie", "password": "Very-strong-pw-123"})
+        self.assertContains(res, "승인 대기 중")
+        self.client.force_login(self.admin)
+        self.assertEqual(self.client.get(reverse("studio:users")).context["pending_count"], 1)
+
+    def test_bad_or_expired_link_and_resend(self):
+        self.signup()
+        sr = User.objects.get(username="newbie").signup_request
+        res = self.client.get(reverse("accounts:verify_email", args=[sr.user_id, "wrong-token"]))
+        self.assertEqual(res.status_code, 400)
+        self.assertContains(res, "링크가 맞지 않아요", status_code=400)
+        SignupRequest.objects.filter(pk=sr.pk).update(verify_sent_at=timezone_now() - timedelta(hours=49))
+        sr.refresh_from_db()
+        res = self.client.get(reverse("accounts:verify_email", args=[sr.user_id, sr.verify_token]))
+        self.assertEqual(res.status_code, 400)
+        # 다시 보내기 → 새 토큰으로 메일
+        res = self.client.post(reverse("accounts:verify_resend"), {"email": "NEWBIE@example.com"})
+        self.assertContains(res, "몇 분 안에 메일이 가요")
+        self.assertEqual(len(mail.outbox), 2)
+        new = User.objects.get(username="newbie").signup_request
+        self.assertNotEqual(new.verify_token, sr.verify_token)
+        self.assertContains(self.client.get(reverse("accounts:verify_email", args=[new.user_id, new.verify_token])), "인증 완료")
+        # 없는 이메일도 같은 화면, 메일은 안 감
+        res = self.client.post(reverse("accounts:verify_resend"), {"email": "nobody@example.com"})
+        self.assertContains(res, "몇 분 안에 메일이 가요")
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_unverified_accounts_are_deleted_after_a_week(self):
+        from accounts.models import cleanup_unverified
+        self.signup("old")
+        self.signup("fresh")
+        SignupRequest.objects.filter(user__username="old").update(verify_sent_at=timezone_now() - timedelta(days=8))
+        self.assertEqual(cleanup_unverified(), 1)
+        self.assertFalse(User.objects.filter(username="old").exists())
+        self.assertTrue(User.objects.filter(username="fresh").exists())
+
+    @override_settings(MAIL_ENABLED=False)
+    def test_without_mail_signup_goes_straight_to_pending(self):
+        from notifications.models import Notification
+        res = self.signup()
+        self.assertContains(res, "가입 신청이 접수됐어요")
+        sr = User.objects.get(username="newbie").signup_request
+        self.assertFalse(sr.needs_verification)
+        self.assertEqual(Notification.objects.filter(kind=Notification.KIND_SIGNUP).count(), 1)
+        self.assertEqual(len(mail.outbox), 0)
+
+
+from datetime import timedelta
+from django.utils.timezone import now as timezone_now

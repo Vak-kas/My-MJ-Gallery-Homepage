@@ -18,12 +18,14 @@ from .common import admin_view
 STATES = [
     ("", "전체"),
     ("pending", "🙋 승인 대기"),
+    ("unverified", "📧 이메일 미인증"),
     ("active", "활성"),
     ("vip", "⭐ VIP 회원"),
     ("inactive", "정지·거절"),
     ("admin", "관리자"),
 ]
-PENDING = Q(signup_request__status=SignupRequest.STATUS_PENDING)
+UNVERIFIED = Q(signup_request__status=SignupRequest.STATUS_PENDING, signup_request__email_verified_at__isnull=True) & ~Q(signup_request__verify_token="")
+PENDING = Q(signup_request__status=SignupRequest.STATUS_PENDING) & ~UNVERIFIED   # 인증을 마친 사람만 "승인 대기"
 
 
 def _purge_user_content(user):
@@ -138,19 +140,22 @@ def users(request):
     state_counts = {
         "": User.objects.count(),
         "pending": User.objects.filter(PENDING).count(),
+        "unverified": User.objects.filter(UNVERIFIED).count(),
         "active": User.objects.filter(is_active=True).count(),
         "vip": User.objects.filter(vip_q).distinct().count(),
-        "inactive": User.objects.filter(is_active=False).exclude(PENDING).count(),
+        "inactive": User.objects.filter(is_active=False).exclude(PENDING).exclude(UNVERIFIED).count(),
         "admin": User.objects.filter(is_superuser=True).count(),
     }
     if state == "pending":
         qs = qs.filter(PENDING)
+    elif state == "unverified":
+        qs = qs.filter(UNVERIFIED)
     elif state == "active":
         qs = qs.filter(is_active=True)
     elif state == "vip":
         qs = qs.filter(is_vip=True)
     elif state == "inactive":
-        qs = qs.filter(is_active=False).exclude(PENDING)
+        qs = qs.filter(is_active=False).exclude(PENDING).exclude(UNVERIFIED)
     elif state == "admin":
         qs = qs.filter(is_superuser=True)
     else:

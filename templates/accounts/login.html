@@ -37,7 +37,7 @@
 
                     {% if error %}
                     <div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-500">
-                        {{ error }}
+                        {{ error }}{% if show_resend %} <a href="{% url 'accounts:verify_resend' %}" class="ml-1 underline">인증 메일 다시 받기</a>{% endif %}
                     </div>
                     {% endif %}
 
