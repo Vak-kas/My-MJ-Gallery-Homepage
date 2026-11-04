@@ -404,12 +404,69 @@ def _trusted_browser(request, user) -> bool:
 		data = signing.loads(raw, salt="accounts.2fa.trust", max_age=TRUST_DAYS * 24 * 3600)
 	except signing.BadSignature:
 		return False
-	return data.get("u") == user.id and data.get("p") == user.password[-12:]
+	from accounts.models import TwoFactor
+
+	tf = TwoFactor.objects.filter(user=user).only("trust_version").first()
+	return data.get("u") == user.id and data.get("p") == user.password[-12:] and data.get("v", 0) == (tf.trust_version if tf else 0)
+
+
+def _trust_token(user):
+	from django.core import signing
+
+	from accounts.models import TwoFactor
+
+	tf = TwoFactor.objects.filter(user=user).only("trust_version").first()
+	return signing.dumps({"u": user.id, "p": user.password[-12:], "v": tf.trust_version if tf else 0}, salt="accounts.2fa.trust")
+
+
+# ── 메일 코드 (6자리, 10분, 5번까지) ──
+EMAIL_CODE_TTL = 10 * 60
+
+
+def _email_code_key(user):
+	return f"2fa:email:{user.id}"
+
+
+def send_email_code(user, purpose="login") -> bool:
+	"""코드를 만들어 메일로 보냄. 60초 안에 다시 보내면 안 보냄(False)."""
+	import secrets as _secrets
+
+	from django.contrib.auth.hashers import make_password
+
+	key = _email_code_key(user)
+	cur = cache.get(key) or {}
+	if cur and timezone.now().timestamp() - cur.get("sent", 0) < 60:
+		return False
+	code = f"{_secrets.randbelow(10 ** 6):06d}"
+	cache.set(key, {"hash": make_password(code), "sent": timezone.now().timestamp(), "tries": 0}, EMAIL_CODE_TTL)
+	send_mail(
+		"[MJ Gallery] 로그인 인증 코드" if purpose == "login" else "[MJ Gallery] 2단계 인증 설정 코드",
+		f"인증 코드: {code}\n\n10분 안에 입력해 주세요. 본인이 요청한 게 아니면 비밀번호를 바꿔 주세요.",
+		None, [user.email], fail_silently=True,
+	)
+	return True
+
+
+def check_email_code(user, code) -> bool:
+	from django.contrib.auth.hashers import check_password
+
+	key = _email_code_key(user)
+	cur = cache.get(key)
+	if not cur:
+		return False
+	digits = "".join(ch for ch in (code or "") if ch.isdigit())
+	if cur.get("tries", 0) >= 5:
+		cache.delete(key)
+		return False
+	if len(digits) == 6 and check_password(digits, cur["hash"]):
+		cache.delete(key)
+		return True
+	cur["tries"] = cur.get("tries", 0) + 1
+	cache.set(key, cur, EMAIL_CODE_TTL)
+	return False
 
 
 def _finish_login(request, user, next_url, remember=False):
-	from django.core import signing
-
 	login(request, user)
 	if MustChangePassword.objects.filter(user=user).exists():
 		request.session[MUST_CHANGE_KEY] = True
@@ -422,8 +479,7 @@ def _finish_login(request, user, next_url, remember=False):
 	else:
 		response = redirect("main:home")
 	if remember:
-		token = signing.dumps({"u": user.id, "p": user.password[-12:]}, salt="accounts.2fa.trust")
-		response.set_cookie(TRUST_COOKIE, token, max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
+		response.set_cookie(TRUST_COOKIE, _trust_token(user), max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
 	return response
 
 
@@ -438,25 +494,48 @@ def two_factor_verify_view(request):
 		messages.error(request, "로그인을 처음부터 다시 해 주세요.")
 		return redirect("accounts:login")
 	ip = client_ip(request)
+	tf = TwoFactor.objects.filter(user=user, enabled=True).first()
+	by_email = bool(tf and tf.method == TwoFactor.METHOD_EMAIL)
+	can_email = bool(user.email and settings.MAIL_ENABLED)
+	ctx = {"by_email": by_email, "can_email": can_email, "email_hint": _mask_email(user.email) if can_email else "", "email_sent": bool(pending.get("sent"))}
+	if by_email and request.method == "GET" and not pending.get("sent"):
+		send_email_code(user, "login")
+		pending["sent"] = True
+		request.session[PENDING_2FA_KEY] = pending
+		ctx["email_sent"] = True
 	if request.method == "POST":
+		if request.POST.get("action") in ("resend", "send_email") and can_email:  # 인증 앱 방식도 폰이 없으면 메일로
+			ctx["info"] = "코드를 메일로 보냈어요." if send_email_code(user, "login") else "방금 보냈어요. 1분 뒤에 다시 눌러 주세요."
+			pending["sent"] = True
+			request.session[PENDING_2FA_KEY] = pending
+			ctx["email_sent"] = True
+			return render(request, "accounts/two_factor_verify.html", ctx)
 		if is_locked(ip, user.username):
-			return render(request, "accounts/two_factor_verify.html", {"error": "시도가 너무 많아 잠시 잠겼어요. 15분 뒤에 다시 해 주세요."})
-		tf = TwoFactor.objects.filter(user=user, enabled=True).first()
-		if tf and tf.verify_code(request.POST.get("code") or ""):
+			ctx["error"] = "시도가 너무 많아 잠시 잠겼어요. 15분 뒤에 다시 해 주세요."
+			return render(request, "accounts/two_factor_verify.html", ctx)
+		code = request.POST.get("code") or ""
+		ok = bool(tf) and ((pending.get("sent") and check_email_code(user, code)) or tf.verify_code(code))
+		if ok:
 			clear_failures(ip, user.username)
 			request.session.pop(PENDING_2FA_KEY, None)
 			return _finish_login(request, user, pending.get("next") or "", remember=request.POST.get("remember") == "1")
 		record_failure(ip, user.username)
 		LoginEvent.objects.create(user=user, username=user.username, ip=ip, user_agent=user_agent(request), result=LoginEvent.RESULT_FAILED, is_admin=user.is_superuser)
-		return render(request, "accounts/two_factor_verify.html", {"error": "코드가 맞지 않아요. 인증 앱의 지금 코드(6자리)나 백업 코드(8자리)를 넣어 주세요."})
-	return render(request, "accounts/two_factor_verify.html", {})
+		ctx["error"] = "코드가 맞지 않아요. " + ("메일로 받은 6자리 코드나 백업 코드(8자리)를 넣어 주세요." if by_email else "인증 앱의 지금 코드(6자리)나 백업 코드(8자리)를 넣어 주세요.")
+		return render(request, "accounts/two_factor_verify.html", ctx)
+	return render(request, "accounts/two_factor_verify.html", ctx)
+
+
+def _mask_email(email):
+	if not email or "@" not in email:
+		return ""
+	local, domain = email.split("@", 1)
+	return f"{local[:2]}***@{domain}"
 
 
 @login_required
 def two_factor_view(request):
 	"""내 계정 › 2단계 인증: 켜기(QR → 코드 확인 → 백업 코드), 끄기(비밀번호 + 코드), 백업 코드 다시 만들기."""
-	from django.core import signing
-
 	from accounts import totp
 	from accounts.models import TwoFactor
 
@@ -464,13 +543,39 @@ def two_factor_view(request):
 	ctx = {"tf": tf, "enabled": bool(tf and tf.enabled)}
 	if request.method == "POST":
 		action = request.POST.get("action")
-		if action == "start":  # 새 비밀키 — 아직 켜진 건 아님
+		if action == "start":  # 인증 앱: 새 비밀키 — 아직 켜진 건 아님
 			if tf and tf.enabled:
 				messages.error(request, "이미 켜져 있어요. 다시 설정하려면 먼저 끄세요.")
 				return redirect("accounts:two_factor")
 			secret = totp.generate_secret()
-			tf, _ = TwoFactor.objects.update_or_create(user=request.user, defaults={"secret": secret, "enabled": False, "backup_codes": [], "last_counter": 0})
+			tf, _ = TwoFactor.objects.update_or_create(user=request.user, defaults={"secret": secret, "method": TwoFactor.METHOD_APP, "enabled": False, "backup_codes": [], "last_counter": 0})
 			ctx.update({"tf": tf, "setup": True})
+		elif action == "start_email":  # 메일 코드: 내 메일로 확인 코드
+			if tf and tf.enabled:
+				messages.error(request, "이미 켜져 있어요. 다시 설정하려면 먼저 끄세요.")
+				return redirect("accounts:two_factor")
+			if not request.user.email or not settings.MAIL_ENABLED:
+				messages.error(request, "메일 주소가 없거나 사이트 메일이 꺼져 있어 메일 코드 방식을 쓸 수 없어요." if request.user.email else "먼저 회원정보 수정에서 메일 주소를 넣어 주세요.")
+				return redirect("accounts:two_factor")
+			tf, _ = TwoFactor.objects.update_or_create(user=request.user, defaults={"secret": "", "method": TwoFactor.METHOD_EMAIL, "enabled": False, "backup_codes": [], "last_counter": 0})
+			send_email_code(request.user, "setup")
+			ctx.update({"tf": tf, "setup_email": True, "email_hint": _mask_email(request.user.email)})
+		elif action == "resend_email":
+			if tf and not tf.enabled and tf.method == TwoFactor.METHOD_EMAIL:
+				ctx.update({"setup_email": True, "email_hint": _mask_email(request.user.email), "info": "코드를 다시 보냈어요." if send_email_code(request.user, "setup") else "방금 보냈어요. 1분 뒤에 다시 눌러 주세요."})
+		elif action == "confirm_email":
+			if not tf or tf.enabled or tf.method != TwoFactor.METHOD_EMAIL:
+				return redirect("accounts:two_factor")
+			if not check_email_code(request.user, request.POST.get("code") or ""):
+				ctx.update({"setup_email": True, "email_hint": _mask_email(request.user.email), "error": "코드가 맞지 않아요. 메일을 다시 확인해 주세요."})
+			else:
+				tf.enabled, tf.confirmed_at = True, timezone.now()
+				tf.save(update_fields=["enabled", "confirmed_at", "updated_at"])
+				codes = tf.issue_backup_codes()
+				ctx.update({"enabled": True, "backup_codes": codes, "just_enabled": True})
+				response = render(request, "accounts/two_factor.html", ctx)
+				response.set_cookie(TRUST_COOKIE, _trust_token(request.user), max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
+				return response
 		elif action == "confirm":  # 앱에 넣은 뒤 지금 코드로 확인 → 켜짐 + 백업 코드
 			if not tf or tf.enabled:
 				return redirect("accounts:two_factor")
@@ -483,15 +588,18 @@ def two_factor_view(request):
 				codes = tf.issue_backup_codes()
 				ctx.update({"enabled": True, "backup_codes": codes, "just_enabled": True})
 				response = render(request, "accounts/two_factor.html", ctx)
-				token = signing.dumps({"u": request.user.id, "p": request.user.password[-12:]}, salt="accounts.2fa.trust")
-				response.set_cookie(TRUST_COOKIE, token, max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
+				response.set_cookie(TRUST_COOKIE, _trust_token(request.user), max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
 				return response
+		elif action == "send_code":  # 메일 방식: 끄기·백업 코드용 코드 보내기
+			if tf and tf.enabled and tf.method == TwoFactor.METHOD_EMAIL:
+				ctx["info"] = "코드를 메일로 보냈어요." if send_email_code(request.user, "login") else "방금 보냈어요. 1분 뒤에 다시 눌러 주세요."
 		elif action == "disable":  # 비밀번호 + 코드
 			if not tf or not tf.enabled:
 				return redirect("accounts:two_factor")
+			code = request.POST.get("code") or ""
 			if not request.user.check_password(request.POST.get("password") or ""):
 				ctx["error"] = "비밀번호가 맞지 않아요."
-			elif not tf.verify_code(request.POST.get("code") or ""):
+			elif not ((tf.method == TwoFactor.METHOD_EMAIL and check_email_code(request.user, code)) or tf.verify_code(code)):
 				ctx["error"] = "코드가 맞지 않아요."
 			else:
 				tf.delete()
@@ -500,7 +608,8 @@ def two_factor_view(request):
 				response.delete_cookie(TRUST_COOKIE)
 				return response
 		elif action == "backup":  # 백업 코드 새로 (코드 확인)
-			if tf and tf.enabled and tf.verify_code(request.POST.get("code") or ""):
+			code = request.POST.get("code") or ""
+			if tf and tf.enabled and ((tf.method == TwoFactor.METHOD_EMAIL and check_email_code(request.user, code)) or tf.verify_code(code)):
 				ctx.update({"backup_codes": tf.issue_backup_codes()})
 			else:
 				ctx["error"] = "코드가 맞지 않아요."
@@ -508,9 +617,26 @@ def two_factor_view(request):
 			if tf and not tf.enabled:
 				tf.delete()
 			return redirect("accounts:two_factor")
+	ctx["mail_enabled"] = settings.MAIL_ENABLED and bool(request.user.email)
 	if ctx.get("setup") and tf:
 		ctx["otpauth"] = totp.otpauth_uri(tf.secret, request.user.username)
 		ctx["secret_groups"] = " ".join(tf.secret[i:i + 4] for i in range(0, len(tf.secret), 4))
 	ctx["backup_left"] = len(tf.backup_codes) if tf and tf.enabled else 0
 	ctx["trusted"] = _trusted_browser(request, request.user) if tf and tf.enabled else False
 	return render(request, "accounts/two_factor.html", ctx)
+
+
+@login_required
+@require_http_methods(["POST"])
+def logout_all_view(request):
+	"""내 계정: 비밀번호 확인 → 지금 브라우저 빼고 모든 로그인 끊기 + 기억한 브라우저 초기화."""
+	from accounts.models import logout_everywhere
+
+	if not request.user.check_password(request.POST.get("password") or ""):
+		messages.error(request, "비밀번호가 맞지 않아요.")
+		return redirect("accounts:index")
+	n = logout_everywhere(request.user, keep_session_key=request.session.session_key)
+	messages.success(request, f"다른 기기 {n}곳에서 로그아웃했어요. 2단계 인증을 기억해 둔 브라우저도 다음엔 코드를 다시 물어봐요.")
+	response = redirect("accounts:index")
+	response.delete_cookie(TRUST_COOKIE)
+	return response

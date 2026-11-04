@@ -421,3 +421,94 @@ class TwoFactorFlowTests(TestCase):
         res = self.client.post(reverse("accounts:two_factor"), {"action": "disable", "password": "pw-1234-ok", "code": totp.totp(tf.secret, at=__import__("time").time() + 30)})
         self.assertEqual(res.status_code, 302)
         self.assertFalse(TwoFactor.objects.filter(user=u).exists())
+
+
+class TwoFactorEmailAndLogoutAllTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        User = get_user_model()
+        self.user = User.objects.create_user("em-user", "em@example.com", "pw-1234-ok")
+
+    def _code_from_mail(self):
+        import re
+
+        from django.core import mail
+
+        return re.search(r"인증 코드: (\d{6})", mail.outbox[-1].body).group(1)
+
+    def test_email_method_setup_and_login(self):
+        from django.core import mail
+        from django.test import override_settings
+
+        from accounts.models import TwoFactor
+
+        with override_settings(MAIL_ENABLED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            self.client.force_login(self.user)
+            res = self.client.post(reverse("accounts:two_factor"), {"action": "start_email"})
+            self.assertContains(res, "em***@example.com")
+            self.assertEqual(len(mail.outbox), 1)
+            res = self.client.post(reverse("accounts:two_factor"), {"action": "confirm_email", "code": "000000"})
+            self.assertContains(res, "코드가 맞지 않아요")
+            res = self.client.post(reverse("accounts:two_factor"), {"action": "confirm_email", "code": self._code_from_mail()})
+            self.assertContains(res, "백업 코드를 지금 저장하세요")
+            tf = TwoFactor.objects.get(user=self.user)
+            self.assertEqual((tf.method, tf.enabled), ("email", True))
+            # 로그인: 코드 화면에 들어가면 메일 자동 발송
+            self.client.logout()
+            self.client.post(reverse("accounts:login"), {"username": "em-user", "password": "pw-1234-ok"})
+            res = self.client.get(reverse("accounts:two_factor_verify"))
+            self.assertContains(res, "em***@example.com")
+            self.assertEqual(len(mail.outbox), 2)
+            res = self.client.post(reverse("accounts:two_factor_verify"), {"action": "resend"})
+            self.assertContains(res, "1분 뒤에 다시")
+            res = self.client.post(reverse("accounts:two_factor_verify"), {"code": self._code_from_mail()})
+            self.assertEqual(res.status_code, 302)
+            self.assertEqual(str(self.client.session["_auth_user_id"]), str(self.user.id))
+
+    def test_app_method_can_fall_back_to_email(self):
+        from django.core import mail
+        from django.test import override_settings
+
+        from accounts import totp
+        from accounts.models import TwoFactor
+
+        TwoFactor.objects.create(user=self.user, secret=totp.generate_secret(), enabled=True)
+        with override_settings(MAIL_ENABLED=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            self.client.post(reverse("accounts:login"), {"username": "em-user", "password": "pw-1234-ok"})
+            res = self.client.get(reverse("accounts:two_factor_verify"))
+            self.assertContains(res, "대신 em***@example.com 로 코드 받기")
+            self.assertEqual(len(mail.outbox), 0)
+            res = self.client.post(reverse("accounts:two_factor_verify"), {"action": "send_email"})
+            self.assertEqual(len(mail.outbox), 1)
+            res = self.client.post(reverse("accounts:two_factor_verify"), {"code": self._code_from_mail()})
+            self.assertEqual(res.status_code, 302)
+
+    def test_logout_all_kills_other_sessions_and_trust(self):
+        from django.test import Client
+
+        from accounts import totp
+        from accounts.models import TwoFactor, logout_everywhere
+
+        tf = TwoFactor.objects.create(user=self.user, secret=totp.generate_secret(), enabled=True)
+        other = Client()
+        other.force_login(self.user)
+        self.assertEqual(other.get(reverse("accounts:index")).status_code, 200)
+        self.client.force_login(self.user)
+        res = self.client.post(reverse("accounts:logout_all"), {"password": "wrong"})
+        self.assertEqual(other.get(reverse("accounts:index")).status_code, 200)
+        res = self.client.post(reverse("accounts:logout_all"), {"password": "pw-1234-ok"})
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(self.client.get(reverse("accounts:index")).status_code, 200)  # 지금 브라우저는 유지
+        self.assertEqual(other.get(reverse("accounts:index")).status_code, 302)  # 다른 기기는 끊김
+        tf.refresh_from_db()
+        self.assertEqual(tf.trust_version, 1)
+        # 예전 신뢰 쿠키(v=0)는 무효
+        from django.core import signing
+
+        self.client.logout()
+        self.client.cookies["mj2fa"] = signing.dumps({"u": self.user.id, "p": self.user.password[-12:], "v": 0}, salt="accounts.2fa.trust")
+        res = self.client.post(reverse("accounts:login"), {"username": "em-user", "password": "pw-1234-ok"})
+        self.assertEqual(res["Location"], reverse("accounts:two_factor_verify"))
+        self.assertEqual(logout_everywhere(self.user), 0)
