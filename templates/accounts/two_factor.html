@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "components/main_nav.html" %}
+<main class="mx-auto max-w-[720px] px-6 py-14">
+    <a href="{% url 'accounts:index' %}" class="text-[14px] text-[#6e6e73] hover:text-[#1d1d1f]">← 내 계정</a>
+    <p class="mt-6 text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SECURITY</p>
+    <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f]">🔐 2단계 인증</h1>
+    <p class="mt-3 text-[15px] leading-[1.7] text-[#6e6e73]">로그인할 때 비밀번호 다음에 인증 앱의 6자리 코드를 한 번 더 물어봐요. 비밀번호가 새어 나가도 폰이 없으면 못 들어와요.</p>
+    {% if messages %}{% for m in messages %}<div class="mt-6 rounded-[16px] border {% if m.tags == 'error' %}border-red-200 bg-red-50 text-red-600{% else %}border-[#0066cc]/20 bg-[#f0f7ff] text-[#1d1d1f]{% endif %} px-5 py-4 text-[14px]">{{ m }}</div>{% endfor %}{% endif %}
+    {% if error %}<div class="mt-6 rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-600">{{ error }}</div>{% endif %}
+
+    {% if backup_codes %}
+    <section class="mt-8 rounded-[22px] border border-[#f2d58a] bg-[#fff8e6] p-6">
+        <h2 class="text-[17px] font-semibold text-[#8a5a00]">{% if just_enabled %}✓ 2단계 인증이 켜졌어요 — {% endif %}백업 코드를 지금 저장하세요</h2>
+        <p class="mt-1 text-[14px] leading-[1.7] text-[#8a5a00]">폰을 잃어버리거나 앱을 지웠을 때 이 코드로 로그인할 수 있어요. <b>지금 한 번만 보여요.</b> 각 코드는 한 번만 쓸 수 있어요. 메모 앱이나 비밀번호 관리자에 넣어 두세요.</p>
+        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-5">
+            {% for c in backup_codes %}<code class="rounded-lg border border-[#f2d58a] bg-white px-2 py-2 text-center font-mono text-[15px] tracking-wider text-[#1d1d1f]">{{ c }}</code>{% endfor %}
+        </div>
+        <button type="button" onclick="navigator.clipboard.writeText('{{ backup_codes|join:'\n' }}').then(()=>{this.textContent='복사했어요'})" class="mt-4 rounded-full border border-[#8a5a00]/30 px-4 py-1.5 text-[13px] text-[#8a5a00]">코드 복사</button>
+    </section>
+    {% endif %}
+
+    {% if setup %}
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <h2 class="text-[17px] font-semibold text-[#1d1d1f]">1. 인증 앱에 추가</h2>
+        <p class="mt-1 text-[14px] leading-[1.7] text-[#6e6e73]">Google Authenticator, Authy, 1Password, Microsoft Authenticator 등에서 QR 을 찍거나 키를 직접 넣어요.</p>
+        <div class="mt-4 flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <div id="qr" class="rounded-xl border border-black/[0.08] bg-white p-3"></div>
+            <div class="min-w-0 flex-1 text-[14px]">
+                <p class="text-[#6e6e73]">QR 을 못 찍으면 이 키를 직접 입력:</p>
+                <code class="mt-1 block break-all rounded-lg bg-[#f5f5f7] px-3 py-2 font-mono text-[14px] tracking-wider">{{ secret_groups }}</code>
+                <p class="mt-2 text-[12px] text-[#8e8e93]">계정 이름 {{ user.username }} · 종류 시간 기반(TOTP) · 6자리 · 30초</p>
+            </div>
+        </div>
+        <h2 class="mt-8 text-[17px] font-semibold text-[#1d1d1f]">2. 앱에 뜬 코드로 확인</h2>
+        <form method="post" class="mt-3 flex flex-wrap items-center gap-2">{% csrf_token %}<input type="hidden" name="action" value="confirm">
+            <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required placeholder="123456" autofocus class="h-[48px] w-[180px] rounded-full border border-black/[0.1] px-5 text-center font-mono text-[20px] tracking-[0.25em] outline-none focus:border-[#0066cc]">
+            <button class="h-[48px] rounded-full bg-[#0066cc] px-6 text-[15px] font-semibold text-white">켜기</button>
+            <button formaction="{% url 'accounts:two_factor' %}" name="action" value="cancel" class="h-[48px] rounded-full border border-black/[0.1] px-5 text-[14px] text-[#6e6e73]">취소</button>
+        </form>
+    </section>
+    {{ otpauth|json_script:"otpauth-data" }}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+    <script>
+        (() => {
+            const uri = JSON.parse(document.getElementById('otpauth-data').textContent);
+            const qr = qrcode(0, 'M'); qr.addData(uri); qr.make();
+            document.getElementById('qr').innerHTML = qr.createSvgTag({ cellSize: 4, margin: 2 });
+        })();
+    </script>
+    {% elif enabled %}
+    <section class="mt-8 rounded-[22px] border border-[#34c759]/40 bg-white p-6">
+        <h2 class="text-[17px] font-semibold text-[#1d1d1f]">켜져 있어요 <span class="ml-1 rounded-full bg-[#34c759]/10 px-2.5 py-0.5 text-[12px] text-[#1e7a35]">{{ tf.confirmed_at|date:"Y.m.d" }}부터</span></h2>
+        <p class="mt-1 text-[14px] leading-[1.7] text-[#6e6e73]">남은 백업 코드 {{ backup_left }}개{% if trusted %} · 이 브라우저는 30일 동안 코드를 안 물어봐요{% endif %}. 폰을 바꿀 땐 먼저 끄고 다시 켜세요.</p>
+        <details class="mt-5 rounded-xl border border-black/[0.08] p-4">
+            <summary class="cursor-pointer text-[14px] font-semibold">백업 코드 새로 만들기</summary>
+            <p class="mt-2 text-[13px] text-[#8e8e93]">예전 코드는 모두 못 쓰게 돼요. 인증 앱의 지금 코드로 확인:</p>
+            <form method="post" class="mt-2 flex flex-wrap gap-2">{% csrf_token %}<input type="hidden" name="action" value="backup">
+                <input type="text" name="code" inputmode="numeric" maxlength="9" required placeholder="123456" class="h-[42px] w-[160px] rounded-full border border-black/[0.1] px-4 text-center font-mono text-[16px] outline-none focus:border-[#0066cc]">
+                <button class="h-[42px] rounded-full border border-black/[0.1] px-4 text-[14px]">새로 만들기</button>
+            </form>
+        </details>
+        <details class="mt-3 rounded-xl border border-red-200 p-4">
+            <summary class="cursor-pointer text-[14px] font-semibold text-red-600">2단계 인증 끄기</summary>
+            <p class="mt-2 text-[13px] text-[#8e8e93]">비밀번호와 인증 앱 코드(또는 백업 코드)를 둘 다 확인해요.</p>
+            <form method="post" class="mt-2 flex flex-wrap gap-2">{% csrf_token %}<input type="hidden" name="action" value="disable">
+                <input type="password" name="password" autocomplete="current-password" required placeholder="비밀번호" class="h-[42px] w-[200px] rounded-full border border-black/[0.1] px-4 text-[14px] outline-none focus:border-red-400">
+                <input type="text" name="code" inputmode="numeric" maxlength="9" required placeholder="코드" class="h-[42px] w-[140px] rounded-full border border-black/[0.1] px-4 text-center font-mono text-[16px] outline-none focus:border-red-400">
+                <button class="h-[42px] rounded-full bg-red-600 px-4 text-[14px] font-semibold text-white" onclick="return confirm('2단계 인증을 끌까요? 비밀번호만으로 로그인하게 돼요.')">끄기</button>
+            </form>
+        </details>
+    </section>
+    {% else %}
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <h2 class="text-[17px] font-semibold text-[#1d1d1f]">아직 꺼져 있어요</h2>
+        <ol class="mt-3 list-decimal space-y-1 pl-5 text-[14px] leading-[1.7] text-[#6e6e73]">
+            <li>폰에 인증 앱(Google Authenticator·Authy·1Password 등)을 준비해요.</li>
+            <li>"켜기"를 누르면 QR 이 떠요. 앱으로 찍어요.</li>
+            <li>앱에 뜬 6자리 코드를 넣어 확인하면 끝. 백업 코드 10개를 꼭 저장해요.</li>
+        </ol>
+        <form method="post" class="mt-5">{% csrf_token %}<input type="hidden" name="action" value="start"><button class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[15px] font-semibold text-white">켜기</button></form>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

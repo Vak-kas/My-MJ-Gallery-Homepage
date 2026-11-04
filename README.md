@@ -168,6 +168,7 @@
 - 관리자 로그인 시 Studio 로 이동
 - **아이디 찾기** `/accounts/find-id/`: 이름+이메일 → 가운데를 가린 아이디(`mi***e`) 표시, 메일이 켜져 있으면 전체 아이디를 메일로. 같은 IP 10회/시간
 - **비밀번호 찾기** `/accounts/password/reset/`: 가입 이메일로 재설정 링크(하루 유효, Django 토큰) → 새 비밀번호. 메일이 꺼져 있으면 "관리자에게 초기화 요청" 안내. 5회/시간
+- **🔐 2단계 인증(TOTP)** `/accounts/two-factor/`: 내 계정에서 켜기 → QR(인증 앱: Google Authenticator·Authy·1Password 등, 직접 입력용 키도) → 앱의 6자리 코드로 확인 → **백업 코드 10개**(한 번만 표시, 각 1회용, 해시 저장). 켜진 계정은 로그인 때 비밀번호 뒤에 코드 화면(`/accounts/two-factor/verify/`, 10분 안에, 실패는 로그인 잠금 규칙과 같이 셈, 같은 코드 재사용 불가). "이 브라우저 30일 기억"(서명 쿠키 `mj2fa`, 비밀번호 바뀌면 무효). 끄기는 비밀번호+코드, 백업 코드 다시 만들기. 외부 패키지 없이 `accounts/totp.py`(RFC 6238). 관리자는 꼭 켜 두기 — 폰·백업 코드를 다 잃으면 서버 `manage.py shell` 에서 `TwoFactor.objects.filter(user__username="...").delete()`
 - **내 계정** `/accounts/`(내비 👤): **회원정보 수정**(이름·이메일, 지금 비밀번호 확인·이메일 중복 검사), 비밀번호 변경(지금 비밀번호 확인), **회원 탈퇴**(비밀번호 확인 + 동의 → 글·댓글·방명록·클립보드·저장 논문 삭제 후 계정 삭제, 관리자 계정은 불가)
 - **관리자 비밀번호 초기화**: Studio → Users 의 "⚙ 설정" 메뉴 안 "🔑 비밀번호 초기화"(잘못 누름 방지로 아이디를 그대로 입력해야 실행) → 임시 비밀번호를 한 번만 표시. 그 회원은 로그인하면 비밀번호 변경 화면으로만 갈 수 있음(`accounts.middleware.MustChangePasswordMiddleware`, 모델 `MustChangePassword`)
 - 메일 설정: `.env` 의 `EMAIL_HOST`·`EMAIL_PORT`·`EMAIL_HOST_USER`·`EMAIL_HOST_PASSWORD`·`DEFAULT_FROM_EMAIL`(Gmail 은 앱 비밀번호). `EMAIL_HOST` 가 비어 있으면 메일을 보내지 않고 서버 로그에만 찍힘(`settings.MAIL_ENABLED`)

@@ -21,5 +21,7 @@ urlpatterns = [
     # 내 계정
     path("profile/", views.profile_edit_view, name="profile_edit"),
     path("password/change/", views.password_change_view, name="password_change"),
+    path("two-factor/", views.two_factor_view, name="two_factor"),
+    path("two-factor/verify/", views.two_factor_verify_view, name="two_factor_verify"),
     path("delete/", views.delete_account_view, name="delete"),
 ]

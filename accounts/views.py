@@ -63,7 +63,9 @@ def _safe_next_url(request):
 @login_required
 def index(request):
     """내 계정: 가입 정보, 비밀번호 변경, 회원탈퇴."""
-    return render(request, "accounts/account.html", {"mail_enabled": settings.MAIL_ENABLED})
+    from accounts.models import two_factor_enabled
+
+    return render(request, "accounts/account.html", {"mail_enabled": settings.MAIL_ENABLED, "two_factor_on": two_factor_enabled(request.user)})
 
 
 class _FakeUser:
@@ -205,20 +207,13 @@ def login_view(request):
         )
         if user is not None:
             clear_failures(ip, username)
-            login(request, user)
-            # 관리자가 임시 비밀번호를 준 계정이면 먼저 비밀번호부터 바꾸게
-            if MustChangePassword.objects.filter(user=user).exists():
-                request.session[MUST_CHANGE_KEY] = True
-                messages.info(request, "임시 비밀번호로 로그인했어요. 새 비밀번호를 정해 주세요.")
-                return redirect("accounts:password_change")
+            # 2단계 인증이 켜진 계정이면 코드 단계로 (기억한 브라우저는 생략)
+            from accounts.models import two_factor_enabled
 
-            if next_url:
-                return redirect(next_url)
-            
-            # superuser면 studio로
-            if user.is_superuser:
-                return redirect('studio:index')
-            return redirect('main:home')
+            if two_factor_enabled(user) and not _trusted_browser(request, user):
+                request.session[PENDING_2FA_KEY] = {"u": user.id, "next": next_url or "", "t": timezone.now().timestamp()}
+                return redirect("accounts:two_factor_verify")
+            return _finish_login(request, user, next_url)
         else:
             record_failure(ip, username)
             reason = _inactive_reason(username, password)
@@ -389,3 +384,133 @@ def delete_account_view(request):
             logout(request)
             return render(request, "accounts/deleted.html", {"username": username})
     return render(request, "accounts/delete.html", {"form": form, "counts": _content_counts(request.user)})
+
+
+# ── 2단계 인증 (TOTP) ────────────────────────────────────────
+
+PENDING_2FA_KEY = "pending_2fa"
+TRUST_COOKIE = "mj2fa"
+TRUST_DAYS = 30
+
+
+def _trusted_browser(request, user) -> bool:
+	"""'이 브라우저 30일 기억' 쿠키(서명됨)가 이 계정 것이면 코드 생략."""
+	from django.core import signing
+
+	raw = request.COOKIES.get(TRUST_COOKIE)
+	if not raw:
+		return False
+	try:
+		data = signing.loads(raw, salt="accounts.2fa.trust", max_age=TRUST_DAYS * 24 * 3600)
+	except signing.BadSignature:
+		return False
+	return data.get("u") == user.id and data.get("p") == user.password[-12:]
+
+
+def _finish_login(request, user, next_url, remember=False):
+	from django.core import signing
+
+	login(request, user)
+	if MustChangePassword.objects.filter(user=user).exists():
+		request.session[MUST_CHANGE_KEY] = True
+		messages.info(request, "임시 비밀번호로 로그인했어요. 새 비밀번호를 정해 주세요.")
+		response = redirect("accounts:password_change")
+	elif next_url:
+		response = redirect(next_url)
+	elif user.is_superuser:
+		response = redirect("studio:index")
+	else:
+		response = redirect("main:home")
+	if remember:
+		token = signing.dumps({"u": user.id, "p": user.password[-12:]}, salt="accounts.2fa.trust")
+		response.set_cookie(TRUST_COOKIE, token, max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
+	return response
+
+
+def two_factor_verify_view(request):
+	"""비밀번호는 맞았고 코드만 남은 단계."""
+	from accounts.models import TwoFactor
+
+	pending = request.session.get(PENDING_2FA_KEY) or {}
+	user = User.objects.filter(id=pending.get("u"), is_active=True).first() if pending else None
+	if not user or timezone.now().timestamp() - pending.get("t", 0) > 10 * 60:
+		request.session.pop(PENDING_2FA_KEY, None)
+		messages.error(request, "로그인을 처음부터 다시 해 주세요.")
+		return redirect("accounts:login")
+	ip = client_ip(request)
+	if request.method == "POST":
+		if is_locked(ip, user.username):
+			return render(request, "accounts/two_factor_verify.html", {"error": "시도가 너무 많아 잠시 잠겼어요. 15분 뒤에 다시 해 주세요."})
+		tf = TwoFactor.objects.filter(user=user, enabled=True).first()
+		if tf and tf.verify_code(request.POST.get("code") or ""):
+			clear_failures(ip, user.username)
+			request.session.pop(PENDING_2FA_KEY, None)
+			return _finish_login(request, user, pending.get("next") or "", remember=request.POST.get("remember") == "1")
+		record_failure(ip, user.username)
+		LoginEvent.objects.create(user=user, username=user.username, ip=ip, user_agent=user_agent(request), result=LoginEvent.RESULT_FAILED, is_admin=user.is_superuser)
+		return render(request, "accounts/two_factor_verify.html", {"error": "코드가 맞지 않아요. 인증 앱의 지금 코드(6자리)나 백업 코드(8자리)를 넣어 주세요."})
+	return render(request, "accounts/two_factor_verify.html", {})
+
+
+@login_required
+def two_factor_view(request):
+	"""내 계정 › 2단계 인증: 켜기(QR → 코드 확인 → 백업 코드), 끄기(비밀번호 + 코드), 백업 코드 다시 만들기."""
+	from django.core import signing
+
+	from accounts import totp
+	from accounts.models import TwoFactor
+
+	tf = TwoFactor.objects.filter(user=request.user).first()
+	ctx = {"tf": tf, "enabled": bool(tf and tf.enabled)}
+	if request.method == "POST":
+		action = request.POST.get("action")
+		if action == "start":  # 새 비밀키 — 아직 켜진 건 아님
+			if tf and tf.enabled:
+				messages.error(request, "이미 켜져 있어요. 다시 설정하려면 먼저 끄세요.")
+				return redirect("accounts:two_factor")
+			secret = totp.generate_secret()
+			tf, _ = TwoFactor.objects.update_or_create(user=request.user, defaults={"secret": secret, "enabled": False, "backup_codes": [], "last_counter": 0})
+			ctx.update({"tf": tf, "setup": True})
+		elif action == "confirm":  # 앱에 넣은 뒤 지금 코드로 확인 → 켜짐 + 백업 코드
+			if not tf or tf.enabled:
+				return redirect("accounts:two_factor")
+			counter = totp.verify(tf.secret, request.POST.get("code") or "")
+			if counter is None:
+				ctx.update({"setup": True, "error": "코드가 맞지 않아요. 앱에 QR 을 다시 넣고 지금 코드를 입력해 주세요."})
+			else:
+				tf.enabled, tf.confirmed_at, tf.last_counter = True, timezone.now(), counter
+				tf.save(update_fields=["enabled", "confirmed_at", "last_counter", "updated_at"])
+				codes = tf.issue_backup_codes()
+				ctx.update({"enabled": True, "backup_codes": codes, "just_enabled": True})
+				response = render(request, "accounts/two_factor.html", ctx)
+				token = signing.dumps({"u": request.user.id, "p": request.user.password[-12:]}, salt="accounts.2fa.trust")
+				response.set_cookie(TRUST_COOKIE, token, max_age=TRUST_DAYS * 24 * 3600, httponly=True, samesite="Lax", secure=request.is_secure())
+				return response
+		elif action == "disable":  # 비밀번호 + 코드
+			if not tf or not tf.enabled:
+				return redirect("accounts:two_factor")
+			if not request.user.check_password(request.POST.get("password") or ""):
+				ctx["error"] = "비밀번호가 맞지 않아요."
+			elif not tf.verify_code(request.POST.get("code") or ""):
+				ctx["error"] = "코드가 맞지 않아요."
+			else:
+				tf.delete()
+				messages.success(request, "2단계 인증을 껐어요.")
+				response = redirect("accounts:two_factor")
+				response.delete_cookie(TRUST_COOKIE)
+				return response
+		elif action == "backup":  # 백업 코드 새로 (코드 확인)
+			if tf and tf.enabled and tf.verify_code(request.POST.get("code") or ""):
+				ctx.update({"backup_codes": tf.issue_backup_codes()})
+			else:
+				ctx["error"] = "코드가 맞지 않아요."
+		elif action == "cancel":
+			if tf and not tf.enabled:
+				tf.delete()
+			return redirect("accounts:two_factor")
+	if ctx.get("setup") and tf:
+		ctx["otpauth"] = totp.otpauth_uri(tf.secret, request.user.username)
+		ctx["secret_groups"] = " ".join(tf.secret[i:i + 4] for i in range(0, len(tf.secret), 4))
+	ctx["backup_left"] = len(tf.backup_codes) if tf and tf.enabled else 0
+	ctx["trusted"] = _trusted_browser(request, request.user) if tf and tf.enabled else False
+	return render(request, "accounts/two_factor.html", ctx)

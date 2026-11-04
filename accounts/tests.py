@@ -325,3 +325,99 @@ class UsernameNormalizationTests(TestCase):
 
 
 import unicodedata
+
+
+class TotpTests(TestCase):
+    def test_rfc6238_vector_and_window(self):
+        import base64
+
+        from accounts import totp
+
+        secret = base64.b32encode(b"12345678901234567890").decode().rstrip("=")
+        self.assertEqual(totp.totp(secret, at=59), "287082")  # RFC 6238 (8자리 94287082 의 뒤 6자리)
+        self.assertEqual(totp.totp(secret, at=1111111109), "081804")
+        self.assertIsNotNone(totp.verify(secret, "287 082", at=59))
+        self.assertIsNotNone(totp.verify(secret, "287082", at=59 + 30))  # ±1칸 허용
+        self.assertIsNone(totp.verify(secret, "287082", at=59 + 90))
+        self.assertIsNone(totp.verify(secret, "287082", at=59, min_counter=1))  # 이미 쓴 counter
+        self.assertIn("otpauth://totp/MJ%20Gallery:mj?secret=", totp.otpauth_uri(secret, "mj"))
+
+
+class TwoFactorFlowTests(TestCase):
+    def setUp(self):
+        from accounts import totp
+        from accounts.models import TwoFactor
+
+        User = get_user_model()
+        self.user = User.objects.create_user("tf-user", "t@example.com", "pw-1234-ok")
+        self.secret = totp.generate_secret()
+        self.tf = TwoFactor.objects.create(user=self.user, secret=self.secret, enabled=True)
+        self.codes = self.tf.issue_backup_codes()
+
+    def code(self):
+        from accounts import totp
+
+        return totp.totp(self.secret)
+
+    def test_login_requires_code_then_succeeds(self):
+        res = self.client.post(reverse("accounts:login"), {"username": "tf-user", "password": "pw-1234-ok"})
+        self.assertRedirects(res, reverse("accounts:two_factor_verify"), fetch_redirect_response=False)
+        self.assertNotIn("_auth_user_id", self.client.session)
+        res = self.client.post(reverse("accounts:two_factor_verify"), {"code": "000000"})
+        self.assertContains(res, "코드가 맞지 않아요")
+        res = self.client.post(reverse("accounts:two_factor_verify"), {"code": self.code(), "remember": "1"})
+        self.assertEqual(res.status_code, 302)
+        self.assertEqual(str(self.client.session["_auth_user_id"]), str(self.user.id))
+        self.assertIn("mj2fa", res.cookies)
+        # 기억한 브라우저는 다음 로그인에서 코드 생략 (테스트 클라이언트의 logout 은 쿠키를 다 지우므로 되살림)
+        trust = res.cookies["mj2fa"].value
+        self.client.logout()
+        self.client.cookies["mj2fa"] = trust
+        res = self.client.post(reverse("accounts:login"), {"username": "tf-user", "password": "pw-1234-ok"})
+        self.assertEqual(res.status_code, 302)
+        self.assertNotEqual(res["Location"], reverse("accounts:two_factor_verify"))
+
+    def test_backup_code_once_and_replay_blocked(self):
+        self.client.post(reverse("accounts:login"), {"username": "tf-user", "password": "pw-1234-ok"})
+        res = self.client.post(reverse("accounts:two_factor_verify"), {"code": self.codes[0]})
+        self.assertEqual(res.status_code, 302)
+        self.tf.refresh_from_db()
+        self.assertEqual(len(self.tf.backup_codes), 9)
+        self.client.logout()
+        self.client.post(reverse("accounts:login"), {"username": "tf-user", "password": "pw-1234-ok"})
+        res = self.client.post(reverse("accounts:two_factor_verify"), {"code": self.codes[0]})
+        self.assertContains(res, "코드가 맞지 않아요")
+        # 같은 TOTP 코드 두 번 → 두 번째는 거부
+        code = self.code()
+        self.assertTrue(self.tf.verify_code(code))
+        self.assertFalse(self.tf.verify_code(code))
+
+    def test_verify_page_without_pending_redirects(self):
+        res = self.client.get(reverse("accounts:two_factor_verify"))
+        self.assertRedirects(res, reverse("accounts:login"), fetch_redirect_response=False)
+
+    def test_setup_confirm_and_disable(self):
+        from accounts import totp
+        from accounts.models import TwoFactor
+
+        User = get_user_model()
+        u = User.objects.create_user("fresh", "f@example.com", "pw-1234-ok")
+        self.client.force_login(u)
+        res = self.client.get(reverse("accounts:index"))
+        self.assertContains(res, "지금 켜기")
+        res = self.client.post(reverse("accounts:two_factor"), {"action": "start"})
+        self.assertContains(res, "otpauth://")
+        tf = TwoFactor.objects.get(user=u)
+        self.assertFalse(tf.enabled)
+        res = self.client.post(reverse("accounts:two_factor"), {"action": "confirm", "code": "000000"})
+        self.assertContains(res, "코드가 맞지 않아요")
+        res = self.client.post(reverse("accounts:two_factor"), {"action": "confirm", "code": totp.totp(tf.secret)})
+        self.assertContains(res, "백업 코드를 지금 저장하세요")
+        tf.refresh_from_db()
+        self.assertTrue(tf.enabled)
+        self.assertEqual(len(tf.backup_codes), 10)
+        res = self.client.post(reverse("accounts:two_factor"), {"action": "disable", "password": "wrong", "code": totp.totp(tf.secret, at=__import__("time").time() + 30)})
+        self.assertContains(res, "비밀번호가 맞지 않아요")
+        res = self.client.post(reverse("accounts:two_factor"), {"action": "disable", "password": "pw-1234-ok", "code": totp.totp(tf.secret, at=__import__("time").time() + 30)})
+        self.assertEqual(res.status_code, 302)
+        self.assertFalse(TwoFactor.objects.filter(user=u).exists())
