@@ -18,7 +18,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_http_methods
 
 from accounts import antibot
-from accounts.forms import DeleteAccountForm, FindIdForm, UserForm
+from accounts.forms import DeleteAccountForm, FindIdForm, ProfileForm, UserForm
 from accounts.middleware import SESSION_KEY as MUST_CHANGE_KEY
 from accounts.models import MustChangePassword, SignupRequest
 from security.models import LoginEvent
@@ -336,6 +336,22 @@ def password_change_view(request):
         messages.success(request, "비밀번호를 바꿨어요.")
         return redirect("accounts:index")
     return render(request, "accounts/password_change.html", {"form": form, "forced": forced})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def profile_edit_view(request):
+    """회원정보 수정: 이름·이메일 (지금 비밀번호 확인)."""
+    user = request.user
+    initial = {"real_name": user.first_name, "email": user.email}
+    form = ProfileForm(user, request.POST or None, initial=initial)
+    if request.method == "POST" and form.is_valid():
+        user.first_name = form.cleaned_data["real_name"]
+        user.email = form.cleaned_data["email"]
+        user.save(update_fields=["first_name", "email"])
+        messages.success(request, "회원정보를 바꿨어요.")
+        return redirect("accounts:index")
+    return render(request, "accounts/profile_edit.html", {"form": form})
 
 
 def _content_counts(user):

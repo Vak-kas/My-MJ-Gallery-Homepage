@@ -69,6 +69,9 @@ def users(request):
             if not target:
                 messages.error(request, "본인·관리자 계정의 비밀번호는 여기서 초기화할 수 없어요.")
                 return back
+            if (request.POST.get("confirm") or "").strip() != target.username:   # 잘못 누름 방지: 아이디를 그대로 입력해야 함
+                messages.error(request, f"비밀번호 초기화는 확인 칸에 아이디({target.username})를 똑같이 입력해야 해요.")
+                return back
             temp = secrets.token_urlsafe(9)   # 12자 정도, 영숫자·-_
             target.set_password(temp)
             target.save(update_fields=["password"])

@@ -107,8 +107,18 @@
                                     {% elif u.is_active %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
                                     {% if u.is_vip %}<span class="ml-1 rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
                                     {% if u.id != request.user.id %}
-                                    <form method="post" action="{% url 'studio:users' %}" class="mt-1.5">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="{% if u.is_vip %}vip_off{% else %}vip_on{% endif %}"><input type="hidden" name="ids" value="{{ u.id }}"><button class="text-[11px] text-[#8e8e93] hover:text-[#0066cc]">{% if u.is_vip %}⭐ 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
-                                    <form method="post" action="{% url 'studio:users' %}" class="mt-1" onsubmit="return confirm('{{ u.username|escapejs }} 님의 비밀번호를 임시 비밀번호로 바꿀까요?\n임시 비밀번호는 한 번만 보여요.');">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="reset_password"><input type="hidden" name="ids" value="{{ u.id }}"><button class="text-[11px] text-[#8e8e93] hover:text-[#0066cc]" title="임시 비밀번호를 발급하고, 다음 로그인 때 새 비밀번호를 정하게 해요">🔑 비번 초기화</button></form>
+                                    <details class="mt-1.5">
+                                        <summary class="cursor-pointer select-none text-[11px] text-[#8e8e93] hover:text-[#0066cc]">⚙ 설정</summary>
+                                        <div class="mt-1 w-[220px] space-y-2 rounded-xl border border-black/[0.08] bg-white p-3 text-[12px] shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+                                            <form method="post" action="{% url 'studio:users' %}">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="{% if u.is_vip %}vip_off{% else %}vip_on{% endif %}"><input type="hidden" name="ids" value="{{ u.id }}"><button class="w-full rounded-lg border border-black/[0.08] px-2 py-1.5 text-left hover:bg-[#f5f5f7]">{% if u.is_vip %}⭐ VIP 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
+                                            <form method="post" action="{% url 'studio:users' %}" class="space-y-1.5 rounded-lg border border-[#ff3b30]/20 bg-[#fff6f5] p-2">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="reset_password"><input type="hidden" name="ids" value="{{ u.id }}">
+                                                <p class="font-semibold text-[#c4271d]">🔑 비밀번호 초기화</p>
+                                                <p class="text-[11px] leading-4 text-[#8e8e93]">임시 비밀번호가 한 번만 보여요. 확인으로 아이디를 그대로 입력:</p>
+                                                <input type="text" name="confirm" placeholder="{{ u.username }}" autocomplete="off" class="h-8 w-full rounded-lg border border-black/[0.1] px-2 text-[12px] outline-none focus:border-[#ff3b30]">
+                                                <button class="w-full rounded-lg bg-[#c4271d] px-2 py-1.5 font-semibold text-white">초기화</button>
+                                            </form>
+                                        </div>
+                                    </details>
                                     {% endif %}
                                     {% elif u.signup_request.status == 'pending' %}
                                     {% if u.signup_request.needs_verification %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]" title="인증 메일의 링크를 아직 안 눌렀어요. 7일 뒤 자동 삭제">📧 이메일 미인증</span>
