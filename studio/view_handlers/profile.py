@@ -9,7 +9,24 @@ from .common import admin_view
 
 @admin_view
 def index(request):
-    return render(request, "studio/index.html")
+    """Studio 첫 화면: 오늘 할 일 숫자 + 포트폴리오·콘텐츠·운영 묶음 카드."""
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from accounts.models import SignupRequest
+    from blog.models import Comment, GuestbookEntry, Post
+
+    week = timezone.now() - timedelta(days=7)
+    unverified = SignupRequest.objects.filter(status=SignupRequest.STATUS_PENDING, email_verified_at__isnull=True).exclude(verify_token="")
+    todo = {
+        "pending": SignupRequest.objects.filter(status=SignupRequest.STATUS_PENDING).exclude(pk__in=unverified).count(),
+        "unverified": unverified.count(),
+        "comments": Comment.objects.filter(created_at__gte=week, is_visible=True).count(),
+        "guestbook": GuestbookEntry.objects.filter(created_at__gte=week).count(),
+        "drafts": Post.objects.filter(author=request.user, is_published=False).count(),
+    }
+    return render(request, "studio/index.html", {"todo": todo})
 
 
 @admin_view

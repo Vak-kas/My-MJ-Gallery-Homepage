@@ -107,9 +107,9 @@
                                     {% elif u.is_active %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
                                     {% if u.is_vip %}<span class="ml-1 rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
                                     {% if u.id != request.user.id %}
-                                    <details class="mt-1.5">
+                                    <details class="user-menu mt-1.5">
                                         <summary class="cursor-pointer select-none text-[11px] text-[#8e8e93] hover:text-[#0066cc]">⚙ 설정</summary>
-                                        <div class="mt-1 w-[220px] space-y-2 rounded-xl border border-black/[0.08] bg-white p-3 text-[12px] shadow-[0_8px_24px_rgba(0,0,0,0.08)]">
+                                        <div class="user-menu-panel fixed z-50 w-[230px] space-y-2 rounded-xl border border-black/[0.08] bg-white p-3 text-[12px] shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
                                             <form method="post" action="{% url 'studio:users' %}">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="{% if u.is_vip %}vip_off{% else %}vip_on{% endif %}"><input type="hidden" name="ids" value="{{ u.id }}"><button class="w-full rounded-lg border border-black/[0.08] px-2 py-1.5 text-left hover:bg-[#f5f5f7]">{% if u.is_vip %}⭐ VIP 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
                                             <form method="post" action="{% url 'studio:users' %}" class="space-y-1.5 rounded-lg border border-[#ff3b30]/20 bg-[#fff6f5] p-2">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="reset_password"><input type="hidden" name="ids" value="{{ u.id }}">
                                                 <p class="font-semibold text-[#c4271d]">🔑 비밀번호 초기화</p>
@@ -158,6 +158,30 @@
 </div>
 
 <script>
+    // ⚙ 설정 패널: 표 안에서 늘어나지 않고 버튼 옆에 떠 있음 (blog 목차처럼). 하나만 열리고 바깥 클릭·Esc·스크롤로 닫힘
+    (() => {
+        const menus = [...document.querySelectorAll('details.user-menu')];
+        const place = (d) => {
+            const panel = d.querySelector('.user-menu-panel');
+            const r = d.querySelector('summary').getBoundingClientRect();
+            const w = 230, h = panel.offsetHeight || 220;
+            let left = r.left, top = r.bottom + 6;
+            if (left + w > window.innerWidth - 12) left = window.innerWidth - w - 12;
+            if (top + h > window.innerHeight - 12) top = Math.max(12, r.top - h - 6);
+            panel.style.left = `${left}px`;
+            panel.style.top = `${top}px`;
+        };
+        menus.forEach((d) => d.addEventListener('toggle', () => {
+            if (!d.open) return;
+            menus.forEach((o) => { if (o !== d) o.open = false; });
+            place(d);
+        }));
+        const closeAll = () => menus.forEach((d) => { d.open = false; });
+        document.addEventListener('click', (e) => { if (!e.target.closest('details.user-menu')) closeAll(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeAll(); });
+        window.addEventListener('scroll', closeAll, { passive: true });
+        document.querySelector('.overflow-x-auto')?.addEventListener('scroll', closeAll, { passive: true });
+    })();
     (function () {
         const form = document.getElementById('bulk-form');
         const selectAll = document.getElementById('select-all');
