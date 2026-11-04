@@ -128,3 +128,70 @@ class ScheduledAttachment(models.Model):
 	filename = models.CharField(max_length=255)
 	content_type = models.CharField(max_length=120, blank=True)
 	size = models.PositiveIntegerField(default=0)
+
+
+# ── 앱 비밀번호: 맥·폰 메일 앱용 전용 로그인 (본 비밀번호는 기기에 안 넣음) ──
+def ssha512(password: str, salt: bytes | None = None) -> str:
+	"""Dovecot 의 {SSHA512} 와 같은 형식: base64(sha512(비밀번호 + salt) + salt)."""
+	import base64
+	import hashlib
+	import secrets
+
+	salt = salt or secrets.token_bytes(16)
+	digest = hashlib.sha512(password.encode("utf-8") + salt).digest()
+	return "{SSHA512}" + base64.b64encode(digest + salt).decode()
+
+
+class AppPassword(models.Model):
+	"""기기마다 따로 발급하는 메일 로그인. 로그인 아이디는 mjseo+<label>@도메인, Dovecot 이 본 계정으로 바꿔 줌."""
+	label = models.CharField("이름", max_length=40)  # 예: macbook, iphone
+	login = models.CharField(max_length=120, unique=True)  # mjseo+macbook@smjgallery.kr
+	password_hash = models.CharField(max_length=200)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["created_at"]
+
+	def __str__(self):
+		return self.login
+
+	@staticmethod
+	def slug(label: str) -> str:
+		import re
+
+		s = re.sub(r"[^a-z0-9]+", "-", (label or "").lower()).strip("-")
+		return s[:24] or "device"
+
+	@classmethod
+	def create_for(cls, label: str):
+		"""새 앱 비밀번호 발급 → (객체, 평문 비밀번호). 평문은 이때만."""
+		import secrets
+
+		from django.conf import settings
+
+		local, domain = settings.WEBMAIL_USER.split("@", 1)
+		base = cls.slug(label)
+		login, n = f"{local}+{base}@{domain}", 2
+		while cls.objects.filter(login=login).exists():
+			login, n = f"{local}+{base}{n}@{domain}", n + 1
+		plain = "-".join(secrets.token_hex(2) for _ in range(4))  # 예: 3f9a-1c02-77be-0d4e
+		obj = cls.objects.create(label=label[:40], login=login, password_hash=ssha512(plain))
+		write_app_password_file()
+		return obj, plain
+
+
+def write_app_password_file():
+	"""Dovecot 이 읽는 passwd-file 을 다시 씀. 한 줄: 로그인:해시:::::::user=본계정"""
+	import os
+	from pathlib import Path
+
+	from django.conf import settings
+
+	path = Path(settings.WEBMAIL_APP_PASSWORD_FILE)
+	path.parent.mkdir(parents=True, exist_ok=True)
+	lines = [f"{a.login}:{a.password_hash}:::::::user={settings.WEBMAIL_USER}" for a in AppPassword.objects.all()]
+	tmp = path.with_suffix(".tmp")
+	tmp.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
+	os.chmod(tmp, 0o640)
+	os.replace(tmp, path)
+	return path

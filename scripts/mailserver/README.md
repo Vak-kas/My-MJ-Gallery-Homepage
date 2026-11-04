@@ -41,6 +41,7 @@
    ```
 
 ## 운영 메모
+- **앱 비밀번호**: 맥·폰 메일 앱에는 본 비밀번호 대신 사이트 메일 설정 › 앱 비밀번호에서 만든 것을 씀(로그인 아이디 `mjseo+기기@smjgallery.kr`). Dovecot 두 번째 passdb 가 `private_media/mail/app_passwords`(Django 가 씀, dovecot 그룹 읽기)를 읽고 `user=` 로 본 계정에 매핑. 본 비밀번호를 서버 안(웹메일)에서만 쓰게 막으려면 `/etc/dovecot/users` 줄 끝에 `:::::::allow_nets=127.0.0.0/8` 를 붙이고 `sudo systemctl reload dovecot` (그 전에 기기들을 앱 비밀번호로 바꿔 둘 것)
 - 왜 스팸함에 갔는지: `sudo grep "보낸주소" /var/log/rspamd/rspamd.log` 의 `[점수/15.00] [기호(점수)…]`. 6점 이상이면 Junk. 네이버·구글 등 DKIM 서명 도메인은 `local.d/trusted_dkim.map` 으로 -4점(추가는 한 줄씩 넣고 `sudo systemctl reload rspamd`). SenderScore 평판 조회는 AWS 리졸버에서 안 되어 꺼 둠(`local.d/rbl.conf`)
 - 받는 메일이 `554 5.7.1 ... blocked using zen.spamhaus.org; Error: open resolver` 로 튕기면 Postfix 에 `reject_rbl_client` 가 남아 있는 것 — AWS 리졸버에서는 Spamhaus 조회가 안 되므로 빼야 함: `sudo postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, reject_unknown_recipient_domain" && sudo systemctl reload postfix`
 - 웹메일·메일 앱 로그인이 2초쯤 느리면 Dovecot 이 PAM(리눅스 계정)을 먼저 시도하는 것: `sudo sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf && sudo doveconf -n >/dev/null && sudo systemctl reload dovecot`

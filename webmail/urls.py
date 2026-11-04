@@ -16,6 +16,7 @@ urlpatterns = [
 	path("api/labels/", views.api_labels, name="api_labels"),
 	path("api/prefs/", views.api_prefs, name="api_prefs"),
 	path("api/contacts/", views.api_contacts, name="api_contacts"),
+	path("api/app-passwords/", views.api_app_passwords, name="api_app_passwords"),
 	path("api/schedule/", views.api_schedule, name="api_schedule"),
 	path("attachment/", views.attachment, name="attachment"),
 	path("raw/", views.raw, name="raw"),
