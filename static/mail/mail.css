@@ -112,6 +112,14 @@ html.theme-dark .mjm__notice { background: rgba(255,196,61,.12); color: #ffd27a;
 .mjm__att { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--mjm-line); color: var(--mjm-accent); }
 .mjm__quickreply { display: flex; gap: 6px; padding: 12px 16px 18px; }
 
+/* 보낸 뒤 안내 */
+.mjm__sent { margin: auto; padding: 32px 24px; text-align: center; }
+.mjm__sent-icon { display: inline-flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 999px; background: rgba(52,199,89,.15); color: #1e7a35; font-size: 26px; font-weight: 700; }
+.mjm__sent-title { margin: 14px 0 6px; font-size: 18px; font-weight: 600; }
+.mjm__sent-subject { margin: 10px 0 0; font-size: 14px; }
+.mjm__sent-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 20px; }
+.mjm__sent-actions button:not(.mjm__send) { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--mjm-line); background: var(--mjm-bg); color: var(--mjm-text); font-size: 13px; }
+
 /* 쓰기 */
 .mjm__compose { display: flex; flex-direction: column; gap: 8px; padding: 0 0 14px; }
 .mjm__field { display: flex; align-items: center; gap: 10px; padding: 0 16px; font-size: 13px; }

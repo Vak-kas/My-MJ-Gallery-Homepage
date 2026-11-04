@@ -124,7 +124,7 @@
             }
             return btn;
         }
-        function goFolder(key) { state.folder = key; state.page = 1; state.q = ''; state.adv = {}; state.filter = 'all'; state.selected.clear(); state.current = null; state.cursor = -1; renderFolders(); renderRead(); loadList(); setPane('list'); }
+        function goFolder(key) { state.sentInfo = null; state.folder = key; state.page = 1; state.q = ''; state.adv = {}; state.filter = 'all'; state.selected.clear(); state.current = null; state.cursor = -1; renderFolders(); renderRead(); loadList(); setPane('list'); }
         async function loadFolders() {
             try { const { folders } = await api('state'); state.folders = folders; renderFolders(); if (mode === 'mini') renderList(); }
             catch (e) { say(e.message, true); }
@@ -291,6 +291,21 @@
             readEl.innerHTML = '';
             const m = state.current;
             if (state.compose) { readEl.append(state.compose); return; }
+            if (state.sentInfo) {  // 방금 보낸 뒤 안내
+                const info = state.sentInfo;
+                readEl.append(h('div', { class: 'mjm__sent' }, [
+                    h('div', { class: 'mjm__sent-icon', text: '✓' }),
+                    h('h3', { class: 'mjm__sent-title', text: '메일 발송이 완료되었습니다' }),
+                    h('p', { class: 'mjm__dim', text: `${info.time} · 받는 사람 ${info.to}${info.cc ? ' · 참조 ' + info.cc : ''}` }),
+                    h('p', { class: 'mjm__sent-subject', text: info.subject || '(제목 없음)' }),
+                    h('div', { class: 'mjm__sent-actions' }, [
+                        h('button', { type: 'button', class: 'mjm__send', text: '보낸 편지함 보기', onclick: () => { state.sentInfo = null; goFolder('sent'); } }),
+                        h('button', { type: 'button', text: '새 메일', onclick: () => { state.sentInfo = null; openCompose(); } }),
+                        h('button', { type: 'button', text: '닫기', onclick: () => { state.sentInfo = null; renderRead(); if (mode === 'mini') setPane('list'); } }),
+                    ]),
+                ]));
+                return;
+            }
             if (!m) { readEl.append(h('div', { class: 'mjm__empty mjm__empty--read' }, [h('span', { class: 'mjm__empty-icon', text: '✉️' }), h('span', { text: mode === 'full' ? '왼쪽에서 메일을 고르세요' : '' })])); return; }
             const toolbar = h('div', { class: 'mjm__toolbar' }, [
                 h('button', { type: 'button', class: 'mjm__back', text: '‹ 목록', onclick: () => { setPane('list'); } }),
@@ -345,7 +360,7 @@
         }
         async function openMessage(uid, { images = false } = {}) {
             if (state.compose && !confirm('쓰던 메일을 닫을까요? (임시 저장을 안 했으면 사라져요)')) return;
-            state.compose = null;
+            state.compose = null; state.sentInfo = null;
             setPane('read');
             readEl.innerHTML = ''; readEl.append(h('div', { class: 'mjm__empty mjm__empty--read', text: '불러오는 중…' }));
             try {
@@ -399,10 +414,12 @@
                 e.preventDefault();
                 submit.disabled = true; submit.textContent = '보내는 중…'; clearTimeout(autosave);
                 try {
-                    await api('send', { method: 'POST', body: new FormData(form) });
+                    const fd = new FormData(form);
+                    await api('send', { method: 'POST', body: fd });
                     say('보냈어요'); state.compose = null; dirty = false;
+                    state.sentInfo = { to: fd.get('to'), cc: fd.get('cc'), subject: fd.get('subject'), time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) };
                     if (reply) { const row = rowOf(reply); if (row) row.answered = true; }
-                    renderRead(); if (mode === 'mini') setPane('list'); renderList(); loadFolders();
+                    state.current = null; renderRead(); setPane('read'); renderList(); loadFolders();
                 } catch (err) { say(err.message, true); submit.disabled = false; submit.textContent = '보내기'; }
             });
             function closeCompose() {
