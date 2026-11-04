@@ -194,7 +194,7 @@
 - 오류 페이지: 없는 주소는 `templates/404.html`(사이트 모양, 홈·이전·블로그 버튼), 권한 없음은 `403.html`, 서버 오류는 `500.html`(컨텍스트 없이도 그려지는 독립 페이지). 모두 "자세한 건 관리자 메일 …" 안내. 꼬리말에도 문의 메일(`CONTACT_EMAIL`, 기본 mjseo@smjgallery.kr)
 - 화면 1024px 미만(폰·태블릿)에서는 왼쪽 사이드바가 서랍으로 바뀌고 왼쪽 아래 ☰ 버튼으로 엶 (`components/studio_sidebar.html`), 본문은 전체 너비
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
-  - Profile › Links 의 Visible/Primary 토글이 옆 열로 넘치던 문제 수정(열 폭 조정, ON/OFF 글자 제거), Resume 탭은 500 대신 "준비 중" 안내 페이지
+  - Profile › Links: 링크마다 **설명** 칸(비우면 플랫폼별 기본 문구), 한글 주소는 퍼센트 인코딩을 풀어서 표시(`urldecode` 필터), 행을 드래그해 순서 변경(`profile_link_reorder`). Visible/Primary 토글이 옆 열로 넘치던 문제 수정, Resume 탭은 500 대신 "준비 중" 안내 페이지
   - Profile › Contact 도 종류(이메일·전화·주소) 안에서 행을 드래그해 순서 변경(`profile_contact_reorder`), Basic Info 의 자기소개는 내용만큼 자동으로 늘어나고 관심 분야·대표 키워드 상자는 칩이 두 줄이어도 안 넘침
   - Publication 에 **상태**(게재됨 · 게재 확정 · 심사중 · 제출 완료 · 준비중): 게재됨이 아니면 Studio 카드와 메인 Publications 카드에 상태 배지. 심사중·제출 완료·준비중이면 발행일 칸이 잠기고 서버에서도 날짜를 비움
 - **Posts**: 검색·작성자·기간·**제목 포함(예: 555)** 필터, 발행/임시저장 상태 필터, 공개 범위 변경

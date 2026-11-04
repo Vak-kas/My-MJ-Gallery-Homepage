@@ -84,6 +84,7 @@ class Link(models.Model):
     platform = models.CharField(max_length=30, choices=PLATFORM_CHOICES)
     label = models.CharField(max_length=100, blank=True)
     url = models.URLField()
+    description = models.CharField("설명", max_length=200, blank=True)  # 비우면 플랫폼별 기본 문구
 
     is_visible = models.BooleanField(default=True)
     is_primary = models.BooleanField(default=False)

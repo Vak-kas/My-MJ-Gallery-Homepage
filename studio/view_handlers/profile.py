@@ -198,6 +198,7 @@ def profile_links(request):
         platform = request.POST.get("platform", "").strip()
         label = request.POST.get("label", "").strip()
         url = request.POST.get("url", "").strip()
+        description = request.POST.get("description", "").strip()[:200]
         is_visible = request.POST.get("is_visible") == "true"
         is_primary = request.POST.get("is_primary") == "true"
 
@@ -206,6 +207,7 @@ def profile_links(request):
                 platform=platform,
                 label=label,
                 url=url,
+                description=description,
                 is_visible=is_visible,
                 is_primary=is_primary,
             )
@@ -232,6 +234,7 @@ def profile_link_update(request, link_id):
         platform = request.POST.get("platform", "").strip()
         label = request.POST.get("label", "").strip()
         url = request.POST.get("url", "").strip()
+        description = request.POST.get("description", "").strip()[:200]
         is_visible = request.POST.get("is_visible") == "true"
         is_primary = request.POST.get("is_primary") == "true"
 
@@ -239,6 +242,7 @@ def profile_link_update(request, link_id):
             link.platform = platform
             link.label = label
             link.url = url
+            link.description = description
             link.is_visible = is_visible
             link.is_primary = is_primary
             link.save()
@@ -300,5 +304,18 @@ def profile_contact_reorder(request):
     if error:
         return error
     if not apply_reorder(Contact, ordered_ids):
+        return JsonResponse({"ok": False, "message": "정렬 저장에 실패했습니다."}, status=400)
+    return JsonResponse({"ok": True})
+
+
+@admin_view
+def profile_link_reorder(request):
+    """링크 드래그 정렬 저장. body: {"ordered_ids": [...]}"""
+    if request.method != "POST":
+        return JsonResponse({"ok": False}, status=405)
+    ordered_ids, error = parse_reorder_payload(request)
+    if error:
+        return error
+    if not apply_reorder(Link, ordered_ids):
         return JsonResponse({"ok": False, "message": "정렬 저장에 실패했습니다."}, status=400)
     return JsonResponse({"ok": True})

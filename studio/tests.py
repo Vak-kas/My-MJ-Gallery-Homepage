@@ -404,3 +404,32 @@ class UserDetailTests(TestCase):
     def test_member_cannot_open(self):
         self.client.force_login(self.member)
         self.assertEqual(self.client.get(reverse("studio:user_detail", args=[self.member.id])).status_code, 302)
+
+
+class LinkDescriptionTests(TestCase):
+    def test_description_and_decoded_url_shown(self):
+        from studio.models import Link
+
+        User = get_user_model()
+        admin = User.objects.create_superuser("link-admin", "a@example.com", "pw")
+        self.client.force_login(admin)
+        url = "https://kitribob.wiki/wiki/%EC%84%9C%EB%AF%BC%EC%9E%AC(14%EA%B8%B0)"
+        self.client.post(reverse("studio:profile_links"), {"platform": "other", "label": "비오비위키", "url": url, "description": "BoB 14기 활동 기록", "is_visible": "true"})
+        link = Link.objects.get(label="비오비위키")
+        self.assertEqual(link.description, "BoB 14기 활동 기록")
+        page = self.client.get(reverse("studio:profile_links"))
+        self.assertContains(page, "kitribob.wiki/wiki/서민재(14기)")
+        home = self.client.get(reverse("main:home"))
+        self.assertContains(home, "BoB 14기 활동 기록")
+        self.assertContains(home, "kitribob.wiki/wiki/서민재(14기)")
+        self.assertNotContains(home, "외부 링크로 이동합니다")
+        self.client.post(reverse("studio:profile_link_update", args=[link.id]), {"platform": "other", "label": "비오비위키", "url": url, "description": "", "is_visible": "true"})
+        self.assertContains(self.client.get(reverse("main:home")), "외부 링크로 이동합니다")
+        # 드래그 순서
+        import json
+
+        other = Link.objects.create(platform="github", url="https://github.com/x", order=5)
+        res = self.client.post(reverse("studio:profile_link_reorder"), json.dumps({"ordered_ids": [other.id, link.id]}), content_type="application/json")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual([l.id for l in Link.objects.order_by("order", "id")], [other.id, link.id])
+        self.assertContains(page, "data-sortable-list")
