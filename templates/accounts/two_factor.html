@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block content %}
-{% include "components/main_nav.html" %}
+{% include "components/main_nav.html" with nav_active="account" %}
 <main class="mx-auto max-w-[720px] px-6 py-14">
     <a href="{% url 'accounts:index' %}" class="text-[14px] text-[#6e6e73] hover:text-[#1d1d1f]">← 내 계정</a>
     <p class="mt-6 text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SECURITY</p>
