@@ -100,3 +100,4 @@ from .settings import site_settings_view
 from .analytics import analytics
 from .server import server, server_logs
 from .ai_usage import ai_usage
+from .mail_log import mail_log  # noqa: E402

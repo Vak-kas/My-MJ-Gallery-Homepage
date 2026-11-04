@@ -1,0 +1,7 @@
+{% if user.is_superuser and webmail_enabled %}
+<a href="{% url 'webmail:index' %}" title="메일함" aria-label="메일함"
+   class="{{ bell_class|default:'border border-black/[0.1] text-[#1d1d1f] hover:bg-[#f5f5f7]' }} relative inline-flex h-[30px] w-[34px] items-center justify-center rounded-full text-[14px]{% if nav_active == 'mail' %} !bg-[#0066cc] !text-white{% endif %}">
+    ✉
+    <span class="absolute -right-1.5 -top-1.5 min-w-[18px] rounded-full bg-[#ff3b30] px-1 text-center text-[11px] font-semibold leading-[18px] text-white" data-mail-unread hidden></span>
+</a>
+{% endif %}

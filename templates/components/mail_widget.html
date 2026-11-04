@@ -1,0 +1,41 @@
+{% load static blog_extras %}
+{# 오른쪽 아래 떠 있는 ✉ 버튼 + 메일 패널 (관리자, WEBMAIL_PASSWORD 설정됐을 때만 base.html 이 넣음) #}
+<meta name="mj-csrf" content="{{ csrf_token }}">
+<link rel="stylesheet" href="{% static_v 'mail/mail.css' %}">
+<button id="mail-fab" type="button" class="mail-fab" aria-label="메일" aria-expanded="false" aria-controls="mail-panel" title="메일함">
+    ✉<span class="mail-fab__badge" data-mail-unread hidden></span>
+</button>
+<div id="mail-panel" class="mail-panel" hidden>
+    <div class="mail-panel__head">
+        <span>✉ 메일</span>
+        <a href="{% url 'webmail:index' %}" title="전체 화면으로">전체 화면 ↗</a>
+        <button type="button" class="mail-panel__close" id="mail-panel-close" aria-label="닫기">×</button>
+    </div>
+    <div class="mail-panel__body"><div id="mail-mini" data-user="{{ request.user.email|default:'' }}"></div></div>
+</div>
+<script src="{% static_v 'mail/mail.js' %}" defer></script>
+<script>
+    (() => {
+        const fab = document.getElementById('mail-fab'), panel = document.getElementById('mail-panel'), mini = document.getElementById('mail-mini');
+        let app = null;
+        // 다른 떠 있는 버튼(홈의 맨 위로 → 다크모드 버튼이 한 칸 위, 글 보기의 맨 위/아래 두 개)과 겹치지 않게 그만큼 위로
+        const stacked = document.querySelector('.post-jump') ? 2 : document.getElementById('back-to-top-btn') ? 1 : 0;
+        if (stacked) { fab.style.bottom = `${76 + stacked * 56}px`; panel.style.bottom = `${132 + stacked * 56}px`; }
+        const setOpen = (open) => {
+            panel.hidden = !open; fab.setAttribute('aria-expanded', String(open));
+            try { localStorage.setItem('mj:mail:open', open ? '1' : '0'); } catch { /* ignore */ }
+            if (open && !app && window.MjMail) app = MjMail.create(mini, { mode: 'mini' });
+            else if (open && app) app.reload();
+        };
+        fab.addEventListener('click', () => setOpen(panel.hidden));
+        document.getElementById('mail-panel-close').addEventListener('click', () => setOpen(false));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden && !panel.querySelector('.mjm__compose')) setOpen(false); });
+        window.addEventListener('load', () => {
+            if (!window.MjMail) return;
+            MjMail.watchUnread();
+            let wasOpen = false;
+            try { wasOpen = localStorage.getItem('mj:mail:open') === '1'; } catch { /* ignore */ }
+            if (wasOpen) setOpen(true);
+        });
+    })();
+</script>

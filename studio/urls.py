@@ -49,6 +49,7 @@ urlpatterns = [
     path('community/', views.community, name='community'),
     path('users/', views.users, name='users'),
     path('security/', views.security, name='security'),
+    path('mail/', views.mail_log, name='mail'),
     path('security/ip/<str:ip>/', views.security_ip, name='security_ip'),
     path('analytics/', views.analytics, name='analytics'),
     path('server/', views.server, name='server'),
