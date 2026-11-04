@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:users' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>회원 목록으로</span>
+            </a>
+        </div>
+
+        {# ── 머리: 이름·상태·요약 ── #}
+        <section class="mb-8 flex flex-wrap items-start justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="flex h-16 w-16 items-center justify-center rounded-full bg-[#0066cc]/10 text-[24px] font-semibold text-[#0066cc]">{{ target.username|slice:":1"|upper }}</div>
+                <div>
+                    <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO USERS</p>
+                    <h1 class="mt-1 text-[28px] font-semibold tracking-[-0.03em] sm:text-[34px]">{% if target.first_name %}{{ target.first_name }} <span class="font-normal text-[#6e6e73]">@{{ target.username }}</span>{% else %}{{ target.username }}{% endif %}{% if target.id == request.user.id %} <span class="text-[16px] font-normal text-[#8e8e93]">(나)</span>{% endif %}</h1>
+                    <div class="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+                        {% if status.0 == 'admin' %}<span class="rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[#0066cc]">관리자</span>
+                        {% elif status.0 == 'active' %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[#1e7a35]">활성</span>
+                        {% elif status.0 == 'pending' %}<span class="rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[#b26a00]">승인 대기</span>
+                        {% elif status.0 == 'unverified' %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[#6e6e73]">📧 이메일 미인증</span>
+                        {% elif status.0 == 'rejected' %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[#6e6e73]">거절됨</span>
+                        {% else %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[#c4271d]">정지</span>{% endif %}
+                        {% if is_vip %}<span class="rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
+                        {% if must_change %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[#c4271d]" title="{{ must_change.created_at|date:'Y.m.d H:i' }} {{ must_change.issued_by.username|default:'' }} 발급">🔑 임시 비밀번호 상태</span>{% endif %}
+                        <span class="text-[#8e8e93]">가입 {{ target.date_joined|date:"Y.m.d H:i" }} · 마지막 로그인 {{ target.last_login|date:"Y.m.d H:i"|default:"-" }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2 text-[12px]">
+                {% if target.email and webmail_enabled %}<a href="{% url 'webmail:index' %}?to={{ target.email|urlencode }}" class="rounded-full border border-black/[0.1] bg-white px-3 py-1.5 hover:bg-[#f5f5f7]">✉ 메일 보내기</a>{% endif %}
+                {% if counts.comments %}<a href="{% url 'studio:community' %}?tab=comments&author={{ target.username|urlencode }}" class="rounded-full border border-black/[0.1] bg-white px-3 py-1.5 hover:bg-[#f5f5f7]">댓글 {{ counts.comments }}</a>{% endif %}
+                {% if counts.guestbook %}<a href="{% url 'studio:community' %}?tab=guestbook&author={{ target.username|urlencode }}" class="rounded-full border border-black/[0.1] bg-white px-3 py-1.5 hover:bg-[#f5f5f7]">방명록 {{ counts.guestbook }}</a>{% endif %}
+                <a href="{% url 'studio:security' %}?tab=logins&username={{ target.username|urlencode }}" class="rounded-full border border-black/[0.1] bg-white px-3 py-1.5 hover:bg-[#f5f5f7]">로그인 기록 전체</a>
+            </div>
+        </section>
+
+        <div class="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div class="min-w-0 space-y-6">
+                {# ── 기본 정보 (수정) ── #}
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
+                    <h2 class="text-[16px] font-semibold">기본 정보</h2>
+                    <form method="post" class="mt-4 grid gap-3 sm:grid-cols-2">
+                        {% csrf_token %}<input type="hidden" name="action" value="edit">
+                        <label class="text-[12px] text-[#6e6e73]">아이디<input value="{{ target.username }}" disabled class="mt-1 h-10 w-full rounded-xl border border-black/[0.08] bg-[#f5f5f7] px-3 text-[14px] text-[#8e8e93]"></label>
+                        <label class="text-[12px] text-[#6e6e73]">이름<input name="first_name" value="{{ target.first_name }}" maxlength="150" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[14px] text-[#1d1d1f] outline-none focus:border-[#0066cc]"></label>
+                        <label class="text-[12px] text-[#6e6e73] sm:col-span-2">이메일<input name="email" type="email" value="{{ target.email }}" maxlength="254" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] px-3 text-[14px] text-[#1d1d1f] outline-none focus:border-[#0066cc]"></label>
+                        <div class="sm:col-span-2 flex items-center gap-3"><button class="rounded-full bg-[#1d1d1f] px-4 py-2 text-[13px] text-white">저장</button><span class="text-[12px] text-[#8e8e93]">이름·이메일만 바꿀 수 있어요. 비밀번호는 오른쪽 "비밀번호 초기화"로.</span></div>
+                    </form>
+                </section>
+
+                {# ── 가입 기록 ── #}
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
+                    <h2 class="text-[16px] font-semibold">가입 기록</h2>
+                    {% if signup %}
+                    <dl class="mt-4 grid gap-x-6 gap-y-2 text-[13px] sm:grid-cols-[120px_minmax(0,1fr)]">
+                        <dt class="text-[#8e8e93]">가입 인사</dt><dd>{% if signup.message %}💬 {{ signup.message }}{% else %}<span class="text-[#8e8e93]">없음</span>{% endif %}</dd>
+                        <dt class="text-[#8e8e93]">상태</dt><dd>{{ signup.get_status_display }}{% if signup.decided_at %} · {{ signup.decided_at|date:"Y.m.d H:i" }}{% if signup.decided_by %} ({{ signup.decided_by.username }}){% endif %}{% endif %}</dd>
+                        <dt class="text-[#8e8e93]">이메일 인증</dt><dd>{% if signup.email_verified_at %}✓ {{ signup.email_verified_at|date:"Y.m.d H:i" }}{% elif signup.verify_token %}<span class="text-[#b26a00]">아직 안 함</span>{% if signup.verify_sent_at %} (메일 {{ signup.verify_sent_at|date:"m.d H:i" }} 보냄){% endif %}{% else %}<span class="text-[#8e8e93]">해당 없음</span>{% endif %}</dd>
+                        <dt class="text-[#8e8e93]">개인정보 동의</dt><dd>{{ signup.privacy_agreed_at|date:"Y.m.d H:i"|default:"-" }}</dd>
+                        <dt class="text-[#8e8e93]">가입 IP</dt><dd>{% if signup.ip %}<a href="{% url 'studio:security_ip' signup.ip %}" class="font-mono text-[#0066cc] hover:underline">🌐 {{ signup.ip }}</a>
+                            {% if not target.is_active %}<form method="post" class="mt-1 inline" onsubmit="return confirm('{{ signup.ip|escapejs }} 을(를) 30일 동안 차단할까요?');">{% csrf_token %}<input type="hidden" name="action" value="block_ip"><input type="hidden" name="ip" value="{{ signup.ip }}"><button class="rounded-full border border-[#ff3b30]/30 px-2 py-0.5 text-[11px] text-[#c4271d] hover:bg-[#ff3b30]/10">이 IP 30일 차단</button></form>{% endif %}
+                            {% else %}-{% endif %}</dd>
+                        <dt class="text-[#8e8e93]">브라우저</dt><dd class="break-all text-[12px] text-[#6e6e73]">{{ signup.user_agent|default:"-" }}</dd>
+                        {% if signup.flags %}<dt class="text-[#8e8e93]">의심 이유</dt><dd class="flex flex-wrap gap-1">{% for f in signup.flag_list %}<span class="rounded-full bg-[#ff3b30]/10 px-2 py-0.5 text-[11px] font-semibold text-[#c4271d]">🤖 {{ f }}</span>{% endfor %}</dd>{% endif %}
+                    </dl>
+                    {% else %}<p class="mt-3 text-[13px] text-[#8e8e93]">가입 신청 기록이 없어요 (관리자가 직접 만든 계정).</p>{% endif %}
+                </section>
+
+                {# ── 활동 ── #}
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
+                    <h2 class="text-[16px] font-semibold">활동</h2>
+                    <div class="mt-4 flex flex-wrap gap-2 text-[12px]">
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">글 {{ counts.posts }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">댓글 {{ counts.comments }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">방명록 {{ counts.guestbook }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">단축 링크 {{ counts.links }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">비밀 쪽지 {{ counts.notes }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">클립보드 {{ counts.clips }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">저장 논문 {{ counts.papers }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">표준 서재 {{ counts.stddocs }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">Paste {{ counts.pastes }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">Hook {{ counts.hooks }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">팀플 일정 {{ counts.meetings }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">맡겨둔 파일 {{ counts.shared }}</span>
+                        <span class="rounded-full bg-[#f2f2f7] px-3 py-1">AI 사용 {{ counts.ai }}</span>
+                    </div>
+                    {% if recent_posts %}
+                    <h3 class="mt-5 text-[13px] font-semibold text-[#6e6e73]">최근 글</h3>
+                    <ul class="mt-2 divide-y divide-black/[0.05] text-[13px]">
+                        {% for p in recent_posts %}<li class="flex items-center justify-between gap-3 py-2"><a href="{% url 'blog:post_detail' p.slug %}" target="_blank" class="truncate hover:text-[#0066cc] hover:underline">{{ p.title }}</a><span class="shrink-0 text-[11px] text-[#8e8e93]">{% if not p.is_published %}임시 · {% endif %}{{ p.created_at|date:"y.m.d" }}</span></li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if recent_comments %}
+                    <h3 class="mt-5 text-[13px] font-semibold text-[#6e6e73]">최근 댓글</h3>
+                    <ul class="mt-2 divide-y divide-black/[0.05] text-[13px]">
+                        {% for c in recent_comments %}<li class="py-2"><p class="truncate">{{ c.content }}</p><p class="text-[11px] text-[#8e8e93]">{{ c.created_at|date:"y.m.d H:i" }} · <a href="{% url 'blog:post_detail' c.post.slug %}" target="_blank" class="hover:underline">{{ c.post.title|truncatechars:40 }}</a>{% if not c.is_visible %} · 숨김{% endif %}</p></li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                    {% if recent_guestbook %}
+                    <h3 class="mt-5 text-[13px] font-semibold text-[#6e6e73]">최근 방명록</h3>
+                    <ul class="mt-2 divide-y divide-black/[0.05] text-[13px]">
+                        {% for g in recent_guestbook %}<li class="py-2"><p class="truncate">{{ g.message }}</p><p class="text-[11px] text-[#8e8e93]">{{ g.created_at|date:"y.m.d H:i" }}</p></li>{% endfor %}
+                    </ul>
+                    {% endif %}
+                </section>
+
+                {# ── 로그인 기록 ── #}
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
+                    <h2 class="text-[16px] font-semibold">로그인 기록 <span class="text-[12px] font-normal text-[#8e8e93]">최근 20건</span></h2>
+                    {% if ips %}
+                    <div class="mt-3 flex flex-wrap gap-1.5 text-[11px]">{% for r in ips %}<a href="{% url 'studio:security_ip' r.ip %}" class="rounded-full border border-black/[0.08] px-2 py-0.5 font-mono hover:border-[#0066cc]/40 hover:text-[#0066cc]" title="마지막 {{ r.last|date:'Y.m.d H:i' }}">{{ r.ip }} ×{{ r.count }}</a>{% endfor %}</div>
+                    {% endif %}
+                    <table class="mt-3 w-full text-[12px]">
+                        <thead class="text-left text-[11px] text-[#8e8e93]"><tr><th class="py-1.5">시각</th><th class="py-1.5">결과</th><th class="py-1.5">IP</th><th class="py-1.5">브라우저</th></tr></thead>
+                        <tbody>
+                            {% for ev in login_events %}
+                            <tr class="border-t border-black/[0.05]">
+                                <td class="whitespace-nowrap py-1.5 text-[#6e6e73]">{{ ev.created_at|date:"m.d H:i" }}</td>
+                                <td class="py-1.5">{% if ev.result == 'success' %}<span class="text-[#1e7a35]">성공{% if ev.new_location %} · 새 IP{% endif %}</span>{% else %}<span class="text-[#c4271d]">{{ ev.get_result_display }}</span>{% endif %}</td>
+                                <td class="py-1.5 font-mono">{% if ev.ip %}<a href="{% url 'studio:security_ip' ev.ip %}" class="hover:text-[#0066cc]">{{ ev.ip }}</a>{% else %}-{% endif %}</td>
+                                <td class="max-w-[260px] truncate py-1.5 text-[#8e8e93]" title="{{ ev.user_agent }}">{{ ev.user_agent|truncatechars:50 }}</td>
+                            </tr>
+                            {% empty %}<tr><td colspan="4" class="py-4 text-center text-[#8e8e93]">기록이 없어요</td></tr>{% endfor %}
+                        </tbody>
+                    </table>
+                </section>
+            </div>
+
+            {# ── 오른쪽: 관리 ── #}
+            <aside class="space-y-4 lg:sticky lg:top-8 lg:self-start">
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-5">
+                    <h2 class="text-[15px] font-semibold">관리</h2>
+                    {% if protected %}
+                    <p class="mt-3 text-[13px] text-[#8e8e93]">본인·관리자 계정은 이름·이메일 수정만 할 수 있어요.</p>
+                    {% else %}
+                    <div class="mt-3 space-y-2 text-[13px]">
+                        {% if status.0 == 'pending' or status.0 == 'unverified' %}
+                        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activate"><button class="w-full rounded-xl bg-[#0066cc] px-3 py-2 font-semibold text-white">승인 (활성화)</button></form>
+                        <form method="post" onsubmit="return confirm('가입을 거절할까요?');">{% csrf_token %}<input type="hidden" name="action" value="reject"><button class="w-full rounded-xl border border-black/[0.1] px-3 py-2">거절</button></form>
+                        {% elif target.is_active %}
+                        <form method="post" onsubmit="return confirm('{{ target.username|escapejs }} 님을 정지할까요? 로그인이 막혀요.');">{% csrf_token %}<input type="hidden" name="action" value="suspend"><button class="w-full rounded-xl border border-[#ff3b30]/30 px-3 py-2 text-[#c4271d] hover:bg-[#ff3b30]/5">정지 (로그인 차단)</button></form>
+                        {% else %}
+                        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="activate"><button class="w-full rounded-xl bg-[#0066cc] px-3 py-2 font-semibold text-white">활성화 (정지 해제)</button></form>
+                        {% endif %}
+                        <form method="post">{% csrf_token %}<input type="hidden" name="action" value="{% if is_vip %}vip_off{% else %}vip_on{% endif %}"><button class="w-full rounded-xl border border-black/[0.1] px-3 py-2 hover:bg-[#f5f5f7]">{% if is_vip %}⭐ VIP 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
+                    </div>
+
+                    <form method="post" class="mt-4 space-y-2 rounded-xl border border-[#ff3b30]/20 bg-[#fff6f5] p-3 text-[12px]">{% csrf_token %}<input type="hidden" name="action" value="reset_password">
+                        <p class="font-semibold text-[#c4271d]">🔑 비밀번호 초기화</p>
+                        <p class="leading-4 text-[#8e8e93]">임시 비밀번호가 한 번만 보여요. 회원은 다음 로그인 때 바로 새 비밀번호를 정해요. 확인으로 아이디를 그대로 입력:</p>
+                        <input type="text" name="confirm" placeholder="{{ target.username }}" autocomplete="off" class="h-9 w-full rounded-lg border border-black/[0.1] px-2 outline-none focus:border-[#ff3b30]">
+                        <button class="w-full rounded-lg bg-[#c4271d] px-2 py-2 font-semibold text-white">초기화</button>
+                    </form>
+
+                    <details class="mt-4 rounded-xl border border-black/[0.08] p-3 text-[12px]">
+                        <summary class="cursor-pointer font-semibold text-[#c4271d]">🗑 작성물 삭제 · 계정 삭제</summary>
+                        <p class="mt-2 leading-4 text-[#8e8e93]">글·댓글·방명록·단축 링크·비밀 쪽지를 지워요. 되돌릴 수 없어요. 확인으로 <b>DELETE</b> 입력:</p>
+                        <form method="post" class="mt-2 space-y-2">{% csrf_token %}
+                            <input type="text" name="confirm" placeholder="DELETE" autocomplete="off" class="h-9 w-full rounded-lg border border-black/[0.1] px-2 outline-none focus:border-[#ff3b30]">
+                            <button name="action" value="purge" class="w-full rounded-lg border border-[#ff3b30]/30 px-2 py-2 text-[#c4271d] hover:bg-[#ff3b30]/5">정지 + 작성물 삭제</button>
+                            <button name="action" value="delete" class="w-full rounded-lg bg-[#c4271d] px-2 py-2 font-semibold text-white" onclick="return confirm('계정을 완전히 삭제할까요? 되돌릴 수 없어요.');">계정 삭제</button>
+                        </form>
+                    </details>
+                    {% endif %}
+                </section>
+            </aside>
+        </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

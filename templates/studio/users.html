@@ -90,7 +90,7 @@
                             <tr class="border-b border-black/[0.05] last:border-b-0 hover:bg-[#fafafa]">
                                 <td class="px-4 py-3">{% if not protected and u.id != request.user.id %}<input type="checkbox" name="ids" value="{{ u.id }}" form="bulk-form" class="item-checkbox h-4 w-4">{% endif %}</td>
                                 <td class="px-2 py-3">
-                                    <p class="font-semibold">{% if u.first_name or u.last_name %}{{ u.get_full_name }} <span class="font-normal text-[#6e6e73]">@{{ u.username }}</span>{% else %}{{ u.username }}{% endif %}{% if u.id == request.user.id %} <span class="font-normal text-[#8e8e93]">(나)</span>{% endif %}</p>
+                                    <p class="font-semibold"><a href="{% url 'studio:user_detail' u.id %}" class="hover:text-[#0066cc] hover:underline" title="회원 상세">{% if u.first_name or u.last_name %}{{ u.get_full_name }} <span class="font-normal text-[#6e6e73]">@{{ u.username }}</span>{% else %}{{ u.username }}{% endif %}</a>{% if u.id == request.user.id %} <span class="font-normal text-[#8e8e93]">(나)</span>{% endif %}</p>
                                     <p class="text-[12px] text-[#8e8e93]">{{ u.email|default:"이메일 없음" }}</p>
                                     {% if u.signup_request.message %}<p class="mt-1 max-w-[280px] rounded-lg bg-[#f5f5f7] px-2 py-1 text-[12px] text-[#1d1d1f]">💬 {{ u.signup_request.message }}</p>{% endif %}
                                     {% if u.signup_request.flags %}<p class="mt-1 flex flex-wrap gap-1">{% for f in u.signup_request.flag_list %}<span class="rounded-full bg-[#ff3b30]/10 px-2 py-0.5 text-[11px] font-semibold text-[#c4271d]">🤖 {{ f }}</span>{% endfor %}</p>{% endif %}

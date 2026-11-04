@@ -179,3 +179,117 @@ def users(request):
         "current_query_string": query.urlencode(),
         "pending_count": state_counts["pending"],
     })
+
+
+@admin_view
+def user_detail(request, id):
+    """회원 한 명: 정보·가입 기록·활동·로그인 기록 + 승인/정지/VIP/비밀번호/정보 수정/삭제."""
+    from security.models import LoginEvent
+    from tools.models import AIUsage, ClipItem, HookBin, Meeting, Paste, SavedPaper, SharedFile, StdDoc
+    from tools.permissions import is_vip
+
+    User = get_user_model()
+    target = User.objects.select_related("signup_request").filter(id=id).first()
+    if not target:
+        messages.error(request, "그런 회원이 없어요.")
+        return redirect("studio:users")
+    here = redirect("studio:user_detail", id=target.id)
+    protected = target.is_superuser or target.id == request.user.id
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "edit":  # 이름·이메일 고치기 (본인·관리자도 가능)
+            first_name = (request.POST.get("first_name") or "").strip()[:150]
+            email = (request.POST.get("email") or "").strip()[:254]
+            if email and User.objects.filter(email__iexact=email).exclude(id=target.id).exists():
+                messages.error(request, "그 이메일을 쓰는 다른 회원이 있어요.")
+                return here
+            target.first_name, target.email = first_name, email
+            target.save(update_fields=["first_name", "email"])
+            messages.success(request, "회원 정보를 고쳤어요.")
+            return here
+        if action == "block_ip":
+            from .security import _add_block
+
+            _add_block(request, request.POST.get("ip"), f"가입 봇 의심 ({target.username[:40]})", "30d")
+            return here
+        if protected:
+            messages.error(request, "본인·관리자 계정에는 이 작업을 할 수 없어요.")
+            return here
+        if action == "reset_password":
+            if (request.POST.get("confirm") or "").strip() != target.username:
+                messages.error(request, f"비밀번호 초기화는 확인 칸에 아이디({target.username})를 똑같이 입력해야 해요.")
+                return here
+            temp = secrets.token_urlsafe(9)
+            target.set_password(temp)
+            target.save(update_fields=["password"])
+            MustChangePassword.objects.update_or_create(user=target, defaults={"issued_by": request.user})
+            messages.success(request, f"{target.username} 님 임시 비밀번호: {temp}  — 본인에게만 전해 주세요. 로그인하면 바로 새 비밀번호를 정하게 돼요. (이 화면을 닫으면 다시 볼 수 없어요)")
+            return here
+        targets = User.objects.filter(id=target.id)
+        if action == "activate":
+            targets.update(is_active=True)
+            _decide(targets, SignupRequest.STATUS_APPROVED, request.user)
+            messages.success(request, "활성화(승인)했어요.")
+        elif action == "reject":
+            targets.update(is_active=False)
+            _decide(targets, SignupRequest.STATUS_REJECTED, request.user)
+            messages.success(request, "가입을 거절했어요.")
+        elif action == "suspend":
+            targets.update(is_active=False)
+            messages.success(request, "정지했어요. 다시 쓰게 하려면 '활성화'.")
+        elif action in {"vip_on", "vip_off"}:
+            set_vip(target, action == "vip_on")
+            messages.success(request, "⭐ VIP 회원으로 지정했어요." if action == "vip_on" else "VIP 회원을 해제했어요.")
+        elif action in {"purge", "delete"}:
+            if (request.POST.get("confirm") or "").strip() != "DELETE":
+                messages.error(request, "삭제 작업은 확인 문구(DELETE) 입력이 필요합니다.")
+                return here
+            n = _purge_user_content(target)
+            summary = f"글 {n['posts']}개, 댓글 {n['comments']}개, 방명록 {n['guestbook']}개, 단축 링크 {n['links']}개 삭제"
+            if action == "purge":
+                targets.update(is_active=False)
+                messages.success(request, f"정지 + 작성한 {summary}")
+            else:
+                name = target.username
+                target.delete()
+                messages.success(request, f"{name} 계정 삭제 + {summary}")
+                return redirect("studio:users")
+        else:
+            messages.error(request, "작업 종류가 올바르지 않습니다.")
+        return here
+
+    signup = getattr(target, "signup_request", None)
+    login_events = list(LoginEvent.objects.filter(Q(user=target) | Q(username=target.username)).order_by("-created_at")[:20])
+    ips = {}
+    for ev in LoginEvent.objects.filter(Q(user=target) | Q(username=target.username), result=LoginEvent.RESULT_SUCCESS).exclude(ip=None).order_by("-created_at")[:200]:
+        ips.setdefault(ev.ip, {"ip": ev.ip, "count": 0, "last": ev.created_at})
+        ips[ev.ip]["count"] += 1
+    if signup and signup.status == SignupRequest.STATUS_PENDING:
+        status = ("unverified", "📧 이메일 미인증") if signup.needs_verification() else ("pending", "승인 대기")
+    elif target.is_superuser:
+        status = ("admin", "관리자")
+    elif target.is_active:
+        status = ("active", "활성")
+    elif signup and signup.status == SignupRequest.STATUS_REJECTED:
+        status = ("rejected", "거절됨")
+    else:
+        status = ("suspended", "정지")
+    counts = {
+        "posts": Post.objects.filter(author=target).count(), "comments": Comment.objects.filter(author=target).count(),
+        "guestbook": GuestbookEntry.objects.filter(author=target).count(), "links": ShortLink.objects.filter(owner=target).count(),
+        "notes": SecretNote.objects.filter(created_by=target).count(), "clips": ClipItem.objects.filter(user=target).count(),
+        "papers": SavedPaper.objects.filter(user=target).count(), "stddocs": StdDoc.objects.filter(user=target).count(),
+        "pastes": Paste.objects.filter(owner=target).count(), "hooks": HookBin.objects.filter(owner=target).count(),
+        "meetings": Meeting.objects.filter(owner=target).count(), "shared": SharedFile.objects.filter(created_by=target).count(),
+        "ai": AIUsage.objects.filter(user=target).count(),
+    }
+    return render(request, "studio/user_detail.html", {
+        "target": target, "signup": signup, "protected": protected, "status": status, "is_vip": is_vip(target),
+        "must_change": MustChangePassword.objects.filter(user=target).select_related("issued_by").first(),
+        "counts": counts,
+        "recent_posts": list(Post.objects.filter(author=target).order_by("-id")[:8]),
+        "recent_comments": list(Comment.objects.filter(author=target).select_related("post").order_by("-id")[:8]),
+        "recent_guestbook": list(GuestbookEntry.objects.filter(author=target).order_by("-id")[:5]),
+        "login_events": login_events, "ips": sorted(ips.values(), key=lambda r: r["last"], reverse=True)[:10],
+    })
