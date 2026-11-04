@@ -54,3 +54,31 @@ class KakaoLink(models.Model):
 
     def __str__(self):
         return f"KakaoLink({self.connected_by})"
+
+
+class AlertMail(models.Model):
+	"""알림을 메일로도 받기 (한 줄짜리 설정). 서버가 직접 메일을 보낼 수 있게 된 뒤 추가."""
+
+	DEFAULT_KINDS = ["signup", "security", "monitor"]
+
+	email = models.EmailField("받을 주소", blank=True)
+	kinds = models.JSONField(default=list, blank=True)  # 보낼 알림 종류 (Notification.KIND_*)
+	enabled = models.BooleanField(default=False)
+	last_sent_at = models.DateTimeField(null=True, blank=True)
+	last_error = models.CharField(max_length=300, blank=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	@classmethod
+	def get(cls):
+		from django.conf import settings
+
+		obj = cls.objects.first()
+		if obj is None:
+			obj = cls.objects.create(email=getattr(settings, "CONTACT_EMAIL", ""), kinds=list(cls.DEFAULT_KINDS), enabled=False)
+		return obj
+
+	def wants(self, kind: str) -> bool:
+		return self.enabled and bool(self.email) and kind in (self.kinds or [])
+
+	def __str__(self):
+		return f"알림 메일 {self.email} ({'켜짐' if self.enabled else '꺼짐'})"

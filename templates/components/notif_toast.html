@@ -1,0 +1,53 @@
+{# 관리자: 사이트 이용 중 새 알림이 오면 오른쪽 위 토스트 (45초마다 확인, 클릭하면 읽음 처리 후 이동) #}
+<div id="notif-toasts" class="notif-toasts" aria-live="polite"></div>
+<style>
+    .notif-toasts { position: fixed; top: 76px; right: 20px; z-index: 90; display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 32px)); pointer-events: none; }
+    .notif-toast { pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.96); color: #1d1d1f; box-shadow: 0 12px 32px rgba(0,0,0,.16); backdrop-filter: blur(8px); cursor: pointer; animation: notif-in .25s ease; font-size: 13px; }
+    html.theme-dark .notif-toast { background: rgba(30,35,45,.96); color: #f3f4f6; border-color: rgba(255,255,255,.14); }
+    .notif-toast__icon { font-size: 20px; line-height: 1; }
+    .notif-toast__main { flex: 1; min-width: 0; }
+    .notif-toast__kind { font-size: 11px; color: #8e8e93; }
+    .notif-toast__title { font-weight: 600; margin-top: 1px; }
+    .notif-toast__body { margin-top: 2px; color: #6e6e73; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    html.theme-dark .notif-toast__body { color: #a1a1aa; }
+    .notif-toast__close { flex: none; width: 22px; height: 22px; border-radius: 999px; color: #8e8e93; font-size: 14px; }
+    .notif-toast.is-leaving { animation: notif-out .2s ease forwards; }
+    @keyframes notif-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
+    @keyframes notif-out { to { opacity: 0; transform: translateY(-6px); } }
+</style>
+<script>
+    (() => {
+        const box = document.getElementById('notif-toasts');
+        const KEY = 'mj:notif:last';
+        const csrf = () => (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
+        const badge = () => document.querySelectorAll('a[href="{% url 'notifications:list' %}"] span');
+        const setBadge = (n) => badge().forEach((b) => { b.textContent = n > 99 ? '99+' : n; b.hidden = !n; });
+        const open = (id) => { const f = document.createElement('form'); f.method = 'post'; f.action = `/notifications/${id}/open/`; f.innerHTML = `<input type="hidden" name="csrfmiddlewaretoken" value="${csrf()}">`; document.body.append(f); f.submit(); };
+        const show = (n) => {
+            const el = document.createElement('div'); el.className = 'notif-toast'; el.setAttribute('role', 'status');
+            el.innerHTML = `<span class="notif-toast__icon"></span><div class="notif-toast__main"><div class="notif-toast__kind"></div><div class="notif-toast__title"></div><div class="notif-toast__body"></div></div><button type="button" class="notif-toast__close" aria-label="닫기">×</button>`;
+            el.querySelector('.notif-toast__icon').textContent = n.icon; el.querySelector('.notif-toast__kind').textContent = n.kind;
+            el.querySelector('.notif-toast__title').textContent = n.title; el.querySelector('.notif-toast__body').textContent = n.body || '';
+            const dismiss = () => { el.classList.add('is-leaving'); setTimeout(() => el.remove(), 200); };
+            el.querySelector('.notif-toast__close').addEventListener('click', (e) => { e.stopPropagation(); dismiss(); });
+            el.addEventListener('click', () => open(n.id));
+            box.append(el);
+            setTimeout(dismiss, 12000);
+        };
+        let last = 0;
+        try { last = Number(localStorage.getItem(KEY) || 0); } catch { /* ignore */ }
+        const poll = async () => {
+            try {
+                const res = await fetch(`{% url 'notifications:recent' %}?since=${last}`, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                setBadge(data.unread);
+                if (last) data.items.forEach(show);
+                if (data.latest > last) { last = data.latest; try { localStorage.setItem(KEY, String(last)); } catch { /* ignore */ } }
+            } catch { /* 조용히 */ }
+        };
+        poll();
+        setInterval(() => { if (!document.hidden) poll(); }, 45000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
+    })();
+</script>

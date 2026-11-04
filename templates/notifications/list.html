@@ -39,6 +39,24 @@
         {% endif %}
     </section>
 
+    <section class="mt-3 rounded-[20px] border {% if alert_mail.enabled %}border-[#34c759]/40{% else %}border-black/[0.06]{% endif %} bg-white px-5 py-4">
+        <form method="post" action="{% url 'notifications:alert_mail_save' %}" class="flex flex-wrap items-center gap-3 text-[13px]">{% csrf_token %}
+            <span class="text-[22px]">✉️</span>
+            <div class="min-w-0 flex-1">
+                <p class="text-[14px] font-semibold">메일 알림 {% if alert_mail.enabled %}<span class="ml-1 rounded-full bg-[#34c759]/10 px-2 py-0.5 text-[11px] text-[#1e7a35]">켜짐</span>{% else %}<span class="ml-1 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] text-[#6e6e73]">꺼짐</span>{% endif %}</p>
+                <p class="text-[#6e6e73]">카톡과 별개로 고른 종류의 알림을 메일로도 보내요{% if alert_mail.last_sent_at %} · 마지막 전송 {{ alert_mail.last_sent_at|timesince }} 전{% endif %}.{% if not mail_enabled %} <span class="text-[#c4271d]">지금은 사이트 메일이 꺼져 있어 안 가요.</span>{% endif %}</p>
+                {% if alert_mail.last_error %}<p class="text-[#c4271d]">최근 오류: {{ alert_mail.last_error }}</p>{% endif %}
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <input type="email" name="email" value="{{ alert_mail.email }}" placeholder="받을 주소" class="h-9 w-[240px] rounded-xl border border-black/[0.1] px-3 text-[13px] outline-none focus:border-[#0066cc]">
+                    {% for value, label in kinds %}<label class="inline-flex items-center gap-1 rounded-full border border-black/[0.08] px-2.5 py-1"><input type="checkbox" name="kinds" value="{{ value }}" {% if value in alert_mail.kinds %}checked{% endif %}> {{ label }}</label>{% endfor %}
+                    <label class="inline-flex items-center gap-1.5 font-semibold"><input type="checkbox" name="enabled" value="1" {% if alert_mail.enabled %}checked{% endif %}> 켜기</label>
+                </div>
+            </div>
+            <button class="rounded-full bg-[#1d1d1f] px-4 py-2 text-[13px] text-white">저장</button>
+        </form>
+        {% if alert_mail.email %}<form method="post" action="{% url 'notifications:alert_mail_test' %}" class="mt-2 text-right">{% csrf_token %}<button class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[12px] hover:bg-[#f5f5f7]">테스트 메일 보내기</button></form>{% endif %}
+    </section>
+
     <div class="mt-6 flex flex-wrap gap-2 text-[13px]">
         <a href="?" class="rounded-full px-4 py-1.5 {% if not kind %}bg-[#1d1d1f] text-white{% else %}border border-black/[0.1] hover:bg-white{% endif %}">전체</a>
         {% for value, label in kinds %}
