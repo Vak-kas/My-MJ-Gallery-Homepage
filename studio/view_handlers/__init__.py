@@ -6,6 +6,7 @@ from .profile import (
     profile_contact_update,
     profile_contact_delete,
     profile_contact_toggle_visibility,
+    profile_contact_reorder,
     profile_links,
     profile_link_update,
     profile_link_delete,

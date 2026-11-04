@@ -86,6 +86,7 @@ def publication(request):
         ("journal", "저널"),
         ("conference", "학술지"),
     ]
+    publication_statuses = Publication.PUBLICATION_STATUS_CHOICES
 
     return render(
         request,
@@ -94,6 +95,7 @@ def publication(request):
             "publications": publications,
             "publication_types": publication_types,
             "publication_kinds": publication_kinds,
+            "publication_statuses": publication_statuses,
             "editing_publication_id": editing_publication_id,
             "editing_publication": editing_publication,
         },
@@ -105,6 +107,9 @@ def publication_create(request):
     if request.method == "POST":
         publication_type = request.POST.get("publication_type", "international").strip() or "international"
         publication_kind = request.POST.get("publication_kind", "journal").strip() or "journal"
+        status = request.POST.get("status", "published").strip() or "published"
+        if status not in dict(Publication.PUBLICATION_STATUS_CHOICES):
+            status = "published"
         title = request.POST.get("title", "").strip()
         venue = request.POST.get("venue", "").strip()
         authors = request.POST.get("authors", "").strip()
@@ -125,6 +130,7 @@ def publication_create(request):
         publication_item = Publication.objects.create(
             publication_type=publication_type,
             publication_kind=publication_kind,
+            status=status,
             title=title,
             venue=venue,
             authors=authors,
@@ -156,6 +162,9 @@ def publication_update(request, id):
     if request.method == "POST":
         publication_type = request.POST.get("publication_type", "international").strip() or "international"
         publication_kind = request.POST.get("publication_kind", "journal").strip() or "journal"
+        status = request.POST.get("status", "published").strip() or "published"
+        if status not in dict(Publication.PUBLICATION_STATUS_CHOICES):
+            status = "published"
         title = request.POST.get("title", "").strip()
         venue = request.POST.get("venue", "").strip()
         authors = request.POST.get("authors", "").strip()
@@ -176,6 +185,7 @@ def publication_update(request, id):
 
         publication_item.publication_type = publication_type
         publication_item.publication_kind = publication_kind
+        publication_item.status = status
         publication_item.title = title
         publication_item.venue = venue
         publication_item.authors = authors

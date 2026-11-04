@@ -182,8 +182,9 @@
                     {% for section in contact_sections %}
                     <div class="overflow-hidden rounded-[30px] border border-black/[0.05] bg-white">
                         <div class="border-b border-black/[0.06] bg-[#fbfbfd] px-7 py-4">
-                            <h3 class="text-[15px] font-semibold text-[#1d1d1f]">{{ section.title }}</h3>
+                            <h3 class="text-[15px] font-semibold text-[#1d1d1f]">{{ section.title }} <span class="ml-2 text-[12px] font-normal text-[#8e8e93]">드래그로 순서 변경</span></h3>
                         </div>
+                        <div data-sortable-list data-reorder-url="{% url 'studio:profile_contact_reorder' %}">
 
                         <div class="grid grid-cols-10 border-b border-black/[0.06] bg-[#fbfbfd] px-7 py-4 text-[12px] uppercase tracking-[0.18em] text-[#6e6e73]">
                             <div class="col-span-2">Label</div>
@@ -240,7 +241,7 @@
                             </div>
                         </form>
                         {% else %}
-                        <div id="contact-{{ contact.id }}" class="grid grid-cols-10 items-center border-b border-black/[0.04] px-7 py-5 transition hover:bg-[#fafafa]">
+                        <div id="contact-{{ contact.id }}" class="contact-row grid grid-cols-10 items-center border-b border-black/[0.04] px-7 py-5 transition hover:bg-[#fafafa]" draggable="true" data-item-id="{{ contact.id }}">
                             <div class="col-span-2 text-[15px] font-medium">
                                 {{ contact.label|default:"-" }}
                             </div>
@@ -292,6 +293,7 @@
                             등록된 항목이 없습니다.
                         </div>
                         {% endfor %}
+                        </div>
                     </div>
                     {% endfor %}
                 </div>
@@ -303,7 +305,53 @@
     </div>
 </div>
 
+<style>
+    [data-item-id] { cursor: grab; position: relative; }
+    [data-item-id].is-dragging { cursor: grabbing; opacity: 0.72; }
+    [data-item-id].is-drop-target { background: rgba(0, 102, 204, 0.035); }
+    [data-item-id].is-drop-before::before, [data-item-id].is-drop-after::after { content: ""; position: absolute; left: 16px; right: 16px; height: 3px; border-radius: 9999px; background: #0066cc; z-index: 1; }
+    [data-item-id].is-drop-before::before { top: -2px; }
+    [data-item-id].is-drop-after::after { bottom: -2px; }
+</style>
 <script>
+    // ── 드래그로 순서 변경 (활동 화면과 같은 방식) ──
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+    function initSortableList(listEl) {
+        let dragged = null;
+        const getItems = () => Array.from(listEl.querySelectorAll('[data-item-id]'));
+        const clearDropMarkers = () => getItems().forEach((it) => it.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
+        const saveOrder = async () => {
+            const orderedIds = getItems().map((item) => Number(item.dataset.itemId));
+            if (!listEl.dataset.reorderUrl || !orderedIds.length) return;
+            const response = await fetch(listEl.dataset.reorderUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') }, body: JSON.stringify({ ordered_ids: orderedIds }) });
+            if (!response.ok) throw new Error('order-save-failed');
+        };
+        getItems().forEach((item) => {
+            item.addEventListener('mousedown', (e) => { item.draggable = !e.target.closest('input, textarea, select, button, label, a, form'); });
+            item.addEventListener('mouseup', () => { item.draggable = true; });
+            item.addEventListener('dragstart', () => { dragged = item; item.classList.add('is-dragging'); });
+            item.addEventListener('dragend', async () => { item.classList.remove('is-dragging'); clearDropMarkers(); dragged = null; try { await saveOrder(); } catch { window.location.reload(); } });
+            item.addEventListener('dragover', (e) => {
+                e.preventDefault(); if (!dragged || dragged === item) return;
+                clearDropMarkers(); item.classList.add('is-drop-target');
+                const rect = item.getBoundingClientRect();
+                item.classList.add((e.clientY - rect.top) < rect.height / 2 ? 'is-drop-before' : 'is-drop-after');
+            });
+            item.addEventListener('dragleave', () => item.classList.remove('is-drop-target', 'is-drop-before', 'is-drop-after'));
+            item.addEventListener('drop', (e) => {
+                e.preventDefault(); if (!dragged || dragged === item) return;
+                const before = item.classList.contains('is-drop-before'); clearDropMarkers();
+                if (before) item.before(dragged); else item.after(dragged);
+            });
+        });
+    }
+    document.querySelectorAll('[data-sortable-list]').forEach(initSortableList);
+
     setTimeout(() => {
         const toasts = document.querySelectorAll(".toast-message");
 

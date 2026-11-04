@@ -188,15 +188,16 @@
                                 <label class="mb-3 block text-[14px] font-semibold">자기소개</label>
                                 <textarea name="bio"
                                           rows="5"
+                                          data-autogrow
                                           placeholder="나를 소개하는 문장을 입력하세요."
-                                          class="w-full resize-none rounded-[22px] border border-black/[0.07] bg-white px-6 py-5 text-[16px] leading-[1.5] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">{{ info.bio|default_if_none:'' }}</textarea>
+                                          class="w-full resize-y rounded-[22px] border border-black/[0.07] bg-white px-6 py-5 text-[16px] leading-[1.5] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">{{ info.bio|default_if_none:'' }}</textarea>
                             </div>
 
                             <div>
                                 <label class="mb-3 block text-[14px] font-semibold">관심 분야</label>
 
                                 <div id="interests_box"
-                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-full border border-black/[0.07] bg-white px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
+                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-[22px] border border-black/[0.07] bg-white px-4 py-2.5 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
                                     <div id="interests_tags" class="flex flex-wrap items-center gap-2"></div>
                                     <input id="interests_field"
                                            type="text"
@@ -209,7 +210,7 @@
                                 <label class="mb-3 block text-[14px] font-semibold">대표 키워드</label>
 
                                 <div id="keywords_box"
-                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-full border border-black/[0.07] bg-white px-4 py-2 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
+                                     class="flex min-h-[52px] flex-wrap items-center gap-2 rounded-[22px] border border-black/[0.07] bg-white px-4 py-2.5 transition focus-within:border-[#0066cc] focus-within:ring-4 focus-within:ring-[#0066cc]/10">
                                     <div id="keywords_tags" class="flex flex-wrap items-center gap-2"></div>
                                     <input id="keywords_field"
                                            type="text"
@@ -254,6 +255,12 @@
 </div>
 
 <script>
+    // 자기소개: 내용만큼 늘어나서 글이 상자 밖으로 안 넘침
+    document.querySelectorAll('textarea[data-autogrow]').forEach((ta) => {
+        const grow = () => { ta.style.height = 'auto'; ta.style.height = `${Math.max(ta.scrollHeight + 2, 140)}px`; };
+        ta.addEventListener('input', grow);
+        grow();
+    });
     const imageInput = document.getElementById("profile_image");
     const preview = document.getElementById("profilePreview");
     const placeholder = document.getElementById("profilePlaceholder");
