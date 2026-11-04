@@ -1,4 +1,4 @@
-"""S3 백업: DB 를 압축해 날짜별로 올리고, media/·private_media/ 는 바뀐 파일만 올림.
+"""S3 백업: DB 를 압축해 날짜별로 올리고, media/·private_media/·메일함(MAIL_BACKUP_DIR) 은 바뀐 파일만 올림.
 
 버킷 구조
   db/2026-10-09_0400.sqlite3.gz   (PostgreSQL 이면 .pgdump, BACKUP_KEEP_DAYS 지나면 지움)
@@ -23,7 +23,7 @@ from django.utils import timezone
 
 STATUS_KEY = "monitor:backup:status"
 RUNNING_KEY = "monitor:backup:running"
-DIRS = (("media", "MEDIA_ROOT"), ("private_media", "PRIVATE_MEDIA_ROOT"))
+DIRS = (("media", "MEDIA_ROOT"), ("private_media", "PRIVATE_MEDIA_ROOT"), ("mail", "MAIL_BACKUP_DIR"))  # 메일함은 .env MAIL_BACKUP_DIR 이 있을 때만
 
 
 def configured():
@@ -135,7 +135,10 @@ def run():
             result["db_key"] = key
         result["uploaded"] = result["skipped"] = result["bytes"] = 0
         for prefix, attr in DIRS:
-            up, skip, nbytes = sync_dir(s3, getattr(settings, attr), prefix)
+            root = getattr(settings, attr, "")
+            if not root:   # 설정이 비어 있으면(예: MAIL_BACKUP_DIR) 건너뜀 — Path("") 는 현재 폴더가 되어 버림
+                continue
+            up, skip, nbytes = sync_dir(s3, root, prefix)
             result["uploaded"] += up
             result["skipped"] += skip
             result["bytes"] += nbytes
