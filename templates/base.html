@@ -228,7 +228,7 @@
     {% include "components/site_footer.html" %}
     {% endblock %}
 
-    {% if webmail_enabled and not hide_mail_widget %}{% include "components/mail_widget.html" %}{% endif %}
+    {% if webmail_enabled and not hide_mail_widget %}{% include "components/mail_widget.html" %}{% elif not user.is_superuser and not hide_contact_widget %}{% include "components/contact_widget.html" %}{% endif %}
 
     <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="다크모드 토글">
         <span id="theme-toggle-icon">🌙</span>

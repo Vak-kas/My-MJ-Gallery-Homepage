@@ -1,0 +1,82 @@
+{# 오른쪽 아래 💬 문의 버튼 + 패널 (관리자 아닌 모두). 나중에 챗봇을 붙일 자리 #}
+<meta name="mj-csrf" content="{{ csrf_token }}">
+<button id="contact-fab" type="button" class="contact-fab" aria-label="관리자에게 문의" aria-expanded="false" aria-controls="contact-panel" title="문의하기">💬</button>
+<div id="contact-panel" class="contact-panel" hidden>
+    <div class="contact-panel__head">
+        <span>💬 문의하기</span>
+        <button type="button" class="contact-panel__close" id="contact-panel-close" aria-label="닫기">×</button>
+    </div>
+    <div class="contact-panel__body">
+        <p class="contact-panel__intro">궁금한 점, 오류 제보, 가입 문의 무엇이든 적어 주세요. 관리자 메일로 바로 전달돼요.</p>
+        <form id="contact-form" class="contact-form">
+            <input type="text" name="website" tabindex="-1" autocomplete="off" class="contact-form__hp" aria-hidden="true">
+            <div class="contact-form__row">
+                <input type="text" name="name" maxlength="60" placeholder="이름 (선택)" value="{% if user.is_authenticated %}{{ user.first_name|default:user.username }}{% endif %}">
+                <input type="email" name="email" maxlength="254" placeholder="답장 받을 메일 (선택)" value="{% if user.is_authenticated %}{{ user.email }}{% endif %}">
+            </div>
+            <textarea name="message" rows="5" maxlength="3000" required placeholder="내용"></textarea>
+            <div class="contact-form__bar">
+                <button type="submit" class="contact-form__send">보내기</button>
+                <a href="mailto:{{ contact_email }}" class="contact-form__mail">메일 앱으로 보내기</a>
+            </div>
+            <p class="contact-form__status" hidden></p>
+        </form>
+        <div id="contact-done" class="contact-done" hidden>
+            <div class="contact-done__icon">✓</div>
+            <p><b>보냈어요.</b> 관리자가 확인하고 답장 드릴게요.</p>
+            <button type="button" id="contact-again" class="contact-form__mail">하나 더 보내기</button>
+        </div>
+    </div>
+</div>
+<style>
+    .contact-fab { position: fixed; right: 20px; bottom: 76px; z-index: 80; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.12); background: rgba(255,255,255,.9); font-size: 20px; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: transform .2s, background .2s; }
+    .contact-fab:hover { transform: translateY(-1px); background: #fff; }
+    html.theme-dark .contact-fab { border-color: rgba(255,255,255,.2); background: rgba(30,35,45,.86); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+    .contact-panel { position: fixed; right: 20px; bottom: 132px; z-index: 81; width: min(380px, calc(100vw - 32px)); display: flex; flex-direction: column; border: 1px solid rgba(0,0,0,.1); border-radius: 18px; background: #fff; color: #1d1d1f; box-shadow: 0 18px 50px rgba(0,0,0,.22); overflow: hidden; }
+    .contact-panel[hidden] { display: none; }
+    html.theme-dark .contact-panel { background: #171a20; color: #f3f4f6; border-color: rgba(255,255,255,.14); }
+    .contact-panel__head { display: flex; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(0,0,0,.08); font-size: 13px; font-weight: 600; }
+    html.theme-dark .contact-panel__head { border-color: rgba(255,255,255,.12); }
+    .contact-panel__close { margin-left: auto; width: 26px; height: 26px; border-radius: 999px; color: #8e8e93; font-size: 16px; }
+    .contact-panel__body { padding: 12px; }
+    .contact-panel__intro { margin: 0 0 10px; font-size: 13px; line-height: 1.6; color: #6e6e73; }
+    .contact-form { display: flex; flex-direction: column; gap: 8px; }
+    .contact-form__hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+    .contact-form__row { display: grid; grid-template-columns: 1fr 1.4fr; gap: 6px; }
+    .contact-form input, .contact-form textarea { width: 100%; padding: 8px 10px; border: 1px solid rgba(0,0,0,.12); border-radius: 10px; background: #fff; color: #1d1d1f; font: inherit; font-size: 13px; }
+    html.theme-dark .contact-form input, html.theme-dark .contact-form textarea { background: #1d2027; color: #f3f4f6; border-color: rgba(255,255,255,.16); }
+    .contact-form textarea { resize: vertical; line-height: 1.5; }
+    .contact-form__bar { display: flex; align-items: center; gap: 10px; }
+    .contact-form__send { padding: 8px 18px; border-radius: 999px; background: #0066cc; color: #fff; font-weight: 600; font-size: 13px; }
+    .contact-form__send:disabled { opacity: .6; }
+    .contact-form__mail { font-size: 12px; color: #0066cc; background: none; border: 0; padding: 0; cursor: pointer; }
+    .contact-form__status { margin: 0; font-size: 12px; color: #c4271d; }
+    .contact-done { text-align: center; padding: 10px 0 4px; font-size: 13px; }
+    .contact-done__icon { display: inline-flex; width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 999px; background: rgba(52,199,89,.15); color: #1e7a35; font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+</style>
+<script>
+    (() => {
+        const fab = document.getElementById('contact-fab'), panel = document.getElementById('contact-panel'), form = document.getElementById('contact-form'), done = document.getElementById('contact-done');
+        const status = form.querySelector('.contact-form__status'), send = form.querySelector('.contact-form__send');
+        const stacked = document.querySelector('.post-jump') ? 2 : document.getElementById('back-to-top-btn') ? 1 : 0;
+        if (stacked) { fab.style.bottom = `${76 + stacked * 56}px`; panel.style.bottom = `${132 + stacked * 56}px`; }
+        const setOpen = (open) => { panel.hidden = !open; fab.setAttribute('aria-expanded', String(open)); if (open) form.querySelector('textarea').focus(); };
+        fab.addEventListener('click', () => setOpen(panel.hidden));
+        document.getElementById('contact-panel-close').addEventListener('click', () => setOpen(false));
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) setOpen(false); });
+        document.getElementById('contact-again').addEventListener('click', () => { done.hidden = true; form.hidden = false; form.querySelector('textarea').value = ''; });
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            status.hidden = true; send.disabled = true; send.textContent = '보내는 중…';
+            const fd = new FormData(form);
+            const body = { name: fd.get('name'), email: fd.get('email'), message: fd.get('message'), website: fd.get('website'), page: location.pathname };
+            try {
+                const res = await fetch("{% url 'main:contact' %}", { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('meta[name="mj-csrf"]').content }, body: JSON.stringify(body), credentials: 'same-origin' });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data.ok) throw new Error(data.error || '보내지 못했어요. 메일 앱으로 보내 주세요.');
+                form.hidden = true; done.hidden = false;
+            } catch (err) { status.textContent = err.message; status.hidden = false; }
+            finally { send.disabled = false; send.textContent = '보내기'; }
+        });
+    })();
+</script>

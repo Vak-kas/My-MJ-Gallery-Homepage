@@ -191,6 +191,7 @@
 
 ### 1.9 Studio (관리자 전용 CMS, `/studio/`)
 - 첫 화면: 위에 할 일 칩(승인 대기·이메일 미인증·이번 주 댓글/방명록·내 임시글), 아래는 사이드바와 같은 순서로 **포트폴리오 · 콘텐츠 · 운영** 묶음의 작은 카드. Users 의 VIP·비밀번호 초기화는 행의 "⚙ 설정" 을 누르면 버튼 옆에 떠 있는 패널로(표가 늘어나지 않음)
+- **💬 문의 위젯**(`components/contact_widget.html`, 관리자가 아닌 모든 방문자·회원에게 오른쪽 아래): 이름·답장 메일(선택, 로그인하면 미리 채움)·내용 → `POST /contact/`(`main/contact.py`) → 관리자 메일(`CONTACT_EMAIL`)로 전달(Reply-To 는 보낸 사람) + 사이트 알림(🔔·카톡). 봇 함정 칸, IP 당 한 시간 3번, "메일 앱으로 보내기" 대안. 나중에 챗봇을 붙일 자리
 - 오류 페이지: 없는 주소는 `templates/404.html`(사이트 모양, 홈·이전·블로그 버튼), 권한 없음은 `403.html`, 서버 오류는 `500.html`(컨텍스트 없이도 그려지는 독립 페이지). 모두 "자세한 건 관리자 메일 …" 안내. 꼬리말에도 문의 메일(`CONTACT_EMAIL`, 기본 mjseo@smjgallery.kr)
 - 화면 1024px 미만(폰·태블릿)에서는 왼쪽 사이드바가 서랍으로 바뀌고 왼쪽 아래 ☰ 버튼으로 엶 (`components/studio_sidebar.html`), 본문은 전체 너비
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
