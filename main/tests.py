@@ -65,3 +65,51 @@ class ResumePageTests(TestCase):
         res = self.client.get(reverse("studio:profile_resume"))
         self.assertEqual(res.status_code, 200)
         self.assertContains(res, "아직 준비 중인 페이지예요")
+
+
+class ContactWidgetTests(TestCase):
+    def test_widget_shown_for_anon_and_member_not_admin(self):
+        from django.contrib.auth import get_user_model
+
+        self.assertContains(self.client.get("/"), 'id="contact-fab"')
+        User = get_user_model()
+        member = User.objects.create_user("c-member", "m@example.com", "pw")
+        self.client.force_login(member)
+        self.assertContains(self.client.get("/"), 'id="contact-fab"')
+        admin = User.objects.create_superuser("c-admin", "a@example.com", "pw")
+        self.client.force_login(admin)
+        self.assertNotContains(self.client.get("/"), 'id="contact-fab"')
+
+    def test_submit_sends_mail_and_notifies(self):
+        import json
+
+        from django.core import mail
+        from django.core.cache import cache
+        from django.test import override_settings
+        from django.urls import reverse
+
+        from notifications.models import Notification
+
+        cache.clear()
+        url = reverse("main:contact")
+        with override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            res = self.client.post(url, json.dumps({"message": "짧"}), content_type="application/json")
+            self.assertEqual(res.status_code, 400)
+            res = self.client.post(url, json.dumps({"message": "사이트 오류가 있어요", "email": "bad"}), content_type="application/json")
+            self.assertEqual(res.status_code, 400)
+            res = self.client.post(url, json.dumps({"message": "봇입니다", "website": "x"}), content_type="application/json")
+            self.assertEqual(res.status_code, 200)
+            self.assertEqual(len(mail.outbox), 0)
+            res = self.client.post(url, json.dumps({"message": "가입 승인 언제 되나요?", "name": "홍길동", "email": "hong@example.com", "page": "/blog/"}), content_type="application/json")
+            self.assertEqual(res.status_code, 200, res.content)
+            self.assertEqual(len(mail.outbox), 1)
+            sent = mail.outbox[0]
+            self.assertEqual(sent.to, ["mjseo@smjgallery.kr"])
+            self.assertEqual(sent.reply_to, ["hong@example.com"])
+            self.assertIn("가입 승인 언제 되나요?", sent.body)
+            self.assertTrue(Notification.objects.filter(title__contains="문의: 홍길동").exists())
+            for _ in range(2):
+                self.client.post(url, json.dumps({"message": "또 문의합니다요"}), content_type="application/json")
+            res = self.client.post(url, json.dumps({"message": "네 번째 문의입니다"}), content_type="application/json")
+            self.assertEqual(res.status_code, 429)
+        cache.clear()

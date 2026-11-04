@@ -10,6 +10,7 @@ class SentMail(models.Model):
 		("find_id", "아이디 찾기"),
 		("test", "설정 테스트"),
 		("webmail", "웹메일에서 직접"),
+		("contact", "사이트 문의"),
 		("other", "기타"),
 	]
 	kind = models.CharField(max_length=20, choices=KIND_CHOICES, default="other", db_index=True)
