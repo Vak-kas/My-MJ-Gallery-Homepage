@@ -65,6 +65,27 @@ class TiptapRenderTests(SimpleTestCase):
 			self.assertIn('<hr class="w-full border-t border-[#d2d2d7]"', out)
 			self.assertNotIn("<script>", out)
 
+	def test_callout(self):
+		html = self.render({
+			"type": "callout", "attrs": {"kind": "warn"},
+			"content": [
+				{"type": "calloutTitle", "content": [text("표기법 안내")]},
+				{"type": "calloutBody", "content": [para(text("본문 "), {"type": "inlineMath", "attrs": {"latex": "N_{ID}"}})]},
+			],
+		})
+		self.assertIn('data-callout="warn"', html)
+		self.assertIn("⚠️", html)
+		self.assertIn("표기법 안내", html)
+		self.assertIn('data-latex="N_{ID}"', html)
+		# 제목이 비면 제목 줄 없음, 아이콘 지정·종류 모름·속성 없음도 안전
+		plain = self.render({"type": "callout", "attrs": {"kind": "<x>", "icon": "<b>"}, "content": [
+			{"type": "calloutTitle"}, {"type": "calloutBody", "content": [para(text("only"))]}]})
+		self.assertIn('data-callout="info"', plain)
+		self.assertIn("&lt;b&gt;", plain)
+		self.assertNotIn("<b>", plain)
+		self.assertNotIn("font-bold", plain)
+		self.assertIn("only", self.render({"type": "callout", "content": [{"type": "calloutBody", "content": [para(text("only"))]}]}))
+
 	def test_math_uses_katex_placeholder(self):
 		html = self.render(
 			para(text("식 "), {"type": "inlineMath", "attrs": {"latex": "x^2"}}),

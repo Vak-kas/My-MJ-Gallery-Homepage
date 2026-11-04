@@ -205,6 +205,31 @@ def render_divider(style):
 	return f'<div class="my-10 flex items-center justify-center gap-4" data-divider="{escape(str(style or "line"))}">{inner}</div>'
 
 
+# ── 콜아웃 (에디터 frontend/editor/src/extensions/callout.js 와 같은 id·색) ──
+CALLOUT_KINDS = {
+	"info": ("ℹ️", "bg-[#eef5ff] border-[#b9d4ff]", "text-[#1d4f91]"),
+	"tip": ("💡", "bg-[#edf9ef] border-[#a9dfb3]", "text-[#1f6b33]"),
+	"warn": ("⚠️", "bg-[#fff8e6] border-[#f2d58a]", "text-[#8a5a00]"),
+	"danger": ("🚫", "bg-[#fdeeee] border-[#f3b3b3]", "text-[#9b2222]"),
+	"note": ("📝", "bg-[#f4f4f6] border-[#d7d7dc]", "text-[#3a3a3f]"),
+}
+
+
+def render_callout(kind, icon, title_html, body_html):
+	"""콜아웃 HTML. 모르는 종류는 info, 아이콘은 4글자까지(이모지 하나)."""
+	kind = str(kind or "info")
+	if kind not in CALLOUT_KINDS:
+		kind = "info"
+	default_icon, box_cls, title_cls = CALLOUT_KINDS[kind]
+	icon = escape(str(icon or "").strip()[:4] or default_icon)
+	title = f'<p class="mb-1 font-bold leading-snug {title_cls}">{title_html}</p>' if title_html else ""
+	return (
+		f'<div class="my-6 flex items-start gap-3 rounded-xl border px-4 py-3.5 {box_cls}" data-callout="{kind}">'
+		f'<span class="flex h-7 w-7 flex-shrink-0 items-center justify-center text-[18px] leading-none" aria-hidden="true">{icon}</span>'
+		f'<div class="min-w-0 flex-1 leading-[1.8] [&>*:last-child]:mb-0">{title}{body_html}</div></div>'
+	)
+
+
 def _render_block(node, tight=False):
 	node_type = node.get("type")
 	attrs = _attrs(node)
@@ -320,6 +345,16 @@ def _render_block(node, tight=False):
 			f'<span>{_render_inline(_children(summary or {}))}</span></summary>'
 			f'<div class="px-4 pb-4 pt-2 leading-relaxed">{_render_blocks(_children(body or {}))}</div>'
 			f'</details>'
+		)
+
+	if node_type == "callout":
+		title = next((c for c in children if c.get("type") == "calloutTitle"), None)
+		body = next((c for c in children if c.get("type") == "calloutBody"), None)
+		return render_callout(
+			attrs.get("kind"),
+			attrs.get("icon"),
+			_render_inline(_children(title or {})),
+			_render_blocks(_children(body or {}), tight=True),
 		)
 
 	if node_type == "blockMath":

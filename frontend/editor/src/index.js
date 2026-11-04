@@ -15,6 +15,7 @@ import { LinkCard } from './extensions/link-card.js';
 import { createMathExtensions } from './extensions/math.js';
 import { SlashMenu } from './extensions/slash-menu.js';
 import { Divider } from './extensions/divider.js';
+import { createCalloutExtensions } from './extensions/callout.js';
 import { BlockHandle } from './extensions/block-handle.js';
 import { createBubbleToolbar } from './extensions/bubble-toolbar.js';
 
@@ -58,6 +59,7 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
                 placeholder: ({ node }) => {
                     if (node.type.name === 'heading') return `제목 ${node.attrs.level}`;
                     if (node.type.name === 'detailsSummary') return '토글 제목';
+                    if (node.type.name === 'calloutTitle') return '콜아웃 제목 (비워도 돼요)';
                     return placeholder || "글을 쓰거나 '/' 를 눌러 블록을 추가하세요";
                 },
             }),
@@ -71,6 +73,7 @@ const create = ({ element, content = '', api: apiConfig = {}, notify = () => {},
             Image.configure({ api, notify }),
             LinkCard.configure({ api, notify }),
             ...createMathExtensions({ api, notify }),
+            ...createCalloutExtensions(),
             Arrows,
             SlashMenu,
             BlockHandle,

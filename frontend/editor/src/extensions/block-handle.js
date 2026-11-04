@@ -6,6 +6,7 @@ import { NodeSelection, Plugin, PluginKey, Selection, TextSelection } from '@tip
 import { dismissOnOutside, h, placeFloating } from '../dom.js';
 import { BLOCK_ITEMS, runBlockItem } from './slash-menu.js';
 import { DIVIDER_STYLES } from './divider.js';
+import { CALLOUT_KINDS, calloutIcon } from './callout.js';
 
 const HANDLE_KEY = new PluginKey('mjBlockHandle');
 
@@ -75,6 +76,17 @@ const openBlockMenu = (editor, anchor, pos) => {
             class: `mj-pop__item${node.attrs.style === d.id ? ' is-active' : ''}`,
             onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { style: d.id }); return true; }).run()),
         }, [h('span', { class: 'mj-pop__icon', text: d.icon }), h('b', { text: d.title })])) : []),
+        node.type.name === 'callout' ? h('div', { class: 'mj-pop__group', text: '종류' }) : null,
+        ...(node.type.name === 'callout' ? CALLOUT_KINDS.map((k) => h('button', {
+            type: 'button',
+            class: `mj-pop__item${node.attrs.kind === k.id ? ' is-active' : ''}`,
+            onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { ...node.attrs, kind: k.id }); return true; }).run()),
+        }, [h('span', { class: 'mj-pop__icon', text: k.icon }), h('b', { text: k.title })])) : []),
+        node.type.name === 'callout' ? h('button', { type: 'button', class: 'mj-pop__item', onclick: act(() => {
+            const next = window.prompt('콜아웃 아이콘 (이모지 하나, 비우면 기본 아이콘)', node.attrs.icon || '');
+            if (next === null) return;
+            editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { ...node.attrs, icon: next.trim().slice(0, 4) }); return true; }).run();
+        }) }, [h('span', { class: 'mj-pop__icon', text: calloutIcon(node.attrs.kind, node.attrs.icon) }), h('b', { text: '아이콘 바꾸기' })]) : null,
         canTurn ? h('div', { class: 'mj-pop__group', text: '전환' }) : null,
         ...(canTurn ? BLOCK_ITEMS.filter((item) => TURN_INTO.includes(item.id)).map((item) => h('button', {
             type: 'button',
