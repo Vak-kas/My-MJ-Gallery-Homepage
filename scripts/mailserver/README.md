@@ -41,6 +41,7 @@
    ```
 
 ## 운영 메모
+- 받는 메일이 `554 5.7.1 ... blocked using zen.spamhaus.org; Error: open resolver` 로 튕기면 Postfix 에 `reject_rbl_client` 가 남아 있는 것 — AWS 리졸버에서는 Spamhaus 조회가 안 되므로 빼야 함: `sudo postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, reject_unknown_recipient_domain" && sudo systemctl reload postfix`
 - 큐: `mailq` · 로그: `sudo journalctl -u postfix -n 50`, `-u dovecot`, `-u rspamd`
 - 스팸 점수 6 이상은 `X-Spam: Yes` 헤더가 붙고 Junk 폴더로, 15 이상은 거절
 - 메일함 경로 `/var/mail/vhosts/smjgallery.kr/mjseo` (Maildir) — S3 백업에 포함(`MAIL_BACKUP_DIR`)
