@@ -41,6 +41,7 @@
    ```
 
 ## 운영 메모
+- 웹메일·메일 앱 로그인이 2초쯤 느리면 Dovecot 이 PAM(리눅스 계정)을 먼저 시도하는 것: `sudo sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf && sudo doveconf -n >/dev/null && sudo systemctl reload dovecot`
 - 큐: `mailq` · 로그: `sudo journalctl -u postfix -n 50`, `-u dovecot`, `-u rspamd`
 - 스팸 점수 6 이상은 `X-Spam: Yes` 헤더가 붙고 Junk 폴더로, 15 이상은 거절
 - 메일함 경로 `/var/mail/vhosts/smjgallery.kr/mjseo` (Maildir) — S3 백업에 포함(`MAIL_BACKUP_DIR`)

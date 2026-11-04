@@ -125,6 +125,9 @@ R
 systemctl enable --now redis-server rspamd >/dev/null; systemctl restart rspamd
 
 echo "▶ 6/8 Dovecot (IMAP 993 · LMTP · 587 로그인)"
+# 기본 설정의 리눅스 계정(PAM) 인증은 끔 — 우리 메일함은 /etc/dovecot/users 만 쓰는데 PAM 이 먼저 시도돼
+# 실패하는 데 2초가 걸려 로그인마다 2초씩 느려짐 (웹메일은 요청마다 로그인함)
+sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
 # Dovecot 설정은 블록을 한 줄에 못 씀 (';' 구분 없음) — 줄마다 나눠서
 mkdir -p /etc/dovecot/sieve
 cat > /etc/dovecot/sieve/default.sieve <<'S'
