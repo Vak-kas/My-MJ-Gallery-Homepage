@@ -108,9 +108,18 @@ const createToolbar = (getEditor) => {
 
     const clearBtn = btn('⌫', '서식 지우기', run((c) => c.unsetAllMarks()));
 
+    // 선택한 글자를 그대로 LaTeX 로 삼아 인라인 수식으로 바꿈 (앞뒤 $ 는 떼어냄)
+    const mathBtn = btn('∑', '선택한 글자를 수식으로', () => {
+        const editor = getEditor();
+        const { from, to } = editor.state.selection;
+        const latex = editor.state.doc.textBetween(from, to, ' ').trim().replace(/^\$+|\$+$/g, '').trim();
+        if (!latex) return;
+        editor.chain().focus().insertContentAt({ from, to }, { type: 'inlineMath', attrs: { latex } }).run();
+    });
+
     const mainRow = h('div', { class: 'mj-bubble__row' }, [
         buttons.bold, buttons.italic, buttons.underline, buttons.strike, buttons.code,
-        h('span', { class: 'mj-bubble__sep' }), linkBtn, colorBtn, fontSelect,
+        h('span', { class: 'mj-bubble__sep' }), linkBtn, mathBtn, colorBtn, fontSelect,
         h('span', { class: 'mj-bubble__sep' }), clearBtn,
     ]);
     const element = h('div', { class: 'mj-bubble' }, [mainRow, linkRow]);
