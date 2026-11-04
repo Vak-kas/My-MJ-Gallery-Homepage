@@ -46,8 +46,11 @@ class Command(BaseCommand):
         from tools.meet_views import cleanup_expired as cleanup_meetings
         from tools.share_views import cleanup_expired
 
+        from accounts.models import cleanup_unverified
+
         cleanup_old_records()
         stats.cleanup()
+        cleanup_unverified()
         cleanup_expired()
         cleanup_meetings()
         uptime.cleanup()

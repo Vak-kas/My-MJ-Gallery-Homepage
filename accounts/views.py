@@ -1,17 +1,25 @@
 from urllib.parse import urlparse
 
-from django.shortcuts import render, redirect
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth import login, logout, authenticate, update_session_auth_hash
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
 from django.contrib.auth.models import User
-from django.contrib.auth import login, logout, authenticate
-from django.http import HttpResponse
-from django.urls import reverse
-from django.utils.http import url_has_allowed_host_and_scheme
+from django.contrib.auth.views import PasswordResetCompleteView, PasswordResetConfirmView, PasswordResetDoneView, PasswordResetView
+from django.core.cache import cache
+from django.core.mail import send_mail
 from django.db import transaction
+from django.shortcuts import render, redirect
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_http_methods
 
 from accounts import antibot
-from accounts.forms import UserForm
-from accounts.models import SignupRequest
+from accounts.forms import DeleteAccountForm, FindIdForm, UserForm
+from accounts.middleware import SESSION_KEY as MUST_CHANGE_KEY
+from accounts.models import MustChangePassword, SignupRequest
 from security.models import LoginEvent
 from security.utils import clear_failures, client_ip, is_locked, record_failure, user_agent
 from notifications.models import Notification
@@ -51,8 +59,10 @@ def _safe_next_url(request):
 
     return next_url
 
+@login_required
 def index(request):
-    return HttpResponse("안녕하세요. 오신것을 환영합니다.")
+    """내 계정: 가입 정보, 비밀번호 변경, 회원탈퇴."""
+    return render(request, "accounts/account.html", {"mail_enabled": settings.MAIL_ENABLED})
 
 
 class _FakeUser:
@@ -94,13 +104,66 @@ def signup_view(request):
             ip=ip, user_agent=ua, flags=" · ".join(flags),
         )
     antibot.note_signup(ip)
+    if settings.MAIL_ENABLED:
+        # 메일이 켜져 있으면: 인증 링크를 누른 뒤에야 관리자에게 알리고 승인 대기에 들어감
+        _send_verify_mail(signup)
+        return render(request, "accounts/signup_pending.html", {"pending_user": user, "verify": True})
+    _notify_signup(signup)
+    return render(request, "accounts/signup_pending.html", {"pending_user": user, "verify": False})
+
+
+def _notify_signup(signup):
+    user, flags = signup.user, signup.flag_list
     notify(
         Notification.KIND_SIGNUP,
         f"{'🤖 의심 · ' if flags else ''}{user.first_name}({user.username}) 님이 가입을 요청했어요",
         (f"[{' · '.join(flags)}] " if flags else "") + (signup.message or user.email),
         reverse("studio:users") + "?state=pending",
     )
-    return render(request, "accounts/signup_pending.html", {"pending_user": user})
+
+
+def _send_verify_mail(signup):
+    token = signup.issue_verify_token()
+    link = f"{settings.SITE_URL}{reverse('accounts:verify_email', args=[signup.user_id, token])}"
+    send_mail(
+        "[MJ Gallery] 가입 이메일 인증",
+        f"{signup.user.first_name or signup.user.username} 님, MJ Gallery 가입 신청 고마워요.\n\n"
+        f"아래 링크를 눌러 이메일을 인증해 주세요 ({SignupRequest.VERIFY_HOURS}시간 안에).\n\n{link}\n\n"
+        f"인증이 끝나면 관리자가 확인한 뒤 승인해요. 본인이 신청한 게 아니면 이 메일은 무시해도 돼요 "
+        f"({SignupRequest.UNVERIFIED_KEEP_DAYS}일 뒤 자동으로 지워져요).",
+        None, [signup.user.email], fail_silently=True,
+    )
+
+
+def verify_email_view(request, user_id: int, token: str):
+    signup = SignupRequest.objects.filter(user_id=user_id).select_related("user").first()
+    if signup and signup.email_verified_at:
+        return render(request, "accounts/verify_done.html", {"pending_user": signup.user, "already": True})
+    if not signup or not signup.verify_link_valid(token):
+        return render(request, "accounts/verify_invalid.html", {"form": None}, status=400)
+    signup.mark_verified()
+    _notify_signup(signup)
+    return render(request, "accounts/verify_done.html", {"pending_user": signup.user, "already": False})
+
+
+@require_http_methods(["GET", "POST"])
+def verify_resend_view(request):
+    """인증 메일 다시 보내기. 계정이 있든 없든 같은 화면 (있는지 떠보기 방지)."""
+    sent = False
+    if request.method == "POST":
+        if not settings.MAIL_ENABLED:
+            messages.error(request, "지금은 메일을 보낼 수 없어요. 관리자에게 문의해 주세요.")
+        elif _recovery_limited(request, "verify-resend", limit=5):
+            messages.error(request, "요청이 너무 많아요. 1시간 뒤에 다시 시도해 주세요.")
+        else:
+            email = (request.POST.get("email") or "").strip()
+            signup = SignupRequest.objects.filter(
+                user__email__iexact=email, status=SignupRequest.STATUS_PENDING, email_verified_at__isnull=True,
+            ).exclude(verify_token="").select_related("user").first()
+            if signup:
+                _send_verify_mail(signup)
+            sent = True
+    return render(request, "accounts/verify_resend.html", {"sent": sent, "mail_enabled": settings.MAIL_ENABLED})
 
 
 def _inactive_reason(username, password):
@@ -109,6 +172,8 @@ def _inactive_reason(username, password):
     if not candidate or not candidate.check_password(password or ""):
         return None
     signup = SignupRequest.objects.filter(user=candidate).first()
+    if signup and signup.needs_verification:
+        return "이메일 인증이 아직 안 됐어요. 가입할 때 받은 메일의 링크를 눌러 주세요."
     if signup and signup.status == SignupRequest.STATUS_PENDING:
         return "아직 관리자 승인 대기 중이에요. 승인되면 로그인할 수 있어요."
     if signup and signup.status == SignupRequest.STATUS_REJECTED:
@@ -139,6 +204,11 @@ def login_view(request):
         if user is not None:
             clear_failures(ip, username)
             login(request, user)
+            # 관리자가 임시 비밀번호를 준 계정이면 먼저 비밀번호부터 바꾸게
+            if MustChangePassword.objects.filter(user=user).exists():
+                request.session[MUST_CHANGE_KEY] = True
+                messages.info(request, "임시 비밀번호로 로그인했어요. 새 비밀번호를 정해 주세요.")
+                return redirect("accounts:password_change")
 
             if next_url:
                 return redirect(next_url)
@@ -149,8 +219,10 @@ def login_view(request):
             return redirect('main:home')
         else:
             record_failure(ip, username)
+            reason = _inactive_reason(username, password)
             return render(request, 'accounts/login.html', {
-                'error': _inactive_reason(username, password) or '아이디 또는 비밀번호가 올바르지 않습니다.',
+                'error': reason or '아이디 또는 비밀번호가 올바르지 않습니다.',
+                'show_resend': bool(reason and "이메일 인증" in reason),
                 'next_url': next_url,
             })
     return render(request, 'accounts/login.html', {'next_url': next_url})
@@ -162,3 +234,140 @@ def logout_view(request):
     if next_url:
         return redirect(next_url)
     return redirect('main:home')
+
+# ── 아이디 찾기 ──────────────────────────────────────────────
+
+def mask_username(username: str) -> str:
+    """minjae → mi***e, ab → a*. 전체 아이디는 메일로만."""
+    if len(username) <= 2:
+        return username[0] + "*" * (len(username) - 1)
+    if len(username) <= 4:
+        return username[:1] + "*" * (len(username) - 2) + username[-1]
+    return username[:2] + "*" * (len(username) - 3) + username[-1]
+
+
+def _recovery_limited(request, what: str, limit: int = 10) -> bool:
+    """같은 IP 에서 한 시간에 limit 번까지만 (아이디 찾기·비밀번호 재설정)."""
+    key = f"recovery:{what}:{client_ip(request)}"
+    n = cache.get(key, 0) + 1
+    cache.set(key, n, 3600)
+    return n > limit
+
+
+@require_http_methods(["GET", "POST"])
+def find_id_view(request):
+    form = FindIdForm(request.POST or None)
+    found, limited = None, False
+    if request.method == "POST" and form.is_valid():
+        if _recovery_limited(request, "find-id"):
+            limited = True
+        else:
+            name = " ".join(form.cleaned_data["real_name"].split())
+            users = list(User.objects.filter(email__iexact=form.cleaned_data["email"].strip(), first_name__iexact=name, is_active=True))
+            if users:
+                found = [mask_username(u.username) for u in users]
+                if settings.MAIL_ENABLED:
+                    send_mail(
+                        "[MJ Gallery] 찾으신 아이디",
+                        f"{name} 님의 아이디는 다음과 같아요.\n\n" + "\n".join(f"  - {u.username} (가입 {u.date_joined:%Y-%m-%d})" for u in users)
+                        + f"\n\n로그인: {settings.SITE_URL}{reverse('accounts:login')}\n본인이 요청한 게 아니면 이 메일은 무시해도 돼요.",
+                        None, [users[0].email], fail_silently=True,
+                    )
+            else:
+                form.add_error(None, "이름과 이메일이 같은 계정이 없어요. 가입할 때 쓴 이름·이메일인지 확인해 주세요.")
+    return render(request, "accounts/find_id.html", {"form": form, "found": found, "limited": limited, "mail_enabled": settings.MAIL_ENABLED})
+
+
+# ── 비밀번호 재설정 (메일로 온 링크 = 본인 확인) ─────────────────
+
+class PasswordResetStart(PasswordResetView):
+    template_name = "accounts/password_reset_form.html"
+    email_template_name = "accounts/password_reset_email.txt"
+    subject_template_name = "accounts/password_reset_subject.txt"
+    success_url = reverse_lazy("accounts:password_reset_done")
+    extra_email_context = {"site_url": settings.SITE_URL}
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["mail_enabled"] = settings.MAIL_ENABLED
+        return ctx
+
+    def post(self, request, *args, **kwargs):
+        if not settings.MAIL_ENABLED:
+            messages.error(request, "지금은 메일을 보낼 수 없어서 관리자에게 초기화를 부탁해야 해요.")
+            return redirect("accounts:password_reset")
+        if _recovery_limited(request, "password-reset", limit=5):
+            messages.error(request, "요청이 너무 많아요. 1시간 뒤에 다시 시도해 주세요.")
+            return redirect("accounts:password_reset")
+        return super().post(request, *args, **kwargs)
+
+
+class PasswordResetSent(PasswordResetDoneView):
+    template_name = "accounts/password_reset_done.html"
+
+
+class PasswordResetConfirm(PasswordResetConfirmView):
+    template_name = "accounts/password_reset_confirm.html"
+    success_url = reverse_lazy("accounts:password_reset_complete")
+    form_class = SetPasswordForm
+
+    def form_valid(self, form):
+        MustChangePassword.objects.filter(user=form.user).delete()
+        return super().form_valid(form)
+
+
+class PasswordResetComplete(PasswordResetCompleteView):
+    template_name = "accounts/password_reset_complete.html"
+
+
+# ── 비밀번호 변경 · 회원탈퇴 ─────────────────────────────────────
+
+@login_required
+def password_change_view(request):
+    form = PasswordChangeForm(request.user, request.POST or None)
+    forced = bool(request.session.get(MUST_CHANGE_KEY))
+    if request.method == "POST" and form.is_valid():
+        user = form.save()
+        update_session_auth_hash(request, user)   # 바꾼 뒤에도 로그인 유지
+        MustChangePassword.objects.filter(user=user).delete()
+        request.session.pop(MUST_CHANGE_KEY, None)
+        messages.success(request, "비밀번호를 바꿨어요.")
+        return redirect("accounts:index")
+    return render(request, "accounts/password_change.html", {"form": form, "forced": forced})
+
+
+def _content_counts(user):
+    from blog.models import Comment, GuestbookEntry, Post
+    from tools.models import ClipItem, SavedPaper, ShortLink
+
+    return {
+        "글": Post.objects.filter(author=user).count(),
+        "댓글": Comment.objects.filter(author=user).count(),
+        "방명록": GuestbookEntry.objects.filter(author=user).count(),
+        "클립보드": ClipItem.objects.filter(user=user).count(),
+        "저장한 논문": SavedPaper.objects.filter(user=user).count(),
+        "단축 링크": ShortLink.objects.filter(owner=user).count(),
+    }
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def delete_account_view(request):
+    if request.user.is_superuser:
+        messages.error(request, "관리자 계정은 여기서 탈퇴할 수 없어요. 다른 관리자가 Studio 에서 정리해야 해요.")
+        return redirect("accounts:index")
+    form = DeleteAccountForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        if not request.user.check_password(form.cleaned_data["password"]):
+            form.add_error("password", "비밀번호가 맞지 않아요.")
+        else:
+            from studio.view_handlers.users import _purge_user_content
+
+            user = request.user
+            username = user.username
+            with transaction.atomic():
+                _purge_user_content(user)
+                user.delete()   # 좋아요·클립보드·저장 논문 등은 CASCADE, 로그 기록은 SET_NULL
+            logout(request)
+            return render(request, "accounts/deleted.html", {"username": username})
+    return render(request, "accounts/delete.html", {"form": form, "counts": _content_counts(request.user)})

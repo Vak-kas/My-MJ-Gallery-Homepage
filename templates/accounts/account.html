@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+{% include "components/main_nav.html" %}
+<main class="mx-auto max-w-[720px] px-6 py-14">
+    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">ACCOUNT</p>
+    <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f]">내 계정</h1>
+    {% if messages %}{% for m in messages %}<div class="mt-6 rounded-[16px] border {% if m.tags == 'error' %}border-red-200 bg-red-50 text-red-600{% else %}border-[#0066cc]/20 bg-[#f0f7ff] text-[#1d1d1f]{% endif %} px-5 py-4 text-[14px]">{{ m }}</div>{% endfor %}{% endif %}
+    <section class="mt-8 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <dl class="grid gap-3 text-[15px] sm:grid-cols-[120px_1fr]">
+            <dt class="text-[#8e8e93]">아이디</dt><dd class="font-mono text-[#1d1d1f]">{{ user.username }}</dd>
+            <dt class="text-[#8e8e93]">이름</dt><dd>{{ user.first_name|default:"-" }}</dd>
+            <dt class="text-[#8e8e93]">이메일</dt><dd>{{ user.email|default:"-" }}</dd>
+            <dt class="text-[#8e8e93]">가입</dt><dd>{{ user.date_joined|date:"Y.m.d" }}</dd>
+        </dl>
+    </section>
+    <section class="mt-4 rounded-[22px] border border-black/[0.08] bg-white p-6">
+        <h2 class="text-[17px] font-semibold text-[#1d1d1f]">🔑 비밀번호</h2>
+        <p class="mt-1 text-[14px] text-[#6e6e73]">지금 비밀번호를 확인한 뒤 새로 정해요.</p>
+        <a href="{% url 'accounts:password_change' %}" class="mt-4 inline-block rounded-full border border-black/[0.1] px-5 py-2 text-[14px] text-[#1d1d1f] hover:bg-[#f5f5f7]">비밀번호 변경</a>
+    </section>
+    {% if not user.is_superuser %}
+    <section class="mt-4 rounded-[22px] border border-red-200 bg-white p-6">
+        <h2 class="text-[17px] font-semibold text-[#1d1d1f]">회원 탈퇴</h2>
+        <p class="mt-1 text-[14px] text-[#6e6e73]">계정과 작성한 글·댓글·저장한 자료가 모두 지워지고 되돌릴 수 없어요.</p>
+        <a href="{% url 'accounts:delete' %}" class="mt-4 inline-block rounded-full border border-red-300 px-5 py-2 text-[14px] text-red-600 hover:bg-red-50">탈퇴하기</a>
+    </section>
+    {% endif %}
+</main>
+{% endblock %}

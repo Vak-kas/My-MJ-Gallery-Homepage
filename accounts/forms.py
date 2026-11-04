@@ -29,3 +29,13 @@ class UserForm(UserCreationForm):
         if len(name) < 2:
             raise forms.ValidationError("이름을 정확히 입력해 주세요.")
         return name
+
+
+class FindIdForm(forms.Form):
+    real_name = forms.CharField(label="이름", max_length=30)
+    email = forms.EmailField(label="가입할 때 쓴 이메일")
+
+
+class DeleteAccountForm(forms.Form):
+    password = forms.CharField(label="비밀번호", widget=forms.PasswordInput)
+    agree = forms.BooleanField(label="작성한 글·댓글·저장한 자료가 모두 지워지는 것을 확인했어요", required=True)

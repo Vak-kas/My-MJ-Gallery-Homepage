@@ -1,0 +1,20 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block auth_title %}회원 탈퇴{% endblock %}
+{% block auth_sub %}정말 떠나시나요? 아래 내용이 모두 지워지고 되돌릴 수 없어요.{% endblock %}
+{% block auth_card %}
+<ul class="grid grid-cols-2 gap-2 rounded-[16px] bg-[#f5f5f7] px-5 py-4 text-[14px] text-[#1d1d1f] sm:grid-cols-3">
+    {% for label, n in counts.items %}<li><span class="text-[#8e8e93]">{{ label }}</span> <b>{{ n }}</b></li>{% endfor %}
+</ul>
+<form method="post" class="mt-6 space-y-6">{% csrf_token %}
+    {% if form.non_field_errors %}<div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-600">{{ form.non_field_errors.0 }}</div>{% endif %}
+    <div>
+    <label class="mb-2 block text-[14px] font-semibold text-[#1d1d1f]">비밀번호 확인</label>
+    <input type="password" name="password" autocomplete="current-password" value="{{ form.password.value|default:'' }}" class="h-[52px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+    {% if form.password.errors %}<p class="mt-2 text-[13px] text-red-600">{{ form.password.errors.0 }}</p>{% endif %}
+</div>
+    <label class="flex items-start gap-3 text-[14px] text-[#1d1d1f]"><input type="checkbox" name="agree" class="mt-1 h-4 w-4 accent-[#0066cc]" {% if form.agree.value %}checked{% endif %}> 작성한 글·댓글·저장한 자료가 모두 지워지는 것을 확인했어요</label>
+    {% if form.agree.errors %}<p class="text-[13px] text-red-600">{{ form.agree.errors.0 }}</p>{% endif %}
+    <button type="submit" class="h-[52px] w-full rounded-full bg-red-600 text-[16px] text-white transition active:scale-[0.97]">탈퇴하기</button>
+</form>
+{% endblock %}
+{% block auth_foot %}<a href="{% url 'accounts:index' %}" class="text-[#0066cc]">그냥 둘래요</a>{% endblock %}

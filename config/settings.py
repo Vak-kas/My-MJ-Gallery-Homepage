@@ -88,6 +88,7 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'accounts.middleware.MustChangePasswordMiddleware',
     'security.middleware.IPBlockMiddleware',
     'studio.middleware.SectionAccessMiddleware',
     'analytics.tracking.PageViewMiddleware',
@@ -127,6 +128,21 @@ CACHES = {
 }
 
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
+
+# 메일 (아이디 찾기·비밀번호 재설정). EMAIL_HOST 를 비우면 실제로 보내지 않고 서버 로그(console)에 찍음
+EMAIL_HOST = os.getenv("EMAIL_HOST", "").strip()
+MAIL_ENABLED = bool(EMAIL_HOST)
+if MAIL_ENABLED:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587") or 587)
+    EMAIL_USE_TLS = env_bool("EMAIL_USE_TLS", "True")
+    EMAIL_USE_SSL = env_bool("EMAIL_USE_SSL", "False")
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+    EMAIL_TIMEOUT = 10
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "MJ Gallery <noreply@smjgallery.kr>")
 # 관리자 알림 카카오톡 '나에게 보내기' (선택)
 KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY", "")
 KAKAO_CLIENT_SECRET = os.getenv("KAKAO_CLIENT_SECRET", "")

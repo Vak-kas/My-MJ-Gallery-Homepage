@@ -1,0 +1,4 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block auth_title %}링크가 맞지 않아요{% endblock %}
+{% block auth_sub %}이미 쓴 링크거나 기한(48시간)이 지났어요.{% endblock %}
+{% block auth_card %}<a href="{% url 'accounts:verify_resend' %}" class="block rounded-full bg-[#0066cc] py-3 text-center text-[15px] text-white">인증 메일 다시 받기</a>{% endblock %}

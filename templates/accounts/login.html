@@ -37,7 +37,7 @@
 
                     {% if error %}
                     <div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-500">
-                        {{ error }}
+                        {{ error }}{% if show_resend %} <a href="{% url 'accounts:verify_resend' %}" class="ml-1 underline">인증 메일 다시 받기</a>{% endif %}
                     </div>
                     {% endif %}
 
@@ -83,8 +83,14 @@
 
                 </form>
 
+                <p class="mt-6 text-center text-[14px] text-[#8e8e93]">
+                    <a href="{% url 'accounts:find_id' %}" class="hover:text-[#0066cc]">아이디 찾기</a>
+                    <span class="mx-2">·</span>
+                    <a href="{% url 'accounts:password_reset' %}" class="hover:text-[#0066cc]">비밀번호 찾기</a>
+                </p>
+
                 <!-- signup -->
-                <p class="mt-10 text-center text-[15px] text-[#6e6e73]">
+                <p class="mt-6 text-center text-[15px] text-[#6e6e73]">
 
                     Don’t have an account?
 

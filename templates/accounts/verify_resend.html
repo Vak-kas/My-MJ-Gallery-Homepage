@@ -1,0 +1,17 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block auth_title %}인증 메일 다시 받기{% endblock %}
+{% block auth_sub %}가입할 때 쓴 이메일을 적으면 인증 링크를 다시 보내 드려요.{% endblock %}
+{% block auth_card %}
+{% if sent %}
+<p class="text-[15px] leading-[1.7] text-[#1d1d1f]">📮 인증이 필요한 계정이면 몇 분 안에 메일이 가요. 스팸함도 확인해 주세요.</p>
+{% else %}
+<form method="post" class="space-y-6">{% csrf_token %}
+    <div>
+        <label class="mb-2 block text-[14px] font-semibold text-[#1d1d1f]">이메일</label>
+        <input type="email" name="email" required autocomplete="email" placeholder="you@example.com" class="h-[52px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-[16px] text-[#1d1d1f] placeholder:text-[#8e8e93] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
+    </div>
+    <button type="submit" class="h-[52px] w-full rounded-full bg-[#0066cc] text-[16px] text-white transition active:scale-[0.97]" {% if not mail_enabled %}disabled{% endif %}>다시 보내기</button>
+    {% if not mail_enabled %}<p class="text-[13px] text-[#8e8e93]">지금은 메일을 보낼 수 없어요. 관리자에게 문의해 주세요.</p>{% endif %}
+</form>
+{% endif %}
+{% endblock %}
