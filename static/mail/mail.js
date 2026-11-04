@@ -76,6 +76,7 @@
         const state = {
             folder: 'inbox', page: 1, q: '', filter: 'all', sort: 'newest', adv: {}, list: null, folders: [], current: null,
             selected: new Set(), pane: 'list', compose: null, cursor: -1,
+            signature: '', contacts: {}, templates: [], scheduled: [],
         };
         const user = root.dataset.user || '';
         root.classList.add('mjm', `mjm--${mode}`);
@@ -94,11 +95,14 @@
         const folderLabel = (key) => { const f = state.folders.find((x) => x.key === key); if (f) return [f.icon, f.label]; return FOLDER_META[key] || ['🏷', key.replace(/^f:/, '')]; };
         const listQuery = () => ({ folder: state.folder, page: state.page, q: state.q, filter: state.filter, sort: state.sort, ...state.adv });
         const labels = () => state.folders.filter((f) => !f.system);
+        const nameOf = (a) => (a && a.email && state.contacts[a.email.toLowerCase()]?.name) || a?.name || a?.email || '';
+        const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
         // ── 폴더·라벨 ──
         function renderFolders() {
             foldersEl.innerHTML = '';
-            if (mode === 'full') foldersEl.append(h('button', { class: 'mjm__compose-btn', type: 'button', text: '✏️ 메일 쓰기', onclick: () => openCompose() }));
+            if (mode === 'full') foldersEl.append(h('button', { class: 'mjm__compose-btn', type: 'button', text: '✏️ 메일 쓰기', onclick: () => openCompose() }),
+                h('div', { class: 'mjm__quicklinks' }, [h('button', { type: 'button', class: 'mjm__mini', text: '내게 쓰기', onclick: () => openCompose({ to: user, self: true }) }), h('button', { type: 'button', class: 'mjm__mini', text: '⚙ 설정', onclick: openSettings })]));
             const wrap = h('div', { class: 'mjm__folderlist' });
             const list = state.folders.length ? state.folders : Object.keys(FOLDER_META).map((k) => ({ key: k, total: 0, unseen: 0, system: true }));
             for (const f of list.filter((x) => x.system)) wrap.append(folderButton(f));
@@ -126,8 +130,11 @@
         }
         function goFolder(key) { state.sentInfo = null; state.folder = key; state.page = 1; state.q = ''; state.adv = {}; state.filter = 'all'; state.selected.clear(); state.current = null; state.cursor = -1; renderFolders(); renderRead(); loadList(); setPane('list'); }
         async function loadFolders() {
-            try { const { folders } = await api('state'); state.folders = folders; renderFolders(); if (mode === 'mini') renderList(); }
-            catch (e) { say(e.message, true); }
+            try {
+                const r = await api('state');
+                Object.assign(state, { folders: r.folders, signature: r.signature || '', contacts: r.contacts || {}, templates: r.templates || [], scheduled: r.scheduled || [] });
+                renderFolders(); if (mode === 'mini') renderList();
+            } catch (e) { say(e.message, true); }
         }
         async function createLabel() {
             const name = prompt('새 라벨 이름 (예: 학교, 영수증)'); if (!name) return;
@@ -159,6 +166,7 @@
                 h('div', { class: 'mjm__searchwrap' }, [search, h('button', { type: 'button', class: 'mjm__iconbtn mjm__iconbtn--inset', title: '상세 검색', text: '⚙', onclick: () => { advOpen = !advOpen; renderList(); } })]),
                 h('button', { type: 'button', class: 'mjm__iconbtn', title: '새로고침', text: '⟳', onclick: () => { loadList(); loadFolders(); } }),
                 mode === 'mini' ? h('button', { type: 'button', class: 'mjm__iconbtn', title: '메일 쓰기', text: '✏️', onclick: () => openCompose() }) : null,
+                mode === 'mini' ? h('button', { type: 'button', class: 'mjm__iconbtn', title: '설정', text: '⚙', onclick: () => openSettings() }) : null,
             ]);
             listEl.append(bar);
             if (advOpen) listEl.append(advancedPanel());
@@ -202,13 +210,13 @@
                 cb.addEventListener('click', (e) => { e.stopPropagation(); cb.checked ? state.selected.add(m.uid) : state.selected.delete(m.uid); renderList(); });
                 const star = h('button', { type: 'button', class: `mjm__star${m.flagged ? ' is-on' : ''}`, title: m.flagged ? '별표 지우기' : '별표', text: m.flagged ? '★' : '☆', onclick: (e) => { e.stopPropagation(); toggleStar(m); } });
                 const outgoing = state.folder === 'sent' || state.folder === 'drafts';
-                const who = outgoing ? `받는 사람: ${m.to_text || '(없음)'}` : (m.from.name || m.from.email || '(보낸 사람 없음)');
+                const who = outgoing ? `받는 사람: ${m.to_text || '(없음)'}` : (nameOf(m.from) || '(보낸 사람 없음)');
                 const row = h('li', {
                     class: `mjm__row${m.seen ? '' : ' is-unread'}${state.current?.uid === m.uid && state.current?.folder === m.folder ? ' is-current' : ''}${state.cursor === idx ? ' is-cursor' : ''}`,
                     'data-uid': m.uid, onclick: () => { state.cursor = idx; openMessage(m.uid); },
                 }, [
                     h('span', { class: 'mjm__rowctl' }, [cb, star]),
-                    outgoing ? null : avatar(m.from.name, m.from.email),
+                    outgoing ? null : avatar(nameOf(m.from), m.from.email),
                     h('div', { class: 'mjm__rowmain' }, [
                         h('div', { class: 'mjm__rowtop' }, [h('span', { class: 'mjm__who', text: who, title: m.from_text || m.to_text }), h('span', { class: 'mjm__rowright' }, [m.has_attachment ? h('span', { class: 'mjm__clip', title: '첨부 있음', text: '📎' }) : null, h('span', { class: 'mjm__date', text: m.date_text })])]),
                         h('div', { class: 'mjm__subject' }, [m.draft ? h('span', { class: 'mjm__draft', text: '[초안] ' }) : null, m.answered ? h('span', { class: 'mjm__ans', title: '답장함', text: '↩ ' }) : null, h('span', { text: m.subject }), m.preview ? h('span', { class: 'mjm__preview', text: ` – ${m.preview}` }) : null]),
@@ -295,11 +303,11 @@
                 const info = state.sentInfo;
                 readEl.append(h('div', { class: 'mjm__sent' }, [
                     h('div', { class: 'mjm__sent-icon', text: '✓' }),
-                    h('h3', { class: 'mjm__sent-title', text: '메일 발송이 완료되었습니다' }),
+                    h('h3', { class: 'mjm__sent-title', text: info.scheduled ? '예약 발송을 등록했어요' : '메일 발송이 완료되었습니다' }),
                     h('p', { class: 'mjm__dim', text: `${info.time} · 받는 사람 ${info.to}${info.cc ? ' · 참조 ' + info.cc : ''}` }),
                     h('p', { class: 'mjm__sent-subject', text: info.subject || '(제목 없음)' }),
                     h('div', { class: 'mjm__sent-actions' }, [
-                        h('button', { type: 'button', class: 'mjm__send', text: '보낸 편지함 보기', onclick: () => { state.sentInfo = null; goFolder('sent'); } }),
+                        info.scheduled ? h('button', { type: 'button', class: 'mjm__send', text: '예약 목록 보기', onclick: () => { state.sentInfo = null; openSettings('scheduled'); } }) : h('button', { type: 'button', class: 'mjm__send', text: '보낸 편지함 보기', onclick: () => { state.sentInfo = null; goFolder('sent'); } }),
                         h('button', { type: 'button', text: '새 메일', onclick: () => { state.sentInfo = null; openCompose(); } }),
                         h('button', { type: 'button', text: '닫기', onclick: () => { state.sentInfo = null; renderRead(); if (mode === 'mini') setPane('list'); } }),
                     ]),
@@ -328,8 +336,9 @@
             readEl.append(toolbar);
             const head = h('div', { class: 'mjm__readhead' }, [
                 h('h3', { class: 'mjm__readsubject', text: m.subject }),
-                h('div', { class: 'mjm__sender' }, [avatar(m.from.name, m.from.email), h('div', { class: 'mjm__meta' }, [
-                    h('div', {}, [h('b', { text: m.from.name || m.from.email }), m.from.name ? h('span', { class: 'mjm__dim', text: ` <${m.from.email}>` }) : null]),
+                h('div', { class: 'mjm__sender' }, [avatar(nameOf(m.from), m.from.email), h('div', { class: 'mjm__meta' }, [
+                    h('div', {}, [h('b', { text: nameOf(m.from) || m.from.email }), nameOf(m.from) ? h('span', { class: 'mjm__dim', text: ` <${m.from.email}>` }) : null,
+                        h('button', { type: 'button', class: 'mjm__mini mjm__mini--inline', title: '이 주소의 표시 이름 정하기', text: state.contacts[m.from.email?.toLowerCase()] ? '이름 바꾸기' : '이름 정하기', onclick: () => setContact(m.from.email, nameOf(m.from)) })]),
                     h('div', { class: 'mjm__dim', text: `받는 사람 ${m.to_text || '-'}${m.cc_text ? ' · 참조 ' + m.cc_text : ''}${m.bcc_text ? ' · 숨은 참조 ' + m.bcc_text : ''}` }),
                 ]), h('div', { class: 'mjm__dim mjm__readdate', text: m.date_text })]),
             ]);
@@ -373,48 +382,95 @@
             } catch (e) { say(e.message, true); state.current = null; renderRead(); }
         }
 
-        // ── 쓰기 ──
-        function openCompose({ reply, forward, draft, all = false, to = '' } = {}) {
-            const sig = store.get('mj:mail:sig', '');
-            const quote = (m) => `\n\n${m.date_text}에 ${m.from_text} 님이 쓴 글:\n> ` + (m.text || stripHtml(m.body_html)).trim().split('\n').join('\n> ');
-            const init = { to, cc: '', bcc: '', subject: '', body: sig ? `\n\n-- \n${sig}` : '', in_reply_to: '', references: '', reply_folder: '', reply_uid: '', draft_uid: '' };
+        // ── 쓰기 (서식 편집기: HTML 로 보내고 글자 본문도 같이) ──
+        function openCompose({ reply, forward, draft, all = false, to = '', self = false } = {}) {
+            const sigBlock = state.signature ? `<br><br><div class="mjm-sig">-- <br>${state.signature}</div>` : '';
+            const quoteBlock = (m) => `<br><br><div class="mjm-quote-head">${esc(m.date_text)}에 ${esc(m.from_text)} 님이 쓴 글:</div><blockquote style="border-left:3px solid #ddd;margin:8px 0;padding-left:10px;color:#555">${m.body_html || esc(m.text).replace(/\n/g, '<br>')}</blockquote>`;
+            const init = { to, cc: '', bcc: '', subject: '', html: sigBlock, in_reply_to: '', references: '', reply_folder: '', reply_uid: '', draft_uid: '' };
+            if (self) init.subject = '[메모] ';
             if (reply) {
                 const others = all ? [...reply.to, ...reply.cc].map((a) => a.email).filter((e) => e && e !== user && e !== reply.from.email) : [];
-                Object.assign(init, { to: reply.reply_to, cc: others.join(', '), subject: /^re:/i.test(reply.subject) ? reply.subject : `Re: ${reply.subject}`, body: (sig ? `\n\n-- \n${sig}` : '') + quote(reply), in_reply_to: reply.message_id, references: reply.references, reply_folder: reply.folder, reply_uid: reply.uid });
+                Object.assign(init, { to: reply.reply_to, cc: others.join(', '), subject: /^re:/i.test(reply.subject) ? reply.subject : `Re: ${reply.subject}`, html: sigBlock + quoteBlock(reply), in_reply_to: reply.message_id, references: reply.references, reply_folder: reply.folder, reply_uid: reply.uid });
             }
-            if (forward) Object.assign(init, { subject: /^fwd?:/i.test(forward.subject) ? forward.subject : `Fwd: ${forward.subject}`, body: (sig ? `\n\n-- \n${sig}` : '') + `\n\n---------- 전달한 메일 ----------\n보낸 사람: ${forward.from_text}\n날짜: ${forward.date_text}\n제목: ${forward.subject}\n받는 사람: ${forward.to_text}\n\n${(forward.text || stripHtml(forward.body_html)).trim()}` });
-            if (draft) Object.assign(init, { to: draft.to_text, cc: draft.cc_text, bcc: draft.bcc_text, subject: draft.subject === '(제목 없음)' ? '' : draft.subject, body: draft.text || stripHtml(draft.body_html), draft_uid: draft.uid });
+            if (forward) Object.assign(init, { subject: /^fwd?:/i.test(forward.subject) ? forward.subject : `Fwd: ${forward.subject}`, html: sigBlock + `<br><br><div class="mjm-quote-head">---------- 전달한 메일 ----------<br>보낸 사람: ${esc(forward.from_text)}<br>날짜: ${esc(forward.date_text)}<br>제목: ${esc(forward.subject)}<br>받는 사람: ${esc(forward.to_text)}</div><br>${forward.body_html || esc(forward.text).replace(/\n/g, '<br>')}` });
+            if (draft) Object.assign(init, { to: draft.to_text, cc: draft.cc_text, bcc: draft.bcc_text, subject: draft.subject === '(제목 없음)' ? '' : draft.subject, html: draft.is_html ? draft.body_html : esc(draft.text).replace(/\n/g, '<br>'), draft_uid: draft.uid });
             const form = h('form', { class: 'mjm__compose', enctype: 'multipart/form-data' });
-            const dl = h('datalist', { id: 'mjm-contacts' }, Object.entries(contacts()).map(([e, n]) => h('option', { value: n ? `${n} <${e}>` : e })));
+            const dl = h('datalist', { id: 'mjm-contacts' }, [...new Set([...Object.keys(state.contacts), ...Object.keys(contacts())])].map((e) => { const n = state.contacts[e]?.name || contacts()[e]; return h('option', { value: n ? `${n} <${e}>` : e }); }));
             const field = (name, label, value = '', hidden = false) => h('label', { class: 'mjm__field', hidden }, [h('span', { text: label }), h('input', { name, type: 'text', value, placeholder: name === 'to' ? '이름 <주소> 또는 주소, 여러 명은 쉼표' : '', list: 'mjm-contacts', autocomplete: 'off' })]);
             const ccField = field('cc', '참조', init.cc, !init.cc), bccField = field('bcc', '숨은 참조', init.bcc, !init.bcc);
-            const body = h('textarea', { name: 'body', rows: mode === 'mini' ? 9 : 14, placeholder: '내용' }); body.value = init.body;
+            const subjectField = field('subject', '제목', init.subject);
+            const editor = h('div', { class: 'mjm__editor', contenteditable: 'true', 'data-placeholder': '내용' });
+            editor.innerHTML = init.html;
+            const cmd = (name, value = null) => { editor.focus(); document.execCommand(name, false, value); };
+            const tb = h('div', { class: 'mjm__fmt' }, [
+                ['bold', '<b>B</b>', '굵게 (⌘B)'], ['italic', '<i>I</i>', '기울임 (⌘I)'], ['underline', '<u>U</u>', '밑줄 (⌘U)'], ['strikeThrough', '<s>S</s>', '취소선'],
+            ].map(([c, html, title]) => h('button', { type: 'button', html, title, onmousedown: (e) => e.preventDefault(), onclick: () => cmd(c) })));
+            tb.append(
+                h('span', { class: 'mjm__fmt-sep' }),
+                h('button', { type: 'button', text: '• 목록', title: '글머리 목록', onmousedown: (e) => e.preventDefault(), onclick: () => cmd('insertUnorderedList') }),
+                h('button', { type: 'button', text: '1. 목록', title: '번호 목록', onmousedown: (e) => e.preventDefault(), onclick: () => cmd('insertOrderedList') }),
+                h('button', { type: 'button', text: '🔗', title: '링크', onmousedown: (e) => e.preventDefault(), onclick: () => { const u = prompt('링크 주소 (https://…)'); if (u) cmd('createLink', u); } }),
+                h('select', { class: 'mjm__selmenu', title: '글자 크기', onmousedown: (e) => e.stopPropagation(), onchange: (e) => { if (e.target.value) cmd('fontSize', e.target.value); e.target.value = ''; } }, [['', '크기'], ['2', '작게'], ['3', '보통'], ['5', '크게'], ['6', '아주 크게']].map(([v, t]) => h('option', { value: v, text: t }))),
+                h('input', { type: 'color', title: '글자색', value: '#1d1d1f', oninput: (e) => cmd('foreColor', e.target.value) }),
+                h('button', { type: 'button', text: '서식 지우기', onmousedown: (e) => e.preventDefault(), onclick: () => cmd('removeFormat') }),
+                h('span', { class: 'mjm__spacer' }),
+                state.templates.length ? h('select', { class: 'mjm__selmenu', title: '템플릿 넣기', onchange: (e) => { const t = state.templates.find((x) => String(x.id) === e.target.value); e.target.value = ''; if (!t) return; if (t.subject && !subjectField.querySelector('input').value.trim()) subjectField.querySelector('input').value = t.subject; editor.innerHTML = t.body + editor.innerHTML; dirty = true; } },
+                    [h('option', { value: '', text: '📋 템플릿' }), ...state.templates.map((t) => h('option', { value: t.id, text: t.name }))]) : null,
+            );
             const files = h('input', { type: 'file', name: 'attachments', multiple: true });
             const submit = h('button', { type: 'submit', class: 'mjm__send', text: '보내기' });
             const draftBtn = h('button', { type: 'button', text: '임시 저장', onclick: () => saveDraft(false) });
+            const previewBtn = h('button', { type: 'button', text: '미리보기', onclick: () => togglePreview() });
+            const scheduleBtn = h('button', { type: 'button', text: '⏰ 예약', onclick: () => toggleSchedule() });
             const status = h('span', { class: 'mjm__dim mjm__draftstatus' });
             const toField = field('to', '받는 사람', init.to);
+            const previewBox = h('div', { class: 'mjm__previewbox', hidden: true });
+            const scheduleBox = h('div', { class: 'mjm__schedulebox', hidden: true }, [
+                h('label', {}, ['보낼 시각 ', h('input', { type: 'datetime-local', name: 'send_at_local', min: localIso(new Date(Date.now() + 5 * 60000)) })]),
+                h('button', { type: 'button', class: 'mjm__send', text: '예약하기', onclick: () => doSchedule() }),
+                h('span', { class: 'mjm__dim', text: '그 시각에 서버가 대신 보내요 (1분 단위). 설정 › 예약에서 취소할 수 있어요' }),
+            ]);
             form.append(
-                h('div', { class: 'mjm__toolbar' }, [h('button', { type: 'button', class: 'mjm__back', text: '‹ 닫기', onclick: closeCompose }), h('h3', { class: 'mjm__readsubject mjm__readsubject--tb', text: reply ? (all ? '전체 답장' : '답장') : forward ? '전달' : draft ? '초안 이어 쓰기' : '새 메일' }), h('span', { class: 'mjm__spacer' }),
+                h('div', { class: 'mjm__toolbar' }, [h('button', { type: 'button', class: 'mjm__back', text: '‹ 닫기', onclick: closeCompose }), h('h3', { class: 'mjm__readsubject mjm__readsubject--tb', text: reply ? (all ? '전체 답장' : '답장') : forward ? '전달' : draft ? '초안 이어 쓰기' : self ? '내게 쓰기' : '새 메일' }), h('span', { class: 'mjm__spacer' }),
                     h('button', { type: 'button', class: 'mjm__mini', text: '참조', title: '참조 칸', onclick: () => { ccField.hidden = !ccField.hidden; } }), h('button', { type: 'button', class: 'mjm__mini', text: '숨은 참조', onclick: () => { bccField.hidden = !bccField.hidden; } }),
-                    h('button', { type: 'button', class: 'mjm__mini', text: '서명', title: '서명 설정', onclick: () => { const s = prompt('서명 (메일 끝에 붙어요, 비우면 없음)', store.get('mj:mail:sig', '')); if (s !== null) { store.set('mj:mail:sig', s.trim()); say('서명을 저장했어요'); } } })]),
-                dl, toField, ccField, bccField, field('subject', '제목', init.subject), body,
+                    h('button', { type: 'button', class: 'mjm__mini', text: '서명 편집', onclick: openSettings })]),
+                dl, toField, ccField, bccField, subjectField, tb, editor, previewBox, scheduleBox,
                 h('label', { class: 'mjm__files' }, ['📎 첨부 (모두 20MB 까지) ', files]),
-                h('div', { class: 'mjm__composebar' }, [submit, draftBtn, status, h('span', { class: 'mjm__spacer' }), h('span', { class: 'mjm__dim', text: `보내는 사람: ${root.dataset.fromName ? root.dataset.fromName + ' ' : ''}<${user}>` })]),
+                h('div', { class: 'mjm__composebar' }, [submit, scheduleBtn, draftBtn, previewBtn, status, h('span', { class: 'mjm__spacer' }), h('span', { class: 'mjm__dim', text: `보내는 사람: ${root.dataset.fromName ? root.dataset.fromName + ' ' : ''}<${user}>` })]),
             );
             for (const [k, v] of Object.entries({ in_reply_to: init.in_reply_to, references: init.references, reply_folder: init.reply_folder, reply_uid: init.reply_uid, draft_uid: init.draft_uid })) form.append(h('input', { type: 'hidden', name: k, value: v }));
             let dirty = false, autosave = 0;
-            form.addEventListener('input', () => { dirty = true; clearTimeout(autosave); autosave = setTimeout(() => { if (dirty) saveDraft(true); }, 30000); });
+            const markDirty = () => { dirty = true; clearTimeout(autosave); autosave = setTimeout(() => { if (dirty) saveDraft(true); }, 30000); };
+            form.addEventListener('input', markDirty);
+            editor.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && ['b', 'i', 'u'].includes(e.key.toLowerCase())) { e.preventDefault(); cmd({ b: 'bold', i: 'italic', u: 'underline' }[e.key.toLowerCase()]); } });
+            const payload = () => { const fd = new FormData(form); fd.delete('send_at_local'); fd.set('html', editor.innerHTML); fd.set('body', htmlToText(editor.innerHTML)); return fd; };
             async function saveDraft(auto) {
-                const fd = new FormData(form); fd.delete('attachments');
+                const fd = payload(); fd.delete('attachments');
                 try { const r = await api('draft', { method: 'POST', body: fd }); form.querySelector('[name=draft_uid]').value = r.uid; dirty = false; status.textContent = `${auto ? '자동 ' : ''}임시 저장 ${new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}`; loadFolders(); if (state.folder === 'drafts') loadList(); }
                 catch (e) { if (!auto) say(e.message, true); }
+            }
+            function togglePreview() {
+                if (!previewBox.hidden) { previewBox.hidden = true; editor.hidden = false; tb.hidden = false; previewBtn.textContent = '미리보기'; return; }
+                previewBox.innerHTML = '';
+                const fr = h('iframe', { class: 'mjm__body', sandbox: 'allow-same-origin', title: '미리보기' });
+                fr.srcdoc = bodyDoc(`<div style="padding-bottom:8px;margin-bottom:10px;border-bottom:1px solid #eee;color:#555;font-size:12px">받는 사람 ${esc(toField.querySelector('input').value || '(없음)')}<br>제목 <b>${esc(subjectField.querySelector('input').value || '(제목 없음)')}</b></div>${editor.innerHTML}`);
+                fr.addEventListener('load', () => { try { fr.style.height = Math.min(4000, fr.contentDocument.body.scrollHeight + 30) + 'px'; } catch { /* sandbox */ } });
+                previewBox.append(h('p', { class: 'mjm__dim', text: '받는 사람에게 이렇게 보여요 (메일 앱마다 조금 다를 수 있어요)' }), fr);
+                previewBox.hidden = false; editor.hidden = true; tb.hidden = true; previewBtn.textContent = '편집으로';
+            }
+            function toggleSchedule() { scheduleBox.hidden = !scheduleBox.hidden; if (!scheduleBox.hidden) scheduleBox.querySelector('input').focus(); }
+            async function doSchedule() {
+                const at = scheduleBox.querySelector('input').value;
+                if (!at) { say('보낼 시각을 골라 주세요', true); return; }
+                const fd = payload(); fd.set('send_at', at);
+                try { const r = await api('schedule', { method: 'POST', body: fd }); state.scheduled = r.scheduled; say(`${r.send_at} 에 보내요`); state.compose = null; dirty = false; state.sentInfo = { to: fd.get('to'), cc: fd.get('cc'), subject: fd.get('subject'), time: r.send_at, scheduled: true }; state.current = null; renderRead(); setPane('read'); loadFolders(); }
+                catch (e) { say(e.message, true); }
             }
             form.addEventListener('submit', async (e) => {
                 e.preventDefault();
                 submit.disabled = true; submit.textContent = '보내는 중…'; clearTimeout(autosave);
                 try {
-                    const fd = new FormData(form);
+                    const fd = payload();
                     await api('send', { method: 'POST', body: fd });
                     say('보냈어요'); state.compose = null; dirty = false;
                     state.sentInfo = { to: fd.get('to'), cc: fd.get('cc'), subject: fd.get('subject'), time: new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) };
@@ -428,8 +484,85 @@
             }
             state.compose = form;
             renderRead(); setPane('read');
-            (reply || forward ? body : toField.querySelector('input')).focus();
-            if (reply || forward) body.setSelectionRange(0, 0);
+            if (reply || forward) { editor.focus(); const sel = window.getSelection(); const r = document.createRange(); r.setStart(editor, 0); r.collapse(true); sel.removeAllRanges(); sel.addRange(r); }
+            else if (self) editor.focus(); else toField.querySelector('input').focus();
+        }
+        const localIso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+        const htmlToText = (html) => { const d = document.createElement('div'); d.innerHTML = html.replace(/<br\s*\/?>/gi, '\n').replace(/<\/(p|div|li|h[1-6]|blockquote|tr)>/gi, '\n'); d.querySelectorAll('style,script').forEach((n) => n.remove()); return (d.textContent || '').replace(/\n{3,}/g, '\n\n').trim(); };
+
+        // ── 설정: 서명 · 템플릿 · 주소록 · 예약 ──
+        function openSettings(tab = 'signature') {
+            if (state.compose && !confirm('쓰던 메일을 닫을까요?')) return;
+            state.compose = null; state.sentInfo = null; state.current = null;
+            const wrap = h('div', { class: 'mjm__settings' });
+            const tabs = [['signature', '서명'], ['templates', '템플릿'], ['contacts', '주소록'], ['scheduled', '예약 발송']];
+            const body = h('div', { class: 'mjm__settings-body' });
+            const draw = (t) => {
+                body.innerHTML = '';
+                wrap.querySelectorAll('.mjm__chip').forEach((c) => c.classList.toggle('is-active', c.dataset.tab === t));
+                if (t === 'signature') {
+                    const ed = h('div', { class: 'mjm__editor', contenteditable: 'true' }); ed.innerHTML = state.signature;
+                    const cmd = (name, value = null) => { ed.focus(); document.execCommand(name, false, value); };
+                    body.append(h('p', { class: 'mjm__dim', text: '새 메일·답장·전달 끝에 자동으로 붙어요. 서식(굵게·기울임·링크)도 돼요. 서버에 저장되니 어느 기기에서나 같아요.' }),
+                        h('div', { class: 'mjm__fmt' }, [['bold', '<b>B</b>'], ['italic', '<i>I</i>'], ['underline', '<u>U</u>']].map(([c, html]) => h('button', { type: 'button', html, onmousedown: (e) => e.preventDefault(), onclick: () => cmd(c) })).concat([h('button', { type: 'button', text: '🔗', onmousedown: (e) => e.preventDefault(), onclick: () => { const u = prompt('링크 주소'); if (u) cmd('createLink', u); } }), h('button', { type: 'button', text: '서식 지우기', onmousedown: (e) => e.preventDefault(), onclick: () => cmd('removeFormat') })])),
+                        ed,
+                        h('div', { class: 'mjm__composebar' }, [h('button', { type: 'button', class: 'mjm__send', text: '서명 저장', onclick: async () => { try { const r = await api('prefs', { method: 'POST', body: { signature: ed.innerHTML } }); state.signature = r.signature; say('서명을 저장했어요'); } catch (e) { say(e.message, true); } } }),
+                            h('button', { type: 'button', text: '서명 없음', onclick: () => { ed.innerHTML = ''; } })]));
+                } else if (t === 'templates') {
+                    const list = h('div', { class: 'mjm__tpl-list' });
+                    const editorFor = (tpl) => {
+                        const name = h('input', { type: 'text', placeholder: '템플릿 이름', value: tpl?.name || '' });
+                        const subject = h('input', { type: 'text', placeholder: '제목 (비워도 됨)', value: tpl?.subject || '' });
+                        const ed = h('div', { class: 'mjm__editor', contenteditable: 'true' }); ed.innerHTML = tpl?.body || '';
+                        const cmd = (name2, value = null) => { ed.focus(); document.execCommand(name2, false, value); };
+                        const box = h('div', { class: 'mjm__tpl-edit' }, [
+                            h('label', { class: 'mjm__field' }, [h('span', { text: '이름' }), name]), h('label', { class: 'mjm__field' }, [h('span', { text: '제목' }), subject]),
+                            h('div', { class: 'mjm__fmt' }, [['bold', '<b>B</b>'], ['italic', '<i>I</i>'], ['underline', '<u>U</u>'], ['insertUnorderedList', '• 목록']].map(([c, html]) => h('button', { type: 'button', html, onmousedown: (e) => e.preventDefault(), onclick: () => cmd(c) }))),
+                            ed,
+                            h('div', { class: 'mjm__composebar' }, [h('button', { type: 'button', class: 'mjm__send', text: tpl ? '저장' : '만들기', onclick: async () => {
+                                try { const r = await api('templates', { method: 'POST', body: { action: tpl ? 'update' : 'create', id: tpl?.id, name: name.value, subject: subject.value, body: ed.innerHTML } }); state.templates = r.templates; say('저장했어요'); draw('templates'); }
+                                catch (e) { say(e.message, true); } } }),
+                                tpl ? h('button', { type: 'button', class: 'is-danger', text: '지우기', onclick: async () => { if (!confirm(`"${tpl.name}" 템플릿을 지울까요?`)) return; const r = await api('templates', { method: 'POST', body: { action: 'delete', id: tpl.id } }); state.templates = r.templates; draw('templates'); } }) : null,
+                                h('button', { type: 'button', text: '닫기', onclick: () => draw('templates') })]),
+                        ]);
+                        return box;
+                    };
+                    body.append(h('div', { class: 'mjm__composebar' }, [h('p', { class: 'mjm__dim', text: '자주 쓰는 메일 틀이에요. 쓰기 창의 📋 템플릿에서 골라 넣어요. [대괄호] 자리는 바꿔 쓰세요.' }), h('span', { class: 'mjm__spacer' }), h('button', { type: 'button', class: 'mjm__send', text: '+ 새 템플릿', onclick: () => { list.innerHTML = ''; list.append(editorFor(null)); } })]), list);
+                    for (const t2 of state.templates) list.append(h('div', { class: 'mjm__tpl' }, [h('div', { class: 'mjm__tpl-main' }, [h('b', { text: t2.name }), h('div', { class: 'mjm__dim mjm__tpl-sub', text: t2.subject || '(제목 없음)' })]),
+                        h('button', { type: 'button', text: '편집', onclick: () => { list.innerHTML = ''; list.append(editorFor(t2)); } }),
+                        h('button', { type: 'button', text: '이걸로 쓰기', onclick: () => { openCompose(); setTimeout(() => { const f = state.compose; if (!f) return; const si = f.querySelector('[name=subject]'); if (!si.value.trim()) si.value = t2.subject; const ed = f.querySelector('.mjm__editor'); ed.innerHTML = t2.body + ed.innerHTML; }, 0); } })]));
+                    if (!state.templates.length) list.append(h('p', { class: 'mjm__empty', text: '템플릿이 없어요' }));
+                } else if (t === 'contacts') {
+                    const email = h('input', { type: 'email', placeholder: '주소' }), name = h('input', { type: 'text', placeholder: '표시 이름' }), note = h('input', { type: 'text', placeholder: '메모 (선택)' });
+                    body.append(h('p', { class: 'mjm__dim', text: '주소마다 이름을 정해 두면 목록·읽기·자동완성에 그 이름으로 보여요 (예: hey_minj@naver.com → 서민재).' }),
+                        h('div', { class: 'mjm__contact-add' }, [email, name, note, h('button', { type: 'button', class: 'mjm__send', text: '저장', onclick: async () => { try { const r = await api('contacts', { method: 'POST', body: { action: 'set', email: email.value, name: name.value, note: note.value } }); state.contacts = r.contacts; say('저장했어요'); draw('contacts'); } catch (e) { say(e.message, true); } } })]));
+                    const ul = h('div', { class: 'mjm__contacts' });
+                    for (const [e2, c] of Object.entries(state.contacts).sort((a, b) => a[1].name.localeCompare(b[1].name, 'ko'))) ul.append(h('div', { class: 'mjm__contact' }, [avatar(c.name, e2), h('div', { class: 'mjm__contact-main' }, [h('b', { text: c.name }), h('div', { class: 'mjm__dim', text: e2 + (c.note ? ` · ${c.note}` : '') })]),
+                        h('button', { type: 'button', text: '✉', title: '메일 쓰기', onclick: () => openCompose({ to: `${c.name} <${e2}>` }) }),
+                        h('button', { type: 'button', text: '편집', onclick: () => { email.value = e2; name.value = c.name; note.value = c.note || ''; name.focus(); } }),
+                        h('button', { type: 'button', class: 'is-danger', text: '지우기', onclick: async () => { const r = await api('contacts', { method: 'POST', body: { action: 'delete', email: e2 } }); state.contacts = r.contacts; draw('contacts'); } })]));
+                    if (!Object.keys(state.contacts).length) ul.append(h('p', { class: 'mjm__empty', text: '아직 없어요. 읽기 화면의 "이름 정하기"로도 넣을 수 있어요.' }));
+                    body.append(ul);
+                } else {
+                    const ul = h('div', { class: 'mjm__contacts' });
+                    for (const r of state.scheduled) ul.append(h('div', { class: 'mjm__contact' }, [h('span', { class: `mjm__chip mjm__chip--${r.status}`, text: r.status_text }), h('div', { class: 'mjm__contact-main' }, [h('b', { text: r.subject || '(제목 없음)' }), h('div', { class: 'mjm__dim', text: `${r.send_at} · ${r.to}${r.error ? ' · ' + r.error : ''}` })]),
+                        r.status === 'pending' ? h('button', { type: 'button', class: 'is-danger', text: '취소', onclick: async () => { try { const x = await api('schedule', { method: 'POST', body: { action: 'cancel', id: r.id } }); state.scheduled = x.scheduled; draw('scheduled'); } catch (e) { say(e.message, true); } } }) : null]));
+                    if (!state.scheduled.length) ul.append(h('p', { class: 'mjm__empty', text: '예약한 메일이 없어요. 쓰기 창의 ⏰ 예약으로 등록해요.' }));
+                    body.append(h('p', { class: 'mjm__dim', text: '서버가 1분마다 확인해서 때가 된 메일을 보내요. 보낸 뒤엔 보낸 편지함에도 들어가요.' }), ul);
+                }
+            };
+            wrap.append(h('div', { class: 'mjm__toolbar' }, [h('button', { type: 'button', class: 'mjm__back', text: '‹ 닫기', onclick: () => { readEl.innerHTML = ''; renderRead(); if (mode === 'mini') setPane('list'); } }), h('h3', { class: 'mjm__readsubject mjm__readsubject--tb', text: '⚙ 메일 설정' })]),
+                h('div', { class: 'mjm__chips' }, tabs.map(([id, label]) => h('button', { type: 'button', class: 'mjm__chip', 'data-tab': id, text: label, onclick: () => draw(id) }))), body);
+            readEl.innerHTML = ''; readEl.append(wrap); setPane('read'); draw(tab);
+        }
+        async function setContact(email, current) {
+            if (!email) return;
+            const name = prompt(`${email} 를 어떤 이름으로 보여 줄까요?`, current || '');
+            if (name === null) return;
+            try {
+                const r = await api('contacts', { method: 'POST', body: name.trim() ? { action: 'set', email, name: name.trim() } : { action: 'delete', email } });
+                state.contacts = r.contacts; say(name.trim() ? '이름을 저장했어요' : '이름을 지웠어요'); renderList(); renderRead();
+            } catch (e) { say(e.message, true); }
         }
         const stripHtml = (html) => { const d = document.createElement('div'); d.innerHTML = html; d.querySelectorAll('style,script').forEach((n) => n.remove()); return d.innerText || d.textContent || ''; };
 
@@ -461,7 +594,7 @@
         loadFolders(); loadList();
         let lastUnread = null;
         watchUnread((n) => { if (lastUnread !== null && n !== lastUnread && state.folder === 'inbox' && !document.hidden && !state.compose && !state.selected.size) { loadList(); loadFolders(); } lastUnread = n; });
-        return { reload: () => { loadList(); loadFolders(); }, compose: openCompose, go: goFolder };
+        return { reload: () => { loadList(); loadFolders(); }, compose: openCompose, go: goFolder, settings: openSettings };
     }
 
     window.MjMail = { create, watchUnread, refreshUnread };

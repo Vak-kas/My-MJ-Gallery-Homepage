@@ -34,6 +34,10 @@ class Command(BaseCommand):
             if backup.due(now):
                 backup.start_in_background()  # 몇 분 걸릴 수 있어 따로 띄움
 
+            from webmail.scheduled import send_due  # 웹메일 예약 발송
+
+            send_due(now)
+
             cache.set(HEARTBEAT_KEY, now.isoformat(), 7 * 24 * 60 * 60)
             if options.get("verbosity", 1) > 1:
                 self.stdout.write(f"업타임 {checked}개 확인")

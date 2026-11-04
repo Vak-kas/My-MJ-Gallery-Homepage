@@ -3,10 +3,9 @@
 import json
 import re
 from datetime import datetime
-from email.utils import formataddr, make_msgid
+from email.utils import formataddr
 
 from django.conf import settings
-from django.core.mail import EmailMessage
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_GET, require_POST
@@ -14,7 +13,9 @@ from django.views.decorators.http import require_GET, require_POST
 from studio.views.common import admin_view
 
 from . import imap
+from .models import MailContact, MailTemplate, ScheduledAttachment, ScheduledMail, WebmailPref
 from .sanitize import sanitize_html, text_to_html
+from .scheduled import after_send, build_message
 
 _EMAIL_RE = re.compile(r"^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$")
 
@@ -117,7 +118,138 @@ def index(request):
 @require_GET
 def api_state(request):
 	with _mailbox() as box:
-		return JsonResponse({"ok": True, "folders": box.folder_status(), "user": settings.WEBMAIL_USER, "from_name": settings.WEBMAIL_FROM_NAME})
+		folders = box.folder_status()
+	return JsonResponse({"ok": True, "folders": folders, "user": settings.WEBMAIL_USER, "from_name": settings.WEBMAIL_FROM_NAME,
+	                     "signature": WebmailPref.get().signature, "contacts": _contacts_map(),
+	                     "templates": [{"id": t.id, "name": t.name, "subject": t.subject, "body": t.body} for t in MailTemplate.objects.all()],
+	                     "scheduled": _scheduled_list()})
+
+
+def _contacts_map():
+	return {c.email: {"name": c.name, "note": c.note} for c in MailContact.objects.all()}
+
+
+def _scheduled_list():
+	from django.utils import timezone
+
+	rows = ScheduledMail.objects.exclude(status=ScheduledMail.STATUS_CANCELLED).order_by("-send_at")[:50]
+	return [{"id": r.id, "to": r.to, "subject": r.subject, "send_at": timezone.localtime(r.send_at).strftime("%Y.%m.%d %H:%M"),
+	         "status": r.status, "status_text": r.get_status_display(), "error": r.error} for r in rows]
+
+
+@_api
+@require_POST
+def api_prefs(request):
+	"""서명 저장."""
+	try:
+		payload = json.loads(request.body or b"{}")
+	except ValueError:
+		raise _ApiError("JSON 이 이상해요")
+	pref = WebmailPref.get()
+	pref.signature = sanitize_html((payload.get("signature") or "").strip()[:4000], show_images=True)
+	pref.save(update_fields=["signature", "updated_at"])
+	return JsonResponse({"ok": True, "signature": pref.signature})
+
+
+@_api
+@require_POST
+def api_templates(request):
+	try:
+		payload = json.loads(request.body or b"{}")
+	except ValueError:
+		raise _ApiError("JSON 이 이상해요")
+	action = payload.get("action")
+	if action == "delete":
+		MailTemplate.objects.filter(id=payload.get("id")).delete()
+	elif action in ("create", "update"):
+		name = (payload.get("name") or "").strip()[:80]
+		if not name:
+			raise _ApiError("템플릿 이름을 적어 주세요")
+		fields = {"name": name, "subject": (payload.get("subject") or "").strip()[:300], "body": sanitize_html(payload.get("body") or "", show_images=True)[:20000]}
+		if action == "create":
+			MailTemplate.objects.create(**fields)
+		else:
+			if not MailTemplate.objects.filter(id=payload.get("id")).update(**fields):
+				raise _ApiError("없는 템플릿이에요")
+	else:
+		raise _ApiError("모르는 동작이에요")
+	return JsonResponse({"ok": True, "templates": [{"id": t.id, "name": t.name, "subject": t.subject, "body": t.body} for t in MailTemplate.objects.all()]})
+
+
+@_api
+@require_POST
+def api_contacts(request):
+	try:
+		payload = json.loads(request.body or b"{}")
+	except ValueError:
+		raise _ApiError("JSON 이 이상해요")
+	action = payload.get("action")
+	email = (payload.get("email") or "").strip().lower()[:254]
+	if not _EMAIL_RE.match(email):
+		raise _ApiError("주소가 이상해요")
+	if action == "set":
+		name = (payload.get("name") or "").strip()[:80]
+		if not name:
+			raise _ApiError("이름을 적어 주세요")
+		MailContact.objects.update_or_create(email=email, defaults={"name": name, "note": (payload.get("note") or "").strip()[:200]})
+	elif action == "delete":
+		MailContact.objects.filter(email=email).delete()
+	else:
+		raise _ApiError("모르는 동작이에요")
+	return JsonResponse({"ok": True, "contacts": _contacts_map()})
+
+
+@_api
+@require_POST
+def api_schedule(request):
+	"""예약 발송 등록(multipart, 쓰기 폼 + send_at) / 취소(JSON {action: cancel, id})."""
+	if request.content_type and request.content_type.startswith("application/json"):
+		try:
+			payload = json.loads(request.body or b"{}")
+		except ValueError:
+			raise _ApiError("JSON 이 이상해요")
+		if payload.get("action") != "cancel":
+			raise _ApiError("모르는 동작이에요")
+		n = ScheduledMail.objects.filter(id=payload.get("id"), status=ScheduledMail.STATUS_PENDING).update(status=ScheduledMail.STATUS_CANCELLED)
+		if not n:
+			raise _ApiError("취소할 수 있는 예약이 아니에요")
+		return JsonResponse({"ok": True, "scheduled": _scheduled_list()})
+	from django.utils import timezone
+	from django.utils.dateparse import parse_datetime
+
+	to = _addresses(request.POST.get("to"))
+	cc = _addresses(request.POST.get("cc"))
+	bcc = _addresses(request.POST.get("bcc"))
+	if not to:
+		raise _ApiError("받는 사람을 적어 주세요")
+	raw_at = (request.POST.get("send_at") or "").strip()
+	send_at = parse_datetime(raw_at) if raw_at else None
+	if not send_at:
+		raise _ApiError("보낼 시각을 골라 주세요")
+	if timezone.is_naive(send_at):
+		send_at = timezone.make_aware(send_at, timezone.get_current_timezone())
+	if send_at <= timezone.now():
+		raise _ApiError("보낼 시각은 지금보다 뒤여야 해요")
+	files = request.FILES.getlist("attachments")
+	if sum(f.size for f in files) > settings.WEBMAIL_ATTACHMENT_MAX_BYTES:
+		raise _ApiError(f"첨부는 모두 합쳐 {settings.WEBMAIL_ATTACHMENT_MAX_BYTES // (1024 * 1024)}MB 까지예요")
+	reply_uid = (request.POST.get("reply_uid") or "").strip()
+	item = ScheduledMail.objects.create(
+		to=", ".join(to), cc=", ".join(cc), bcc=", ".join(bcc), subject=(request.POST.get("subject") or "").strip()[:300], body=request.POST.get("body") or "",
+		html=request.POST.get("html") or "",
+		in_reply_to=(request.POST.get("in_reply_to") or "").strip()[:300], references=(request.POST.get("references") or "").strip(),
+		reply_folder=(request.POST.get("reply_folder") or "")[:100], reply_uid=int(reply_uid) if reply_uid.isdigit() else None, send_at=send_at,
+	)
+	for f in files:
+		ScheduledAttachment.objects.create(mail=item, file=f, filename=f.name[:255], content_type=(f.content_type or "")[:120], size=f.size)
+	draft_uid = (request.POST.get("draft_uid") or "").strip()
+	if draft_uid.isdigit():
+		try:
+			with _mailbox() as box:
+				box.delete("drafts", [int(draft_uid)])
+		except (_ApiError, imap.WebmailError):
+			pass
+	return JsonResponse({"ok": True, "id": item.id, "send_at": timezone.localtime(send_at).strftime("%Y.%m.%d %H:%M"), "scheduled": _scheduled_list()})
 
 
 @_api
@@ -298,21 +430,13 @@ def _build_message(request):
 	to = _addresses(request.POST.get("to"))
 	cc = _addresses(request.POST.get("cc"))
 	bcc = _addresses(request.POST.get("bcc"))
-	subject = (request.POST.get("subject") or "").strip()[:300]
-	body = request.POST.get("body") or ""
 	files = request.FILES.getlist("attachments")
 	total = sum(f.size for f in files)
 	if total > settings.WEBMAIL_ATTACHMENT_MAX_BYTES:
 		raise _ApiError(f"첨부는 모두 합쳐 {settings.WEBMAIL_ATTACHMENT_MAX_BYTES // (1024 * 1024)}MB 까지예요")
-	from_email = formataddr((settings.WEBMAIL_FROM_NAME, settings.WEBMAIL_USER))
-	headers = {"X-MJ-Kind": "webmail", "Message-ID": make_msgid(domain=settings.WEBMAIL_USER.split("@")[-1])}
-	in_reply_to = (request.POST.get("in_reply_to") or "").strip()
-	if in_reply_to:
-		headers["In-Reply-To"] = in_reply_to
-		headers["References"] = ((request.POST.get("references") or "").strip() + " " + in_reply_to).strip()
-	msg = EmailMessage(subject or "(제목 없음)", body, from_email, to, cc=cc, bcc=bcc, headers=headers)
-	for f in files:
-		msg.attach(f.name, f.read(), f.content_type or "application/octet-stream")
+	msg = build_message(to, cc, bcc, (request.POST.get("subject") or "").strip()[:300], request.POST.get("body") or "",
+	                    (request.POST.get("in_reply_to") or "").strip(), (request.POST.get("references") or "").strip(),
+	                    [(f.name, f.read(), f.content_type) for f in files], html=request.POST.get("html") or "")
 	return msg, to
 
 
@@ -338,9 +462,14 @@ def _build_message_lenient(request):
 	to = [a.strip() for a in re.split(r"[,;\n]", request.POST.get("to") or "") if a.strip()]
 	cc = [a.strip() for a in re.split(r"[,;\n]", request.POST.get("cc") or "") if a.strip()]
 	bcc = [a.strip() for a in re.split(r"[,;\n]", request.POST.get("bcc") or "") if a.strip()]
+	from django.core.mail import EmailMultiAlternatives
+
 	from_email = formataddr((settings.WEBMAIL_FROM_NAME, settings.WEBMAIL_USER))
-	msg = EmailMessage((request.POST.get("subject") or "").strip()[:300], request.POST.get("body") or "", from_email, to, cc=cc, bcc=bcc,
-	                   headers={"X-MJ-Draft": "1"})
+	msg = EmailMultiAlternatives((request.POST.get("subject") or "").strip()[:300], request.POST.get("body") or "", from_email, to, cc=cc, bcc=bcc,
+	                             headers={"X-MJ-Draft": "1"})
+	html = request.POST.get("html") or ""
+	if html.strip():
+		msg.attach_alternative(sanitize_html(html, show_images=True), "text/html")
 	return msg, to
 
 
@@ -358,18 +487,13 @@ def api_send(request):
 		raise _ApiError("보내지 못했어요", 502)
 
 	# 보낸 편지함에 사본, 답장이면 원본에 답장 표시, 초안이었으면 초안 삭제
-	with _mailbox() as box:
-		box.append("sent", msg.message().as_bytes())
-		reply_folder, reply_uid = request.POST.get("reply_folder"), request.POST.get("reply_uid")
-		if reply_folder and reply_uid:
-			try:
-				box.set_flag(_folder_key(reply_folder), [_uid(reply_uid)], "\\Answered", True)
-			except (_ApiError, imap.WebmailError):
-				pass
-		draft_uid = (request.POST.get("draft_uid") or "").strip()
-		if draft_uid.isdigit():
-			try:
+	reply_folder, reply_uid = (request.POST.get("reply_folder") or ""), (request.POST.get("reply_uid") or "")
+	after_send(msg, reply_folder if reply_folder in imap.FOLDER_BY_KEY or reply_folder.startswith(imap.LABEL_PREFIX) else "", int(reply_uid) if reply_uid.isdigit() else None)
+	draft_uid = (request.POST.get("draft_uid") or "").strip()
+	if draft_uid.isdigit():
+		try:
+			with _mailbox() as box:
 				box.delete("drafts", [int(draft_uid)])
-			except imap.WebmailError:
-				pass
+		except (_ApiError, imap.WebmailError):
+			pass
 	return JsonResponse({"ok": True})
