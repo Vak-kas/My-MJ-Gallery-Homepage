@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+{# 500 은 템플릿 컨텍스트 없이 그려지므로 base.html 을 상속하지 않는 독립 페이지 #}
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>문제가 생겼어요 — 서민재 갤러리</title>
+    <meta name="robots" content="noindex">
+    <style>
+        body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; background: #f5f5f7; color: #1d1d1f; font-family: system-ui, -apple-system, "SF Pro Text", "Inter", sans-serif; text-align: center; }
+        main { max-width: 640px; padding: 48px 24px; }
+        .eyebrow { font-size: 12px; letter-spacing: .28em; text-transform: uppercase; color: #0066cc; }
+        h1 { margin: 16px 0 0; font-size: 36px; letter-spacing: -.04em; font-weight: 600; }
+        p { font-size: 16px; line-height: 1.8; color: #6e6e73; }
+        .btns { margin-top: 28px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+        .btn { display: inline-block; padding: 10px 20px; border-radius: 999px; font-size: 14px; text-decoration: none; border: 1px solid rgba(0,0,0,.1); background: #fff; color: #1d1d1f; }
+        .btn.primary { background: #0066cc; border-color: #0066cc; color: #fff; font-weight: 600; }
+        .contact { margin-top: 36px; font-size: 13px; color: #8e8e93; }
+        .contact a { color: #0066cc; font-weight: 600; text-decoration: none; }
+        @media (prefers-color-scheme: dark) { body { background: #0f1115; color: #f3f4f6; } .btn { background: #171a20; border-color: rgba(255,255,255,.14); color: #f3f4f6; } }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="eyebrow">500</div>
+        <h1>문제가 생겼어요</h1>
+        <p>서버 쪽에서 오류가 났어요. 잠시 뒤 다시 시도해 보세요.<br>계속 그러면 어떤 화면에서 났는지 알려 주시면 빨리 고칠게요.</p>
+        <div class="btns">
+            <a class="btn primary" href="/">홈으로</a>
+            <a class="btn" href="javascript:history.back()">이전 페이지</a>
+        </div>
+        <p class="contact">자세한 건 관리자 메일 <a href="mailto:mjseo@smjgallery.kr">mjseo@smjgallery.kr</a> 로 보내 주세요.</p>
+    </main>
+</body>
+</html>

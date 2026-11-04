@@ -173,10 +173,10 @@
                     <div class="grid grid-cols-12 border-b border-black/[0.06] bg-[#fbfbfd] px-7 py-4 text-[12px] uppercase tracking-[0.18em] text-[#6e6e73]">
                         <div class="col-span-2">Platform</div>
                         <div class="col-span-2">Label</div>
-                        <div class="col-span-4">URL</div>
-                        <div class="col-span-1">Visible</div>
-                        <div class="col-span-1">Primary</div>
-                        <div class="col-span-2 text-right">Actions</div>
+                        <div class="col-span-3">URL</div>
+                        <div class="col-span-1" title="메인 화면에 보이기">공개</div>
+                        <div class="col-span-1" title="대표 링크">대표</div>
+                        <div class="col-span-3 text-right">Actions</div>
                     </div>
 
                     {% for link in links %}
@@ -212,7 +212,7 @@
                                    class="h-[42px] w-full rounded-full border border-black/[0.07] bg-white px-4 text-[14px] outline-none focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
                         </div>
 
-                        <div class="col-span-4">
+                        <div class="col-span-3">
                             <input type="url"
                                    name="url"
                                    value="{{ link.url }}"
@@ -244,7 +244,7 @@
                             </label>
                         </div>
 
-                        <div class="col-span-2 flex justify-end gap-2">
+                        <div class="col-span-3 flex justify-end gap-2">
                             <button type="submit"
                                     class="rounded-full bg-[#0066cc] px-4 py-2 text-[13px] text-white transition active:scale-[0.97]">
                                 Save
@@ -279,7 +279,7 @@
                             {{ link.label|default:"-" }}
                         </div>
 
-                        <div class="col-span-4 truncate text-[15px] text-[#6e6e73]">
+                        <div class="col-span-3 truncate text-[15px] text-[#6e6e73]">
                             <a href="{{ link.url }}" target="_blank" class="hover:text-[#0066cc]">
                                 {{ link.url }}
                             </a>
@@ -298,9 +298,6 @@
                                            onchange="this.form.submit()"
                                            class="peer sr-only">
                                     <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#34c759] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
-                                    <span class="text-[11px] font-medium {% if link.is_visible %}text-green-700{% else %}text-[#8e8e93]{% endif %}">
-                                        {% if link.is_visible %}ON{% else %}OFF{% endif %}
-                                    </span>
                                 </label>
                             </form>
                         </div>
@@ -318,14 +315,11 @@
                                            onchange="this.form.submit()"
                                            class="peer sr-only">
                                     <span class="relative h-6 w-11 rounded-full bg-[#d2d2d7] transition peer-checked:bg-[#0066cc] after:absolute after:left-1 after:top-1 after:h-4 after:w-4 after:rounded-full after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-5"></span>
-                                    <span class="text-[11px] font-medium {% if link.is_primary %}text-[#0066cc]{% else %}text-[#8e8e93]{% endif %}">
-                                        {% if link.is_primary %}ON{% else %}OFF{% endif %}
-                                    </span>
                                 </label>
                             </form>
                         </div>
 
-                        <div class="col-span-2 flex justify-end gap-2">
+                        <div class="col-span-3 flex justify-end gap-2">
                             <a href="{% url 'studio:profile_links' %}?edit={{ link.id }}#link-{{ link.id }}"
                                     class="rounded-full border border-black/[0.06] px-4 py-2 text-[13px] text-[#1d1d1f]">
                                 Edit
