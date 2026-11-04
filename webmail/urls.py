@@ -12,5 +12,8 @@ urlpatterns = [
 	path("api/message/", views.api_message, name="api_message"),
 	path("api/action/", views.api_action, name="api_action"),
 	path("api/send/", views.api_send, name="api_send"),
+	path("api/draft/", views.api_draft, name="api_draft"),
+	path("api/labels/", views.api_labels, name="api_labels"),
 	path("attachment/", views.attachment, name="attachment"),
+	path("raw/", views.raw, name="raw"),
 ]
