@@ -246,6 +246,8 @@ WEBMAIL_PASSWORD = os.getenv("WEBMAIL_PASSWORD", "")
 WEBMAIL_FROM_NAME = os.getenv("WEBMAIL_FROM_NAME", "서민재")
 WEBMAIL_ENABLED = bool(WEBMAIL_PASSWORD)
 WEBMAIL_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024
+# 앱 비밀번호 파일: Dovecot 의 두 번째 passdb 가 읽음 (설치 스크립트가 폴더를 dovecot 그룹 setgid 로 만듦)
+WEBMAIL_APP_PASSWORD_FILE = os.getenv("WEBMAIL_APP_PASSWORD_FILE", str(PRIVATE_MEDIA_ROOT / "mail" / "app_passwords"))
 
 if USE_S3:
     INSTALLED_APPS.append('storages')

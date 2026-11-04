@@ -417,3 +417,59 @@ class WebmailV3Tests(TestCase):
 		self.assertEqual(self.post_json("webmail:api_schedule", {"action": "cancel", "id": sid}).status_code, 200)
 		self.assertEqual(ScheduledMail.objects.get(id=sid).status, "cancelled")
 		self.assertEqual(self.post_json("webmail:api_schedule", {"action": "cancel", "id": sid}).status_code, 400)
+
+
+@override_settings(WEBMAIL_ENABLED=True, WEBMAIL_PASSWORD="x", WEBMAIL_USER="mjseo@smjgallery.kr")
+class AppPasswordTests(TestCase):
+	def setUp(self):
+		import tempfile
+
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("ap-admin", "a@example.com", "pw")
+		self.client.force_login(self.admin)
+		self.tmp = tempfile.mkdtemp()
+		patcher = mock.patch("webmail.views.imap.Mailbox", FakeMailbox)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+		FakeMailbox.reset()
+		self.override = override_settings(WEBMAIL_APP_PASSWORD_FILE=f"{self.tmp}/mail/app_passwords")
+		self.override.enable()
+		self.addCleanup(self.override.disable)
+
+	def test_ssha512_matches_dovecot_format(self):
+		import base64
+		import hashlib
+
+		from .models import ssha512
+
+		h = ssha512("secret", salt=b"0123456789abcdef")
+		self.assertTrue(h.startswith("{SSHA512}"))
+		raw = base64.b64decode(h[len("{SSHA512}"):])
+		self.assertEqual(raw[-16:], b"0123456789abcdef")
+		self.assertEqual(raw[:-16], hashlib.sha512(b"secret" + b"0123456789abcdef").digest())
+
+	def test_create_writes_file_and_delete_removes(self):
+		import os
+		from pathlib import Path
+
+		from .models import AppPassword
+
+		res = self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "create", "label": "맥북 Mail"}), content_type="application/json")
+		self.assertEqual(res.status_code, 200, res.content)
+		data = res.json()
+		self.assertEqual(data["login"], "mjseo+mail@smjgallery.kr")  # 한글은 빠지고 영문만 slug 로
+		self.assertRegex(data["password"], r"^[0-9a-f]{4}(-[0-9a-f]{4}){3}$")
+		res2 = self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "create", "label": "iPhone 15"}), content_type="application/json").json()
+		self.assertEqual(res2["login"], "mjseo+iphone-15@smjgallery.kr")
+		path = Path(self.tmp) / "mail" / "app_passwords"
+		lines = path.read_text().splitlines()
+		self.assertEqual(len(lines), 2)
+		self.assertTrue(lines[0].startswith("mjseo+mail@smjgallery.kr:{SSHA512}"))
+		self.assertTrue(lines[0].endswith(":::::::user=mjseo@smjgallery.kr"))
+		self.assertEqual(oct(os.stat(path).st_mode & 0o777), "0o640")
+		state = self.client.get(reverse("webmail:api_state")).json()
+		self.assertEqual([a["label"] for a in state["app_passwords"]], ["맥북 Mail", "iPhone 15"])
+		first = AppPassword.objects.get(label="맥북 Mail")
+		self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "delete", "id": first.id}), content_type="application/json")
+		self.assertEqual(len(path.read_text().splitlines()), 1)
+		self.assertEqual(self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "create", "label": ""}), content_type="application/json").status_code, 400)

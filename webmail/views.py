@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 from studio.views.common import admin_view
 
 from . import imap
-from .models import MailContact, ScheduledAttachment, ScheduledMail, WebmailPref
+from .models import AppPassword, MailContact, ScheduledAttachment, ScheduledMail, WebmailPref, write_app_password_file
 from .sanitize import sanitize_html, text_to_html
 from .scheduled import after_send, build_message
 
@@ -120,7 +120,44 @@ def api_state(request):
 	with _mailbox() as box:
 		folders = box.folder_status()
 	return JsonResponse({"ok": True, "folders": folders, "user": settings.WEBMAIL_USER, "from_name": settings.WEBMAIL_FROM_NAME,
-	                     "signature": WebmailPref.get().signature, "contacts": _contacts_map(), "scheduled": _scheduled_list()})
+	                     "signature": WebmailPref.get().signature, "contacts": _contacts_map(), "scheduled": _scheduled_list(),
+	                     "app_passwords": _app_password_list(), "imap_host": settings.WEBMAIL_IMAP_TLS_NAME})
+
+
+def _app_password_list():
+	from django.utils import timezone
+
+	return [{"id": a.id, "label": a.label, "login": a.login, "created": timezone.localtime(a.created_at).strftime("%Y.%m.%d")} for a in AppPassword.objects.all()]
+
+
+@_api
+@require_POST
+def api_app_passwords(request):
+	"""앱 비밀번호 만들기(평문은 이 응답에만)·지우기."""
+	try:
+		payload = json.loads(request.body or b"{}")
+	except ValueError:
+		raise _ApiError("JSON 이 이상해요")
+	action = payload.get("action")
+	if action == "create":
+		label = (payload.get("label") or "").strip()
+		if not label:
+			raise _ApiError("기기 이름을 적어 주세요 (예: 맥북 Mail)")
+		if AppPassword.objects.count() >= 20:
+			raise _ApiError("앱 비밀번호는 20개까지예요. 안 쓰는 걸 지워 주세요")
+		try:
+			obj, plain = AppPassword.create_for(label)
+		except OSError as exc:
+			raise _ApiError(f"비밀번호 파일을 쓰지 못했어요: {exc}", 500)
+		return JsonResponse({"ok": True, "login": obj.login, "password": plain, "app_passwords": _app_password_list()})
+	if action == "delete":
+		AppPassword.objects.filter(id=payload.get("id")).delete()
+		try:
+			write_app_password_file()
+		except OSError as exc:
+			raise _ApiError(f"비밀번호 파일을 쓰지 못했어요: {exc}", 500)
+		return JsonResponse({"ok": True, "app_passwords": _app_password_list()})
+	raise _ApiError("모르는 동작이에요")
 
 
 def _contacts_map():

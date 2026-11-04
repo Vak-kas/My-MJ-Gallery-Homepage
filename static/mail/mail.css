@@ -206,3 +206,10 @@ html.theme-dark .mail-panel__head { color: #f3f4f6; border-color: rgba(255,255,2
 .mjm__chip--sent { color: #1e7a35; border-color: rgba(52,199,89,.4); }
 .mjm__chip--failed { color: #c4271d; border-color: rgba(255,59,48,.4); }
 @media (max-width: 640px) { .mjm__contact-add { grid-template-columns: 1fr 1fr; } }
+
+/* 앱 비밀번호 */
+.mjm__contact-add--2 { grid-template-columns: 1fr auto; }
+.mjm__appmade { margin: 0 16px; padding: 12px 14px; border: 1px solid rgba(52,199,89,.4); border-radius: 12px; background: rgba(52,199,89,.08); font-size: 13px; }
+.mjm__apptable { margin: 8px 0; border-collapse: collapse; font-size: 13px; }
+.mjm__apptable th { text-align: left; padding: 3px 10px 3px 0; color: var(--mjm-dim); font-weight: 500; white-space: nowrap; }
+.mjm__apptable td code { font-family: ui-monospace, monospace; font-size: 13px; user-select: all; }

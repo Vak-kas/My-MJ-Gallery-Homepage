@@ -158,6 +158,12 @@ R
 systemctl enable --now redis-server rspamd >/dev/null; systemctl restart rspamd
 
 echo "▶ 6/8 Dovecot (IMAP 993 · LMTP · 587 로그인)"
+# 앱 비밀번호 파일 폴더: Django(ubuntu)가 쓰고 Dovecot(dovecot 그룹)이 읽음 — setgid 로 새 파일이 dovecot 그룹을 물려받음
+APP_DIR="/home/ubuntu/projects/smjgallery"
+mkdir -p "${APP_DIR}/private_media/mail"
+chown ubuntu:dovecot "${APP_DIR}/private_media/mail"
+chmod 2750 "${APP_DIR}/private_media/mail"
+[ -f "${APP_DIR}/private_media/mail/app_passwords" ] || { touch "${APP_DIR}/private_media/mail/app_passwords"; chown ubuntu:dovecot "${APP_DIR}/private_media/mail/app_passwords"; chmod 640 "${APP_DIR}/private_media/mail/app_passwords"; }
 # 기본 설정의 리눅스 계정(PAM) 인증은 끔 — 우리 메일함은 /etc/dovecot/users 만 쓰는데 PAM 이 먼저 시도돼
 # 실패하는 데 2초가 걸려 로그인마다 2초씩 느려짐 (웹메일은 요청마다 로그인함)
 sed -i 's/^!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
@@ -183,6 +189,12 @@ last_valid_uid = 5000
 passdb {
   driver = passwd-file
   args = scheme=SHA512-CRYPT username_format=%u /etc/dovecot/users
+  result_failure = continue
+}
+# 앱 비밀번호 (사이트 메일 설정에서 발급, 로그인은 mjseo+기기@도메인 → user= 로 본 계정에 매핑). 파일은 Django 가 씀
+passdb {
+  driver = passwd-file
+  args = username_format=%u ${APP_DIR}/private_media/mail/app_passwords
 }
 userdb {
   driver = static

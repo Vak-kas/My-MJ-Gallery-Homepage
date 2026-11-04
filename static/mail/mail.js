@@ -76,7 +76,7 @@
         const state = {
             folder: 'inbox', page: 1, q: '', filter: 'all', sort: 'newest', adv: {}, list: null, folders: [], current: null,
             selected: new Set(), pane: 'list', compose: null, cursor: -1,
-            signature: '', contacts: {}, scheduled: [],
+            signature: '', contacts: {}, scheduled: [], appPasswords: [], imapHost: '',
         };
         const user = root.dataset.user || '';
         root.classList.add('mjm', `mjm--${mode}`);
@@ -132,7 +132,7 @@
         async function loadFolders() {
             try {
                 const r = await api('state');
-                Object.assign(state, { folders: r.folders, signature: r.signature || '', contacts: r.contacts || {}, scheduled: r.scheduled || [] });
+                Object.assign(state, { folders: r.folders, signature: r.signature || '', contacts: r.contacts || {}, scheduled: r.scheduled || [], appPasswords: r.app_passwords || [], imapHost: r.imap_host || '' });
                 renderFolders(); if (mode === 'mini') renderList();
             } catch (e) { say(e.message, true); }
         }
@@ -493,7 +493,7 @@
             if (state.compose && !confirm('쓰던 메일을 닫을까요?')) return;
             state.compose = null; state.sentInfo = null; state.current = null;
             const wrap = h('div', { class: 'mjm__settings' });
-            const tabs = [['signature', '서명'], ['contacts', '주소록'], ['scheduled', '예약 발송']];
+            const tabs = [['signature', '서명'], ['contacts', '주소록'], ['devices', '앱 비밀번호'], ['scheduled', '예약 발송']];
             const body = h('div', { class: 'mjm__settings-body' });
             const draw = (t) => {
                 body.innerHTML = '';
@@ -516,6 +516,33 @@
                         h('button', { type: 'button', text: '편집', onclick: () => { email.value = e2; name.value = c.name; note.value = c.note || ''; name.focus(); } }),
                         h('button', { type: 'button', class: 'is-danger', text: '지우기', onclick: async () => { const r = await api('contacts', { method: 'POST', body: { action: 'delete', email: e2 } }); state.contacts = r.contacts; draw('contacts'); } })]));
                     if (!Object.keys(state.contacts).length) ul.append(h('p', { class: 'mjm__empty', text: '아직 없어요. 읽기 화면의 "이름 정하기"로도 넣을 수 있어요.' }));
+                    body.append(ul);
+                } else if (t === 'devices') {
+                    const label = h('input', { type: 'text', placeholder: '기기 이름 (예: 맥북 Mail, 아이폰)', maxlength: 40 });
+                    const made = h('div', { class: 'mjm__appmade', hidden: true });
+                    body.append(h('p', { class: 'mjm__dim', text: '맥·아이폰 메일 앱에는 본 비밀번호 대신 기기마다 따로 만든 앱 비밀번호를 넣어요. 기기를 잃어버리면 그것만 지우면 돼요. 비밀번호는 만들 때 한 번만 보여요.' }),
+                        h('div', { class: 'mjm__contact-add mjm__contact-add--2' }, [label, h('button', { type: 'button', class: 'mjm__send', text: '만들기', onclick: async () => {
+                            try {
+                                const r = await api('app-passwords', { method: 'POST', body: { action: 'create', label: label.value } });
+                                state.appPasswords = r.app_passwords; label.value = '';
+                                made.hidden = false; made.innerHTML = '';
+                                made.append(h('b', { text: '지금 한 번만 보여요 — 메일 앱에 이렇게 넣으세요' }),
+                                    h('table', { class: 'mjm__apptable' }, [
+                                        ['받는 메일 서버 (IMAP)', `${state.imapHost} · 993 · SSL`], ['보내는 메일 서버 (SMTP)', `${state.imapHost} · 587 · STARTTLS · 인증 사용`],
+                                        ['사용자 이름', r.login], ['비밀번호', r.password],
+                                    ].map(([k, v]) => h('tr', {}, [h('th', { text: k }), h('td', {}, [h('code', { text: v })])]))),
+                                    h('button', { type: 'button', class: 'mjm__mini', text: '비밀번호 복사', onclick: (e) => { navigator.clipboard?.writeText(r.password); e.target.textContent = '복사했어요'; } }));
+                                drawList();
+                            } catch (e) { say(e.message, true); }
+                        } })]), made);
+                    const ul = h('div', { class: 'mjm__contacts' });
+                    const drawList = () => {
+                        ul.innerHTML = '';
+                        for (const a of state.appPasswords) ul.append(h('div', { class: 'mjm__contact' }, [h('span', { class: 'mjm__chip mjm__chip--sent', text: '📱' }), h('div', { class: 'mjm__contact-main' }, [h('b', { text: a.label }), h('div', { class: 'mjm__dim', text: `${a.login} · ${a.created} 만듦` })]),
+                            h('button', { type: 'button', class: 'is-danger', text: '지우기', onclick: async () => { if (!confirm(`"${a.label}" 앱 비밀번호를 지울까요? 그 기기는 더 이상 로그인 못 해요.`)) return; try { const r = await api('app-passwords', { method: 'POST', body: { action: 'delete', id: a.id } }); state.appPasswords = r.app_passwords; drawList(); } catch (e) { say(e.message, true); } } })]));
+                        if (!state.appPasswords.length) ul.append(h('p', { class: 'mjm__empty', text: '아직 없어요. 위에서 기기 이름을 적고 만들어요.' }));
+                    };
+                    drawList();
                     body.append(ul);
                 } else {
                     const ul = h('div', { class: 'mjm__contacts' });
