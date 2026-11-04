@@ -95,7 +95,7 @@ from .posts import (
     post_delete,
 )
 from .community import community
-from .users import users
+from .users import users, user_detail
 from .security import security, security_ip
 from .settings import site_settings_view
 from .analytics import analytics

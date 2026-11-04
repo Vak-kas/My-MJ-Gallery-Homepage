@@ -130,6 +130,7 @@ CACHES = {
 }
 
 SITE_URL = os.getenv("SITE_URL", "https://smjgallery.kr")
+CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "mjseo@smjgallery.kr")  # 문의 안내(꼬리말·오류 페이지)
 
 # 메일 (아이디 찾기·비밀번호 재설정). EMAIL_HOST 를 비우면 실제로 보내지 않고 서버 로그(console)에 찍음
 # 보내는 메일은 모두 webmail.backend.LoggingEmailBackend 를 거쳐 SentMail 에 기록(Studio › Mail)

@@ -3,6 +3,6 @@
         <p class="text-[13px] text-[#6e6e73]">© {% now "Y" %} MjGallery. All rights reserved.</p>
         <a href="{% url 'pwa_install' %}" class="text-[13px] font-semibold text-[#0066cc] hover:underline" id="footer-app-link">📱 앱으로 설치</a>
         <script>if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) document.getElementById('footer-app-link').remove();</script>
-        <p class="text-[13px] text-[#6e6e73]">Designed & Built by Minjae Seo</p>
+        <p class="text-[13px] text-[#6e6e73]">문의 <a href="mailto:{{ contact_email }}" class="hover:text-[#0066cc] hover:underline">{{ contact_email }}</a> · Designed & Built by Minjae Seo</p>
     </div>
 </footer>

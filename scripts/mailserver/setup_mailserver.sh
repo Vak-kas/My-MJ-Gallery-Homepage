@@ -248,7 +248,9 @@ postconf -e "smtpd_sasl_type = dovecot"
 postconf -e "smtpd_sasl_path = private/auth"
 postconf -e "smtpd_sasl_auth_enable = no"
 postconf -e "smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination"
-postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, reject_unknown_recipient_domain, reject_rbl_client zen.spamhaus.org"
+# Spamhaus 직접 조회(reject_rbl_client)는 넣지 않음: AWS 공용 리졸버에서는 Spamhaus 가 조회를 거부해서("open resolver")
+# 모든 메일이 554 로 튕김. 스팸 판단은 rspamd 가 함(점수 6 이상 Junk, 15 이상 거절)
+postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, reject_unknown_recipient_domain"
 postconf -e "smtpd_helo_required = yes"
 postconf -e "smtpd_sender_restrictions = reject_unknown_sender_domain"
 # 밀터: 받을 때 rspamd, 보낼 때 DKIM + rspamd
