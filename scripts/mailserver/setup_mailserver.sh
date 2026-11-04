@@ -29,7 +29,7 @@ debconf-set-selections <<< "postfix postfix/mailname string ${DOMAIN}"
 debconf-set-selections <<< "roundcube-core roundcube/dbconfig-install boolean true"
 debconf-set-selections <<< "roundcube-core roundcube/database-type select sqlite3"
 apt-get update -qq
-apt-get install -y -qq postfix postfix-lmtp dovecot-core dovecot-imapd dovecot-lmtpd \
+apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-lmtpd \
   opendkim opendkim-tools rspamd redis-server \
   roundcube roundcube-sqlite3 php-fpm php-intl php-gd php-zip \
   certbot python3-certbot-nginx mailutils >/dev/null
