@@ -104,3 +104,62 @@ class MustChangePassword(models.Model):
 
     def __str__(self):
         return f"{self.user} 임시 비밀번호 ({self.created_at:%Y-%m-%d})"
+
+
+class TwoFactor(models.Model):
+	"""2단계 인증(메일 코드). 비밀번호 뒤에 메일로 받은 6자리 코드(또는 백업 코드)까지 맞아야 로그인."""
+
+	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="two_factor")
+	enabled = models.BooleanField(default=False, db_index=True)
+	confirmed_at = models.DateTimeField(null=True, blank=True)
+	backup_codes = models.JSONField(default=list, blank=True)  # make_password 해시 목록, 쓰면 지움
+	trust_version = models.PositiveIntegerField(default=0)  # "30일 기억" 쿠키 무효화용 (모든 기기에서 로그아웃하면 +1)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	def __str__(self):
+		return f"{self.user} 2단계 인증 {'켜짐' if self.enabled else '설정 중'}"
+
+	def use_backup_code(self, code: str) -> bool:
+		"""백업 코드(8자리) 확인 → 맞으면 그 코드 삭제."""
+		from django.contrib.auth.hashers import check_password
+
+		digits = "".join(ch for ch in (code or "") if ch.isdigit())
+		if len(digits) != 8:
+			return False
+		for i, hashed in enumerate(self.backup_codes):
+			if check_password(digits, hashed):
+				self.backup_codes = self.backup_codes[:i] + self.backup_codes[i + 1:]
+				self.save(update_fields=["backup_codes", "updated_at"])
+				return True
+		return False
+
+	def issue_backup_codes(self):
+		import secrets
+
+		from django.contrib.auth.hashers import make_password
+
+		codes = [f"{secrets.randbelow(10 ** 8):08d}" for _ in range(10)]
+		self.backup_codes = [make_password(c) for c in codes]
+		self.save(update_fields=["backup_codes", "updated_at"])
+		return codes
+
+
+def two_factor_enabled(user) -> bool:
+	return bool(user and user.is_authenticated and TwoFactor.objects.filter(user=user, enabled=True).exists())
+
+
+def logout_everywhere(user, keep_session_key=None) -> int:
+	"""이 계정의 모든 로그인 세션을 끊음(지금 브라우저는 keep_session_key 로 남길 수 있음) + '30일 기억' 쿠키 무효화. 끊은 세션 수 반환."""
+	from django.contrib.sessions.models import Session
+	from django.utils import timezone
+
+	n = 0
+	for sess in Session.objects.filter(expire_date__gte=timezone.now()):
+		if sess.session_key == keep_session_key:
+			continue
+		if sess.get_decoded().get("_auth_user_id") == str(user.id):
+			sess.delete()
+			n += 1
+	TwoFactor.objects.filter(user=user).update(trust_version=models.F("trust_version") + 1)
+	return n
