@@ -13,7 +13,7 @@ from django.views.decorators.http import require_GET, require_POST
 from studio.views.common import admin_view
 
 from . import imap
-from .models import MailContact, MailTemplate, ScheduledAttachment, ScheduledMail, WebmailPref
+from .models import MailContact, ScheduledAttachment, ScheduledMail, WebmailPref
 from .sanitize import sanitize_html, text_to_html
 from .scheduled import after_send, build_message
 
@@ -120,9 +120,7 @@ def api_state(request):
 	with _mailbox() as box:
 		folders = box.folder_status()
 	return JsonResponse({"ok": True, "folders": folders, "user": settings.WEBMAIL_USER, "from_name": settings.WEBMAIL_FROM_NAME,
-	                     "signature": WebmailPref.get().signature, "contacts": _contacts_map(),
-	                     "templates": [{"id": t.id, "name": t.name, "subject": t.subject, "body": t.body} for t in MailTemplate.objects.all()],
-	                     "scheduled": _scheduled_list()})
+	                     "signature": WebmailPref.get().signature, "contacts": _contacts_map(), "scheduled": _scheduled_list()})
 
 
 def _contacts_map():
@@ -149,31 +147,6 @@ def api_prefs(request):
 	pref.signature = sanitize_html((payload.get("signature") or "").strip()[:4000], show_images=True)
 	pref.save(update_fields=["signature", "updated_at"])
 	return JsonResponse({"ok": True, "signature": pref.signature})
-
-
-@_api
-@require_POST
-def api_templates(request):
-	try:
-		payload = json.loads(request.body or b"{}")
-	except ValueError:
-		raise _ApiError("JSON 이 이상해요")
-	action = payload.get("action")
-	if action == "delete":
-		MailTemplate.objects.filter(id=payload.get("id")).delete()
-	elif action in ("create", "update"):
-		name = (payload.get("name") or "").strip()[:80]
-		if not name:
-			raise _ApiError("템플릿 이름을 적어 주세요")
-		fields = {"name": name, "subject": (payload.get("subject") or "").strip()[:300], "body": sanitize_html(payload.get("body") or "", show_images=True)[:20000]}
-		if action == "create":
-			MailTemplate.objects.create(**fields)
-		else:
-			if not MailTemplate.objects.filter(id=payload.get("id")).update(**fields):
-				raise _ApiError("없는 템플릿이에요")
-	else:
-		raise _ApiError("모르는 동작이에요")
-	return JsonResponse({"ok": True, "templates": [{"id": t.id, "name": t.name, "subject": t.subject, "body": t.body} for t in MailTemplate.objects.all()]})
 
 
 @_api
