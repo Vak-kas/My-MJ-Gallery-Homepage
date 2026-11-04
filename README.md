@@ -173,6 +173,7 @@
 - **카카오톡 '나에게 보내기'** 연동: 알림 화면에서 카카오톡 연결 → 새 알림을 나와의 채팅으로 전송 (토큰 자동 갱신)
 
 ### 1.9 Studio (관리자 전용 CMS, `/studio/`)
+- 화면 1024px 미만(폰·태블릿)에서는 왼쪽 사이드바가 서랍으로 바뀌고 왼쪽 아래 ☰ 버튼으로 엶 (`components/studio_sidebar.html`), 본문은 전체 너비
 - Profile / Career / Activity / Award / Publication / Certification / Skill / Project CRUD, 노출 토글, 순서 변경
 - **Posts**: 검색·작성자·기간·**제목 포함(예: 555)** 필터, 발행/임시저장 상태 필터, 공개 범위 변경
   - 일괄 작업(발행, 발행 취소, 공개 범위, 삭제)을 체크한 글 또는 **필터 결과 전체(모든 페이지)** 에 적용

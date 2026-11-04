@@ -5,7 +5,7 @@
     <div class="flex">
         {% include "components/studio_sidebar.html" %}
 
-        <main class="ml-[260px] flex-1 px-14 py-12 pb-24">
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
             {% if messages %}
             <div id="toast-container" class="fixed right-8 top-8 z-50 space-y-3">
                 {% for message in messages %}

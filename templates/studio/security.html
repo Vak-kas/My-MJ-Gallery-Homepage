@@ -5,7 +5,7 @@
     <div class="flex">
         {% include "components/studio_sidebar.html" %}
 
-        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
         {% include "components/studio_messages.html" %}
         <div class="mb-8">
             <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
@@ -16,7 +16,7 @@
 
         <section class="mb-8">
             <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO SECURITY</p>
-            <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">보안</h1>
+            <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[36px] lg:text-[44px]">보안</h1>
             <p class="mt-3 text-[16px] text-[#6e6e73]">누가, 어디서, 언제 로그인하고 글을 썼는지 남기고, 문제 있는 IP 를 막습니다. 기록은 {{ retention_days }}일 뒤 자동으로 지워져요. 지금 내 IP: <span class="font-mono text-[#1d1d1f]">{{ my_ip|default:"-" }}</span></p>
             <form class="mt-4 flex max-w-[420px] gap-2" onsubmit="event.preventDefault(); const v=this.q.value.trim(); if (v) location.href='{% url 'studio:security' %}ip/'+encodeURIComponent(v)+'/';">
                 <input name="q" placeholder="🔎 IP 조회 (누구의 IP 인지, 신고 연락처, 우리 서버 기록)" class="h-10 flex-1 rounded-xl border border-black/[0.1] bg-white px-3 font-mono text-[13px]">

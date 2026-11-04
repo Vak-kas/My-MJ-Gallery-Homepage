@@ -1,4 +1,7 @@
-<aside id="studio-sidebar" class="fixed left-0 top-0 z-40 h-screen w-[260px] overflow-y-auto overscroll-contain border-r border-black/[0.06] bg-white px-5 py-7">
+{# 작은 화면(lg 미만): 왼쪽 아래 ☰ 버튼으로 여는 서랍. 큰 화면: 왼쪽 고정 사이드바 #}
+<button id="studio-menu-btn" type="button" class="fixed bottom-5 left-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-[#1d1d1f] text-[20px] text-white shadow-[0_8px_24px_rgba(0,0,0,0.25)] lg:hidden" aria-label="Studio 메뉴 열기" aria-controls="studio-sidebar" aria-expanded="false">☰</button>
+<div id="studio-backdrop" class="fixed inset-0 z-40 hidden bg-black/30 lg:hidden"></div>
+<aside id="studio-sidebar" class="fixed left-0 top-0 z-50 h-screen w-[260px] -translate-x-full overflow-y-auto overscroll-contain border-r border-black/[0.06] bg-white px-5 py-7 transition-transform duration-200 lg:translate-x-0">
 
     <div>
         <h1 class="apple-display text-[28px] font-semibold tracking-[-0.03em]">
@@ -153,6 +156,20 @@
     const side = document.getElementById('studio-sidebar');
     const tip = document.getElementById('studio-tip');
     if (!side || !tip) return;
+    // 작은 화면: 햄버거로 서랍 열고, 바깥·메뉴 클릭·Esc 로 닫기
+    const btn = document.getElementById('studio-menu-btn');
+    const backdrop = document.getElementById('studio-backdrop');
+    const setOpen = (open) => {
+        side.classList.toggle('-translate-x-full', !open);
+        backdrop.classList.toggle('hidden', !open);
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('overflow-hidden', open && window.innerWidth < 1024);
+    };
+    btn?.addEventListener('click', () => setOpen(side.classList.contains('-translate-x-full')));
+    backdrop?.addEventListener('click', () => setOpen(false));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') setOpen(false); });
+    side.querySelectorAll('nav a').forEach((a) => a.addEventListener('click', () => { if (window.innerWidth < 1024) setOpen(false); }));
+    window.addEventListener('resize', () => { if (window.innerWidth >= 1024) setOpen(false); });
     const show = (link) => {
         const text = link.querySelector('.studio-tip')?.textContent.trim();
         if (!text) return;

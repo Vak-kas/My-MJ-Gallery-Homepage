@@ -5,7 +5,7 @@
     <div class="flex">
         {% include "components/studio_sidebar.html" %}
 
-        <main class="ml-[260px] min-w-0 flex-1 px-14 py-12 pb-24">
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
         {% include "components/studio_messages.html" %}
         <div class="mb-8">
             <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
@@ -17,7 +17,7 @@
         <section class="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
                 <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO AI</p>
-                <h1 class="mt-4 text-[44px] font-semibold tracking-[-0.04em]">AI 사용량</h1>
+                <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[36px] lg:text-[44px]">AI 사용량</h1>
                 <p class="mt-2 text-[14px] text-[#6e6e73]">모델 <span class="font-mono">{{ model }}</span> · 단가 입력 ${{ price_in }} / 출력 ${{ price_out }} (100만 토큰당) · 입력한 글은 저장하지 않아요</p>
             </div>
             <div class="flex gap-1.5">
