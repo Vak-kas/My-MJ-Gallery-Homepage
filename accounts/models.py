@@ -107,51 +107,39 @@ class MustChangePassword(models.Model):
 
 
 class TwoFactor(models.Model):
-	"""2단계 인증(TOTP). 비밀번호 뒤에 인증 앱의 6자리 코드(또는 백업 코드)까지 맞아야 로그인."""
-
-	METHOD_APP, METHOD_EMAIL = "app", "email"
-	METHOD_CHOICES = [(METHOD_APP, "인증 앱 (TOTP)"), (METHOD_EMAIL, "메일 코드")]
+	"""2단계 인증(메일 코드). 비밀번호 뒤에 메일로 받은 6자리 코드(또는 백업 코드)까지 맞아야 로그인."""
 
 	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="two_factor")
-	method = models.CharField(max_length=10, choices=METHOD_CHOICES, default=METHOD_APP)
-	secret = models.CharField(max_length=64, blank=True)  # 인증 앱 방식만
 	enabled = models.BooleanField(default=False, db_index=True)
-	trust_version = models.PositiveIntegerField(default=0)  # "30일 기억" 쿠키 무효화용 (모든 기기에서 로그아웃하면 +1)
 	confirmed_at = models.DateTimeField(null=True, blank=True)
 	backup_codes = models.JSONField(default=list, blank=True)  # make_password 해시 목록, 쓰면 지움
-	last_counter = models.BigIntegerField(default=0)  # 같은 코드 재사용 방지
+	trust_version = models.PositiveIntegerField(default=0)  # "30일 기억" 쿠키 무효화용 (모든 기기에서 로그아웃하면 +1)
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
 	def __str__(self):
 		return f"{self.user} 2단계 인증 {'켜짐' if self.enabled else '설정 중'}"
 
-	def verify_code(self, code: str) -> bool:
-		"""인증 앱 코드 → 맞으면 counter 갱신. 아니면 백업 코드 → 맞으면 그 코드 삭제."""
+	def use_backup_code(self, code: str) -> bool:
+		"""백업 코드(8자리) 확인 → 맞으면 그 코드 삭제."""
 		from django.contrib.auth.hashers import check_password
 
-		from . import totp
-
-		counter = totp.verify(self.secret, code, min_counter=self.last_counter) if self.method == self.METHOD_APP and self.secret else None
-		if counter is not None:
-			self.last_counter = counter
-			self.save(update_fields=["last_counter", "updated_at"])
-			return True
 		digits = "".join(ch for ch in (code or "") if ch.isdigit())
-		if len(digits) == 8:
-			for i, hashed in enumerate(self.backup_codes):
-				if check_password(digits, hashed):
-					self.backup_codes = self.backup_codes[:i] + self.backup_codes[i + 1:]
-					self.save(update_fields=["backup_codes", "updated_at"])
-					return True
+		if len(digits) != 8:
+			return False
+		for i, hashed in enumerate(self.backup_codes):
+			if check_password(digits, hashed):
+				self.backup_codes = self.backup_codes[:i] + self.backup_codes[i + 1:]
+				self.save(update_fields=["backup_codes", "updated_at"])
+				return True
 		return False
 
 	def issue_backup_codes(self):
+		import secrets
+
 		from django.contrib.auth.hashers import make_password
 
-		from . import totp
-
-		codes = totp.generate_backup_codes()
+		codes = [f"{secrets.randbelow(10 ** 8):08d}" for _ in range(10)]
 		self.backup_codes = [make_password(c) for c in codes]
 		self.save(update_fields=["backup_codes", "updated_at"])
 		return codes

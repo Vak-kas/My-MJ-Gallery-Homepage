@@ -1,6 +1,6 @@
 {% extends "accounts/_auth_shell.html" %}
 {% block auth_title %}2단계 인증{% endblock %}
-{% block auth_sub %}비밀번호는 맞았어요. {% if by_email %}<b>{{ email_hint }}</b> 로 보낸 6자리 코드를 넣어 주세요.{% else %}인증 앱(구글 OTP 등)에 뜬 6자리 코드를 넣어 주세요.{% endif %}{% endblock %}
+{% block auth_sub %}비밀번호는 맞았어요. {% if no_email %}계정에 메일 주소가 없어 백업 코드로만 들어올 수 있어요.{% else %}<b>{{ email_hint }}</b> 로 보낸 6자리 코드를 넣어 주세요.{% endif %}{% endblock %}
 {% block auth_card %}
 <form method="post" class="space-y-6">{% csrf_token %}
     {% if error %}<div class="rounded-[16px] border border-red-200 bg-red-50 px-5 py-4 text-[14px] text-red-600">{{ error }}</div>{% endif %}
@@ -9,13 +9,11 @@
         <label class="mb-2 block text-[14px] font-semibold text-[#1d1d1f]">인증 코드</label>
         <input type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]*" maxlength="9" autofocus required placeholder="123 456"
                class="h-[56px] w-full rounded-full border border-black/[0.08] bg-[#fbfbfd] px-6 text-center font-mono text-[24px] tracking-[0.3em] text-[#1d1d1f] placeholder:tracking-[0.3em] placeholder:text-[#c7c7cc] outline-none transition focus:border-[#0066cc] focus:ring-4 focus:ring-[#0066cc]/10">
-        <p class="mt-2 text-[13px] text-[#8e8e93]">{% if email_sent %}메일 코드{% if not by_email %}나 인증 앱 코드{% endif %}, 또는 {% else %}앱을 못 쓰면 {% endif %}켤 때 받은 8자리 백업 코드를 넣어도 돼요(한 번만 쓸 수 있어요).</p>
+        <p class="mt-2 text-[13px] text-[#8e8e93]">메일이 안 오면 스팸함을 확인하거나 아래 "다시 보내기". 메일함을 못 열면 켤 때 받은 8자리 백업 코드를 넣어도 돼요(한 번만 쓸 수 있어요).</p>
     </div>
     <label class="flex items-center gap-2 text-[14px] text-[#1d1d1f]"><input type="checkbox" name="remember" value="1" class="h-4 w-4"> 이 브라우저는 30일 동안 코드 없이 로그인</label>
     <button type="submit" class="h-[52px] w-full rounded-full bg-[#0066cc] text-[16px] text-white transition active:scale-[0.97]">확인</button>
-    {% if can_email %}
-    <button type="submit" name="action" value="{% if by_email or email_sent %}resend{% else %}send_email{% endif %}" formnovalidate class="h-[44px] w-full rounded-full border border-black/[0.1] text-[14px] text-[#6e6e73] hover:bg-[#f5f5f7]">{% if by_email or email_sent %}코드 메일 다시 보내기{% else %}폰이 없어요 — 대신 {{ email_hint }} 로 코드 받기{% endif %}</button>
-    {% endif %}
+    {% if not no_email %}<button type="submit" name="action" value="resend" formnovalidate class="h-[44px] w-full rounded-full border border-black/[0.1] text-[14px] text-[#6e6e73] hover:bg-[#f5f5f7]">코드 메일 다시 보내기</button>{% endif %}
 </form>
 {% endblock %}
 {% block auth_foot %}<a href="{% url 'accounts:login' %}" class="text-[#0066cc]">다른 계정으로 로그인</a>{% endblock %}
