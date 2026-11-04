@@ -19,13 +19,14 @@ def _game_meta(url_name):
 	return None
 
 
-CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "tech"): ("page", "tech"), ("blog", "board"): ("page", "board"),
+CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "all"): ("page", "all"), ("blog", "tech"): ("page", "tech"), ("blog", "board"): ("page", "board"),
 			 ("blog", "life"): ("page", "life"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
 			 ("games", "index"): ("page", "games")}
 
 
 PAGE_TITLES = {
 	("blog", "index"): ("Blog", "기술 글, 자유게시판, 일상 기록을 모은 서민재의 블로그."),
+	("blog", "all"): ("All Posts", "모든 카테고리의 글을 한곳에서."),
 	("blog", "tech"): ("Tech Blog", "트러블슈팅·네트워크·보안 등 기술 글."),
 	("blog", "board"): ("자유게시판", None),
 	("blog", "life"): ("Life", "기록 · 생각 · 메모."),

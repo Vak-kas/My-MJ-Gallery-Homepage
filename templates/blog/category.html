@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="blog" %}
+
+<main class="mx-auto max-w-[1320px] px-6 py-16">
+    <div class="mb-8">
+        <a href="{% url 'blog:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+            <span class="text-[18px]">←</span>
+            <span>Back to Blog Hub</span>
+        </a>
+    </div>
+
+    <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">BLOG / {{ page_title|upper }}</p>
+    <h1 class="apple-display mt-4 text-[56px] font-semibold tracking-[-0.04em]">{{ page_title }}.</h1>
+    <p class="mt-4 text-[18px] text-[#6e6e73]">{{ page_desc }} <span class="text-[#8e8e93]">· {{ total_posts }}개</span></p>
+
+    {# 카테고리 탭: 전체 · Tech · Board · Life · (관리자) Secret #}
+    <div class="mt-8 flex flex-wrap gap-2">
+        {% for tab in category_tabs %}
+        <a href="{{ tab.url }}" class="rounded-full px-4 py-1.5 text-[12px] {% if tab.key == active_tab %}bg-[#0066cc] font-semibold text-white{% elif tab.secret %}border border-red-300 bg-red-50 font-semibold text-red-700{% else %}border border-black/[0.1] text-[#1d1d1f]{% endif %}">{{ tab.label }}</a>
+        {% endfor %}
+    </div>
+
+    <section class="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <div>
+            <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {% for post in posts %}
+                    {% include "blog/components/post_card.html" with post=post compact=True %}
+                {% empty %}
+                <div class="col-span-full rounded-[18px] border border-black/[0.08] bg-white p-6 text-[14px] text-[#8e8e93]">{{ page_title }} 글이 아직 없습니다.</div>
+                {% endfor %}
+            </div>
+
+            {% if page.paginator.num_pages > 1 %}
+            <nav class="mt-8 flex flex-wrap items-center justify-center gap-2 text-[13px]" aria-label="페이지">
+                {% if page.has_previous %}<a href="?page={{ page.previous_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">이전</a>{% endif %}
+                {% for num in page.paginator.page_range %}
+                    {% if num == page.number %}
+                    <span class="rounded-full bg-[#0066cc] px-3 py-1.5 font-semibold text-white">{{ num }}</span>
+                    {% elif num < 3 or num > page.paginator.num_pages|add:"-2" or num >= page.number|add:"-2" and num <= page.number|add:"2" %}
+                    <a href="?page={{ num }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">{{ num }}</a>
+                    {% endif %}
+                {% endfor %}
+                {% if page.has_next %}<a href="?page={{ page.next_page_number }}" class="rounded-full border border-black/[0.1] px-3 py-1.5 text-[#1d1d1f]">다음</a>{% endif %}
+            </nav>
+            {% endif %}
+        </div>
+
+        {% include "blog/components/sidebar_widgets.html" %}
+    </section>
+</main>
+{% endblock %}

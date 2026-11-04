@@ -376,24 +376,46 @@ def _sidebar_context(request):
 	}
 
 
-def _category_page(request, category: str, page_title: str):
+CATEGORY_PAGES = {
+	# 탭 → (URL 이름, 제목, 설명). None 은 모든 카테고리
+	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
+	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
+	Post.CATEGORY_BOARD: ("blog:board", "Board", "자유롭게 이야기하는 게시판입니다."),
+	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상/라이프 블로그 목록입니다."),
+	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
+}
+CATEGORY_PAGE_SIZE = 30
+
+
+def _category_page(request, category):
+	"""카테고리 카드 목록(전체 = "all"). 30개씩 페이지, 관리자만 Secret."""
 	if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
 		raise Http404("Not found")
 
-	posts = list(
-		_accessible_posts_qs(request)
-		.filter(category=category)
-		.annotate(visible_comment_count=Count("comments", filter=Q(comments__is_visible=True), distinct=True))
-		.order_by("-published_at", "-id")[:18]
-	)
+	qs = _accessible_posts_qs(request)
+	if category != "all":
+		qs = qs.filter(category=category)
+	qs = qs.annotate(visible_comment_count=Count("comments", filter=Q(comments__is_visible=True), distinct=True)).order_by("-published_at", "-id")
+	page = Paginator(qs, CATEGORY_PAGE_SIZE).get_page(request.GET.get("page"))
+	_, page_title, page_desc = CATEGORY_PAGES[category]
+
+	tabs = []
+	for key, (url_name, label, _desc) in CATEGORY_PAGES.items():
+		if key == Post.CATEGORY_SECRET and not request.user.is_superuser:
+			continue
+		tabs.append({"key": key, "url": reverse(url_name), "label": "전체" if key == "all" else label, "secret": key == Post.CATEGORY_SECRET})
 
 	context = {
 		"active_tab": category,
-		"posts": posts,
+		"posts": list(page.object_list),
+		"page": page,
 		"page_title": page_title,
+		"page_desc": page_desc,
+		"category_tabs": tabs,
+		"total_posts": page.paginator.count,
 	}
 	context.update(_sidebar_context(request))
-	return context
+	return render(request, "blog/category.html", context)
 
 
 def _guestbook_rate_limited(user):
@@ -675,20 +697,24 @@ def image_upload(request):
 	return JsonResponse({"url": default_storage.url(name)})
 
 
+def all_posts(request):
+	return _category_page(request, "all")
+
+
 def tech(request):
-	return render(request, "blog/tech.html", _category_page(request, Post.CATEGORY_TECH, "Tech"))
+	return _category_page(request, Post.CATEGORY_TECH)
 
 
 def board(request):
-	return render(request, "blog/board.html", _category_page(request, Post.CATEGORY_BOARD, "Board"))
+	return _category_page(request, Post.CATEGORY_BOARD)
 
 
 def life(request):
-	return render(request, "blog/life.html", _category_page(request, Post.CATEGORY_LIFE, "Life"))
+	return _category_page(request, Post.CATEGORY_LIFE)
 
 
 def secret(request):
-	return render(request, "blog/secret.html", _category_page(request, Post.CATEGORY_SECRET, "Secret"))
+	return _category_page(request, Post.CATEGORY_SECRET)
 
 
 def post_detail(request, slug: str):

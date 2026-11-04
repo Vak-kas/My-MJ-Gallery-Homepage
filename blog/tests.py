@@ -514,3 +514,50 @@ class EditedBadgeTests(SimpleTestCase):
 		created = timezone.now() - timedelta(hours=1)
 		self.assertFalse(self._post(created, None, created + timedelta(seconds=5)).is_edited)
 		self.assertTrue(self._post(created, None, timezone.now()).is_edited)
+
+
+class CategoryPageTests(TestCase):
+	"""카테고리 카드 목록: 전체 탭은 모든 카테고리, Secret 은 관리자만, 30개 넘으면 페이지"""
+
+	def setUp(self):
+		from django.contrib.auth import get_user_model
+		from django.utils import timezone
+
+		self.admin = get_user_model().objects.create_superuser("cat-admin", "a@example.com", "pw")
+		now = timezone.now()
+		for i, cat in enumerate([Post.CATEGORY_TECH, Post.CATEGORY_LIFE, Post.CATEGORY_SECRET]):
+			Post.objects.create(title=f"글 {cat}", slug=f"cat-{cat}", category=cat, author=self.admin, content="", is_published=True, published_at=now)
+
+	def test_all_tab_lists_every_public_category(self):
+		res = self.client.get(reverse("blog:all"))
+		self.assertEqual(res.status_code, 200)
+		self.assertEqual(sorted(p.title for p in res.context["posts"]), ["글 life", "글 tech"])
+		self.assertNotContains(res, reverse("blog:secret"))
+		self.assertEqual(res.context["active_tab"], "all")
+
+	def test_admin_sees_secret_in_all_tab(self):
+		self.client.force_login(self.admin)
+		res = self.client.get(reverse("blog:all"))
+		self.assertIn("글 secret", [p.title for p in res.context["posts"]])
+		self.assertContains(res, reverse("blog:secret"))
+
+	def test_category_tab_filters(self):
+		res = self.client.get(reverse("blog:life"))
+		# 옆 "인기글 순위" 위젯에는 다른 카테고리도 나오니 카드 목록으로 판정
+		self.assertEqual([p.title for p in res.context["posts"]], ["글 life"])
+		self.assertContains(res, reverse("blog:all"))
+
+	def test_secret_hidden_from_anonymous(self):
+		self.assertEqual(self.client.get(reverse("blog:secret")).status_code, 404)
+
+	def test_pagination_after_30(self):
+		from django.utils import timezone
+
+		for i in range(31):
+			Post.objects.create(title=f"많은 글 {i}", slug=f"many-{i}", category=Post.CATEGORY_TECH, author=self.admin, content="", is_published=True, published_at=timezone.now())
+		res = self.client.get(reverse("blog:all"))
+		self.assertEqual(len(res.context["posts"]), 30)
+		self.assertContains(res, "?page=2")
+		res2 = self.client.get(reverse("blog:all") + "?page=2")
+		self.assertEqual(res2.status_code, 200)
+		self.assertGreater(len(res2.context["posts"]), 0)

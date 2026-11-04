@@ -16,7 +16,7 @@
 - 공통 상단 내비게이션 (관리자에게만 Studio · 🔔 알림 표시)
 
 ### 1.2 블로그
-- 카테고리: `Tech`, `Board`, `Life`, `Secret(관리자)`
+- 카테고리: `Tech`, `Board`, `Life`, `Secret(관리자)` — 카테고리 페이지(`/blog/tech/` 등)는 카드 격자 30개씩 페이지, 맨 앞 "전체" 탭(`/blog/all/`)은 모든 카테고리를 한곳에(허브 피드의 "전체 글 보기 →" 버튼, "내가 쓴 글 보기"는 켜면 "내 글만 ✓"). 템플릿은 `blog/category.html` 하나
 - 통합 검색(제목/요약/본문/태그), 정렬(최신·오래된·인기), 페이지당 개수 선택, 페이지네이션, 내 글만 보기
 - 사이드 위젯: 인기글, 태그, 최근 댓글, 방명록
 - 공개 범위: `public` 전체공개 / `private` 비공개 / `protected` 비밀번호 보호
@@ -444,7 +444,7 @@ python -m unittest discover -s relay/tests -t .
 | URL | 설명 |
 |---|---|
 | `/` | Home |
-| `/blog/`, `/blog/tech/`, `/blog/board/`, `/blog/life/`, `/blog/secret/` | 블로그 |
+| `/blog/`, `/blog/all/`, `/blog/tech/`, `/blog/board/`, `/blog/life/`, `/blog/secret/` | 블로그 |
 | `/blog/write/` | 글 작성 (로그인 필요) |
 | `/blog/series/<slug>/` | 시리즈 모아보기 |
 | `/blog/feed/`, `/sitemap.xml`, `/robots.txt` | RSS · 사이트맵 · 크롤러 안내 |
