@@ -8,6 +8,7 @@ from django.core.mail.backends.base import BaseEmailBackend
 from django.test import SimpleTestCase, TestCase, override_settings
 from django.urls import reverse
 
+from .imap import WebmailError, date_group, mutf7_decode, mutf7_encode
 from .models import SentMail, classify_subject
 from .sanitize import sanitize_html, text_to_html
 
@@ -39,6 +40,23 @@ class SanitizeTests(SimpleTestCase):
 		out = text_to_html("see https://smjgallery.kr <b>")
 		self.assertIn('<a href="https://smjgallery.kr"', out)
 		self.assertIn("&lt;b&gt;", out)
+
+
+class ImapHelperTests(SimpleTestCase):
+	def test_mutf7_roundtrip(self):
+		for name in ("학교", "영수증 2026", "Work&Life", "plain"):
+			enc = mutf7_encode(name)
+			self.assertTrue(all(0x20 <= ord(c) <= 0x7E for c in enc), enc)
+			self.assertEqual(mutf7_decode(enc), name)
+		self.assertEqual(mutf7_encode("Work&Life"), "Work&-Life")
+
+	def test_date_group(self):
+		from django.utils import timezone
+
+		now = timezone.localtime()
+		self.assertEqual(date_group(now.isoformat()), "오늘")
+		self.assertEqual(date_group(""), "이전")
+		self.assertEqual(date_group("2000-01-01T00:00:00+09:00"), "이전")
 
 
 class ClassifyTests(SimpleTestCase):
@@ -73,18 +91,35 @@ class BrokenBackend(BaseEmailBackend):
 		raise RuntimeError("boom")
 
 
+def _msg(uid, folder="inbox", **kw):
+	base = {
+		"uid": uid, "folder": folder, "subject": "안녕", "from": {"name": "홍길동", "email": "hong@example.com"}, "from_text": "홍길동 <hong@example.com>",
+		"to": [{"name": "", "email": "mjseo@smjgallery.kr"}], "to_text": "mjseo@smjgallery.kr", "cc": [], "cc_text": "", "bcc_text": "", "reply_to": "hong@example.com",
+		"date": "2026-11-04T10:00:00+09:00", "date_text": "2026.11.04 10:00", "message_id": "<m1@example.com>", "references": "", "text": "", "html": "",
+		"attachments": [], "seen": False, "flagged": False, "answered": False, "draft": False, "has_attachment": False, "size": 100, "preview": "hi",
+	}
+	base.update(kw)
+	return base
+
+
 class FakeMailbox:
 	"""IMAP 없이 뷰를 시험하기 위한 가짜 메일함."""
 	calls = []
-	messages = {
-		("inbox", 7): {
-			"uid": 7, "folder": "inbox", "subject": "안녕", "from": {"name": "홍길동", "email": "hong@example.com"}, "from_text": "홍길동 <hong@example.com>",
-			"to": [], "to_text": "mjseo@smjgallery.kr", "cc": [], "cc_text": "", "reply_to": "hong@example.com", "date": "", "date_text": "2026.11.04 10:00",
-			"message_id": "<m1@example.com>", "references": "", "text": "", "html": '<p>hi</p><script>x</script><img src="https://t/p.png"><img src="cid:pic1">',
-			"attachments": [{"index": 2, "filename": "pic.png", "content_type": "image/png", "size": 10, "content_id": "pic1", "inline": True},
-			                {"index": 3, "filename": "doc.pdf", "content_type": "application/pdf", "size": 20, "content_id": "", "inline": False}],
-		},
-	}
+	labels = ["학교"]
+	messages = {}
+
+	@classmethod
+	def reset(cls):
+		cls.calls = []
+		cls.labels = ["학교"]
+		cls.messages = {
+			("inbox", 7): _msg(7, html='<p>hi</p><script>x</script><img src="https://t/p.png"><img src="cid:pic1">',
+			                   attachments=[{"index": 2, "filename": "pic.png", "content_type": "image/png", "size": 10, "content_id": "pic1", "inline": True},
+			                                {"index": 3, "filename": "doc.pdf", "content_type": "application/pdf", "size": 20, "content_id": "", "inline": False}],
+			                   has_attachment=True),
+			("inbox", 5): _msg(5, subject="두 번째", seen=True, flagged=True, text="plain body"),
+			("drafts", 9): _msg(9, folder="drafts", subject="초안", draft=True, text="쓰다 만 글", seen=True),
+		}
 
 	def __init__(self):
 		pass
@@ -96,21 +131,38 @@ class FakeMailbox:
 		pass
 
 	def folder_status(self):
-		return [{"key": "inbox", "label": "받은 편지함", "icon": "📥", "total": 1, "unseen": 1}]
+		sys_ = [{"key": k, "label": k, "icon": "x", "total": 1, "unseen": 1 if k == "inbox" else 0, "system": True} for k in ("inbox", "sent", "drafts", "junk", "trash")]
+		return sys_ + [{"key": f"f:{n}", "label": n, "icon": "🏷", "total": 0, "unseen": 0, "system": False} for n in FakeMailbox.labels]
 
 	def unread_count(self):
-		return 1
+		return sum(1 for (f, _u), m in self.messages.items() if f == "inbox" and not m["seen"])
 
-	def list(self, folder, page=1, per_page=30, query=""):
-		items = [dict(m, seen=False, flagged=False, answered=False, size=100) for (f, _u), m in self.messages.items() if f == folder]
+	def list(self, folder, page=1, per_page=30, query="", filter="all", sort="newest", advanced=None):
+		FakeMailbox.calls.append(("list", folder, query, filter, sort, advanced or {}))
+		items = [dict(m) for (f, _u), m in sorted(self.messages.items(), reverse=True) if f == folder]
+		if filter == "unseen":
+			items = [m for m in items if not m["seen"]]
+		if filter == "flagged":
+			items = [m for m in items if m["flagged"]]
+		if query:
+			items = [m for m in items if query in m["subject"]]
 		return {"items": items, "total": len(items), "page": page, "pages": 1}
 
 	def message(self, folder, uid):
 		try:
 			return dict(self.messages[(folder, uid)])
 		except KeyError:
-			from .imap import WebmailError
 			raise WebmailError("메일을 찾을 수 없어요")
+
+	def neighbors(self, folder, uid, **kw):
+		uids = [u for (f, u) in sorted(self.messages, reverse=True) if f == folder]
+		i = uids.index(uid)
+		return (uids[i - 1] if i > 0 else None), (uids[i + 1] if i + 1 < len(uids) else None)
+
+	def fetch_raw(self, folder, uid):
+		if (folder, uid) not in self.messages:
+			raise WebmailError("없음")
+		return b"Subject: raw\r\n\r\nbody"
 
 	def set_flag(self, folder, uids, flag, on=True):
 		FakeMailbox.calls.append(("flag", folder, tuple(uids), flag, on))
@@ -121,8 +173,26 @@ class FakeMailbox:
 	def delete(self, folder, uids):
 		FakeMailbox.calls.append(("delete", folder, tuple(uids)))
 
+	def empty(self, folder):
+		FakeMailbox.calls.append(("empty", folder))
+		return 3
+
 	def append(self, folder, raw, flags="(\\Seen)"):
-		FakeMailbox.calls.append(("append", folder))
+		FakeMailbox.calls.append(("append", folder, flags))
+		return 42
+
+	def create_label(self, name):
+		if name in FakeMailbox.labels:
+			raise WebmailError("이미 있어요")
+		FakeMailbox.labels.append(name)
+		return "f:" + name
+
+	def rename_label(self, old, new):
+		FakeMailbox.labels[FakeMailbox.labels.index(old)] = new
+		return "f:" + new
+
+	def delete_label(self, name):
+		FakeMailbox.labels.remove(name)
 
 
 @override_settings(WEBMAIL_ENABLED=True, WEBMAIL_PASSWORD="x", WEBMAIL_USER="mjseo@smjgallery.kr",
@@ -133,7 +203,7 @@ class WebmailViewTests(TestCase):
 		User = get_user_model()
 		self.admin = User.objects.create_superuser("mail-admin", "a@example.com", "pw")
 		self.member = User.objects.create_user("mail-member", "m@example.com", "pw")
-		FakeMailbox.calls = []
+		FakeMailbox.reset()
 		patcher = mock.patch("webmail.views.imap.Mailbox", FakeMailbox)
 		patcher.start()
 		self.addCleanup(patcher.stop)
@@ -147,7 +217,14 @@ class WebmailViewTests(TestCase):
 		res = self.client.get(reverse("webmail:index"))
 		self.assertEqual(res.status_code, 200)
 		self.assertContains(res, 'id="mail-app"')
-		self.assertContains(res, "/mail/")  # navbar 아이콘
+		self.assertContains(res, "/mail/")  # navbar 버튼
+
+	def test_compose_to_param(self):
+		self.client.force_login(self.admin)
+		res = self.client.get(reverse("webmail:index") + "?to=hong@example.com")
+		self.assertContains(res, 'data-compose-to="hong@example.com"')
+		res = self.client.get(reverse("webmail:index") + "?to=not-an-address")
+		self.assertContains(res, 'data-compose-to=""')
 
 	def test_widget_only_for_admin_and_hidden_on_mail_page(self):
 		self.client.force_login(self.member)
@@ -156,11 +233,29 @@ class WebmailViewTests(TestCase):
 		self.assertContains(self.client.get(reverse("main:home")), 'id="mail-fab"')
 		self.assertNotContains(self.client.get(reverse("webmail:index")), 'id="mail-fab"')
 
-	def test_list_and_message_sanitized(self):
+	def test_state_lists_labels(self):
+		self.client.force_login(self.admin)
+		data = self.client.get(reverse("webmail:api_state")).json()
+		self.assertIn("f:학교", [f["key"] for f in data["folders"]])
+
+	def test_list_filters_sort_and_groups(self):
 		self.client.force_login(self.admin)
 		data = self.client.get(reverse("webmail:api_list"), {"folder": "inbox"}).json()
-		self.assertEqual(data["total"], 1)
-		self.assertEqual(data["items"][0]["subject"], "안녕")
+		self.assertEqual(data["total"], 2)
+		self.assertIn(data["items"][0]["group"], ("오늘", "이전"))
+		self.assertTrue(data["items"][0]["has_attachment"])
+		data = self.client.get(reverse("webmail:api_list"), {"folder": "inbox", "filter": "flagged"}).json()
+		self.assertEqual([m["uid"] for m in data["items"]], [5])
+		data = self.client.get(reverse("webmail:api_list"), {"folder": "inbox", "filter": "weird", "sort": "oldest", "from": "hong", "since": "2026-01-01"}).json()
+		self.assertEqual((data["filter"], data["sort"]), ("all", "oldest"))
+		self.assertEqual(FakeMailbox.calls[-1][5]["from"], "hong")
+		self.assertEqual(str(FakeMailbox.calls[-1][5]["since"]), "2026-01-01")
+		self.assertEqual(self.client.get(reverse("webmail:api_list"), {"folder": "inbox", "since": "bad"}).status_code, 400)
+		self.assertEqual(self.client.get(reverse("webmail:api_list"), {"folder": "nope"}).status_code, 400)
+		self.assertEqual(self.client.get(reverse("webmail:api_list"), {"folder": "f:학교"}).status_code, 200)
+
+	def test_message_sanitized_with_neighbors(self):
+		self.client.force_login(self.admin)
 		msg = self.client.get(reverse("webmail:api_message"), {"folder": "inbox", "uid": 7}).json()
 		self.assertTrue(msg["is_html"])
 		self.assertNotIn("<script", msg["body_html"])
@@ -168,33 +263,56 @@ class WebmailViewTests(TestCase):
 		self.assertTrue(msg["has_remote_images"])
 		self.assertIn("/mail/attachment/?folder=inbox&uid=7&i=2", msg["body_html"])  # cid → 첨부 주소
 		self.assertEqual(msg["attachments"][1]["url"], "/mail/attachment/?folder=inbox&uid=7&i=3")
+		self.assertEqual((msg["prev_uid"], msg["next_uid"]), (None, 5))
+		self.assertEqual(msg["raw_url"], "/mail/raw/?folder=inbox&uid=7")
 		self.assertIn(("flag", "inbox", (7,), "\\Seen", True), FakeMailbox.calls)
 		self.assertEqual(self.client.get(reverse("webmail:api_message"), {"folder": "inbox", "uid": 99}).status_code, 502)
-		self.assertEqual(self.client.get(reverse("webmail:api_list"), {"folder": "nope"}).status_code, 400)
+		raw = self.client.get(reverse("webmail:raw"), {"folder": "inbox", "uid": 7})
+		self.assertEqual(raw.status_code, 200)
+		self.assertEqual(raw["Content-Type"], "text/plain; charset=utf-8")
+		self.assertEqual(self.client.get(reverse("webmail:raw"), {"folder": "inbox", "uid": 99}).status_code, 404)
 
-	def test_actions(self):
+	def test_actions_and_empty(self):
 		self.client.force_login(self.admin)
-		res = self.client.post(reverse("webmail:api_action"), json.dumps({"folder": "inbox", "uids": [7], "action": "move", "to": "junk"}), content_type="application/json")
-		self.assertEqual(res.status_code, 200)
-		self.assertIn(("move", "inbox", (7,), "junk"), FakeMailbox.calls)
-		res = self.client.post(reverse("webmail:api_action"), json.dumps({"folder": "inbox", "uids": [7], "action": "delete"}), content_type="application/json")
-		self.assertIn(("delete", "inbox", (7,)), FakeMailbox.calls)
-		res = self.client.post(reverse("webmail:api_action"), json.dumps({"folder": "inbox", "uids": [], "action": "seen"}), content_type="application/json")
-		self.assertEqual(res.status_code, 400)
+		post = lambda body: self.client.post(reverse("webmail:api_action"), json.dumps(body), content_type="application/json")  # noqa: E731
+		self.assertEqual(post({"folder": "inbox", "uids": [7], "action": "move", "to": "f:학교"}).status_code, 200)
+		self.assertIn(("move", "inbox", (7,), "f:학교"), FakeMailbox.calls)
+		self.assertEqual(post({"folder": "inbox", "uids": [7], "action": "flag"}).status_code, 200)
+		self.assertIn(("flag", "inbox", (7,), "\\Flagged", True), FakeMailbox.calls)
+		self.assertEqual(post({"folder": "inbox", "uids": [], "action": "seen"}).status_code, 400)
+		self.assertEqual(post({"folder": "inbox", "action": "empty"}).status_code, 400)
+		res = post({"folder": "trash", "action": "empty"})
+		self.assertEqual(res.json()["count"], 3)
 
-	def test_send_records_and_copies_to_sent(self):
+	def test_labels(self):
 		self.client.force_login(self.admin)
-		res = self.client.post(reverse("webmail:api_send"), {"to": "hong@example.com", "subject": "Re: 안녕", "body": "답장이에요",
-		                                                     "in_reply_to": "<m1@example.com>", "reply_folder": "inbox", "reply_uid": "7"})
+		post = lambda body: self.client.post(reverse("webmail:api_labels"), json.dumps(body), content_type="application/json")  # noqa: E731
+		res = post({"action": "create", "name": "영수증"})
+		self.assertEqual(res.json()["key"], "f:영수증")
+		self.assertIn("f:영수증", [f["key"] for f in res.json()["folders"]])
+		self.assertEqual(post({"action": "create", "name": "영수증"}).status_code, 502)
+		self.assertEqual(post({"action": "rename", "folder": "f:영수증", "name": "지출"}).json()["key"], "f:지출")
+		self.assertEqual(post({"action": "rename", "folder": "inbox", "name": "x"}).status_code, 400)
+		self.assertEqual(post({"action": "delete", "folder": "f:지출"}).status_code, 200)
+		self.assertNotIn("지출", FakeMailbox.labels)
+
+	def test_draft_then_send(self):
+		self.client.force_login(self.admin)
+		res = self.client.post(reverse("webmail:api_draft"), {"to": "", "subject": "초안", "body": "쓰는 중"})
 		self.assertEqual(res.status_code, 200, res.content)
-		self.assertEqual(len(mail.outbox), 1)
+		self.assertEqual(res.json()["uid"], 42)
+		self.assertIn(("append", "drafts", "(\\Seen \\Draft)"), FakeMailbox.calls)
+		res = self.client.post(reverse("webmail:api_send"), {"to": "hong@example.com", "cc": "", "bcc": "b@example.com", "subject": "Re: 안녕", "body": "답장이에요",
+		                                                     "in_reply_to": "<m1@example.com>", "reply_folder": "inbox", "reply_uid": "7", "draft_uid": "42"})
+		self.assertEqual(res.status_code, 200, res.content)
 		sent = mail.outbox[0]
-		self.assertEqual(sent.to, ["hong@example.com"])
+		self.assertEqual((sent.to, sent.bcc), (["hong@example.com"], ["b@example.com"]))
 		self.assertEqual(sent.extra_headers["In-Reply-To"], "<m1@example.com>")
 		self.assertIn("mjseo@smjgallery.kr", sent.from_email)
 		self.assertEqual(SentMail.objects.get().kind, "webmail")
-		self.assertIn(("append", "sent"), FakeMailbox.calls)
+		self.assertIn(("append", "sent", "(\\Seen)"), FakeMailbox.calls)
 		self.assertIn(("flag", "inbox", (7,), "\\Answered", True), FakeMailbox.calls)
+		self.assertIn(("delete", "drafts", (42,)), FakeMailbox.calls)
 		self.assertEqual(self.client.post(reverse("webmail:api_send"), {"to": "not-an-address", "body": "x"}).status_code, 400)
 
 	def test_unread_endpoint(self):

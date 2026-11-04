@@ -13,13 +13,13 @@
         <div>
             <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">MJ MAIL</p>
             <h1 class="apple-display mt-2 text-[34px] font-semibold tracking-[-0.04em]">메일함</h1>
-            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ mail_user }} · 같은 서버의 메일함을 사이트 안에서 봐요. 폰은 메일 앱(IMAP 993 · SMTP 587)으로.</p>
+            <p class="mt-1 text-[14px] text-[#6e6e73]">{{ mail_user }} · 폰은 메일 앱(IMAP 993 · SMTP 587)으로. 단축키: <kbd>c</kbd> 쓰기 · <kbd>/</kbd> 검색 · <kbd>j</kbd><kbd>k</kbd> 이동 · <kbd>Enter</kbd> 열기 · <kbd>r</kbd> 답장 · <kbd>a</kbd> 전체 답장 · <kbd>s</kbd> 별표 · <kbd>#</kbd> 삭제 · <kbd>u</kbd> 목록</p>
         </div>
         <a href="{% url 'studio:mail' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[12px] text-[#1d1d1f] hover:bg-white">사이트가 보낸 메일 기록 →</a>
     </div>
 
     {% if enabled %}
-    <div id="mail-app" data-user="{{ mail_user }}"></div>
+    <div id="mail-app" data-user="{{ mail_user }}" data-from-name="{{ from_name }}" data-compose-to="{{ compose_to }}"></div>
     {% else %}
     <div class="rounded-2xl border border-[#f2d58a] bg-[#fff8e6] p-6 text-[14px] leading-[1.8] text-[#8a5a00]">
         웹메일이 꺼져 있어요. 서버 <code>.env</code> 에 <code>WEBMAIL_PASSWORD=(mjseo@ 메일 비밀번호)</code> 를 넣고 gunicorn 을 재시작하면 켜져요.
@@ -31,7 +31,9 @@
 {% if enabled %}
 <script src="{% static_v 'mail/mail.js' %}"></script>
 <script>
-    MjMail.create(document.getElementById('mail-app'), { mode: 'full' });
+    const app = MjMail.create(document.getElementById('mail-app'), { mode: 'full' });
+    const to = document.getElementById('mail-app').dataset.composeTo;
+    if (to) app.compose({ to });
 </script>
 {% endif %}
 {% endblock %}
