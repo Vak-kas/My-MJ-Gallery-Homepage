@@ -16,6 +16,7 @@
     "@tiptap/extension-list": "3.31.4",
     "@tiptap/extension-mathematics": "3.31.4",
     "@tiptap/extension-table": "3.31.4",
+    "@tiptap/extension-text-align": "^3.31.4",
     "@tiptap/extension-text-style": "3.31.4",
     "@tiptap/extensions": "3.31.4",
     "@tiptap/pm": "3.31.4",

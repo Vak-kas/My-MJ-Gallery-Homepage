@@ -116,6 +116,20 @@ class TiptapRenderTests(SimpleTestCase):
 		self.assertIn('<col style="width:100px"><col style="width:50px">', merged)
 		self.assertIn('colspan="2"', merged)
 
+	def test_text_align(self):
+		html = self.render(
+			{"type": "paragraph", "attrs": {"textAlign": "center"}, "content": [text("가운데")]},
+			{"type": "heading", "attrs": {"level": 2, "textAlign": "right"}, "content": [text("오른쪽")]},
+			{"type": "blockMath", "attrs": {"latex": "x", "textAlign": "center"}},
+			{"type": "paragraph", "attrs": {"textAlign": "left"}, "content": [text("왼쪽")]},
+			{"type": "paragraph", "attrs": {"textAlign": "<bad>"}, "content": [text("이상")]},
+		)
+		self.assertIn('class="mb-4 leading-[1.85] text-center">가운데', html)
+		self.assertIn("text-right", html.split("오른쪽")[0])
+		self.assertIn("py-3 text-center", html)
+		self.assertNotIn("text-left", html)
+		self.assertNotIn("<bad>", html)
+
 	def test_math_uses_katex_placeholder(self):
 		html = self.render(
 			para(text("식 "), {"type": "inlineMath", "attrs": {"latex": "x^2"}}),

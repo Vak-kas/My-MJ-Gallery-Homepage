@@ -9,6 +9,7 @@ import { DIVIDER_STYLES } from './divider.js';
 import { CALLOUT_KINDS, calloutIcon, hasCalloutAside } from './callout.js';
 import { openMathEditor } from './math.js';
 import { TABLE_ACTIONS } from './table-tools.js';
+import { ALIGNMENTS } from './bubble-toolbar.js';
 
 const HANDLE_KEY = new PluginKey('mjBlockHandle');
 
@@ -78,6 +79,16 @@ const openBlockMenu = (editor, anchor, pos) => {
             class: `mj-pop__item${node.attrs.style === d.id ? ' is-active' : ''}`,
             onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { style: d.id }); return true; }).run()),
         }, [h('span', { class: 'mj-pop__icon', text: d.icon }), h('b', { text: d.title })])) : []),
+        // ── 정렬 (문단·제목·블록 수식) ──
+        ...(['paragraph', 'heading', 'blockMath'].includes(node.type.name) ? [
+            h('div', { class: 'mj-pop__group', text: '정렬' }),
+            h('div', { class: 'mj-pop__row' }, ALIGNMENTS.map(([id, label, title]) => h('button', {
+                type: 'button', title,
+                class: `mj-pop__mini${(node.attrs.textAlign || 'left') === id ? ' is-active' : ''}`,
+                text: label,
+                onclick: act(() => editor.chain().command(({ tr }) => { tr.setNodeMarkup(pos, undefined, { ...node.attrs, textAlign: id === 'left' ? null : id }); return true; }).run()),
+            }))),
+        ] : []),
         // ── 블록 종류별 메뉴 ──
         ...(node.type.name === 'blockMath' ? [
             h('div', { class: 'mj-pop__group', text: '수식' }),
