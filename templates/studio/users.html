@@ -103,9 +103,9 @@
                                     {% endif %}
                                 </td>
                                 <td class="px-2 py-3">
-                                    {% if u.is_superuser %}<span class="rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[12px] text-[#0066cc]">관리자</span>
-                                    {% elif u.is_active %}<span class="rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
-                                    {% if u.is_vip %}<span class="ml-1 rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
+                                    {% if u.is_superuser %}<span class="whitespace-nowrap rounded-full bg-[#0066cc]/10 px-2.5 py-1 text-[12px] text-[#0066cc]">관리자</span>
+                                    {% elif u.is_active %}<span class="inline-flex flex-wrap gap-1"><span class="whitespace-nowrap rounded-full bg-[#34c759]/10 px-2.5 py-1 text-[12px] text-[#1e7a35]">활성</span>
+                                    {% if u.is_vip %}<span class="whitespace-nowrap rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[12px] text-[#8a6d00]">⭐ VIP</span>{% endif %}</span>
                                     {% if u.id != request.user.id %}
                                     <details class="user-menu mt-1.5">
                                         <summary class="cursor-pointer select-none text-[11px] text-[#8e8e93] hover:text-[#0066cc]">⚙ 설정</summary>
@@ -121,14 +121,14 @@
                                     </details>
                                     {% endif %}
                                     {% elif u.signup_request.status == 'pending' %}
-                                    {% if u.signup_request.needs_verification %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]" title="인증 메일의 링크를 아직 안 눌렀어요. 7일 뒤 자동 삭제">📧 이메일 미인증</span>
-                                    {% else %}<span class="rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[12px] text-[#b26a00]">승인 대기</span>{% endif %}
+                                    {% if u.signup_request.needs_verification %}<span class="whitespace-nowrap rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]" title="인증 메일의 링크를 아직 안 눌렀어요. 7일 뒤 자동 삭제">📧 미인증</span>
+                                    {% else %}<span class="whitespace-nowrap rounded-full bg-[#b26a00]/10 px-2.5 py-1 text-[12px] text-[#b26a00]">승인 대기</span>{% endif %}
                                     <div class="mt-2 flex gap-1">
                                         <form method="post" action="{% url 'studio:users' %}">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="activate"><input type="hidden" name="ids" value="{{ u.id }}"><button class="rounded-full bg-[#0066cc] px-3 py-1 text-[12px] font-semibold text-white">승인</button></form>
                                         <form method="post" action="{% url 'studio:users' %}" onsubmit="return confirm('{{ u.username|escapejs }} 님의 가입을 거절할까요?');">{% csrf_token %}<input type="hidden" name="return_qs" value="{{ current_query_string }}"><input type="hidden" name="action" value="reject"><input type="hidden" name="ids" value="{{ u.id }}"><button class="rounded-full border border-black/[0.1] px-3 py-1 text-[12px]">거절</button></form>
                                     </div>
-                                    {% elif u.signup_request.status == 'rejected' %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]">거절됨</span>
-                                    {% else %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[12px] text-[#c4271d]">정지</span>{% endif %}
+                                    {% elif u.signup_request.status == 'rejected' %}<span class="whitespace-nowrap rounded-full bg-black/[0.06] px-2.5 py-1 text-[12px] text-[#6e6e73]">거절됨</span>
+                                    {% else %}<span class="whitespace-nowrap rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[12px] text-[#c4271d]">정지</span>{% endif %}
                                 </td>
                                 <td class="px-2 py-3 text-right tabular-nums">{{ u.post_count }}</td>
                                 <td class="px-2 py-3 text-right tabular-nums">{% if u.comment_count %}<a href="{% url 'studio:community' %}?tab=comments&author={{ u.username|urlencode }}" class="text-[#0066cc] hover:underline">{{ u.comment_count }}</a>{% else %}0{% endif %}</td>
