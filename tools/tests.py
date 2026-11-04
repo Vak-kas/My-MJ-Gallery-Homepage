@@ -169,14 +169,14 @@ class StreamViewTests(TestCase):
 			self.assertTrue(all(t["category"] == section["key"] for t in section["tools"]))
 		self.assertEqual(resp.context["tool_count"], len(registry.TOOLS))
 		self.assertContains(resp, "🔒 회원")
-		self.assertContains(resp, "로그인하고 쓰기")
+		self.assertContains(resp, "로그인 →")
 		self.assertNotContains(resp, "관리자 전용")  # 관리자 도구가 없으면 칸 자체가 없음
 		admin_tool = {"slug": "x", "url_name": "tools:index", "icon": "🛠", "title": "관리자 테스트 도구", "description": "", "tags": [], "access": "admin"}
 		with mock.patch.object(registry, "TOOLS", registry.TOOLS + [admin_tool]), mock.patch("tools.views.TOOLS", registry.TOOLS + [admin_tool]):
 			self.client.force_login(self.member)
 			resp = self.client.get(reverse("tools:index"))
 			self.assertNotContains(resp, "관리자 테스트 도구")
-			self.assertNotContains(resp, "로그인하고 쓰기")
+			self.assertNotContains(resp, "로그인 →")
 			self.assertNotContains(resp, "로그인 →")
 			self.client.force_login(self.admin)
 			resp = self.client.get(reverse("tools:index"))
@@ -1433,7 +1433,7 @@ class ToolViewsTests(TestCase):
 		PageView.objects.create(day=today - timezone.timedelta(days=40), path="/tools/time/", section="tool", visitor="z", source="direct", device="desktop")  # 30일 지난 건 안 셈
 		res = self.client.get(reverse("tools:index"))
 		self.assertContains(res, 'data-pop="3"')
-		self.assertContains(res, 'data-view="pop"')
+		self.assertContains(res, 'option value="pop"')
 		html = res.content.decode()
 		i = html.index('href="/tools/time/"')
 		self.assertIn('data-pop="0"', html[i:i + 600])
