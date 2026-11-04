@@ -198,15 +198,35 @@ def user_detail(request, id):
 
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
-        if action == "edit":  # 이름·이메일 고치기 (본인·관리자도 가능)
+        if action == "edit":  # 아이디·이름·이메일 고치기 (본인·관리자도 가능)
+            from django.contrib.auth.validators import UnicodeUsernameValidator
+            from django.core.exceptions import ValidationError
+
+            username = (request.POST.get("username") or target.username).strip()[:150]
             first_name = (request.POST.get("first_name") or "").strip()[:150]
             email = (request.POST.get("email") or "").strip()[:254]
+            if username != target.username:
+                try:
+                    UnicodeUsernameValidator()(username)
+                except ValidationError:
+                    messages.error(request, "아이디는 글자·숫자·@ . + - _ 만 쓸 수 있어요.")
+                    return here
+                if User.objects.filter(username__iexact=username).exclude(id=target.id).exists():
+                    messages.error(request, "그 아이디를 쓰는 다른 회원이 있어요.")
+                    return here
             if email and User.objects.filter(email__iexact=email).exclude(id=target.id).exists():
                 messages.error(request, "그 이메일을 쓰는 다른 회원이 있어요.")
                 return here
-            target.first_name, target.email = first_name, email
-            target.save(update_fields=["first_name", "email"])
-            messages.success(request, "회원 정보를 고쳤어요.")
+            old_username = target.username
+            target.username, target.first_name, target.email = username, first_name, email
+            target.save(update_fields=["username", "first_name", "email"])
+            if username != old_username:
+                from security.models import LoginEvent
+
+                LoginEvent.objects.filter(user=target).update(username=username)  # 기록도 새 아이디로
+                messages.success(request, f"아이디를 {old_username} → {username} 로 바꿨어요. 회원에게 알려 주세요 (로그인 아이디가 바뀜).")
+            else:
+                messages.success(request, "회원 정보를 고쳤어요.")
             return here
         if action == "block_ip":
             from .security import _add_block

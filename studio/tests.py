@@ -364,6 +364,20 @@ class UserDetailTests(TestCase):
         self.client.post(url, {"action": "edit", "first_name": "x", "email": "a@example.com"})  # 관리자 이메일과 중복
         self.member.refresh_from_db()
         self.assertEqual(self.member.email, "new@example.com")
+        # 아이디 바꾸기: 중복·형식은 거부, 정상이면 로그인 기록의 아이디도 같이
+        from security.models import LoginEvent
+
+        LoginEvent.objects.create(user=self.member, username="detail-member", result="success")
+        self.client.post(url, {"action": "edit", "username": "detail-admin", "first_name": "새이름", "email": "new@example.com"})
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.username, "detail-member")
+        self.client.post(url, {"action": "edit", "username": "bad id!", "first_name": "새이름", "email": "new@example.com"})
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.username, "detail-member")
+        self.client.post(url, {"action": "edit", "username": "renamed", "first_name": "새이름", "email": "new@example.com"})
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.username, "renamed")
+        self.assertEqual(LoginEvent.objects.get(user=self.member).username, "renamed")
         self.client.post(url, {"action": "vip_on"})
         self.assertTrue(is_vip(self.member))
         self.client.post(url, {"action": "suspend"})
@@ -374,7 +388,7 @@ class UserDetailTests(TestCase):
         self.assertTrue(self.member.is_active)
         self.client.post(url, {"action": "reset_password", "confirm": "wrong"})
         self.assertFalse(MustChangePassword.objects.filter(user=self.member).exists())
-        self.client.post(url, {"action": "reset_password", "confirm": "detail-member"})
+        self.client.post(url, {"action": "reset_password", "confirm": "renamed"})
         self.assertTrue(MustChangePassword.objects.filter(user=self.member).exists())
         # 본인·관리자는 보호
         res = self.client.post(reverse("studio:user_detail", args=[self.admin.id]), {"action": "suspend"})
