@@ -250,8 +250,32 @@
     </section>
     {% endif %}
 </main>
+{# 따라다니는 맨 위/맨 아래 버튼 (다크모드 버튼 위에 쌓임) #}
+<div class="post-jump" aria-label="페이지 이동">
+    <button id="post-jump-top" type="button" class="post-jump__btn" title="맨 위로" aria-label="맨 위로" hidden>⌃</button>
+    <button id="post-jump-bottom" type="button" class="post-jump__btn" title="맨 아래로" aria-label="맨 아래로" hidden>⌄</button>
+</div>
 <style>
 #post-body :is(h1, h2, h3, h4)[id] { scroll-margin-top: 96px; }
+.post-jump { position: fixed; right: 20px; bottom: 76px; z-index: 80; display: flex; flex-direction: column; gap: 10px; }
+.post-jump__btn { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; padding: 0 0 4px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.12); background: rgba(255,255,255,.9); color: #1d1d1f; font-size: 22px; font-weight: 700; line-height: 1; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: background .2s, transform .2s, opacity .2s; }
+.post-jump__btn:hover { transform: translateY(-1px); background: #fff; }
+#post-jump-bottom { padding: 4px 0 0; }
+/* 다크모드: 투명 배경 그림(검은 선 도식)이 안 보이지 않게 그림 뒤는 밝게 */
+html.theme-dark #post-body figure > img { background: #f5f5f7; }
+/* 다크모드 콜아웃: 에디터와 같은 어두운 색조 (밝은 상자에 흰 글자가 얹히던 문제) */
+html.theme-dark #post-body [data-callout] { background-color: rgba(78,161,255,.12) !important; border-color: rgba(78,161,255,.35) !important; color: #e8e8ed; }
+html.theme-dark #post-body [data-callout] > div > p:first-child { color: #9cc8ff !important; }
+html.theme-dark #post-body [data-callout="tip"] { background-color: rgba(72,199,116,.12) !important; border-color: rgba(72,199,116,.35) !important; }
+html.theme-dark #post-body [data-callout="tip"] > div > p:first-child { color: #8ee0a5 !important; }
+html.theme-dark #post-body [data-callout="warn"] { background-color: rgba(255,196,61,.12) !important; border-color: rgba(255,196,61,.4) !important; }
+html.theme-dark #post-body [data-callout="warn"] > div > p:first-child { color: #ffd27a !important; }
+html.theme-dark #post-body [data-callout="danger"] { background-color: rgba(255,99,99,.12) !important; border-color: rgba(255,99,99,.4) !important; }
+html.theme-dark #post-body [data-callout="danger"] > div > p:first-child { color: #ff9c9c !important; }
+html.theme-dark #post-body [data-callout="note"] { background-color: rgba(255,255,255,.06) !important; border-color: rgba(255,255,255,.16) !important; }
+html.theme-dark #post-body [data-callout="note"] > div > p:first-child { color: #d6d6dc !important; }
+html.theme-dark #post-body [data-callout-aside] { background-color: rgba(0,0,0,.25) !important; border-color: inherit; }
+html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background: rgba(30,35,45,.86); color: #f3f4f6; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 .post-toc { width: 36px; height: 1px; z-index: 30; }   /* 위치는 xl:sticky 가 맡음 */
 @media (min-width: 1280px) { .post-toc.is-on { display: block; } }   /* 좁은 화면은 본문 위 접이식 목차만 */
 .post-toc-bars { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; padding: 6px 4px; }
@@ -344,6 +368,24 @@
         const t = document.getElementById(decodeURIComponent(location.hash.slice(1)));
         if (t && body.contains(t)) setTimeout(() => t.scrollIntoView({ block: 'start' }), 50);
     }
+})();
+</script>
+<script>
+(() => {
+    // 맨 위/맨 아래 버튼: 맨 위에선 ⌃ 숨기고 맨 아래에선 ⌄ 숨김
+    const top = document.getElementById('post-jump-top'), bottom = document.getElementById('post-jump-bottom');
+    if (!top || !bottom) return;
+    const update = () => {
+        const y = window.scrollY, max = document.documentElement.scrollHeight - window.innerHeight;
+        top.hidden = y < 200;
+        bottom.hidden = max < 200 || y > max - 200;
+    };
+    top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
+    bottom.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
+    let raf = 0;
+    window.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; update(); }); }, { passive: true });
+    window.addEventListener('resize', update);
+    update();
 })();
 </script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
