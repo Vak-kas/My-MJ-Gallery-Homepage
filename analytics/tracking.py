@@ -146,4 +146,5 @@ class PageViewMiddleware:
             referrer_host=ref_host,
             device=device_of(ua),
             is_member=bool(user and user.is_authenticated),
+            user=user if (user and user.is_authenticated) else None,
         )

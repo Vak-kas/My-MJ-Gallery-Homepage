@@ -84,3 +84,39 @@ class TrackingTests(TestCase):
 		member = get_user_model().objects.create_user("m", "m@example.com", "pw")
 		self.client.force_login(member)
 		self.assertEqual(self.client.get(reverse("studio:analytics")).status_code, 302)
+
+
+class LiveVisitorsTests(TestCase):
+    def test_pageview_records_member_and_live_page(self):
+        from django.contrib.auth import get_user_model
+        from django.urls import reverse
+
+        from analytics.models import PageView
+
+        User = get_user_model()
+        member = User.objects.create_user("live-member", "m@example.com", "pw", first_name="민재")
+        admin = User.objects.create_superuser("live-admin", "a@example.com", "pw")
+        ua = {"HTTP_USER_AGENT": "Mozilla/5.0 (Macintosh) Chrome/120 Safari/537.36"}
+        self.client.force_login(member)
+        self.client.get("/blog/", **ua)
+        pv = PageView.objects.latest("id")
+        self.assertEqual((pv.user_id, pv.is_member, pv.path), (member.id, True, "/blog/"))
+        self.client.logout()
+        self.client.get("/blog/", HTTP_USER_AGENT="Mozilla/5.0 (iPhone) Safari/604")  # 비회원(다른 기기)은 user 없음
+        self.assertIsNone(PageView.objects.latest("id").user_id)
+        self.client.force_login(admin)
+        before = PageView.objects.count()
+        res = self.client.get(reverse("studio:analytics_live"), **ua)
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(PageView.objects.count(), before)  # 관리자 방문은 기록 안 함
+        self.assertContains(res, "live-member")
+        self.assertContains(res, "익명")
+        data = self.client.get(reverse("studio:analytics_live") + "?format=json", **ua).json()
+        self.assertEqual(data["online_total"], 2)
+        self.assertEqual(data["online_members"], 1)
+        self.assertEqual(data["stream"][0]["who"][:2], "익명")
+        detail = self.client.get(reverse("studio:user_detail", args=[member.id]))
+        self.assertContains(detail, "최근 본 페이지")
+        self.assertContains(detail, "/blog/")
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("studio:analytics_live")).status_code, 302)

@@ -53,6 +53,7 @@ urlpatterns = [
     path('mail/', views.mail_log, name='mail'),
     path('security/ip/<str:ip>/', views.security_ip, name='security_ip'),
     path('analytics/', views.analytics, name='analytics'),
+    path('analytics/live/', views.analytics_live, name='analytics_live'),
     path('server/', views.server, name='server'),
     path('server/logs/', views.server_logs, name='server_logs'),
     path('ai/', views.ai_usage, name='ai'),

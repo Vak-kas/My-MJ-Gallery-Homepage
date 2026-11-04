@@ -112,6 +112,14 @@
                     {% endif %}
                 </section>
 
+                {# ── 최근 본 페이지 ── #}
+                <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
+                    <h2 class="text-[16px] font-semibold">최근 본 페이지 <span class="text-[12px] font-normal text-[#8e8e93]">최근 20건 · <a href="{% url 'studio:analytics_live' %}" class="text-[#0066cc] hover:underline">실시간 현황</a></span></h2>
+                    <ul class="mt-3 divide-y divide-black/[0.05] text-[13px]">
+                        {% for v in recent_views %}<li class="flex items-center justify-between gap-3 py-1.5"><a href="{{ v.path }}" target="_blank" class="truncate hover:text-[#0066cc]">{{ v.path }}</a><span class="shrink-0 text-[11px] text-[#8e8e93]">{{ v.created_at|date:"m.d H:i" }} · {{ v.get_device_display }}</span></li>{% empty %}<li class="py-3 text-[#8e8e93]">기록이 없어요 (최근 90일, 이 기능이 들어간 뒤부터)</li>{% endfor %}
+                    </ul>
+                </section>
+
                 {# ── 로그인 기록 ── #}
                 <section class="rounded-2xl border border-black/[0.08] bg-white p-6">
                     <h2 class="text-[16px] font-semibold">로그인 기록 <span class="text-[12px] font-normal text-[#8e8e93]">최근 20건</span></h2>

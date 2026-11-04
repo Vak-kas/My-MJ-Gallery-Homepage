@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
+        <div class="mb-8">
+            <a href="{% url 'studio:analytics' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>방문자 통계로</span>
+            </a>
+        </div>
+
+        <section class="mb-8 flex flex-wrap items-end justify-between gap-4">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">STUDIO ANALYTICS</p>
+                <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[36px] lg:text-[44px]">🟢 실시간 현황</h1>
+                <p class="mt-3 text-[16px] text-[#6e6e73]">최근 5분 안에 움직인 사람과 최근 24시간 활동 흐름이에요. 30초마다 새로 받아요. 회원은 아이디로, 비회원은 익명 번호로 보여요(IP 는 저장 안 함). 관리자 본인 방문은 안 세요.</p>
+            </div>
+            <p class="text-[12px] text-[#8e8e93]">마지막 갱신 <span id="live-updated">-</span> · <button type="button" id="live-refresh" class="rounded-full border border-black/[0.1] bg-white px-3 py-1 hover:bg-[#f5f5f7]">지금 새로고침</button></p>
+        </section>
+
+        <section class="grid grid-cols-2 gap-4 xl:grid-cols-4">
+            <div class="rounded-2xl border border-black/[0.08] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">지금 접속 중</p><p class="mt-1 text-[32px] font-semibold" id="live-total">{{ live.online_total }}</p><p class="text-[12px] text-[#8e8e93]">최근 5분</p></div>
+            <div class="rounded-2xl border border-black/[0.08] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">그중 회원</p><p class="mt-1 text-[32px] font-semibold" id="live-members">{{ live.online_members }}</p></div>
+            <div class="rounded-2xl border border-black/[0.08] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">오늘 조회</p><p class="mt-1 text-[32px] font-semibold" id="live-today">{{ live.today_views }}</p></div>
+            <div class="rounded-2xl border border-black/[0.08] bg-white p-5"><p class="text-[13px] text-[#8e8e93]">자동 갱신</p><p class="mt-1 text-[32px] font-semibold">30<span class="text-[16px] text-[#8e8e93]">초</span></p></div>
+        </section>
+
+        <section class="mt-6 rounded-2xl border border-black/[0.08] bg-white p-6">
+            <h2 class="text-[16px] font-semibold">지금 접속 중인 사람</h2>
+            <div id="live-online" class="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {% for p in live.online %}
+                <div class="rounded-xl border border-black/[0.06] px-4 py-3 text-[13px]">
+                    <p class="font-semibold">{% if p.user %}<a href="{% url 'studio:user_detail' p.user_id %}" class="hover:text-[#0066cc]">{{ p.first_name|default:p.user }} <span class="font-normal text-[#8e8e93]">@{{ p.user }}</span></a>{% else %}익명 {{ p.visitor }}{% endif %}</p>
+                    <p class="truncate text-[#6e6e73]" title="{{ p.last_path }}">{{ p.last_path }}</p>
+                    <p class="text-[11px] text-[#8e8e93]">{{ p.last_at|date:"H:i:s" }} · {{ p.device }} · {{ p.source }} · {{ p.views }}쪽</p>
+                </div>
+                {% empty %}<p class="text-[13px] text-[#8e8e93]">최근 5분 안에 움직인 사람이 없어요.</p>{% endfor %}
+            </div>
+        </section>
+
+        <section class="mt-6 overflow-hidden rounded-2xl border border-black/[0.08] bg-white">
+            <div class="border-b border-black/[0.06] px-6 py-4"><h2 class="text-[16px] font-semibold">최근 활동 <span class="text-[12px] font-normal text-[#8e8e93]">24시간 · 최근 60건</span></h2></div>
+            <table class="w-full text-[13px]">
+                <thead class="bg-[#fafafa] text-left text-[12px] text-[#8e8e93]"><tr><th class="px-4 py-2">시각</th><th class="px-4 py-2">누구</th><th class="px-4 py-2">페이지</th><th class="px-4 py-2">기기</th><th class="px-4 py-2">유입</th></tr></thead>
+                <tbody id="live-stream">
+                    {% for v in live.stream %}
+                    <tr class="border-t border-black/[0.05]"><td class="whitespace-nowrap px-4 py-2 text-[#6e6e73]">{{ v.at|date:"H:i:s" }}</td><td class="px-4 py-2">{% if v.user_id %}<a href="{% url 'studio:user_detail' v.user_id %}" class="font-semibold hover:text-[#0066cc]">{{ v.who }}</a>{% else %}<span class="text-[#8e8e93]">{{ v.who }}</span>{% endif %}</td><td class="max-w-[360px] truncate px-4 py-2" title="{{ v.path }}"><a href="{{ v.path }}" target="_blank" class="hover:text-[#0066cc]">{{ v.path }}</a></td><td class="px-4 py-2 text-[#6e6e73]">{{ v.device }}</td><td class="px-4 py-2 text-[#6e6e73]">{{ v.source }}{% if v.referrer %} · {{ v.referrer }}{% endif %}</td></tr>
+                    {% empty %}<tr><td colspan="5" class="px-4 py-8 text-center text-[#8e8e93]">아직 활동이 없어요</td></tr>{% endfor %}
+                </tbody>
+            </table>
+        </section>
+        </main>
+    </div>
+</div>
+<script>
+    (() => {
+        const esc = (t) => String(t ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+        const userUrl = (id) => "{% url 'studio:user_detail' 0 %}".replace('/0/', `/${id}/`);
+        const draw = (d) => {
+            document.getElementById('live-total').textContent = d.online_total;
+            document.getElementById('live-members').textContent = d.online_members;
+            document.getElementById('live-today').textContent = d.today_views;
+            document.getElementById('live-online').innerHTML = d.online.length ? d.online.map((p) => `<div class="rounded-xl border border-black/[0.06] px-4 py-3 text-[13px]"><p class="font-semibold">${p.user ? `<a href="${userUrl(p.user_id)}" class="hover:text-[#0066cc]">${esc(p.first_name || p.user)} <span class="font-normal text-[#8e8e93]">@${esc(p.user)}</span></a>` : `익명 ${esc(p.visitor)}`}</p><p class="truncate text-[#6e6e73]" title="${esc(p.last_path)}">${esc(p.last_path)}</p><p class="text-[11px] text-[#8e8e93]">${esc(p.last_at)} · ${esc(p.device)} · ${esc(p.source)} · ${p.views}쪽</p></div>`).join('') : '<p class="text-[13px] text-[#8e8e93]">최근 5분 안에 움직인 사람이 없어요.</p>';
+            document.getElementById('live-stream').innerHTML = d.stream.length ? d.stream.map((v) => `<tr class="border-t border-black/[0.05]"><td class="whitespace-nowrap px-4 py-2 text-[#6e6e73]">${esc(v.at)}</td><td class="px-4 py-2">${v.user_id ? `<a href="${userUrl(v.user_id)}" class="font-semibold hover:text-[#0066cc]">${esc(v.who)}</a>` : `<span class="text-[#8e8e93]">${esc(v.who)}</span>`}</td><td class="max-w-[360px] truncate px-4 py-2" title="${esc(v.path)}"><a href="${esc(v.path)}" target="_blank" class="hover:text-[#0066cc]">${esc(v.path)}</a></td><td class="px-4 py-2 text-[#6e6e73]">${esc(v.device)}</td><td class="px-4 py-2 text-[#6e6e73]">${esc(v.source)}${v.referrer ? ' · ' + esc(v.referrer) : ''}</td></tr>`).join('') : '<tr><td colspan="5" class="px-4 py-8 text-center text-[#8e8e93]">아직 활동이 없어요</td></tr>';
+            document.getElementById('live-updated').textContent = new Date().toLocaleTimeString('ko-KR');
+        };
+        const refresh = async () => { try { const r = await fetch('?format=json', { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } }); if (r.ok) draw(await r.json()); } catch { /* ignore */ } };
+        document.getElementById('live-refresh').addEventListener('click', refresh);
+        document.getElementById('live-updated').textContent = new Date().toLocaleTimeString('ko-KR');
+        setInterval(() => { if (!document.hidden) refresh(); }, 30000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) refresh(); });
+    })();
+</script>
+{% endblock %}
