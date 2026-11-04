@@ -76,7 +76,7 @@
         const state = {
             folder: 'inbox', page: 1, q: '', filter: 'all', sort: 'newest', adv: {}, list: null, folders: [], current: null,
             selected: new Set(), pane: 'list', compose: null, cursor: -1,
-            signature: '', contacts: {}, templates: [], scheduled: [],
+            signature: '', contacts: {}, scheduled: [],
         };
         const user = root.dataset.user || '';
         root.classList.add('mjm', `mjm--${mode}`);
@@ -132,7 +132,7 @@
         async function loadFolders() {
             try {
                 const r = await api('state');
-                Object.assign(state, { folders: r.folders, signature: r.signature || '', contacts: r.contacts || {}, templates: r.templates || [], scheduled: r.scheduled || [] });
+                Object.assign(state, { folders: r.folders, signature: r.signature || '', contacts: r.contacts || {}, scheduled: r.scheduled || [] });
                 renderFolders(); if (mode === 'mini') renderList();
             } catch (e) { say(e.message, true); }
         }
@@ -414,8 +414,6 @@
                 h('input', { type: 'color', title: '글자색', value: '#1d1d1f', oninput: (e) => cmd('foreColor', e.target.value) }),
                 h('button', { type: 'button', text: '서식 지우기', onmousedown: (e) => e.preventDefault(), onclick: () => cmd('removeFormat') }),
                 h('span', { class: 'mjm__spacer' }),
-                state.templates.length ? h('select', { class: 'mjm__selmenu', title: '템플릿 넣기', onchange: (e) => { const t = state.templates.find((x) => String(x.id) === e.target.value); e.target.value = ''; if (!t) return; if (t.subject && !subjectField.querySelector('input').value.trim()) subjectField.querySelector('input').value = t.subject; editor.innerHTML = t.body + editor.innerHTML; dirty = true; } },
-                    [h('option', { value: '', text: '📋 템플릿' }), ...state.templates.map((t) => h('option', { value: t.id, text: t.name }))]) : null,
             );
             const files = h('input', { type: 'file', name: 'attachments', multiple: true });
             const submit = h('button', { type: 'submit', class: 'mjm__send', text: '보내기' });
@@ -495,7 +493,7 @@
             if (state.compose && !confirm('쓰던 메일을 닫을까요?')) return;
             state.compose = null; state.sentInfo = null; state.current = null;
             const wrap = h('div', { class: 'mjm__settings' });
-            const tabs = [['signature', '서명'], ['templates', '템플릿'], ['contacts', '주소록'], ['scheduled', '예약 발송']];
+            const tabs = [['signature', '서명'], ['contacts', '주소록'], ['scheduled', '예약 발송']];
             const body = h('div', { class: 'mjm__settings-body' });
             const draw = (t) => {
                 body.innerHTML = '';
@@ -508,30 +506,6 @@
                         ed,
                         h('div', { class: 'mjm__composebar' }, [h('button', { type: 'button', class: 'mjm__send', text: '서명 저장', onclick: async () => { try { const r = await api('prefs', { method: 'POST', body: { signature: ed.innerHTML } }); state.signature = r.signature; say('서명을 저장했어요'); } catch (e) { say(e.message, true); } } }),
                             h('button', { type: 'button', text: '서명 없음', onclick: () => { ed.innerHTML = ''; } })]));
-                } else if (t === 'templates') {
-                    const list = h('div', { class: 'mjm__tpl-list' });
-                    const editorFor = (tpl) => {
-                        const name = h('input', { type: 'text', placeholder: '템플릿 이름', value: tpl?.name || '' });
-                        const subject = h('input', { type: 'text', placeholder: '제목 (비워도 됨)', value: tpl?.subject || '' });
-                        const ed = h('div', { class: 'mjm__editor', contenteditable: 'true' }); ed.innerHTML = tpl?.body || '';
-                        const cmd = (name2, value = null) => { ed.focus(); document.execCommand(name2, false, value); };
-                        const box = h('div', { class: 'mjm__tpl-edit' }, [
-                            h('label', { class: 'mjm__field' }, [h('span', { text: '이름' }), name]), h('label', { class: 'mjm__field' }, [h('span', { text: '제목' }), subject]),
-                            h('div', { class: 'mjm__fmt' }, [['bold', '<b>B</b>'], ['italic', '<i>I</i>'], ['underline', '<u>U</u>'], ['insertUnorderedList', '• 목록']].map(([c, html]) => h('button', { type: 'button', html, onmousedown: (e) => e.preventDefault(), onclick: () => cmd(c) }))),
-                            ed,
-                            h('div', { class: 'mjm__composebar' }, [h('button', { type: 'button', class: 'mjm__send', text: tpl ? '저장' : '만들기', onclick: async () => {
-                                try { const r = await api('templates', { method: 'POST', body: { action: tpl ? 'update' : 'create', id: tpl?.id, name: name.value, subject: subject.value, body: ed.innerHTML } }); state.templates = r.templates; say('저장했어요'); draw('templates'); }
-                                catch (e) { say(e.message, true); } } }),
-                                tpl ? h('button', { type: 'button', class: 'is-danger', text: '지우기', onclick: async () => { if (!confirm(`"${tpl.name}" 템플릿을 지울까요?`)) return; const r = await api('templates', { method: 'POST', body: { action: 'delete', id: tpl.id } }); state.templates = r.templates; draw('templates'); } }) : null,
-                                h('button', { type: 'button', text: '닫기', onclick: () => draw('templates') })]),
-                        ]);
-                        return box;
-                    };
-                    body.append(h('div', { class: 'mjm__composebar' }, [h('p', { class: 'mjm__dim', text: '자주 쓰는 메일 틀이에요. 쓰기 창의 📋 템플릿에서 골라 넣어요. [대괄호] 자리는 바꿔 쓰세요.' }), h('span', { class: 'mjm__spacer' }), h('button', { type: 'button', class: 'mjm__send', text: '+ 새 템플릿', onclick: () => { list.innerHTML = ''; list.append(editorFor(null)); } })]), list);
-                    for (const t2 of state.templates) list.append(h('div', { class: 'mjm__tpl' }, [h('div', { class: 'mjm__tpl-main' }, [h('b', { text: t2.name }), h('div', { class: 'mjm__dim mjm__tpl-sub', text: t2.subject || '(제목 없음)' })]),
-                        h('button', { type: 'button', text: '편집', onclick: () => { list.innerHTML = ''; list.append(editorFor(t2)); } }),
-                        h('button', { type: 'button', text: '이걸로 쓰기', onclick: () => { openCompose(); setTimeout(() => { const f = state.compose; if (!f) return; const si = f.querySelector('[name=subject]'); if (!si.value.trim()) si.value = t2.subject; const ed = f.querySelector('.mjm__editor'); ed.innerHTML = t2.body + ed.innerHTML; }, 0); } })]));
-                    if (!state.templates.length) list.append(h('p', { class: 'mjm__empty', text: '템플릿이 없어요' }));
                 } else if (t === 'contacts') {
                     const email = h('input', { type: 'email', placeholder: '주소' }), name = h('input', { type: 'text', placeholder: '표시 이름' }), note = h('input', { type: 'text', placeholder: '메모 (선택)' });
                     body.append(h('p', { class: 'mjm__dim', text: '주소마다 이름을 정해 두면 목록·읽기·자동완성에 그 이름으로 보여요 (예: hey_minj@naver.com → 서민재).' }),

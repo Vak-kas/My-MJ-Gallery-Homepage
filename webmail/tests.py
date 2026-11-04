@@ -345,8 +345,6 @@ class WebmailV3Tests(TestCase):
 	"""서명·템플릿·주소록·예약 발송·HTML 메일"""
 
 	def setUp(self):
-		from .models import MailTemplate
-
 		User = get_user_model()
 		self.admin = User.objects.create_superuser("v3-admin", "a@example.com", "pw")
 		self.client.force_login(self.admin)
@@ -357,7 +355,6 @@ class WebmailV3Tests(TestCase):
 		patcher2 = mock.patch("webmail.scheduled.imap.Mailbox", FakeMailbox)
 		patcher2.start()
 		self.addCleanup(patcher2.stop)
-		self.assertGreaterEqual(MailTemplate.objects.count(), 6)  # 기본 템플릿이 마이그레이션으로 들어옴
 
 	def post_json(self, name, body):
 		return self.client.post(reverse(name), json.dumps(body), content_type="application/json")
@@ -366,22 +363,12 @@ class WebmailV3Tests(TestCase):
 		data = self.client.get(reverse("webmail:api_state")).json()
 		self.assertIn("<b>Minjae Seo", data["signature"])
 		self.assertIn("mjseo@smjgallery.kr", data["signature"])
-		self.assertTrue(any(t["name"] == "미팅 요청" for t in data["templates"]))
 		self.assertEqual(data["contacts"], {})
 
 	def test_signature_saved_sanitized(self):
 		res = self.post_json("webmail:api_prefs", {"signature": "<b>민재</b><script>x</script>"})
 		self.assertEqual(res.json()["signature"], "<b>민재</b>")
 		self.assertEqual(self.client.get(reverse("webmail:api_state")).json()["signature"], "<b>민재</b>")
-
-	def test_templates_crud(self):
-		res = self.post_json("webmail:api_templates", {"action": "create", "name": "테스트", "subject": "제목", "body": "<p>본문</p><script>x</script>"})
-		tpl = next(t for t in res.json()["templates"] if t["name"] == "테스트")
-		self.assertEqual(tpl["body"], "<p>본문</p>")
-		self.post_json("webmail:api_templates", {"action": "update", "id": tpl["id"], "name": "테스트2", "subject": "", "body": "<i>x</i>"})
-		res = self.post_json("webmail:api_templates", {"action": "delete", "id": tpl["id"]})
-		self.assertFalse(any(t["id"] == tpl["id"] for t in res.json()["templates"]))
-		self.assertEqual(self.post_json("webmail:api_templates", {"action": "create", "name": ""}).status_code, 400)
 
 	def test_contacts(self):
 		res = self.post_json("webmail:api_contacts", {"action": "set", "email": "Hey_minj@naver.com", "name": "서민재", "note": "본인"})
