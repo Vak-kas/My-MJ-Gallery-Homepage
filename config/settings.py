@@ -90,6 +90,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'accounts.middleware.MustChangePasswordMiddleware',
+    'accounts.middleware.RestrictedUserMiddleware',
     'security.middleware.IPBlockMiddleware',
     'studio.middleware.SectionAccessMiddleware',
     'analytics.tracking.PageViewMiddleware',

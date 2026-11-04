@@ -433,3 +433,62 @@ class LinkDescriptionTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual([l.id for l in Link.objects.order_by("order", "id")], [other.id, link.id])
         self.assertContains(page, "data-sortable-list")
+
+
+class RestrictedUserTests(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.admin = User.objects.create_superuser("r-admin", "a@example.com", "pw")
+        self.member = User.objects.create_user("r-member", "m@example.com", "pw", first_name="민재")
+        from tools.permissions import set_vip
+
+        set_vip(self.member, True)
+
+    def test_restrict_blocks_writes_but_not_reads_and_hides_from_user(self):
+        from accounts.models import AccountRestriction, is_restricted
+        from tools.permissions import is_vip
+
+        self.client.force_login(self.admin)
+        res = self.client.post(reverse("studio:user_detail", args=[self.member.id]), {"action": "restrict", "reason": "장난 가입"})
+        self.assertEqual(res.status_code, 302)
+        self.assertTrue(AccountRestriction.objects.filter(user=self.member, reason="장난 가입").exists())
+        self.member = get_user_model().objects.get(id=self.member.id)
+        self.assertTrue(is_restricted(self.member))
+        self.assertFalse(is_vip(self.member))
+        page = self.client.get(reverse("studio:users"), {"state": "restricted"})
+        self.assertContains(page, "⚠ 위험")
+        self.assertContains(page, "r-member")
+        detail = self.client.get(reverse("studio:user_detail", args=[self.member.id]))
+        self.assertContains(detail, "장난 가입")
+        # 본인: 읽기는 되고 표시는 없고, 쓰기는 막힘
+        self.client.force_login(self.member)
+        acct = self.client.get(reverse("accounts:index"))
+        self.assertEqual(acct.status_code, 200)
+        self.assertNotContains(acct, "위험")
+        res = self.client.post(reverse("accounts:profile_edit"), {"first_name": "바꿈", "email": "m@example.com"})
+        self.assertEqual(res.status_code, 302)
+        self.member.refresh_from_db()
+        self.assertEqual(self.member.first_name, "민재")
+        res = self.client.post(reverse("main:contact"), '{"message": "문의합니다요"}', content_type="application/json", HTTP_X_REQUESTED_WITH="fetch")
+        self.assertEqual(res.status_code, 403)
+        self.assertIn("지금은 이 작업을 할 수 없어요", res.json()["error"])
+        self.assertEqual(self.client.get("/blog/").status_code, 200)
+        self.assertEqual(self.client.post(reverse("accounts:logout")).status_code, 302)  # 로그아웃은 됨
+        # 해제
+        self.client.force_login(self.admin)
+        self.client.post(reverse("studio:users"), {"action": "unrestrict", "ids": [self.member.id]})
+        self.assertFalse(AccountRestriction.objects.filter(user=self.member).exists())
+        self.client.force_login(self.member)
+        from django.core.cache import cache
+
+        cache.clear()
+        res = self.client.post(reverse("main:contact"), '{"message": "다시 문의합니다요"}', content_type="application/json", HTTP_X_REQUESTED_WITH="fetch")
+        self.assertEqual(res.status_code, 200)  # 해제 뒤엔 쓰기 됨
+
+    def test_bulk_restrict(self):
+        from accounts.models import AccountRestriction
+
+        self.client.force_login(self.admin)
+        self.client.post(reverse("studio:users"), {"action": "restrict", "ids": [self.member.id, self.admin.id], "reason": "x"})
+        self.assertTrue(AccountRestriction.objects.filter(user=self.member).exists())
+        self.assertFalse(AccountRestriction.objects.filter(user=self.admin).exists())  # 관리자는 제외
