@@ -29,10 +29,18 @@ debconf-set-selections <<< "postfix postfix/mailname string ${DOMAIN}"
 debconf-set-selections <<< "roundcube-core roundcube/dbconfig-install boolean true"
 debconf-set-selections <<< "roundcube-core roundcube/database-type select sqlite3"
 apt-get update -qq
-apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-lmtpd \
+apt-get install -y -qq postfix dovecot-core dovecot-imapd dovecot-lmtpd dovecot-sieve \
   opendkim opendkim-tools rspamd redis-server \
-  roundcube roundcube-sqlite3 php-fpm php-intl php-gd php-zip \
+  php-fpm php-intl php-gd php-zip \
   certbot python3-certbot-nginx mailutils >/dev/null
+# roundcube 는 apache2 를 "추천"으로 끌고 오므로 추천 패키지 없이 (nginx + php-fpm 으로 띄움)
+apt-get install -y -qq --no-install-recommends roundcube roundcube-sqlite3 >/dev/null
+# 이미 apache2 가 딸려 들어왔다면 끔 (nginx 와 80 포트를 다툼)
+if dpkg -s apache2 >/dev/null 2>&1; then
+  systemctl disable --now apache2 >/dev/null 2>&1 || true
+  apt-get purge -y -qq apache2 apache2-bin apache2-data libapache2-mod-php8.3 >/dev/null 2>&1 || true
+  apt-get autoremove -y -qq >/dev/null 2>&1 || true
+fi
 
 echo "▶ 2/8 메일함 사용자(vmail)와 비밀번호"
 getent group vmail >/dev/null || groupadd -g 5000 vmail
@@ -117,6 +125,12 @@ R
 systemctl enable --now redis-server rspamd >/dev/null; systemctl restart rspamd
 
 echo "▶ 6/8 Dovecot (IMAP 993 · LMTP · 587 로그인)"
+# Dovecot 설정은 블록을 한 줄에 못 씀 (';' 구분 없음) — 줄마다 나눠서
+mkdir -p /etc/dovecot/sieve
+cat > /etc/dovecot/sieve/default.sieve <<'S'
+require ["fileinto"];
+if header :contains "X-Spam" "Yes" { fileinto "Junk"; }
+S
 cat > /etc/dovecot/local.conf <<D
 protocols = imap lmtp
 listen = *
@@ -130,31 +144,66 @@ mail_location = maildir:${VMAIL_DIR}/%d/%n
 mail_privileged_group = vmail
 first_valid_uid = 5000
 last_valid_uid = 5000
-passdb { driver = passwd-file; args = scheme=SHA512-CRYPT username_format=%u /etc/dovecot/users }
-userdb  { driver = static; args = uid=vmail gid=vmail home=${VMAIL_DIR}/%d/%n }
+passdb {
+  driver = passwd-file
+  args = scheme=SHA512-CRYPT username_format=%u /etc/dovecot/users
+}
+userdb {
+  driver = static
+  args = uid=vmail gid=vmail home=${VMAIL_DIR}/%d/%n
+}
 namespace inbox {
   inbox = yes
-  mailbox Drafts { auto = subscribe; special_use = \\Drafts }
-  mailbox Junk   { auto = subscribe; special_use = \\Junk }
-  mailbox Sent   { auto = subscribe; special_use = \\Sent }
-  mailbox Trash  { auto = subscribe; special_use = \\Trash }
+  mailbox Drafts {
+    auto = subscribe
+    special_use = \\Drafts
+  }
+  mailbox Junk {
+    auto = subscribe
+    special_use = \\Junk
+  }
+  mailbox Sent {
+    auto = subscribe
+    special_use = \\Sent
+  }
+  mailbox Trash {
+    auto = subscribe
+    special_use = \\Trash
+  }
 }
-service imap-login { inet_listener imap { port = 0 } inet_listener imaps { port = 993 } }
-service lmtp { unix_listener /var/spool/postfix/private/dovecot-lmtp { mode = 0600; user = postfix; group = postfix } }
-service auth { unix_listener /var/spool/postfix/private/auth { mode = 0660; user = postfix; group = postfix } }
-protocol lmtp { mail_plugins = \$mail_plugins sieve }
+service imap-login {
+  inet_listener imap {
+    port = 0
+  }
+  inet_listener imaps {
+    port = 993
+  }
+}
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0600
+    user = postfix
+    group = postfix
+  }
+}
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    user = postfix
+    group = postfix
+  }
+}
+protocol lmtp {
+  mail_plugins = \$mail_plugins sieve
+}
+plugin {
+  sieve_default = file:/etc/dovecot/sieve/default.sieve
+}
 D
-# 스팸 점수 높은 건 Junk 폴더로 (sieve)
-apt-get install -y -qq dovecot-sieve >/dev/null
-mkdir -p /etc/dovecot/sieve
-cat > /etc/dovecot/sieve/default.sieve <<'S'
-require ["fileinto"];
-if header :contains "X-Spam" "Yes" { fileinto "Junk"; }
-S
 sievec /etc/dovecot/sieve/default.sieve
-cat >> /etc/dovecot/local.conf <<'D'
-plugin { sieve_default = file:/etc/dovecot/sieve/default.sieve }
-D
+doveconf -n >/dev/null   # 설정 문법 확인 (틀리면 여기서 멈춤)
+# 앞서 설치가 중간에 멈췄다면(dovecot-core 설정 안 끝남) 마저 끝냄
+dpkg --configure -a >/dev/null 2>&1 || true
 systemctl enable --now dovecot >/dev/null; systemctl restart dovecot
 
 echo "▶ 7/8 Postfix"
