@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load static %}
+{% load static blog_extras %}
 
 {% block title %}{{ editor_heading|default:"글쓰기" }} — Blog{% endblock %}
 
 {% block content %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
-<link rel="stylesheet" href="{% static 'editor/mj-editor.css' %}">
+<link rel="stylesheet" href="{% static_v 'editor/mj-editor.css' %}">
 <style>
     @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&family=Nanum+Gothic:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap');
 
@@ -354,7 +354,7 @@
 </main>
 
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script defer src="{% static 'editor/mj-editor.js' %}"></script>
+<script defer src="{% static_v 'editor/mj-editor.js' %}"></script>
 <script>
 window.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('writer-form');

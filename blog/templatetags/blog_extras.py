@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 
@@ -15,6 +16,29 @@ from blog.content import (
 )
 
 register = template.Library()
+
+_STATIC_VERSIONS = {}
+
+
+@register.simple_tag
+def static_v(path):
+	"""{% static %} + 파일 내용 해시(?v=) — 에디터 번들처럼 이름이 고정된 파일을 바꿔도 브라우저가 예전 캐시를 쓰지 않게."""
+	from django.contrib.staticfiles import finders
+	from django.templatetags.static import static
+
+	url = static(path)
+	if path not in _STATIC_VERSIONS:
+		version = ""
+		found = finders.find(path)
+		if found:
+			try:
+				with open(found, "rb") as fh:
+					version = hashlib.md5(fh.read()).hexdigest()[:10]
+			except OSError:
+				version = ""
+		_STATIC_VERSIONS[path] = version
+	version = _STATIC_VERSIONS[path]
+	return f"{url}?v={version}" if version else url
 
 
 def _strip_tags_text(value: str):
