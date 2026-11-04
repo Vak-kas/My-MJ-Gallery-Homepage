@@ -12,6 +12,7 @@ urlpatterns = [
     path("post/<str:slug>/edit/", views.post_edit, name="post_edit"),
     path("post/<str:slug>/delete/", views.post_delete, name="post_delete"),
     path("series/<str:slug>/", views.series_detail, name="series"),
+    path("all/", views.all_posts, name="all"),
     path("tech/", views.tech, name="tech"),
     path("board/", views.board, name="board"),
     path("life/", views.life, name="life"),

@@ -344,7 +344,7 @@ def _render_block(node, tight=False):
 		alt = str(attrs.get("alt") or caption)
 		caption_html = f'<figcaption class="px-4 py-3 text-sm text-[#8e8e93]">{escape(caption)}</figcaption>' if caption else ""
 		return (
-			f'<figure class="my-5 overflow-hidden rounded-2xl border border-[#e5e5ea] bg-[#f9f9fb]">'
+			f'<figure class="my-5 overflow-hidden rounded-2xl border border-[#e5e5ea] bg-white">'
 			f'<img src="{escape(src)}" alt="{escape(alt)}" loading="lazy" class="block w-full h-auto object-contain" />'
 			f'{caption_html}</figure>'
 		)

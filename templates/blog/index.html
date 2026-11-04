@@ -95,8 +95,9 @@
                             <option value="{% url 'blog:index' %}{{ limit_30_qs }}" {% if page_limit == 30 %}selected{% endif %}>표시 30개</option>
                         </select>
                         {% if user.is_authenticated %}
-                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">{% if mine_only %}전체 글 보기{% else %}내가 쓴 글 보기{% endif %}</a>
+                        <a href="{% url 'blog:index' %}{{ toggle_mine_qs }}" data-preserve-scroll="1" class="rounded-full border px-3 py-1 text-[12px] {% if mine_only %}border-[#111827] bg-[#111827] text-white{% else %}border-black/[0.1] text-[#1d1d1f]{% endif %}">{% if mine_only %}내 글만 ✓{% else %}내가 쓴 글 보기{% endif %}</a>
                         {% endif %}
+                        <a href="{% url 'blog:all' %}" class="rounded-full border border-[#0066cc]/30 bg-[#f0f7ff] px-3 py-1 text-[12px] font-semibold text-[#0066cc]">전체 글 보기 →</a>
                     </div>
                 </div>
 

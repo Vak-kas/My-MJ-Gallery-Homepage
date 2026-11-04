@@ -13,6 +13,7 @@ BLUE, GREEN, ORANGE, PURPLE, GOLD = (10, 132, 255), (16, 185, 129), (249, 115, 2
 
 PAGES = {
     "blog": {"title": "Blog", "subtitle": "기술 글 · 자유게시판 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
+    "all": {"title": "All Posts", "subtitle": "기술 · 자유게시판 · 일상 — 모든 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
     "tech": {"title": "Tech Blog", "subtitle": "트러블슈팅 · 네트워크 · 보안", "pill": "TECH", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
     "board": {"title": "자유게시판", "subtitle": "공지 · 소통 · 자유 글", "pill": "BOARD", "accent": ORANGE, "eyebrow": "SMJ GALLERY · BLOG"},
     "life": {"title": "Life", "subtitle": "일상 메모 · 생각 기록 · 회고", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
