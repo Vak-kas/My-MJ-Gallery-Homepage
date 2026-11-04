@@ -295,3 +295,18 @@ class EmailVerificationTests(TestCase):
 
 from datetime import timedelta
 from django.utils.timezone import now as timezone_now
+
+
+class UsernameNormalizationTests(TestCase):
+    def test_login_matches_signup_normalization(self):
+        # 가입 폼은 NFKC 로 저장 → 'ㅎㅇ'(U+314E U+3147) 가 'ᄒᄋ'(U+1112 U+110B) 로 바뀜. 로그인도 같은 규칙이어야 함
+        stored = unicodedata.normalize("NFKC", "ㅎㅇ")
+        self.assertNotEqual(stored, "ㅎㅇ")
+        User.objects.create_user(stored, "n@example.com", "Very-strong-pw-123")
+        res = self.client.post(reverse("accounts:login"), {"username": "ㅎㅇ", "password": "Very-strong-pw-123"})
+        self.assertEqual(res.status_code, 302)
+        res = self.client.post(reverse("accounts:login"), {"username": " ㅎㅇ ", "password": "Very-strong-pw-123"})
+        self.assertEqual(res.status_code, 302)
+
+
+import unicodedata
