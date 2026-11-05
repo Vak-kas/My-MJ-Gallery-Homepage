@@ -152,11 +152,14 @@ def api_app_passwords(request):
 			raise _ApiError(f"비밀번호 파일을 쓰지 못했어요: {exc}", 500)
 		return JsonResponse({"ok": True, "login": obj.login, "password": plain, "app_passwords": _app_password_list()})
 	if action == "delete":
-		AppPassword.objects.filter(id=payload.get("id")).delete()
+		# 파일 쓰기가 실패하면 삭제도 되돌림 (화면에선 지워졌는데 Dovecot 파일에 남아 계속 로그인되던 것)
+		from django.db import transaction
 		try:
-			write_app_password_file()
+			with transaction.atomic():
+				AppPassword.objects.filter(id=payload.get("id")).delete()
+				write_app_password_file()
 		except OSError as exc:
-			raise _ApiError(f"비밀번호 파일을 쓰지 못했어요: {exc}", 500)
+			raise _ApiError(f"비밀번호 파일을 쓰지 못해 지우지 않았어요: {exc}", 500)
 		return JsonResponse({"ok": True, "app_passwords": _app_password_list()})
 	raise _ApiError("모르는 동작이에요")
 

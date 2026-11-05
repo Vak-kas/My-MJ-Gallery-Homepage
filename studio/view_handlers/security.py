@@ -53,6 +53,12 @@ def _content_rows(params, limit=300):
     return rows[:limit], {"ip": ip, "who": who, "kind": kind}
 
 
+def _csv_cell(value):
+    """엑셀 수식 주입 방지: = + - @ 탭 CR 로 시작하는 칸은 앞에 ' 를 붙여 글자로 (댓글에 =HYPERLINK(...) 를 남기면 증거 CSV 를 열 때 실행됐음)"""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 def _export_csv(rows):
     response = HttpResponse(content_type="text/csv; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="evidence-{timezone.localtime():%Y%m%d-%H%M}.csv"'
@@ -60,7 +66,7 @@ def _export_csv(rows):
     writer = csv.writer(response)
     writer.writerow(["작성 시각", "종류", "작성자", "내용", "IP", "브라우저"])
     for r in rows:
-        writer.writerow([timezone.localtime(r["created_at"]).strftime("%Y-%m-%d %H:%M:%S"), r["label"], r["author"], r["text"], r["ip"], r["agent"]])
+        writer.writerow([timezone.localtime(r["created_at"]).strftime("%Y-%m-%d %H:%M:%S"), r["label"], _csv_cell(r["author"]), _csv_cell(r["text"]), r["ip"], _csv_cell(r["agent"])])
     return response
 
 

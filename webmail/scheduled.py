@@ -18,6 +18,9 @@ def build_message(to, cc, bcc, subject, body, in_reply_to="", references="", fil
 	from .sanitize import sanitize_html
 	from_email = formataddr((settings.WEBMAIL_FROM_NAME, settings.WEBMAIL_USER))
 	headers = {"X-MJ-Kind": "webmail", "Message-ID": make_msgid(domain=settings.WEBMAIL_USER.split("@")[-1])}
+	# 받은 메일의 헤더는 줄이 접혀(\r\n + 공백) 올 수 있어 한 줄로 펴서 넣음 (그대로 넣으면 Django 가 거부해 답장이 실패했음)
+	in_reply_to = " ".join(str(in_reply_to or "").split())
+	references = " ".join(str(references or "").split())
 	if in_reply_to:
 		headers["In-Reply-To"] = in_reply_to
 		headers["References"] = (references + " " + in_reply_to).strip()

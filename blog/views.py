@@ -369,7 +369,7 @@ def _sidebar_context(request):
 
 	tag_filter = Q(posts__is_published=True)
 	if not request.user.is_superuser:
-		tag_filter &= ~Q(posts__category=Post.CATEGORY_SECRET)
+		tag_filter &= ~Q(posts__category=Post.CATEGORY_SECRET) & ~Q(posts__visibility=Post.VISIBILITY_PRIVATE)   # 비공개 글 태그도 숨김
 
 	tags = list(
 		Tag.objects.annotate(

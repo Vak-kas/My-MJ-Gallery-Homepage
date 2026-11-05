@@ -191,8 +191,18 @@ def write_app_password_file():
 	path = Path(settings.WEBMAIL_APP_PASSWORD_FILE)
 	path.parent.mkdir(parents=True, exist_ok=True)
 	lines = [f"{a.login}:{a.password_hash}:::::::user={settings.WEBMAIL_USER}" for a in AppPassword.objects.all()]
-	tmp = path.with_suffix(".tmp")
-	tmp.write_text("".join(line + "\n" for line in lines), encoding="utf-8")
-	os.chmod(tmp, 0o640)
-	os.replace(tmp, path)
+	# 임시 파일 이름을 매번 다르게 (gunicorn 워커 둘이 동시에 쓰면 같은 .tmp 를 두고 다퉜음), 같은 폴더에 써서 os.replace 가 원자적으로
+	import tempfile
+	fd, tmp_name = tempfile.mkstemp(prefix=".app_passwords.", dir=str(path.parent))
+	try:
+		with os.fdopen(fd, "w", encoding="utf-8") as fh:
+			fh.write("".join(line + "\n" for line in lines))
+		os.chmod(tmp_name, 0o640)
+		os.replace(tmp_name, path)
+	except BaseException:
+		try:
+			os.unlink(tmp_name)
+		except OSError:
+			pass
+		raise
 	return path

@@ -20,7 +20,7 @@
                 <span class="mx-1 h-5 w-px bg-white/30" aria-hidden="true"></span>
                 {% include "components/notif_bell.html" with bell_class="border border-white/20 bg-white/10 text-white hover:bg-white/20 h-[34px]" %}
                 <a href="{% url 'accounts:index' %}" id="account-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">My</a>
-                <a href="{% url 'accounts:logout' %}" id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
+                <a href="{% url 'accounts:logout' %}" data-logout id="logout-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Logout</a>
             {% else %}
                 <a href="{% url 'accounts:login' %}" id="login-link" class="quick-nav-link rounded-full border border-white/20 bg-white/10 px-4 py-2 text-[13px] text-white transition hover:bg-white/20">Login</a>
             {% endif %}

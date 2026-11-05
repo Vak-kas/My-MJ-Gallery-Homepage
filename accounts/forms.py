@@ -19,7 +19,7 @@ class UserForm(UserCreationForm):
     def clean_email(self):
         email = self.cleaned_data.get("email")
 
-        if User.objects.filter(email=email).exists():
+        if email and User.objects.filter(email__iexact=email).exists():   # 대소문자만 다른 같은 메일로 여러 계정 방지
             raise forms.ValidationError("이미 사용 중인 이메일입니다.")
 
         return email

@@ -141,7 +141,8 @@ def _send_verify_mail(signup):
 def verify_email_view(request, user_id: int, token: str):
     signup = SignupRequest.objects.filter(user_id=user_id).select_related("user").first()
     if signup and signup.email_verified_at:
-        return render(request, "accounts/verify_done.html", {"pending_user": signup.user, "already": True})
+        # 아이디는 보여 주지 않음 (토큰이 틀려도 보여 줘서 /accounts/verify/1..N/x/ 로 회원 아이디를 줄줄이 알아낼 수 있었음)
+        return render(request, "accounts/verify_done.html", {"pending_user": None, "already": True})
     if not signup or not signup.verify_link_valid(token):
         return render(request, "accounts/verify_invalid.html", {"form": None}, status=400)
     signup.mark_verified()
@@ -206,13 +207,14 @@ def login_view(request):
             password=password
         )
         if user is not None:
-            clear_failures(ip, username)
             # 2단계 인증이 켜진 계정이면 코드 단계로 (기억한 브라우저는 생략)
             from accounts.models import two_factor_enabled
 
             if two_factor_enabled(user) and not _trusted_browser(request, user):
+                # 실패 횟수는 2단계까지 끝나야 지움 (비밀번호만 아는 사람이 다시 로그인해 2단계 잠금을 풀지 못하게)
                 request.session[PENDING_2FA_KEY] = {"u": user.id, "next": next_url or "", "t": timezone.now().timestamp()}
                 return redirect("accounts:two_factor_verify")
+            clear_failures(None, username)   # IP 실패 횟수는 그대로 (자기 계정으로 한 번 로그인해 IP 잠금을 풀며 남의 계정을 대입하지 못하게)
             return _finish_login(request, user, next_url)
         else:
             record_failure(ip, username)
@@ -226,6 +228,12 @@ def login_view(request):
 
 
 def logout_view(request):
+    """로그아웃은 POST 로만 (GET 한 번이면 다른 사이트의 <img src=/accounts/logout/> 로 강제 로그아웃됐음).
+    주소로 직접 들어오면 확인 화면, 화면의 Logout 링크는 base.html 의 숨은 양식으로 POST"""
+    if request.method != "POST":
+        if not request.user.is_authenticated:
+            return redirect('main:home')
+        return render(request, "accounts/logout_confirm.html", {"next": _safe_next_url(request) or ""})
     next_url = _safe_next_url(request)
     logout(request)
     if next_url:
@@ -341,9 +349,21 @@ def profile_edit_view(request):
     initial = {"real_name": user.first_name, "email": user.email}
     form = ProfileForm(user, request.POST or None, initial=initial)
     if request.method == "POST" and form.is_valid():
+        old_email = user.email
         user.first_name = form.cleaned_data["real_name"]
         user.email = form.cleaned_data["email"]
         user.save(update_fields=["first_name", "email"])
+        if old_email and old_email.lower() != (user.email or "").lower() and settings.MAIL_ENABLED:
+            # 예전 주소로 알림 — 세션을 훔친 사람이 메일을 바꿔 2단계 코드·비밀번호 재설정을 가로채면 바로 알 수 있게
+            try:
+                send_mail(
+                    "[서민재 갤러리] 계정 이메일이 바뀌었어요",
+                    f"{user.get_username()} 계정의 이메일이 {old_email} 에서 다른 주소로 바뀌었어요.\n"
+                    f"직접 바꾼 게 아니라면 바로 비밀번호를 바꾸고 관리자에게 알려 주세요.\n\n{settings.SITE_URL}/accounts/",
+                    settings.DEFAULT_FROM_EMAIL, [old_email], fail_silently=True,
+                )
+            except Exception:  # noqa: BLE001
+                pass
         messages.success(request, "회원정보를 바꿨어요.")
         return redirect("accounts:index")
     return render(request, "accounts/profile_edit.html", {"form": form})
@@ -513,7 +533,7 @@ def two_factor_verify_view(request):
 			return render(request, "accounts/two_factor_verify.html", ctx)
 		code = request.POST.get("code") or ""
 		if tf and (check_email_code(user, code) or tf.use_backup_code(code)):
-			clear_failures(ip, user.username)
+			clear_failures(None, user.username)
 			request.session.pop(PENDING_2FA_KEY, None)
 			return _finish_login(request, user, pending.get("next") or "", remember=request.POST.get("remember") == "1")
 		record_failure(ip, user.username)

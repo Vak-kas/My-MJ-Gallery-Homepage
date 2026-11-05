@@ -227,7 +227,7 @@
                     <span class="mx-1 h-5 w-px bg-black/[0.1]" aria-hidden="true"></span>
                     {% include "components/notif_bell.html" %}
                     <a href="{% url 'accounts:index' %}" title="내 계정" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">My</a>
-                    <a href="{% url 'accounts:logout' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
+                    <a href="{% url 'accounts:logout' %}" data-logout class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Logout</a>
                 {% else %}
                     <a href="{% url 'accounts:login' %}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] text-[#1d1d1f] hover:bg-[#f5f5f7]">Login</a>
                 {% endif %}
@@ -250,6 +250,18 @@
         <span id="theme-toggle-icon" class="theme-toggle-icon">🌙</span>
     </button>
     {% include "components/scroll_top.html" %}
+    {% if user.is_authenticated %}
+    {# Logout 링크는 이 숨은 양식으로 POST (GET 로그아웃 막음) #}
+    <form id="logout-form" method="post" action="{% url 'accounts:logout' %}" hidden>{% csrf_token %}</form>
+    <script>
+        document.addEventListener('click', (e) => {
+            const a = e.target.closest('a[data-logout]');
+            if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+            e.preventDefault();
+            document.getElementById('logout-form').submit();
+        });
+    </script>
+    {% endif %}
 
     <script>
         // 글 저장 후 에디터가 아닌 페이지로 넘어왔다면 저장 성공 → 에디터 자동저장본 정리
