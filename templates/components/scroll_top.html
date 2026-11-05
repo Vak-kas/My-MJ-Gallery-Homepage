@@ -3,19 +3,17 @@
 가운데는 평소 ↑, 마우스를 올리면 지금 읽은 %. 물에 잠긴 부분의 글자·화살표는 흰색으로 바뀜.
 화면 높이의 60% 넘게 내려오면 나타남.
 {% endcomment %}
-{# 숫자 글꼴: Pretendard (SIL OFL 1.1, github.com/orioncactus/pretendard) — 쓰는 글자 조각만 내려받는 dynamic subset #}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin>
 <button id="scroll-top-btn" type="button" class="scroll-top" aria-label="맨 위로" title="맨 위로" tabindex="-1">
     <svg viewBox="0 0 58 58" aria-hidden="true">
         <defs>
-            <clipPath id="scroll-top-circle"><circle cx="29" cy="29" r="26"/></clipPath>
+            <clipPath id="scroll-top-circle"><circle cx="29" cy="29" r="27"/></clipPath>
             <clipPath id="scroll-top-under"><rect id="scroll-top-under-rect" x="0" y="58" width="58" height="60"/></clipPath>
-            <linearGradient id="scroll-top-water" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="36">
+            <linearGradient id="scroll-top-water-grad" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="36">
                 <stop offset="0" stop-color="#4c9bff"/>
                 <stop offset="1" stop-color="#0058b0"/>
             </linearGradient>
         </defs>
-        <circle class="scroll-top__bg" cx="29" cy="29" r="27.5"/>
+        <circle class="scroll-top__bg" cx="29" cy="29" r="28.5"/>
         <g clip-path="url(#scroll-top-circle)">
             <g id="scroll-top-water" class="scroll-top__water" style="transform: translateY(56px)">
                 {# 물결 한 주기 = 58, 두 주기를 그려 두고 옆으로 흘려 이어지게 #}
@@ -37,16 +35,16 @@
     </svg>
 </button>
 <style>
-    .scroll-top { position: fixed; right: 20px; bottom: 20px; z-index: 80; width: 58px; height: 58px; padding: 0; border: 0; background: transparent; border-radius: 9999px; cursor: pointer; opacity: 0; transform: translateY(10px) scale(.9); pointer-events: none; transition: opacity .3s ease, transform .3s ease; filter: drop-shadow(0 8px 20px rgba(0, 60, 140, .16)); }
+    .scroll-top { position: fixed; right: 20px; bottom: 20px; z-index: 80; width: 52px; height: 52px; padding: 0; border: 0; background: transparent; border-radius: 9999px; cursor: pointer; opacity: 0; transform: translateY(10px) scale(.9); pointer-events: none; transition: opacity .3s ease, transform .3s ease; filter: drop-shadow(0 8px 18px rgba(0, 0, 0, .12)); }
     .scroll-top.is-shown { opacity: 1; transform: none; pointer-events: auto; }
     .scroll-top svg { width: 100%; height: 100%; display: block; }
-    .scroll-top__bg { fill: rgba(255, 255, 255, .97); stroke: rgba(0, 102, 204, .28); stroke-width: 1.2; }
+    .scroll-top__bg { fill: rgba(255, 255, 255, .96); stroke: rgba(0, 0, 0, .1); stroke-width: 1; }
     .scroll-top__water { transition: transform .35s cubic-bezier(.22, .61, .36, 1); }
     .scroll-top__wave { animation: scrollTopWave 2.8s linear infinite; }
     .scroll-top__wave.is-back { fill: #9cc8ff; opacity: .7; animation-duration: 4.2s; animation-direction: reverse; }
-    .scroll-top__wave.is-front { fill: url(#scroll-top-water); }
+    .scroll-top__wave.is-front { fill: url(#scroll-top-water-grad); }
     @keyframes scrollTopWave { from { transform: translateX(0); } to { transform: translateX(-58px); } }
-    .scroll-top__arrow { fill: none; stroke: #0066cc; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; transition: opacity .2s, transform .25s ease; }
+    .scroll-top__arrow { fill: none; stroke: #0066cc; stroke-width: 2.1; stroke-linecap: round; stroke-linejoin: round; transition: opacity .2s, transform .25s ease; }
     .scroll-top__pct { opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .25s ease; fill: #0b3d75; font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
     .scroll-top__num { font-size: 16px; font-weight: 800; letter-spacing: -.8px; }
     .scroll-top__unit { font-size: 9px; font-weight: 700; opacity: .7; }
