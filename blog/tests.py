@@ -821,3 +821,57 @@ class CollectionCardsTests(TestCase):
 		self.client.force_login(self.admin)
 		cards = {c["title"]: c for c in self.client.get(reverse("blog:index")).context["collections"]}
 		self.assertEqual(cards["Secret"]["count"], 1)
+
+
+class KnowledgeMapTests(TestCase):
+	"""연결 지도: 같은 시리즈(앞뒤)·본문 링크·태그 공유로 글끼리 선, 너무 넓은 태그는 빼고, Secret 은 관리자에게만"""
+
+	def setUp(self):
+		from django.utils import timezone
+		from blog.models import Series, Tag
+		self.admin = get_user_model().objects.create_superuser("km", "k@x.kr", "pw-for-tests-only")
+		now = timezone.now()
+		mk = lambda slug, cat="tech", content="x", **kw: Post.objects.create(title=slug, slug=slug, category=cat, content=content, author=self.admin, is_published=True, published_at=now, **kw)
+		s = Series.objects.create(name="S", slug="s", author=self.admin)
+		self.a = mk("a", series=s, series_order=1)
+		self.b = mk("b", series=s, series_order=2)
+		self.c = mk("c", series=s, series_order=3)
+		self.d = mk("d", cat="life", content='{"href": "/blog/post/a/"}')
+		self.e = mk("e")
+		self.f = mk("f")
+		self.alone = mk("alone")
+		self.sec = mk("sec", cat="secret", content='{"href": "/blog/post/e/"}')
+		t = Tag.objects.create(name="hackrf", slug="hackrf")
+		self.e.tags.add(t); self.f.tags.add(t)
+		wide = Tag.objects.create(name="wide", slug="wide")
+		for i in range(13):
+			mk(f"w{i}").tags.add(wide)
+
+	def pairs(self, m):
+		ids = {n["id"]: n["title"] for n in m["nodes"]}
+		return {tuple(sorted((ids[e["a"]], ids[e["b"]]))): e["kinds"] for e in m["edges"]}
+
+	def test_edges_and_visibility(self):
+		from blog.views import _published_posts_qs
+		from blog.knowledge_map import build_map
+		qs = _published_posts_qs().exclude(category="secret")
+		m = build_map(qs)
+		p = self.pairs(m)
+		self.assertEqual(p[("a", "b")], ["series"])
+		self.assertEqual(p[("b", "c")], ["series"])
+		self.assertNotIn(("a", "c"), p)          # 시리즈는 앞뒤 글끼리만
+		self.assertEqual(p[("a", "d")], ["link"])
+		self.assertEqual(p[("e", "f")], ["tag"])
+		self.assertFalse(any(k[0].startswith("w") and k[1].startswith("w") for k in p))   # 13개 달린 태그는 뺌
+		alone = next(n for n in m["nodes"] if n["title"] == "alone")
+		self.assertFalse(alone["connected"])
+		self.assertNotIn("sec", [n["title"] for n in m["nodes"]])
+		self.assertNotIn("secret", [h["key"] for h in m["hubs"]])
+		admin_map = build_map(_published_posts_qs(), include_secret=True)
+		self.assertIn(("e", "sec"), self.pairs(admin_map))
+
+	def test_hub_page_renders_map(self):
+		res = self.client.get(reverse("blog:index"))
+		self.assertContains(res, "연결 지도")
+		self.assertContains(res, 'id="kmap-data"')
+		self.assertNotContains(res, '"title": "sec"')

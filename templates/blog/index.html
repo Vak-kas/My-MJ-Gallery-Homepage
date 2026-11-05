@@ -45,10 +45,6 @@
         </form>
     </section>
 
-    {% include "blog/components/weekly_record.html" with weekly=weekly %}
-
-    {% include "blog/components/collections.html" with collections=collections %}
-
     <section class="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[340px_minmax(0,1fr)]">
         {% include "blog/components/sidebar_widgets.html" %}
 
@@ -230,6 +226,13 @@
 
         </div>
     </section>
+
+    {# 글 목록이 먼저, 둘러보기 카드는 그 아래 #}
+    {% include "blog/components/collections.html" with collections=collections %}
+
+    {% include "blog/components/knowledge_map.html" with knowledge_map=knowledge_map %}
+
+    {% include "blog/components/weekly_record.html" with weekly=weekly %}
 </main>
 
 <script>

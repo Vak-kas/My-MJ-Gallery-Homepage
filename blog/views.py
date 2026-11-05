@@ -538,6 +538,7 @@ def index(request):
 	from studio import site_settings
 	from .weekly import weekly_stats
 	from .collections import build_collections
+	from .knowledge_map import build_map
 
 	context = {
 		"weekly": weekly_stats(site_settings.load()["blog_goals"], include_secret=request.user.is_superuser),
@@ -568,6 +569,7 @@ def index(request):
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
 		"collections": build_collections(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
+		"knowledge_map": build_map(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
 	}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/index.html", context)
