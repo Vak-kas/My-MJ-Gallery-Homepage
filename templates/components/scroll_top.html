@@ -1,0 +1,65 @@
+{% comment %}
+모든 페이지 오른쪽 아래 "맨 위로" 버튼.
+   바깥 링이 스크롤한 비율만큼 차오르고, 안쪽 원에서 별이 위로 솟음. 화면 높이의 60% 넘게 내려오면 나타남.
+   구성은 minter-v1.com (github.com/Minter-v1/Minter-blog, app/components/back-to-top.tsx) 을 참고해 바닐라 JS 로 직접 구현
+{% endcomment %}
+<button id="scroll-top-btn" type="button" class="scroll-top" aria-label="맨 위로" title="맨 위로" tabindex="-1">
+    <svg class="scroll-top__ring" viewBox="0 0 58 58" aria-hidden="true">
+        <defs>
+            <linearGradient id="scroll-top-grad" x1="0" x2="1">
+                <stop offset="0" stop-color="#9cc8ff"/>
+                <stop offset="1" stop-color="#0066cc"/>
+            </linearGradient>
+        </defs>
+        <circle cx="29" cy="29" r="27" fill="none" stroke="rgba(0,102,204,.18)" stroke-width="2.5"/>
+        <circle id="scroll-top-arc" cx="29" cy="29" r="27" fill="none" stroke="url(#scroll-top-grad)" stroke-width="2.5" stroke-linecap="round" pathlength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+    </svg>
+    <span class="scroll-top__sky" aria-hidden="true">
+        <i class="scroll-top__dot" style="top:28%;left:24%"></i>
+        <i class="scroll-top__dot" style="top:70%;left:72%;opacity:.5"></i>
+        <i class="scroll-top__dot" style="top:22%;left:66%;opacity:.6"></i>
+        <span class="scroll-top__star"><i class="scroll-top__trail"></i><i class="scroll-top__mark"></i></span>
+    </span>
+</button>
+<style>
+    .scroll-top { position: fixed; right: 20px; bottom: 20px; z-index: 80; width: 58px; height: 58px; padding: 0; border: 0; background: transparent; border-radius: 9999px; cursor: pointer; opacity: 0; transform: translateY(10px) scale(.9); pointer-events: none; transition: opacity .3s ease, transform .3s ease; }
+    .scroll-top.is-shown { opacity: 1; transform: none; pointer-events: auto; }
+    .scroll-top__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .scroll-top__sky { position: absolute; inset: 5px; overflow: hidden; border-radius: 9999px; background: radial-gradient(circle at 40% 28%, #2d4a8a, #14213f 72%); box-shadow: 0 8px 24px rgba(20, 33, 63, .35), inset 0 0 0 1px rgba(156, 200, 255, .22); }
+    .scroll-top__dot { position: absolute; width: 1.6px; height: 1.6px; border-radius: 9999px; background: #eaf2ff; opacity: .7; }
+    .scroll-top__star { position: absolute; top: 50%; left: 50%; animation: scrollTopStar 2.6s ease-in-out infinite; }
+    .scroll-top__trail { position: absolute; top: 4px; left: -1px; width: 2px; height: 14px; border-radius: 2px; background: linear-gradient(to top, rgba(156,200,255,0), rgba(156,200,255,.85)); }
+    .scroll-top__mark { position: absolute; top: -5px; left: -5px; width: 10px; height: 10px; background: #fff; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); filter: drop-shadow(0 0 4px #9cc8ff); }
+    .scroll-top:hover .scroll-top__sky { box-shadow: 0 10px 28px rgba(20, 33, 63, .45), inset 0 0 0 1px rgba(156, 200, 255, .4); }
+    @keyframes scrollTopStar { 0% { transform: translateY(14px); opacity: 0; } 25% { opacity: 1; } 60% { transform: translateY(-8px); opacity: 1; } 100% { transform: translateY(-16px); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { .scroll-top__star { animation: none; transform: translateY(-2px); } .scroll-top { transition: none; } }
+    /* 다크 CSS 생성기가 별·점을 어둡게 바꾸는 것 되돌림 (밤하늘 위 흰 별) */
+    html.theme-dark .scroll-top__dot { background: #eaf2ff !important; }
+    html.theme-dark .scroll-top__mark { background: #fff !important; }
+    html.theme-dark .scroll-top__sky { box-shadow: 0 8px 24px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(156, 200, 255, .3); }
+</style>
+<script>
+    (() => {
+        const btn = document.getElementById('scroll-top-btn');
+        const arc = document.getElementById('scroll-top-arc');
+        if (!btn || !arc) return;
+        let raf = 0;
+        const update = () => {
+            raf = 0;
+            const max = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
+            arc.setAttribute('stroke-dashoffset', String(1 - progress));
+            const shown = window.scrollY > window.innerHeight * 0.6;
+            btn.classList.toggle('is-shown', shown);
+            btn.tabIndex = shown ? 0 : -1;
+        };
+        const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
+        btn.addEventListener('click', () => {
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+        });
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
+        update();
+    })();
+</script>

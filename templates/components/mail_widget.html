@@ -18,9 +18,9 @@
     (() => {
         const fab = document.getElementById('mail-fab'), panel = document.getElementById('mail-panel'), mini = document.getElementById('mail-mini');
         let app = null;
-        // 다른 떠 있는 버튼(홈의 맨 위로 → 다크모드 버튼이 한 칸 위, 글 보기의 맨 위/아래 두 개)과 겹치지 않게 그만큼 위로
-        const stacked = document.querySelector('.post-jump') ? 2 : document.getElementById('back-to-top-btn') ? 1 : 0;
-        if (stacked) { fab.style.bottom = `${76 + stacked * 56}px`; panel.style.bottom = `${132 + stacked * 56}px`; }
+        // 글 보기의 맨 아래로(⌄) 버튼과 겹치지 않게 한 칸 위로 (아래부터 맨 위로 게이지 · 다크모드 · 이 버튼 순)
+        const stacked = document.querySelector('.post-jump') ? 1 : 0;
+        if (stacked) { fab.style.bottom = `${146 + stacked * 56}px`; panel.style.bottom = `${202 + stacked * 56}px`; }
         const setOpen = (open) => {
             panel.hidden = !open; fab.setAttribute('aria-expanded', String(open));
             try { localStorage.setItem('mj:mail:open', open ? '1' : '0'); } catch { /* ignore */ }
