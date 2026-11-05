@@ -621,7 +621,7 @@
         const url = $('ag-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('ag-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('ag-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('ag-kakao').addEventListener('click', () => mjShare({ title: `🌈 증목 한 판 — {{ room.title|escapejs }}`, text: '돌이 사라지는 오목 + 증강 카드! 링크를 열고 닉네임만 넣으면 돼요.', url: $('ag-copy').dataset.url, button: '증목 하러 가기' }));
+    $('ag-kakao').addEventListener('click', () => mjShare({ title: `🌈 증목 한 판 — ${'{{ room.title|escapejs }}'}`, text: '돌이 사라지는 오목 + 증강 카드! 링크를 열고 닉네임만 넣으면 돼요.', url: $('ag-copy').dataset.url, button: '증목 하러 가기' }));
     new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     render();
     window.__augomok = { state: () => S, seat: () => mySeat, send, gacha, feed: handle };  // feed: 화면 시험용 (서버 메시지를 그대로 넣어 봄)

@@ -837,3 +837,29 @@ class KnowledgeMapTests(TestCase):
 		self.assertContains(res, "Topic Map")
 		self.assertContains(res, 'id="kmap-data"')
 		self.assertNotContains(res, "연결 지도")
+
+
+class CoverUploadTests(TestCase):
+	"""커버 이미지: 이미지가 아니면 거절, 이미지는 다시 그려 uuid 이름으로 (HTML 커버로 저장형 XSS 방지)"""
+
+	def setUp(self):
+		self.member = get_user_model().objects.create_user("cov", "c@x.kr", "pw-for-tests-only")
+		self.client.force_login(self.member)
+
+	def _post(self, upload):
+		return self.client.post(reverse("blog:post_create"), {"title": "커버 글", "category": "board", "content": "x", "submit_action": "publish", "cover_image": upload})
+
+	def test_html_cover_rejected(self):
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		self._post(SimpleUploadedFile("x.html", b"<script>alert(1)</script>", content_type="text/html"))
+		self.assertFalse(Post.objects.filter(title="커버 글").exists())
+
+	def test_image_cover_reencoded(self):
+		from io import BytesIO
+		from PIL import Image
+		from django.core.files.uploadedfile import SimpleUploadedFile
+		buf = BytesIO(); Image.new("RGB", (20, 10), "red").save(buf, format="PNG")
+		with self.settings(MEDIA_ROOT=__import__("tempfile").mkdtemp()):
+			self._post(SimpleUploadedFile("evil.html.png", buf.getvalue(), content_type="image/png"))
+			post = Post.objects.get(title="커버 글")
+			self.assertRegex(post.cover_image.name, r"^blog/covers/[0-9a-f]{32}\.jpg$")

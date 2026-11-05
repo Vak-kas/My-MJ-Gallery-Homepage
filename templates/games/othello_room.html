@@ -183,7 +183,7 @@
         $('om-rematch').disabled = !(S && S.status === 'over' && mySeat);
         $('om-stand').disabled = !(mySeat && !(S.status === 'playing' && S.move_count));
         $('om-undo-ask').classList.toggle('hidden', !(S && S.undo_from && mySeat && S.undo_from !== mySeat));
-        document.title = myTurn() ? `🟢 내 차례 · ${'{{ room.title|escapejs }}'}` : `⚪ {{ room.title|escapejs }} · 오셀로`;
+        document.title = myTurn() ? `🟢 내 차례 · ${'{{ room.title|escapejs }}'}` : `⚪ ${'{{ room.title|escapejs }}'} · 오셀로`;
         draw();
     }
     document.querySelector('aside').addEventListener('click', (e) => { const b = e.target.closest('[data-sit]'); if (b) send({ type: 'sit', seat: b.dataset.sit }); });
@@ -264,7 +264,7 @@
         const url = $('om-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('om-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('om-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('om-kakao').addEventListener('click', () => mjShare({ title: `⚪ 오셀로 한 판 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.', url: $('om-copy').dataset.url, button: '오셀로 두러 가기' }));
+    $('om-kakao').addEventListener('click', () => mjShare({ title: `⚪ 오셀로 한 판 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 둘 수 있어요.', url: $('om-copy').dataset.url, button: '오셀로 두러 가기' }));
     render();
     window.__othello = { state: () => S, seat: () => mySeat, send };
 })();

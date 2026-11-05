@@ -192,7 +192,7 @@
         render();
         if (isOver()) {
             g.over = true;
-            setTimeout(() => (LOGGED_IN ? submit() : overlay(`<p class="text-[30px] font-extrabold">${g.score}점</p><p class="text-[14px]">더 움직일 수 없어요!</p><a class="text-[14px] font-semibold text-[#0f9f6e] underline" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">로그인하면 랭킹에 올라가요</a><button class="gm-btn" data-new>새 게임</button>`)), 400);
+            setTimeout(() => (LOGGED_IN ? submit() : overlay(`<p class="text-[30px] font-extrabold">${g.score}점</p><p class="text-[14px]">더 움직일 수 없어요!</p><a class="text-[14px] font-semibold text-[#0f9f6e] underline" href="{% url 'accounts:login' %}?next=${'{{ request.path|urlencode|escapejs }}'}">로그인하면 랭킹에 올라가요</a><button class="gm-btn" data-new>새 게임</button>`)), 400);
         }
     }
 

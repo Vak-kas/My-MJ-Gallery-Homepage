@@ -220,7 +220,7 @@
         $('db-start').textContent = S?.status === 'over' ? '🔁 다시 하기' : '▶ 시작';
         $('db-resign').classList.toggle('hidden', !(S?.status === 'playing' && mySeat));
         $('db-stand').disabled = !(mySeat && idle);
-        document.title = myTurn() ? `🟢 내 차례 · {{ room.title|escapejs }}` : `🟦 {{ room.title|escapejs }} · 점 잇기`;
+        document.title = myTurn() ? `🟢 내 차례 · ${'{{ room.title|escapejs }}'}` : `🟦 ${'{{ room.title|escapejs }}'} · 점 잇기`;
         draw();
     }
     $('db-seats').addEventListener('click', (e) => {
@@ -298,7 +298,7 @@
         const url = $('db-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('db-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('db-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('db-kakao').addEventListener('click', () => mjShare({ title: `🟦 점 잇기 땅따먹기 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('db-copy').dataset.url, button: '땅따먹기 하러 가기' }));
+    $('db-kakao').addEventListener('click', () => mjShare({ title: `🟦 점 잇기 땅따먹기 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('db-copy').dataset.url, button: '땅따먹기 하러 가기' }));
     new MutationObserver(() => draw()).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     render();
     window.__dots = { state: () => S, seat: () => mySeat, send };
