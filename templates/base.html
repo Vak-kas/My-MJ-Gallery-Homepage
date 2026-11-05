@@ -146,34 +146,28 @@
         .theme-toggle-btn:hover {
             transform: translateY(-1px);
         }
-        /* 다크모드 버튼: 앞면 = 지금 모드(☀️ 라이트 / 🌙 다크). 마우스를 올리면 지구처럼 180도 돌아 뒷면 = 바뀔 모드와 그 하늘
+        /* 다크모드 버튼: 낮·밤이 반반 그려진 원판(버튼 지름의 2배, 중심 = 버튼 아래 끝)이 버튼 창 뒤에 있음.
+           평소엔 위 절반 = 지금 모드(☀️ 라이트 / 🌙 다크), 마우스를 올리면 원판이 180도 돌아 아래 절반 = 바뀔 모드와 그 하늘이 올라옴
            (라이트면 🌙 밤하늘·별, 다크면 ☀️ 낮 하늘·구름), 떼면 되돌아옴. 누르면 그 모습 그대로 모드가 바뀜 */
-        .theme-toggle-btn { overflow: hidden; perspective: 160px; }
-        .theme-flip { position: relative; z-index: 1; width: 28px; height: 28px; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.4, .2, .2, 1); }
-        .theme-flip__face { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 22px; line-height: 1; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
-        .theme-flip__back { transform: rotateY(180deg); filter: drop-shadow(0 0 6px rgba(255, 225, 140, .7)); }
-        .theme-toggle-btn:hover .theme-flip, .theme-toggle-btn:focus-visible .theme-flip, .theme-toggle-btn.is-flipping .theme-flip { transform: rotateY(180deg); }
-        .theme-toggle-btn.is-settled .theme-flip { transform: none !important; transition: none !important; }
-        /* 뒷면 하늘: 라이트 → 밤하늘(남색+별), 다크 → 낮 하늘(파랑+구름) */
-        .theme-toggle-btn::before, .theme-toggle-btn::after { content: ""; position: absolute; pointer-events: none; opacity: 0; transition: opacity .35s ease; }
-        .theme-toggle-btn::before { inset: 0; border-radius: inherit; background: radial-gradient(circle at 35% 30%, #2b3a78, #121735 75%); }
-        .theme-toggle-btn::after { top: 50%; left: 50%; width: 2px; height: 2px; border-radius: 50%; background: #fff;
-            box-shadow: -14px -12px 0 0 #fff, 13px -15px 0 -.3px #fff, -17px 6px 0 -.4px #dfe8ff, 15px 9px 0 0 #fff, -5px 16px 0 -.4px #dfe8ff, 6px -19px 0 -.5px #fff, 19px -3px 0 -.4px #dfe8ff; }
-        html.theme-dark .theme-toggle-btn::before { background: linear-gradient(180deg, #3d9bff 0%, #8fd0ff 70%, #d6efff 100%); }
-        html.theme-dark .theme-toggle-btn::after { width: 12px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .95); top: 28%; left: 16%;
-            box-shadow: 4px -3px 0 1px rgba(255, 255, 255, .95), 22px 17px 0 -1px rgba(255, 255, 255, .85), 27px 14px 0 0 rgba(255, 255, 255, .85); }
-        .theme-toggle-btn:hover::before, .theme-toggle-btn:focus-visible::before, .theme-toggle-btn.is-flipping::before { opacity: 1; }
-        .theme-toggle-btn:hover::after, .theme-toggle-btn:focus-visible::after, .theme-toggle-btn.is-flipping::after { opacity: 1; animation: themeTwinkle 1.6s ease-in-out infinite; }
-        html.theme-dark .theme-toggle-btn:hover::after, html.theme-dark .theme-toggle-btn.is-flipping::after { animation: themeCloud 3.2s ease-in-out infinite; }
-        .theme-toggle-btn:hover { background: #121735; border-color: rgba(120, 140, 255, .35); }
-        html.theme-dark .theme-toggle-btn:hover { background: #6bbaff; border-color: rgba(255, 255, 255, .5); }
-        /* 방금 바꾼 뒤(마우스가 아직 위에 있어도)는 새 모드 앞면만 — 하늘은 숨김 */
-        .theme-toggle-btn.is-settled::before, .theme-toggle-btn.is-settled::after { opacity: 0 !important; animation: none !important; }
-        .theme-toggle-btn.is-settled:hover { background: rgba(255, 255, 255, .94); border-color: rgba(0, 0, 0, .08); }
-        html.theme-dark .theme-toggle-btn.is-settled:hover { background: rgba(30, 35, 45, .86); border-color: rgba(255, 255, 255, .2); }
-        @keyframes themeTwinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
+        .theme-toggle-btn { overflow: hidden; }
+        .theme-dial { position: absolute; width: 104px; height: 104px; left: calc(50% - 52px); top: calc(100% - 52px); border-radius: 50%; transform-origin: 50% 50%; transition: transform .75s cubic-bezier(.45, .05, .2, 1); pointer-events: none; }
+        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, transparent 50%, #182050 50%, #2b3a78 100%); }
+        .theme-dial__sky::after { content: ""; position: absolute; left: 50%; top: 75%; width: 2px; height: 2px; border-radius: 50%; background: #fff;
+            box-shadow: -14px 12px 0 0 #fff, 13px 15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
+        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, transparent 50%, #3d9bff 50%, #8fd0ff 80%, #d6efff 100%); }
+        html.theme-dark .theme-dial__sky::after { width: 12px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .95); left: 34%; top: 80%;
+            box-shadow: 4px 3px 0 1px rgba(255, 255, 255, .95), 24px -15px 0 -1px rgba(255, 255, 255, .85), 29px -12px 0 0 rgba(255, 255, 255, .85); }
+        .theme-dial__now, .theme-dial__next { position: absolute; left: 50%; font-size: 22px; line-height: 1; }
+        .theme-dial__now { top: 25%; transform: translate(-50%, -50%); }
+        .theme-dial__next { top: 75%; transform: translate(-50%, -50%) rotate(180deg); filter: drop-shadow(0 0 6px rgba(255, 225, 140, .75)); }
+        .theme-toggle-btn:hover .theme-dial, .theme-toggle-btn:focus-visible .theme-dial, .theme-toggle-btn.is-flipping .theme-dial { transform: rotate(180deg); }
+        .theme-toggle-btn:hover .theme-dial__sky::after, .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeTwinkle 1.6s ease-in-out infinite; }
+        html.theme-dark .theme-toggle-btn:hover .theme-dial__sky::after, html.theme-dark .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeCloud 3.2s ease-in-out infinite; }
+        /* 방금 바꾼 뒤(마우스가 아직 위에 있어도)는 새 모드 위 절반으로 바로 */
+        .theme-toggle-btn.is-settled .theme-dial { transform: none !important; transition: none !important; }
+        @keyframes themeTwinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
         @keyframes themeCloud { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(4px); } }
-        @media (prefers-reduced-motion: reduce) { .theme-flip { transition: none; } .theme-toggle-btn:hover::after { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .theme-dial { transition: none; } .theme-dial__sky::after { animation: none !important; } }
 
         .site-global-nav {
             position: fixed;
@@ -303,7 +297,7 @@
     {% if webmail_enabled and not hide_mail_widget %}{% include "components/mail_widget.html" %}{% elif not user.is_superuser and not hide_contact_widget %}{% include "components/contact_widget.html" %}{% endif %}
 
     <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="다크모드 토글">
-        <span id="theme-toggle-icon" class="theme-flip"><span class="theme-flip__face theme-flip__front">☀️</span><span class="theme-flip__face theme-flip__back">🌙</span></span>
+        <span id="theme-toggle-icon" class="theme-dial" aria-hidden="true"><span class="theme-dial__sky"></span><span class="theme-dial__now">☀️</span><span class="theme-dial__next">🌙</span></span>
     </button>
     {% include "components/scroll_top.html" %}
     {% if user.is_authenticated %}
@@ -342,8 +336,8 @@
             const applyThemeLabel = () => {
                 const st = window.MJTheme ? window.MJTheme.apply() : null;
                 const isDark = document.documentElement.classList.contains("theme-dark");
-                icon.querySelector(".theme-flip__front").textContent = isDark ? "🌙" : "☀️";   // 앞면 = 지금 모드
-                icon.querySelector(".theme-flip__back").textContent = isDark ? "☀️" : "🌙";    // 뒷면 = 바뀔 모드
+                icon.querySelector(".theme-dial__now").textContent = isDark ? "🌙" : "☀️";   // 앞면 = 지금 모드
+                icon.querySelector(".theme-dial__next").textContent = isDark ? "☀️" : "🌙";    // 뒷면 = 바뀔 모드
                 btn.setAttribute("aria-label", isDark ? "라이트모드로 전환" : "다크모드로 전환");
                 if (st) {
                     const when = hm(new Date(st.next));
@@ -361,18 +355,18 @@
                 if (window.MJTheme) window.MJTheme.toggle();
                 else document.documentElement.classList.toggle("theme-dark");
                 btn.classList.remove("is-flipping");
-                btn.classList.add("is-settled");   // 앞면(새 모드)으로 바로 — 마우스를 떼면 풀림
+                btn.classList.add("is-settled");   // 원판을 새 모드 위 절반으로 바로 — 마우스를 떼면 풀림
                 applyThemeLabel();
             };
             btn.addEventListener("click", () => {
                 clearTimeout(flipTimer);
                 const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-                // 마우스를 올려 이미 뒷면(바뀔 모드)이 보이면 그대로 바꾸고, 아니면(휴대폰·키보드·방금 바꾼 뒤) 먼저 돌린 다음 바꿈
+                // 마우스를 올려 원판이 이미 돌아가 바뀔 모드가 보이면 그대로 바꾸고, 아니면(휴대폰·키보드·방금 바꾼 뒤) 먼저 돌린 다음 바꿈
                 if (reduce || (btn.matches(":hover") && !btn.classList.contains("is-settled"))) { doSwitch(); return; }
                 btn.classList.remove("is-settled");
                 void btn.offsetWidth;
                 btn.classList.add("is-flipping");
-                flipTimer = setTimeout(doSwitch, 600);
+                flipTimer = setTimeout(doSwitch, 750);
             });
             btn.addEventListener("mouseleave", () => btn.classList.remove("is-settled"));
         })();
