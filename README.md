@@ -43,6 +43,8 @@
 - 구분선 모양 10종: 기본 선·가운데 점(점에서 좌우로 선)·마름모·별·점 세 개·별표 셋(⁂)·흐려지는 선·두 줄·점선·물결 — `/구분선` 으로 넣거나, 구분선 블록 메뉴(⋮⋮)의 "모양"에서 바꿈 (`attrs.style`, 보기 화면은 `blog/content.py` `render_divider`)
 - 글 보기 화면 목차: 본문의 제목(h1~h4)을 모아 노션처럼 오른쪽에 떠 있는 막대 목차(올리면 제목 목록, 현재 위치 강조, 클릭하면 이동), 좁은 화면은 본문 위 접이식 📑 목차. 제목 2개 이상일 때만 보임
 - **모든 페이지 오른쪽 아래 "맨 위로" 버튼** (`components/scroll_top.html`): 바깥 링이 스크롤한 비율만큼 차오르고, 밤하늘 원 안에서 별이 위로 솟음. 화면 높이의 60% 넘게 내려오면 나타남, 움직임 줄이기 설정이면 애니메이션 끔. 떠 있는 버튼은 아래부터 맨 위로 → 🌙 다크모드 → (글 보기의 ⌄ 맨 아래로) → ✉ 메일/💬 문의 순으로 쌓임
+- 글 보기 화면 목차(**Index**): 본문의 제목(h1~h4)을 모아 넓은 화면(1280px 이상)에서는 **왼쪽에 따라다니는 번호 목차**. 가장 높은 단계 제목은 `01`·`02` 번호 원, 그 아래 단계는 지금 읽는 큰 제목 아래에만 점으로. 평소에는 번호와 지금 읽는 큰 제목 글씨만 보이고(파란 원), 마우스를 올리거나 키보드로 들어가면 모든 제목과 작은 제목 글씨까지 펼쳐짐. 1536px 이상은 큰 제목을 처음부터 펼침. 클릭하면 그 제목으로 부드럽게 이동, 다크모드 대응. 좁은 화면은 본문 위 접이식 📑 목차. 제목 2개 이상일 때만 보임
+- 글 보기 화면 오른쪽 아래에 따라다니는 ⌃ 맨 위 / ⌄ 맨 아래 동그라미 버튼 (맨 위에선 ⌃, 맨 아래에선 ⌄ 가 숨음, 다크모드 버튼 위에 쌓임)
 - 다크모드 글 보기: 콜아웃은 에디터와 같은 어두운 색조(밝은 상자에 흰 글자가 얹히던 문제), 그림 뒤는 밝은 배경(배경 없는 PNG 도식의 검은 선이 안 보이지 않게)
 - 블록 왼쪽 핸들로 드래그 이동 · 블록 메뉴, 텍스트 선택 시 서식 툴바
 - 이미지 붙여넣기 / 끌어놓기 업로드 (큰 이미지는 업로드 전 브라우저에서 축소)
@@ -539,6 +541,7 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 |---|---|---|
 | 스크롤 게이지 맨 위로 버튼 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `templates/components/scroll_top.html` |
 | 블로그 이번 주 기록 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/weekly.py`, `templates/blog/components/weekly_record.html` |
+| 글 보기 왼쪽 번호 목차(Index) | [hamsik.kr](https://www.hamsik.kr/) · [apkool12/eunsik-portfolio](https://github.com/apkool12/eunsik-portfolio) | `templates/blog/post_detail.html` |
 
 ## 9) 라이선스
 

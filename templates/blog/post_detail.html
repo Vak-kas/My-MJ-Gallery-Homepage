@@ -17,7 +17,7 @@
         </div>
     </div>
 
-    <div class="xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start xl:gap-8">
+    <div id="post-layout" class="post-layout">
     <article class="min-w-0 overflow-hidden rounded-[28px] border border-black/[0.08] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
         {% with cover_from_content=post.content|editorjs_cover_image %}
         <div class="border-b border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff]">
@@ -137,12 +137,10 @@
             {% endif %}
         </div>
     </article>
-    <aside id="post-toc" class="post-toc hidden xl:sticky xl:top-24" aria-label="이 글의 목차">
-        <div class="post-toc-bars" aria-hidden="true"></div>
-        <nav class="post-toc-panel">
-            <p class="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#8e8e93]">목차</p>
-            <ol class="post-toc-list"></ol>
-        </nav>
+    {# 넓은 화면 왼쪽 번호 목차: 평소엔 번호와 지금 읽는 큰 제목만, 마우스를 올리면 전체 제목·작은 제목 글씨까지 #}
+    <aside id="post-toc" class="post-index" aria-label="이 글의 목차" hidden>
+        <p class="post-index__head"><span class="post-index__ring" aria-hidden="true"></span>Index</p>
+        <ol class="post-index__list"></ol>
     </aside>
     </div>
 
@@ -274,32 +272,65 @@ html.theme-dark #post-body [data-callout="note"] { background-color: rgba(255,25
 html.theme-dark #post-body [data-callout="note"] > div > p:first-child { color: #d6d6dc !important; }
 html.theme-dark #post-body [data-callout-aside] { background-color: rgba(0,0,0,.25) !important; border-color: inherit; }
 html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background: rgba(30,35,45,.86); color: #f3f4f6; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
-.post-toc { width: 36px; height: 1px; z-index: 30; }   /* 위치는 xl:sticky 가 맡음 */
-@media (min-width: 1280px) { .post-toc.is-on { display: block; } }   /* 좁은 화면은 본문 위 접이식 목차만 */
-.post-toc-bars { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; padding: 6px 4px; }
-.post-toc-bars span { display: block; height: 3px; border-radius: 2px; background: #c7c7cc; transition: background .15s, width .15s; }
-.post-toc-bars span[data-l="1"] { width: 20px; }
-.post-toc-bars span[data-l="2"] { width: 14px; }
-.post-toc-bars span[data-l="3"] { width: 9px; }
-.post-toc-bars span.on { background: #0066cc; }
-.post-toc-panel { position: absolute; top: -10px; right: -8px; width: 248px; padding: 14px 16px; border-radius: 16px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.96); box-shadow: 0 12px 40px rgba(0,0,0,.08); backdrop-filter: blur(8px); opacity: 0; visibility: hidden; transform: translateX(8px); transition: opacity .18s, transform .18s, visibility .18s; }
-.post-toc:hover .post-toc-panel, .post-toc:focus-within .post-toc-panel, .post-toc.is-pinned .post-toc-panel { opacity: 1; visibility: visible; transform: none; }
-.post-toc:hover .post-toc-bars, .post-toc:focus-within .post-toc-bars, .post-toc.is-pinned .post-toc-bars { opacity: 0; }
-.post-toc-list { max-height: calc(100vh - 180px); overflow-y: auto; }
-.post-toc-list a, .toc-mobile-list a { display: block; padding: 4px 8px; border-radius: 8px; font-size: 13px; line-height: 1.45; color: #6e6e73; text-decoration: none; word-break: keep-all; overflow-wrap: anywhere; }
-.post-toc-list a:hover, .toc-mobile-list a:hover { background: #f2f2f7; color: #1d1d1f; }
-.post-toc-list a.on, .toc-mobile-list a.on { color: #0066cc; font-weight: 600; background: #eef4ff; }
-.post-toc-list a[data-l="2"], .toc-mobile-list a[data-l="2"] { padding-left: 20px; }
-.post-toc-list a[data-l="3"], .toc-mobile-list a[data-l="3"] { padding-left: 32px; font-size: 12.5px; }
-.post-toc-list a[data-l="4"], .toc-mobile-list a[data-l="4"] { padding-left: 44px; font-size: 12px; }
+.toc-mobile-list a { display: block; padding: 4px 8px; border-radius: 8px; font-size: 13px; line-height: 1.45; color: #6e6e73; text-decoration: none; word-break: keep-all; overflow-wrap: anywhere; }
+.toc-mobile-list a:hover { background: #f2f2f7; color: #1d1d1f; }
+.toc-mobile-list a.on { color: #0066cc; font-weight: 600; background: #eef4ff; }
+.toc-mobile-list a[data-l="2"] { padding-left: 20px; }
+.toc-mobile-list a[data-l="3"] { padding-left: 32px; font-size: 12.5px; }
+.toc-mobile-list a[data-l="4"] { padding-left: 44px; font-size: 12px; }
+/* 왼쪽 번호 목차 — 구성은 hamsik.kr (github.com/apkool12/eunsik-portfolio) 의 Index 를 참고해 직접 구현 */
+.post-index { display: none; }
+@media (min-width: 1280px) {
+    .post-layout.has-index { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
+    .post-layout.has-index .post-index { display: block; order: -1; position: sticky; top: 96px; }
+}
+.post-index__head { display: flex; align-items: center; gap: 8px; margin: 0 0 14px 2px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: #1d1d1f; }
+.post-index__ring { position: relative; width: 18px; height: 18px; border-radius: 9999px; border: 1.5px solid #0066cc; }
+.post-index__ring::after { content: ""; position: absolute; inset: 5px; border-radius: 9999px; background: #0066cc; }
+.post-index__list { max-height: calc(100vh - 170px); overflow-y: auto; padding: 2px 4px 8px 2px; scrollbar-width: thin; }
+.post-index__item + .post-index__item { margin-top: 6px; }
+.post-index__major { display: flex; align-items: flex-start; gap: 10px; padding: 4px 6px 4px 0; border-radius: 10px; color: #6e6e73; text-decoration: none; }
+.post-index__num { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; border: 1.5px solid #d2d2d7; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #8e8e93; background: #fff; transition: background .2s, border-color .2s, color .2s, transform .2s; }
+.post-index__text { min-width: 0; padding-top: 5px; font-size: 13px; font-weight: 600; line-height: 1.45; word-break: keep-all; overflow-wrap: anywhere; opacity: 0; visibility: hidden; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: opacity .18s, color .2s; }
+.post-index__major:hover .post-index__num { border-color: #0066cc; color: #0066cc; }
+.post-index__item.is-current .post-index__num { border-color: #0066cc; background: #0066cc; color: #fff; transform: scale(1.06); }
+.post-index__item.is-current > .post-index__major .post-index__text { color: #0066cc; opacity: 1; visibility: visible; white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.post-index__subs { display: none; margin: 4px 0 2px 13px; padding-left: 15px; border-left: 1.5px solid #e5e5ea; }
+.post-index__item.is-current .post-index__subs { display: block; }
+.post-index__sub { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 0; color: #6e6e73; text-decoration: none; font-size: 12px; line-height: 1.4; }
+.post-index__dot { flex: none; width: 6px; height: 6px; border-radius: 9999px; background: #c7c7cc; transition: background .2s, transform .2s; }
+.post-index__sub .post-index__text { padding-top: 0; font-size: 12px; font-weight: 500; }
+.post-index__sub.on .post-index__dot { background: #0066cc; transform: scale(1.35); }
+.post-index__sub.on .post-index__text { color: #0066cc; }
+.post-index__sub[data-l="3"] { padding-left: 12px; }
+/* 마우스를 올리거나 키보드로 들어오면 전체 제목·작은 제목 글씨까지 */
+.post-index:hover .post-index__text, .post-index:focus-within .post-index__text { opacity: 1; visibility: visible; }
+.post-index:hover .post-index__major .post-index__text, .post-index:focus-within .post-index__major .post-index__text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.post-index:hover .post-index__major:hover .post-index__text { color: #1d1d1f; }
+.post-index:hover .post-index__sub:hover .post-index__text { color: #1d1d1f; }
+/* 아주 넓은 화면은 처음부터 큰 제목 전부 펼침 */
+@media (min-width: 1536px) {
+    .post-index__major .post-index__text { opacity: 1; visibility: visible; white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+}
+html.theme-dark .post-index__head { color: #f3f4f6; }
+html.theme-dark .post-index__major, html.theme-dark .post-index__sub { color: #a1a1aa; }
+html.theme-dark .post-index__num { background: #171a20; border-color: rgba(255,255,255,.22); color: #a1a1aa; }
+html.theme-dark .post-index__item.is-current .post-index__num { background: #4ea1ff; border-color: #4ea1ff; color: #0f1115; }
+html.theme-dark .post-index__item.is-current > .post-index__major .post-index__text, html.theme-dark .post-index__sub.on .post-index__text { color: #4ea1ff; }
+html.theme-dark .post-index__ring { border-color: #4ea1ff; }
+html.theme-dark .post-index__ring::after, html.theme-dark .post-index__sub.on .post-index__dot { background: #4ea1ff; }
+html.theme-dark .post-index__subs { border-color: rgba(255,255,255,.12); }
+html.theme-dark .post-index__dot { background: rgba(255,255,255,.28); }
+html.theme-dark .post-index:hover .post-index__major:hover .post-index__text, html.theme-dark .post-index:hover .post-index__sub:hover .post-index__text { color: #f3f4f6; }
 </style>
 <script>
 (() => {
-    // 본문의 h1~h4 를 모아 노션처럼 옆에 떠 있는 목차를 만든다.
+    // 본문의 h1~h4 를 모아 목차를 만든다. 넓은 화면은 왼쪽 번호 목차, 좁은 화면은 본문 위 접이식 목차
     const body = document.getElementById('post-body');
     const aside = document.getElementById('post-toc');
+    const layout = document.getElementById('post-layout');
     const mobile = document.getElementById('post-toc-mobile');
-    if (!body || !aside || !mobile) return;
+    if (!body || !aside || !mobile || !layout) return;
     const heads = [...body.querySelectorAll('h1, h2, h3, h4')].filter((h) => h.textContent.trim());
     if (heads.length < 2) return;
     const levels = [...new Set(heads.map((h) => +h.tagName[1]))].sort();
@@ -312,32 +343,61 @@ html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background
         h.id = id;
         return { h, id, text, l: levels.indexOf(+h.tagName[1]) + 1 };   // 쓰인 단계만 세어 1부터
     });
-    const bars = aside.querySelector('.post-toc-bars');
-    const list = aside.querySelector('.post-toc-list');
+    const go = (it, e) => {
+        e.preventDefault();
+        it.h.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        history.replaceState(null, '', `#${it.id}`);
+    };
+    const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+    // 왼쪽 번호 목차: 가장 높은 단계 = 큰 제목(번호), 그 아래 단계 = 점
+    const list = aside.querySelector('.post-index__list');
+    const groups = [];   // { li, subs: [{ a, idx }] , idx }
+    items.forEach((it, idx) => {
+        it.group = groups.length - 1;
+        if (it.l === 1 || !groups.length) {
+            const li = el('li', 'post-index__item');
+            const a = el('a', 'post-index__major');
+            a.href = `#${it.id}`;
+            a.title = it.text;
+            a.append(el('span', 'post-index__num', String(groups.length + 1).padStart(2, '0')), el('span', 'post-index__text', it.text));
+            a.addEventListener('click', (e) => go(it, e));
+            li.appendChild(a);
+            list.appendChild(li);
+            groups.push({ li, subs: [], idx, sublist: null });
+            it.group = groups.length - 1;
+            return;
+        }
+        const g = groups[groups.length - 1];
+        if (!g.sublist) { g.sublist = el('ol', 'post-index__subs'); g.li.appendChild(g.sublist); }
+        const li = el('li');
+        const a = el('a', 'post-index__sub');
+        a.href = `#${it.id}`;
+        a.title = it.text;
+        a.dataset.l = Math.min(it.l, 3);
+        a.append(el('span', 'post-index__dot'), el('span', 'post-index__text', it.text));
+        a.addEventListener('click', (e) => go(it, e));
+        li.appendChild(a);
+        g.sublist.appendChild(li);
+        g.subs.push({ a, idx });
+    });
+
+    // 좁은 화면 접이식 목차
     const mlist = mobile.querySelector('.toc-mobile-list');
     for (const it of items) {
-        const bar = document.createElement('span');
-        bar.dataset.l = Math.min(it.l, 3);
-        bars.appendChild(bar);
-        for (const ol of [list, mlist]) {
-            const li = document.createElement('li');
-            const a = document.createElement('a');
-            a.href = `#${it.id}`;
-            a.textContent = it.text;
-            a.dataset.l = it.l;
-            a.addEventListener('click', (e) => {
-                e.preventDefault();
-                it.h.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                history.replaceState(null, '', `#${it.id}`);
-                if (ol === mlist) mobile.open = false;
-            });
-            li.appendChild(a);
-            ol.appendChild(li);
-        }
+        const li = el('li');
+        const a = el('a', null, it.text);
+        a.href = `#${it.id}`;
+        a.dataset.l = it.l;
+        a.addEventListener('click', (e) => { go(it, e); mobile.open = false; });
+        li.appendChild(a);
+        mlist.appendChild(li);
     }
-    aside.classList.add('is-on');
+    aside.hidden = false;
+    layout.classList.add('has-index');
     mobile.classList.remove('hidden');
-    // 스크롤 위치에 맞춰 현재 항목 표시
+
+    // 스크롤 위치에 맞춰 지금 읽는 항목 표시
     let current = -1;
     const mark = () => {
         const line = 120;
@@ -348,13 +408,17 @@ html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background
         if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 2) idx = items.length - 1;
         if (idx === current) return;
         current = idx;
-        bars.querySelectorAll('span').forEach((b, i) => b.classList.toggle('on', i === idx));
-        for (const ol of [list, mlist]) ol.querySelectorAll('a').forEach((a, i) => a.classList.toggle('on', i === idx));
+        const gi = items[idx].group;
+        groups.forEach((g, i) => {
+            g.li.classList.toggle('is-current', i === gi);
+            g.subs.forEach((s) => s.a.classList.toggle('on', s.idx === idx));
+        });
+        mlist.querySelectorAll('a').forEach((a, i) => a.classList.toggle('on', i === idx));
         // 목차 목록 안에서만 스크롤 (scrollIntoView 는 창까지 끌어와서 안 씀)
-        const on = list.querySelectorAll('a')[idx];
+        const on = groups[gi]?.li;
         if (on) {
             const d = on.getBoundingClientRect(), r = list.getBoundingClientRect();
-            if (d.top < r.top || d.bottom > r.bottom) list.scrollTop += d.top - r.top - r.height / 2;
+            if (d.top < r.top || d.bottom > r.bottom) list.scrollTop += d.top - r.top - r.height / 3;
         }
     };
     let raf = 0;
