@@ -49,9 +49,13 @@ CLOUD = re.compile(r"amazon|aws|google cloud|google llc|microsoft|azure|digitalo
 
 def parse(raw):
 	try:
-		return ipaddress.ip_address((raw or "").strip())
+		addr = ipaddress.ip_address((raw or "").strip())
 	except ValueError:
 		return None
+	# IPv6 scope id(…%eth0) 는 거부 — 그대로 외부 조회 URL 에 들어가 경로·쿼리를 바꿀 수 있었음
+	if getattr(addr, "scope_id", None):
+		return None
+	return addr
 
 
 def _get_json(url, headers=None, timeout=6):

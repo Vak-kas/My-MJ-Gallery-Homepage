@@ -136,7 +136,7 @@ class ShellLogic:
 		self.ball = cup
 		self.phase, self.phase_until = "shuffle", now + SHUFFLE_TIME
 		self._emit_to(room, self.dealer, {"type": "ball", "cup": cup})
-		room.emit({"type": "placed", "cup": cup}, exclude=None)
+		room.emit({"type": "placed"}, exclude=None)   # 위치는 빼고 "넣었다"만 (맞히는 사람이 웹소켓 프레임에서 컵 번호를 보던 것)
 		if self.dealer in self.bots:
 			self.bot_plan = {"easy": 4, "normal": 6, "hard": 99}[self.bot_level]
 			self.bot_due = now + 1.0

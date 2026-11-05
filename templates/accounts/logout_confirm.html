@@ -1,0 +1,10 @@
+{% extends "accounts/_auth_shell.html" %}
+{% block auth_title %}로그아웃{% endblock %}
+{% block auth_sub %}이 기기에서 로그아웃할까요?{% endblock %}
+{% block auth_card %}
+<form method="post" action="{% url 'accounts:logout' %}" class="space-y-4">{% csrf_token %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+    <button type="submit" class="h-[52px] w-full rounded-full bg-[#0066cc] text-[16px] font-semibold text-white">로그아웃</button>
+</form>
+{% endblock %}
+{% block auth_foot %}<a href="{% url 'main:home' %}" class="text-[#0066cc]">홈으로</a>{% endblock %}

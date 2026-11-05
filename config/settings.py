@@ -50,6 +50,9 @@ if not SECRET_KEY:
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "False").lower() == "true"   # 기본은 꺼짐 — .env 에 DEBUG 줄이 빠져도 디버그 화면이 열리지 않게
 
+# 알림 메시지는 쿠키가 아니라 서버 세션에 (관리자가 발급한 임시 비밀번호가 표시 전까지 쿠키에 평문 base64 로 남던 것)
+MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
+
 # HTTPS 운영 보안 (DEBUG 가 꺼진 운영에서만). nginx 가 X-Forwarded-Proto 를 $scheme 으로 덮어써 넘김
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
