@@ -1,57 +1,90 @@
 {% comment %}
-모든 페이지 오른쪽 아래 "맨 위로" 버튼.
-   바깥 링이 스크롤한 비율만큼 차오르고, 안쪽 원에서 별이 위로 솟음. 화면 높이의 60% 넘게 내려오면 나타남.
-   구성은 minter-v1.com (github.com/Minter-v1/Minter-blog, app/components/back-to-top.tsx) 을 참고해 바닐라 JS 로 직접 구현
+모든 페이지 오른쪽 아래 "맨 위로" 버튼 — 원 안에 물이 스크롤한 만큼 차오르는 게이지 (물결이 계속 일렁임).
+가운데는 평소 ↑, 마우스를 올리면 지금 읽은 %. 물에 잠긴 부분의 글자·화살표는 흰색으로 바뀜.
+화면 높이의 60% 넘게 내려오면 나타남.
 {% endcomment %}
+{# 숫자 글꼴: Pretendard (SIL OFL 1.1, github.com/orioncactus/pretendard) — 쓰는 글자 조각만 내려받는 dynamic subset #}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin>
 <button id="scroll-top-btn" type="button" class="scroll-top" aria-label="맨 위로" title="맨 위로" tabindex="-1">
-    <svg class="scroll-top__ring" viewBox="0 0 58 58" aria-hidden="true">
+    <svg viewBox="0 0 58 58" aria-hidden="true">
         <defs>
-            <linearGradient id="scroll-top-grad" x1="0" x2="1">
-                <stop offset="0" stop-color="#9cc8ff"/>
-                <stop offset="1" stop-color="#0066cc"/>
+            <clipPath id="scroll-top-circle"><circle cx="29" cy="29" r="26"/></clipPath>
+            <clipPath id="scroll-top-under"><rect id="scroll-top-under-rect" x="0" y="58" width="58" height="60"/></clipPath>
+            <linearGradient id="scroll-top-water" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="36">
+                <stop offset="0" stop-color="#4c9bff"/>
+                <stop offset="1" stop-color="#0058b0"/>
             </linearGradient>
         </defs>
-        <circle cx="29" cy="29" r="27" fill="none" stroke="rgba(0,102,204,.18)" stroke-width="2.5"/>
-        <circle id="scroll-top-arc" cx="29" cy="29" r="27" fill="none" stroke="url(#scroll-top-grad)" stroke-width="2.5" stroke-linecap="round" pathlength="1" stroke-dasharray="1" stroke-dashoffset="1"/>
+        <circle class="scroll-top__bg" cx="29" cy="29" r="27.5"/>
+        <g clip-path="url(#scroll-top-circle)">
+            <g id="scroll-top-water" class="scroll-top__water" style="transform: translateY(56px)">
+                {# 물결 한 주기 = 58, 두 주기를 그려 두고 옆으로 흘려 이어지게 #}
+                <path class="scroll-top__wave is-back" d="M0 0 Q14.5 -3.2 29 0 T58 0 T87 0 T116 0 V70 H0 Z"/>
+                <path class="scroll-top__wave is-front" d="M0 1 Q14.5 4 29 1 T58 1 T87 1 T116 1 V70 H0 Z"/>
+            </g>
+        </g>
+        {# 같은 글자를 두 번: 위는 기본색, 아래는 물에 잠긴 만큼만 흰색 #}
+        <g class="scroll-top__face">
+            <g class="scroll-top__ink">
+                <path class="scroll-top__arrow" d="M22.5 28 29 21.5l6.5 6.5M29 22v14"/>
+                <text class="scroll-top__pct" x="29" y="33.5" text-anchor="middle"><tspan class="scroll-top__num" data-scroll-top-num>0</tspan><tspan class="scroll-top__unit" dx="0.6">%</tspan></text>
+            </g>
+            <g class="scroll-top__ink is-under" clip-path="url(#scroll-top-under)">
+                <path class="scroll-top__arrow" d="M22.5 28 29 21.5l6.5 6.5M29 22v14"/>
+                <text class="scroll-top__pct" x="29" y="33.5" text-anchor="middle"><tspan class="scroll-top__num" data-scroll-top-num>0</tspan><tspan class="scroll-top__unit" dx="0.6">%</tspan></text>
+            </g>
+        </g>
     </svg>
-    <span class="scroll-top__sky" aria-hidden="true">
-        <i class="scroll-top__dot" style="top:28%;left:24%"></i>
-        <i class="scroll-top__dot" style="top:70%;left:72%;opacity:.5"></i>
-        <i class="scroll-top__dot" style="top:22%;left:66%;opacity:.6"></i>
-        <span class="scroll-top__star"><i class="scroll-top__trail"></i><i class="scroll-top__mark"></i></span>
-    </span>
 </button>
 <style>
-    .scroll-top { position: fixed; right: 20px; bottom: 20px; z-index: 80; width: 58px; height: 58px; padding: 0; border: 0; background: transparent; border-radius: 9999px; cursor: pointer; opacity: 0; transform: translateY(10px) scale(.9); pointer-events: none; transition: opacity .3s ease, transform .3s ease; }
+    .scroll-top { position: fixed; right: 20px; bottom: 20px; z-index: 80; width: 58px; height: 58px; padding: 0; border: 0; background: transparent; border-radius: 9999px; cursor: pointer; opacity: 0; transform: translateY(10px) scale(.9); pointer-events: none; transition: opacity .3s ease, transform .3s ease; filter: drop-shadow(0 8px 20px rgba(0, 60, 140, .16)); }
     .scroll-top.is-shown { opacity: 1; transform: none; pointer-events: auto; }
-    .scroll-top__ring { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
-    .scroll-top__sky { position: absolute; inset: 5px; overflow: hidden; border-radius: 9999px; background: radial-gradient(circle at 40% 28%, #2d4a8a, #14213f 72%); box-shadow: 0 8px 24px rgba(20, 33, 63, .35), inset 0 0 0 1px rgba(156, 200, 255, .22); }
-    .scroll-top__dot { position: absolute; width: 1.6px; height: 1.6px; border-radius: 9999px; background: #eaf2ff; opacity: .7; }
-    .scroll-top__star { position: absolute; top: 50%; left: 50%; animation: scrollTopStar 2.6s ease-in-out infinite; }
-    .scroll-top__trail { position: absolute; top: 4px; left: -1px; width: 2px; height: 14px; border-radius: 2px; background: linear-gradient(to top, rgba(156,200,255,0), rgba(156,200,255,.85)); }
-    .scroll-top__mark { position: absolute; top: -5px; left: -5px; width: 10px; height: 10px; background: #fff; clip-path: polygon(50% 0, 60% 40%, 100% 50%, 60% 60%, 50% 100%, 40% 60%, 0 50%, 40% 40%); filter: drop-shadow(0 0 4px #9cc8ff); }
-    .scroll-top:hover .scroll-top__sky { box-shadow: 0 10px 28px rgba(20, 33, 63, .45), inset 0 0 0 1px rgba(156, 200, 255, .4); }
-    @keyframes scrollTopStar { 0% { transform: translateY(14px); opacity: 0; } 25% { opacity: 1; } 60% { transform: translateY(-8px); opacity: 1; } 100% { transform: translateY(-16px); opacity: 0; } }
-    @media (prefers-reduced-motion: reduce) { .scroll-top__star { animation: none; transform: translateY(-2px); } .scroll-top { transition: none; } }
-    /* 다크 CSS 생성기가 별·점을 어둡게 바꾸는 것 되돌림 (밤하늘 위 흰 별) */
-    html.theme-dark .scroll-top__dot { background: #eaf2ff !important; }
-    html.theme-dark .scroll-top__mark { background: #fff !important; }
-    html.theme-dark .scroll-top__sky { box-shadow: 0 8px 24px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(156, 200, 255, .3); }
+    .scroll-top svg { width: 100%; height: 100%; display: block; }
+    .scroll-top__bg { fill: rgba(255, 255, 255, .97); stroke: rgba(0, 102, 204, .28); stroke-width: 1.2; }
+    .scroll-top__water { transition: transform .35s cubic-bezier(.22, .61, .36, 1); }
+    .scroll-top__wave { animation: scrollTopWave 2.8s linear infinite; }
+    .scroll-top__wave.is-back { fill: #9cc8ff; opacity: .7; animation-duration: 4.2s; animation-direction: reverse; }
+    .scroll-top__wave.is-front { fill: url(#scroll-top-water); }
+    @keyframes scrollTopWave { from { transform: translateX(0); } to { transform: translateX(-58px); } }
+    .scroll-top__arrow { fill: none; stroke: #0066cc; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; transition: opacity .2s, transform .25s ease; }
+    .scroll-top__pct { opacity: 0; transform: translateY(4px); transition: opacity .2s, transform .25s ease; fill: #0b3d75; font-family: "Pretendard Variable", Pretendard, system-ui, -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+    .scroll-top__num { font-size: 16px; font-weight: 800; letter-spacing: -.8px; }
+    .scroll-top__unit { font-size: 9px; font-weight: 700; opacity: .7; }
+    .scroll-top__ink.is-under .scroll-top__arrow { stroke: #fff; }
+    .scroll-top__ink.is-under .scroll-top__pct { fill: #fff; }
+    .scroll-top:hover .scroll-top__arrow, .scroll-top:focus-visible .scroll-top__arrow { opacity: 0; transform: translateY(-4px); }
+    .scroll-top:hover .scroll-top__pct, .scroll-top:focus-visible .scroll-top__pct { opacity: 1; transform: none; }
+    .scroll-top:focus-visible { outline: 2px solid #0066cc; outline-offset: 3px; }
+    @media (prefers-reduced-motion: reduce) { .scroll-top__wave { animation: none; } .scroll-top, .scroll-top__water { transition: none; } }
+    html.theme-dark .scroll-top { filter: drop-shadow(0 8px 20px rgba(0, 0, 0, .45)); }
+    html.theme-dark .scroll-top__bg { fill: rgba(28, 31, 38, .96); stroke: rgba(78, 161, 255, .35); }
+    html.theme-dark .scroll-top__arrow { stroke: #4ea1ff; }
+    html.theme-dark .scroll-top__pct { fill: #dbeafe; }
+    html.theme-dark .scroll-top__wave.is-back { fill: #1e4f8c; }
 </style>
 <script>
     (() => {
         const btn = document.getElementById('scroll-top-btn');
-        const arc = document.getElementById('scroll-top-arc');
-        if (!btn || !arc) return;
+        const water = document.getElementById('scroll-top-water');
+        const under = document.getElementById('scroll-top-under-rect');
+        if (!btn || !water || !under) return;
+        const nums = btn.querySelectorAll('[data-scroll-top-num]');
+        // 원 안쪽 y 3(위) ~ 55(아래). 0% 면 바닥, 100% 면 가득 (물결 높이만큼 조금 더)
+        const EMPTY = 56, FULL = 0;
         let raf = 0;
         const update = () => {
             raf = 0;
             const max = document.documentElement.scrollHeight - window.innerHeight;
             const progress = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
-            arc.setAttribute('stroke-dashoffset', String(1 - progress));
+            const level = EMPTY - (EMPTY - FULL) * progress;
+            water.style.transform = `translateY(${level.toFixed(2)}px)`;
+            under.setAttribute('y', (level + 1).toFixed(2));
+            const n = Math.round(progress * 100);
+            nums.forEach((t) => { t.textContent = n; });
             const shown = window.scrollY > window.innerHeight * 0.6;
             btn.classList.toggle('is-shown', shown);
             btn.tabIndex = shown ? 0 : -1;
+            btn.setAttribute('aria-label', `맨 위로 (${n}% 읽음)`);
         };
         const onScroll = () => { if (!raf) raf = requestAnimationFrame(update); };
         btn.addEventListener('click', () => {
