@@ -499,6 +499,15 @@ def index(request):
 		order_fields = ("-published_at", "-id")
 
 	all_posts = list(feed_qs.order_by(*order_fields))
+	recent_badge_cutoff = timezone.now() - timedelta(days=3)
+
+	def _preview_posts(category: str):
+		posts = [post for post in all_posts if post.category == category][:3]
+		for post in posts:
+			published_at = post.published_at or post.created_at
+			post.is_new_badge = bool(published_at and published_at >= recent_badge_cutoff)
+		return posts
+
 	def _query_link(**updates):
 		params = {}
 		if search_query:
@@ -538,7 +547,6 @@ def index(request):
 
 	from studio import site_settings
 	from .weekly import weekly_stats
-	from .collections import build_collections
 	from .knowledge_map import build_map
 
 	context = {
@@ -569,7 +577,14 @@ def index(request):
 		"feed_next_qs": _query_link(page=feed_page.next_page_number()) if feed_page.has_next() else "",
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
-		"collections": build_collections(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
+		"tech_posts": _preview_posts(Post.CATEGORY_TECH),
+		"board_posts": _preview_posts(Post.CATEGORY_BOARD),
+		"life_posts": _preview_posts(Post.CATEGORY_LIFE),
+		"secret_posts": _preview_posts(Post.CATEGORY_SECRET),
+		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
+		"board_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_BOARD),
+		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
+		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
 		"knowledge_map": build_map(_accessible_posts_qs(request)),
 	}
 	context.update(_sidebar_context(request))
