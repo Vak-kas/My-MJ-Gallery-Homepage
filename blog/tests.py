@@ -696,3 +696,21 @@ class MemberCategoryTests(TestCase):
 		for cat in ("tech", "board", "life", "secret"):
 			self._post(cat)
 			self.assertTrue(Post.objects.filter(category=cat).exists(), cat)
+
+
+class PostIndexMarkupTests(TestCase):
+	"""글 보기의 왼쪽 번호 목차 틀 (목차 내용은 브라우저 스크립트가 제목을 모아 채움)"""
+
+	def test_index_aside_and_mobile_toc_present(self):
+		from django.utils import timezone
+		admin = get_user_model().objects.create_superuser("idx", "i@x.kr", "pw-for-tests-only")
+		post = Post.objects.create(title="목차 글", slug="toc-post", category="tech", content=tiptap(
+			{"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "하나"}]},
+			{"type": "heading", "attrs": {"level": 2}, "content": [{"type": "text", "text": "둘"}]},
+		), author=admin, is_published=True, published_at=timezone.now())
+		res = self.client.get(reverse("blog:post_detail", args=[post.slug]))
+		self.assertContains(res, 'id="post-layout"')
+		self.assertContains(res, 'class="post-index"')
+		self.assertContains(res, 'id="post-toc-mobile"')
+		self.assertNotContains(res, "post-toc-bars")
+		self.assertNotContains(res, "{#")
