@@ -1,6 +1,6 @@
 {# 오른쪽 아래 💬 문의 버튼 + 패널 (관리자 아닌 모두). 나중에 챗봇을 붙일 자리 #}
 <meta name="mj-csrf" content="{{ csrf_token }}">
-<button id="contact-fab" type="button" class="contact-fab" aria-label="관리자에게 문의" aria-expanded="false" aria-controls="contact-panel" title="문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 19.5V7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8Z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg></button>
+<button id="contact-fab" type="button" class="contact-fab" aria-label="관리자에게 문의" aria-expanded="false" aria-controls="contact-panel" title="문의하기"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="chatfab__bubble" d="M4.5 19.5V7A2.5 2.5 0 0 1 7 4.5h10A2.5 2.5 0 0 1 19.5 7v7a2.5 2.5 0 0 1-2.5 2.5H8Z"/><path class="chatfab__lines" d="M8.5 9.5h7M8.5 12.5h4.5"/><g class="chatfab__dots" fill="currentColor" stroke="none"><circle cx="8.6" cy="10.6" r="1.25"/><circle cx="12" cy="10.6" r="1.25"/><circle cx="15.4" cy="10.6" r="1.25"/></g></svg></button>
 <div id="contact-panel" class="contact-panel" hidden>
     <div class="contact-panel__head">
         <span>💬 문의하기</span>
@@ -30,7 +30,20 @@
 </div>
 <style>
     .contact-fab { position: fixed; right: 20px; bottom: 148px; z-index: 80; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.9); backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: transform .2s, background .2s; }
-    .contact-fab svg { display: block; }
+    .contact-fab svg { display: block; overflow: visible; }
+    /* 말풍선: 마우스를 올리면 글줄이 사라지고 점 세 개가 차례로 톡톡 (입력 중…), 말풍선은 살짝 흔들림 */
+    .chatfab__bubble { transform-box: view-box; transform-origin: 5px 19px; transition: transform .25s cubic-bezier(.3, .7, .3, 1.4); }
+    .chatfab__lines { transition: opacity .15s ease; }
+    .chatfab__dots { opacity: 0; transition: opacity .15s ease; }
+    .chatfab__dots circle { transform-box: fill-box; transform-origin: center; }
+    .contact-fab:hover .chatfab__bubble, .contact-fab:focus-visible .chatfab__bubble { transform: rotate(-6deg) scale(1.06); }
+    .contact-fab:hover .chatfab__lines, .contact-fab:focus-visible .chatfab__lines { opacity: 0; }
+    .contact-fab:hover .chatfab__dots, .contact-fab:focus-visible .chatfab__dots { opacity: 1; }
+    .contact-fab:hover .chatfab__dots circle, .contact-fab:focus-visible .chatfab__dots circle { animation: chatfabTyping 1s ease-in-out infinite; }
+    .contact-fab:hover .chatfab__dots circle:nth-child(2), .contact-fab:focus-visible .chatfab__dots circle:nth-child(2) { animation-delay: .15s; }
+    .contact-fab:hover .chatfab__dots circle:nth-child(3), .contact-fab:focus-visible .chatfab__dots circle:nth-child(3) { animation-delay: .3s; }
+    @keyframes chatfabTyping { 0%, 60%, 100% { transform: translateY(0); opacity: .45; } 30% { transform: translateY(-2.4px); opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .contact-fab .chatfab__dots circle { animation: none !important; opacity: 1; } .chatfab__bubble { transition: none; } }
     .contact-fab { color: #1d1d1f; }
     .contact-fab:hover { transform: translateY(-1px); background: #fff; color: #0066cc; }
     html.theme-dark .contact-fab { color: #f3f4f6; border-color: rgba(255,255,255,.2); background: rgba(30,35,45,.86); box-shadow: 0 8px 24px rgba(0,0,0,.35); }
