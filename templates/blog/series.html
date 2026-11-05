@@ -16,7 +16,7 @@
                 <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f0f7ff] text-[15px] font-semibold text-[#0066cc]">{{ post.series_order|default:forloop.counter }}</span>
                 <div class="min-w-0 flex-1">
                     <p class="text-[17px] font-semibold text-[#1d1d1f]">{{ post.title }}</p>
-                    {% if post.summary %}<p class="mt-1 line-clamp-2 text-[14px] text-[#6e6e73]">{{ post.summary }}</p>{% endif %}
+                    {% if post.visibility == "protected" %}<p class="mt-1 line-clamp-2 text-[14px] text-[#8e8e93]">🔒 비밀번호가 필요한 보호글이에요</p>{% elif post.summary %}<p class="mt-1 line-clamp-2 text-[14px] text-[#6e6e73]">{{ post.summary }}</p>{% endif %}
                     <p class="mt-2 text-[12px] text-[#8e8e93]">{{ post.published_at|date:"Y.m.d" }} · 조회 {{ post.views }}</p>
                 </div>
             </a>

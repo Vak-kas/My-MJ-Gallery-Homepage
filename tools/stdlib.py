@@ -243,6 +243,20 @@ def index_doc(doc_id):
 		StdDoc.objects.filter(pk=doc.pk).update(status=StdDoc.STATUS_ERROR, error=str(exc)[:300] or exc.__class__.__name__, updated_at=timezone.now())
 
 
+MAX_INDEXING_PER_USER = 1   # 나누기(PyMuPDF 파싱) 프로세스는 무거워서 동시에 도는 수를 제한
+MAX_INDEXING_TOTAL = 2
+
+
+def indexing_busy(user):
+	"""지금 새로 나누기를 시작하면 안 되는 이유(문구) 또는 None"""
+	running = StdDoc.objects.filter(status=StdDoc.STATUS_PROCESSING)
+	if running.filter(user=user).count() >= MAX_INDEXING_PER_USER:
+		return "지금 나누고 있는 문서가 끝나면 다시 해 주세요."
+	if running.count() >= MAX_INDEXING_TOTAL:
+		return "다른 문서를 나누는 중이라 잠시 뒤 다시 해 주세요."
+	return None
+
+
 def start_index(doc):
 	subprocess.Popen(
 		[sys.executable, str(Path(settings.BASE_DIR) / "manage.py"), "stdlib_index", str(doc.pk)],
@@ -384,6 +398,9 @@ def upload(request):
 	if head != b"%PDF-":
 		return JsonResponse({"error": "PDF 파일이 아니에요."}, status=400)
 	title = (request.POST.get("title") or "").strip()[:200] or re.sub(r"\.pdf$", "", f.name, flags=re.I)[:200]
+	busy = indexing_busy(request.user)
+	if busy:
+		return JsonResponse({"error": busy}, status=429)
 	doc = StdDoc(user=request.user, title=title, filename=f.name[:255], size=f.size)
 	doc.file.save("x.pdf", f, save=False)
 	doc.save()
@@ -399,6 +416,12 @@ def doc_action(request, pk, action):
 		doc.delete()
 		return JsonResponse({"deleted": True})
 	if action == "reindex":
+		# 누를 때마다 새 프로세스를 띄우던 것 → 이미 나누는 중이면 거절, 동시에 도는 수 제한
+		if doc.status == StdDoc.STATUS_PROCESSING:
+			return JsonResponse({"error": "이미 나누고 있어요."}, status=409)
+		busy = indexing_busy(request.user)
+		if busy:
+			return JsonResponse({"error": busy}, status=429)
 		StdDoc.objects.filter(pk=doc.pk).update(status=StdDoc.STATUS_PROCESSING, progress=0, error="", updated_at=timezone.now())
 		start_index(doc)
 		doc.refresh_from_db()

@@ -518,6 +518,11 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 - **업로드**: 글 커버·본문 이미지는 Pillow 로 열어 다시 그려 저장하고 이름은 uuid (`blog/views.py _reencode_image`). HTML·SVG 등 이미지가 아닌 파일은 거절 — 공개 `/media/` 에서 같은 출처 스크립트가 돌지 않게
 - **JS 안 템플릿 값**: 백틱 문자열에는 `${'{{ 값|escapejs }}'}` 처럼 작은따옴표 문자열로만 넣음 (`escapejs` 는 `${ }` 를 막지 못함). `games/tests.py RoomTitleXssTests` 가 모든 템플릿을 줄 단위로 검사
 - **관리자 로그인**: `/admin/login/` 은 사이트 로그인(2단계 인증·실패 잠금)으로 넘김 (`config/urls.py`)
+- **보호글**: 목록·카테고리 카드·시리즈에서 요약·본문 앞부분 대신 "🔒 비밀번호가 필요한 보호글", 카드·상세의 대표 이미지도 잠긴 동안 숨김(`post_teaser` 필터). 검색은 보호글을 제목·태그로만 찾음(본문으로 찾으면 결과 유무로 본문을 한 글자씩 알아낼 수 있었음). 비밀번호 시도는 세션 + IP·글 단위(10분 5번) + 글 하나당 1시간 60번(캐시)
+- **HTTPS 쿠키**: DEBUG 가 꺼진 운영에서 세션·CSRF 쿠키 Secure, HSTS 1년(하위 도메인 제외, `.env` `SECURE_HSTS_SECONDS` 로 조정·0 이면 끔), nosniff, `X-Forwarded-Proto` 신뢰. `DEBUG` 기본값은 꺼짐
+- **도구 남용**: 포트 확인은 범위를 리스트로 만들기 전에 개수 검사(`1-400000000` 으로 메모리를 다 먹던 것), 표준 서재 다시 나누기는 이미 나누는 중이면 거절·한 사람 1개·전체 2개까지, 팀플 일정 비밀번호는 IP 10분 10번·이름 1시간 20번
+- **웹메일 style**: 역슬래시(CSS 이스케이프)·주석으로 `url(` 검사를 피하던 것, `image-set(` 등 외부 그림 불러오기, 화면을 덮는 `position:fixed` 를 막음. `<svg/>` 같은 스스로 닫힌 버릴 태그 뒤 본문이 사라지던 것도
+- **JSON 본문**: `main/jsonbody.loads_object` — 객체가 아니면(배열 등) 400 (문의·비밀 메모·OCR·팀플 일정·웹메일)
 
 - 관리 명령
   - `python manage.py run_scheduled` — 예약 작업 (위 cron), 업타임·트래픽·정리를 한 번에

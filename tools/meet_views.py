@@ -21,6 +21,7 @@ from security.utils import client_ip
 
 from .link_views import _absolute
 from .models import Meeting, MeetingResponse
+from main.jsonbody import loads_object
 
 MAX_DATES = 31
 MAX_ACTIVE_MEETINGS = 30
@@ -43,7 +44,7 @@ def _get(meet_id):
 
 def _body(request):
 	try:
-		return json.loads(request.body or b"{}")
+		return loads_object(request.body)
 	except ValueError:
 		return {}
 
@@ -165,12 +166,22 @@ def meet_join(request, meet_id):
 	if existing:
 		if key and secrets.compare_digest(existing.key_hash, _hash(key)):
 			return JsonResponse({"ok": True, "id": existing.id, "name": existing.name, "key": key, "slots": existing.slots})
+		if existing.pin_hash and pin:
+			# 비밀번호 시도 제한: IP 마다 10분 10번, 이름(응답) 마다 1시간 20번 (4자리 숫자를 0000~9999 로 대입하던 것)
+			ip_try, name_try = f"meet:pin:{client_ip(request)}", f"meet:pin:resp:{existing.id}"
+			cache.add(ip_try, 0, 600)
+			cache.add(name_try, 0, 3600)
+			if (cache.get(ip_try) or 0) >= 10 or (cache.get(name_try) or 0) >= 20:
+				return _err("비밀번호를 너무 많이 틀렸어요. 잠시 뒤 다시 해 주세요.", 429)
 		if existing.pin_hash and pin and check_password(pin, existing.pin_hash):
 			new_key = secrets.token_urlsafe(24)
 			existing.key_hash = _hash(new_key)
 			existing.save(update_fields=["key_hash"])
 			return JsonResponse({"ok": True, "id": existing.id, "name": existing.name, "key": new_key, "slots": existing.slots})
 		if existing.pin_hash:
+			if pin:
+				cache.incr(f"meet:pin:{client_ip(request)}")
+				cache.incr(f"meet:pin:resp:{existing.id}")
 			return _err("이미 있는 이름이에요. 그 이름으로 정한 비밀번호를 넣어 주세요.", 403)
 		return _err("이미 있는 이름이에요. 다른 이름을 쓰거나, 처음 들어온 기기에서 고쳐 주세요.", 403)
 

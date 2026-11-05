@@ -16,6 +16,7 @@ from . import imap
 from .models import AppPassword, MailContact, ScheduledAttachment, ScheduledMail, WebmailPref, write_app_password_file
 from .sanitize import sanitize_html, text_to_html
 from .scheduled import after_send, build_message
+from main.jsonbody import loads_object
 
 _EMAIL_RE = re.compile(r"^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$")
 
@@ -135,7 +136,7 @@ def _app_password_list():
 def api_app_passwords(request):
 	"""앱 비밀번호 만들기(평문은 이 응답에만)·지우기."""
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		raise _ApiError("JSON 이 이상해요")
 	action = payload.get("action")
@@ -177,7 +178,7 @@ def _scheduled_list():
 def api_prefs(request):
 	"""서명 저장."""
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		raise _ApiError("JSON 이 이상해요")
 	pref = WebmailPref.get()
@@ -190,7 +191,7 @@ def api_prefs(request):
 @require_POST
 def api_contacts(request):
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		raise _ApiError("JSON 이 이상해요")
 	action = payload.get("action")
@@ -215,7 +216,7 @@ def api_schedule(request):
 	"""예약 발송 등록(multipart, 쓰기 폼 + send_at) / 취소(JSON {action: cancel, id})."""
 	if request.content_type and request.content_type.startswith("application/json"):
 		try:
-			payload = json.loads(request.body or b"{}")
+			payload = loads_object(request.body)
 		except ValueError:
 			raise _ApiError("JSON 이 이상해요")
 		if payload.get("action") != "cancel":
@@ -371,7 +372,7 @@ def raw(request):
 @require_POST
 def api_action(request):
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		raise _ApiError("JSON 이 이상해요")
 	folder = _folder_key(payload.get("folder"))
@@ -411,7 +412,7 @@ def api_action(request):
 def api_labels(request):
 	"""라벨(사용자 폴더) 만들기·이름 바꾸기·지우기."""
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		raise _ApiError("JSON 이 이상해요")
 	action = payload.get("action")

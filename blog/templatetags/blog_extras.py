@@ -335,3 +335,16 @@ def editorjs_excerpt(content, max_chars=180):
 @register.filter
 def editorjs_cover_image(content):
     return _extract_cover_image_url(content)
+
+
+PROTECTED_TEASER = "🔒 비밀번호가 필요한 보호글이에요"
+
+
+@register.filter
+def post_teaser(post, length=90):
+    """목록용 한두 줄 소개 — 보호글은 요약·본문을 보여 주지 않음 (비밀번호 없이 내용이 새지 않게)"""
+    if getattr(post, "visibility", "") == "protected":
+        return PROTECTED_TEASER
+    if post.summary:
+        return post.summary
+    return editorjs_excerpt(post.content, length)

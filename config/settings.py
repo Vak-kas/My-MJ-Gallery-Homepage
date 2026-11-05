@@ -48,7 +48,17 @@ if not SECRET_KEY:
     raise ValueError("DJANGO_SECRET_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "True").lower() == "true"
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"   # 기본은 꺼짐 — .env 에 DEBUG 줄이 빠져도 디버그 화면이 열리지 않게
+
+# HTTPS 운영 보안 (DEBUG 가 꺼진 운영에서만). nginx 가 X-Forwarded-Proto 를 $scheme 으로 덮어써 넘김
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True          # 세션·CSRF 쿠키를 HTTPS 에서만 보냄 (http 첫 요청에 평문으로 실리지 않게)
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = int(os.getenv("SECURE_HSTS_SECONDS", "31536000"))   # 1년. 문제 생기면 .env 에 0
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = False   # mail. 등 하위 도메인은 따로 판단
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 
 ALLOWED_HOSTS = [
     host.strip()
