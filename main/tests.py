@@ -113,3 +113,17 @@ class ContactWidgetTests(TestCase):
             res = self.client.post(url, json.dumps({"message": "네 번째 문의입니다"}), content_type="application/json")
             self.assertEqual(res.status_code, 429)
         cache.clear()
+
+
+class ScrollTopButtonTests(TestCase):
+	"""맨 위로 물 게이지: 스크립트가 찾는 id 가 겹치면 물 대신 다른 요소를 움직임 (2026-11-05 운영 버그)"""
+
+	def test_ids_are_unique(self):
+		import re
+		html = self.client.get("/").content.decode()
+		start = html.index('id="scroll-top-btn"')
+		block = html[start:html.index("</button>", start)]
+		ids = re.findall(r'id="([^"]+)"', block)
+		self.assertEqual(len(ids), len(set(ids)), ids)
+		self.assertIn('id="scroll-top-water"', block)
+		self.assertIn('class="scroll-top__water"', block[block.index('id="scroll-top-water"') - 80:block.index('id="scroll-top-water"') + 80])
