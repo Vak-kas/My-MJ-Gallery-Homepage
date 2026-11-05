@@ -522,3 +522,16 @@ class PublicationUnpublishedTests(TestCase):
         self.assertEqual(accepted.date.strftime("%Y-%m"), "2026-12")
         res = self.client.get(reverse("studio:publication"))
         self.assertContains(res, "심사중 · 발행일 미정")
+
+
+class KoreanUsernameEditTests(ModerationTestBase):
+    """Studio 회원 상세에서 한글 아이디로 바꾸기 (입력칸 브라우저 규칙이 한글을 막던 것)"""
+
+    def test_korean_username(self):
+        member = get_user_model().objects.create_user("ehddn", "e@example.com", "pw")
+        url = reverse("studio:user_detail", args=[member.id])
+        page = self.client.get(url).content.decode()
+        self.assertNotIn('pattern="[\\w.@+\\-]+"', page)
+        self.client.post(url, {"action": "edit", "username": "이동우", "first_name": "", "email": "e@example.com"})
+        member.refresh_from_db()
+        self.assertEqual(member.username, "이동우")
