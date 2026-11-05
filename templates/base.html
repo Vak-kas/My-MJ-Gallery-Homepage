@@ -151,9 +151,9 @@
            (라이트면 🌙 밤하늘·별, 다크면 ☀️ 낮 하늘·구름), 떼면 되돌아옴. 누르면 그 모습 그대로 모드가 바뀜 */
         .theme-toggle-btn { overflow: hidden; }
         .theme-dial { position: absolute; width: 104px; height: 104px; left: calc(50% - 52px); top: calc(100% - 52px); border-radius: 50%; transform-origin: 50% 50%; transition: transform .75s cubic-bezier(.45, .05, .2, 1); pointer-events: none; }
-        /* 원판 = 낮 하늘 반 + 밤하늘 반 (지평선 = 원판 가운데). 라이트: 위 낮(☀️·구름) / 아래 밤(🌙·별), 다크: 위 밤 / 아래 낮 */
-        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, #3d9bff 0%, #9fd6ff 42%, #d9f0ff 50%, #2b3a78 50%, #121735 100%); }
-        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, #121735 0%, #2b3a78 50%, #d9f0ff 50%, #9fd6ff 58%, #3d9bff 100%); }
+        /* 원판 = 낮 하늘 반 + 밤하늘 반, 가운데(지평선)는 노을빛 띠로 부드럽게 이어짐. 라이트: 위 낮(☀️·구름) / 아래 밤(🌙·별), 다크: 위 밤 / 아래 낮 */
+        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, #3d9bff 0%, #8ccaff 30%, #cfe9ff 39%, #ffd9a8 45%, #f39ab2 50%, #8a6fb8 55%, #3a4488 63%, #1b2350 78%, #121735 100%); }
+        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, #121735 0%, #1b2350 22%, #3a4488 37%, #8a6fb8 45%, #f39ab2 50%, #ffd9a8 55%, #cfe9ff 61%, #8ccaff 70%, #3d9bff 100%); }
         /* 별(밤 쪽)·구름(낮 쪽) — ::before 는 위 절반, ::after 는 아래 절반 */
         .theme-dial__sky::before, .theme-dial__sky::after { content: ""; position: absolute; left: 50%; }
         .theme-dial__sky::before { width: 11px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .95); top: 17%; margin-left: -20px;
