@@ -2,6 +2,9 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
+    {# 사이트 글꼴: Pretendard (SIL OFL 1.1, github.com/orioncactus/pretendard) — 맥·윈도우 같은 모양. 쓰는 글자 조각만 받는 dynamic subset #}
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin>
     {% with m=meta|default:default_meta %}
     <title>{% block title %}{{ m.title|default:"서민재 갤러리" }}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -64,14 +67,14 @@
 
     <style>
         body {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", sans-serif;
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
             background: #f5f5f7;
             color: #1d1d1f;
             transition: background-color .25s ease, color .25s ease;
         }
 
         .apple-display {
-            font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
             letter-spacing: -0.03em;
         }
 
