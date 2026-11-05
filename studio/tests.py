@@ -492,3 +492,33 @@ class RestrictedUserTests(TestCase):
         self.client.post(reverse("studio:users"), {"action": "restrict", "ids": [self.member.id, self.admin.id], "reason": "x"})
         self.assertTrue(AccountRestriction.objects.filter(user=self.member).exists())
         self.assertFalse(AccountRestriction.objects.filter(user=self.admin).exists())  # 관리자는 제외
+
+
+class PublicationUnpublishedTests(TestCase):
+    """발행일 아래 '아직 출판되지 않았어요' — 체크하면 상태가 들어가고, 심사중 등은 발행일을 비움"""
+
+    def setUp(self):
+        self.admin = get_user_model().objects.create_superuser("pubadmin", "p@example.com", "pw")
+        self.client.force_login(self.admin)
+
+    def test_form_shows_toggle_with_cv_terms(self):
+        res = self.client.get(reverse("studio:publication"))
+        self.assertContains(res, "아직 출판되지 않았어요")
+        self.assertContains(res, "Under review")
+        self.assertContains(res, "Accepted · In press")
+
+    def test_pending_status_clears_date_and_accepted_keeps_it(self):
+        from studio.models import Publication
+        self.client.post(reverse("studio:publication_create"), {
+            "title": "심사중 논문", "status": "under_review", "date": "2026-12", "publication_type": "international", "publication_kind": "journal",
+        })
+        self.client.post(reverse("studio:publication_create"), {
+            "title": "확정 논문", "status": "accepted", "date": "2026-12", "publication_type": "international", "publication_kind": "journal",
+        })
+        pending = Publication.objects.get(title="심사중 논문")
+        accepted = Publication.objects.get(title="확정 논문")
+        self.assertIsNone(pending.date)
+        self.assertTrue(pending.is_pending)
+        self.assertEqual(accepted.date.strftime("%Y-%m"), "2026-12")
+        res = self.client.get(reverse("studio:publication"))
+        self.assertContains(res, "심사중 · 발행일 미정")

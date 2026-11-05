@@ -191,16 +191,6 @@
                         </div>
 
                         <div>
-                            <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">상태</label>
-                            <select name="status" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] outline-none focus:border-[#0066cc]">
-                                {% for value, label in publication_statuses %}
-                                <option value="{{ value }}"{% if editing_publication %}{% if editing_publication.status == value %} selected{% endif %}{% else %}{% if value == 'published' %} selected{% endif %}{% endif %}>{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                            <p class="mt-1 text-[11px] text-[#8e8e93]">게재됨이 아니면 메인 화면 카드에 상태 배지가 붙어요 (심사중·제출 완료·게재 확정·준비중)</p>
-                        </div>
-
-                        <div>
                             <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">제목 *</label>
                             <input type="text" name="title" value="{{ editing_publication.title|default:'' }}" required class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px]" placeholder="예: Efficient ...">
                         </div>
@@ -218,7 +208,20 @@
                         <div>
                             <label class="mb-2 block text-[13px] font-semibold text-[#6e6e73]">발행일</label>
                             <input type="month" name="date" value="{{ editing_publication.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] disabled:cursor-not-allowed disabled:bg-[#f2f2f7] disabled:text-[#8e8e93]" data-pub-date>
-                            <p class="mt-1 hidden text-[11px] text-[#b26a00]" data-pub-date-hint>심사중·제출 완료·준비중에는 발행일을 안 받아요. 게재되면 상태를 바꾸고 넣어 주세요.</p>
+                            {# 아직 안 나온 논문: 체크하면 발행일 대신 상태(심사중 등)를 고르고, 카드에는 상태 배지가 붙음 #}
+                            <input type="hidden" name="status" value="{{ editing_publication.status|default:'published' }}" data-pub-status>
+                            <label class="mt-2 flex cursor-pointer items-center gap-2 text-[13px] text-[#1d1d1f]">
+                                <input type="checkbox" class="h-4 w-4 rounded border-black/[0.2] accent-[#0066cc]" data-pub-unpublished{% if editing_publication and editing_publication.status != 'published' %} checked{% endif %}>
+                                아직 출판되지 않았어요 <span class="text-[11px] text-[#8e8e93]">(CV 의 in press · under review 등)</span>
+                            </label>
+                            <div class="mt-2 hidden" data-pub-unpublished-box>
+                                <select class="h-[40px] w-full rounded-full border border-black/[0.08] px-4 text-[13px] outline-none focus:border-[#0066cc]" data-pub-status-pick>
+                                    {% for value, label, cv in publication_unpublished_statuses %}
+                                    <option value="{{ value }}"{% if editing_publication and editing_publication.status == value %} selected{% endif %}>{{ label }} — {{ cv }}</option>
+                                    {% endfor %}
+                                </select>
+                                <p class="mt-1 text-[11px] text-[#8e8e93]" data-pub-date-hint>심사중·제출 완료·준비중이면 발행일은 비워 두고, 카드에 상태 배지가 붙어요. 게재 확정(in press)은 예정 발행월을 넣어도 돼요.</p>
+                            </div>
                         </div>
 
                         <div>
@@ -287,6 +290,8 @@
                                     {% endif %}
                                     {% if publication_item.date %}
                                     <p class="mt-1 text-[12px] text-[#8e8e93]">{{ publication_item.date|date:"Y.m" }}</p>
+                                    {% elif publication_item.is_pending %}
+                                    <p class="mt-1 text-[12px] text-[#b26a00]">{{ publication_item.get_status_display }} · 발행일 미정</p>
                                     {% endif %}
                                     {% if publication_item.doi %}<p class="mt-1 text-[12px] text-[#8e8e93]">DOI: {{ publication_item.doi }}</p>{% endif %}
                                     {% if publication_item.abstract %}<p class="mt-2 text-[13px] text-[#6e6e73]">{{ publication_item.abstract }}</p>{% endif %}
@@ -316,19 +321,24 @@
 </div>
 
 <script>
-    // 상태가 심사중·제출 완료·준비중이면 발행일 칸을 잠금 (서버도 그 상태면 날짜를 비움)
+    // "아직 출판되지 않았어요" 체크 → 상태 선택이 열리고 hidden status 에 반영. 심사중·제출 완료·준비중이면 발행일 잠금 (서버도 그 상태면 날짜를 비움)
     (() => {
-        const status = document.querySelector('select[name="status"]');
+        const status = document.querySelector('[data-pub-status]');
+        const check = document.querySelector('[data-pub-unpublished]');
+        const box = document.querySelector('[data-pub-unpublished-box]');
+        const pick = document.querySelector('[data-pub-status-pick]');
         const date = document.querySelector('[data-pub-date]');
-        const hint = document.querySelector('[data-pub-date-hint]');
-        if (!status || !date) return;
+        if (!status || !check || !box || !pick || !date) return;
         const sync = () => {
-            const pending = ['under_review', 'submitted', 'in_prep'].includes(status.value);
+            const on = check.checked;
+            box.classList.toggle('hidden', !on);
+            status.value = on ? pick.value : 'published';
+            const pending = on && ['under_review', 'submitted', 'in_prep'].includes(pick.value);
             date.disabled = pending;
             if (pending) date.value = '';
-            if (hint) hint.classList.toggle('hidden', !pending);
         };
-        status.addEventListener('change', sync);
+        check.addEventListener('change', sync);
+        pick.addEventListener('change', sync);
         sync();
     })();
     const SCROLL_KEY = 'studio_publication_scroll_y';

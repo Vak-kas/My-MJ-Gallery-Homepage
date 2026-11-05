@@ -96,6 +96,9 @@ def publication(request):
             "publication_types": publication_types,
             "publication_kinds": publication_kinds,
             "publication_statuses": publication_statuses,
+            "publication_unpublished_statuses": [
+                (value, label, Publication.STATUS_CV_TERMS.get(value, "")) for value, label in publication_statuses if value != "published"
+            ],
             "editing_publication_id": editing_publication_id,
             "editing_publication": editing_publication,
         },
