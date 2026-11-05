@@ -21,10 +21,17 @@ TOP = 10
 
 
 def _json(request):
+	"""요청 본문 JSON — 객체가 아니면(배열·문자열·숫자) 빈 dict 로 (예전엔 `[]` 를 보내면 500)"""
 	try:
-		return json.loads(request.body or b"{}")
+		data = json.loads(request.body or b"{}")
 	except ValueError:
 		return {}
+	return data if isinstance(data, dict) else {}
+
+
+def _consume(key):
+	"""한 판 토큰을 딱 한 번만 쓰기 — delete 가 False 면 다른 요청이 먼저 가져간 것 (동시 제출 중복 저장 방지)"""
+	return bool(cache.delete(key))
 
 
 def _err(msg, status=400):
@@ -100,7 +107,8 @@ def g2048_submit(request):
 	moves = str(data.get("moves") or "")
 	if len(moves) > MAX_MOVES or set(moves) - set("UDLR"):
 		return _err("움직임 기록이 올바르지 않아요.")
-	cache.delete(key)  # 한 판은 한 번만 등록
+	if not _consume(key):
+		return _err("이미 등록된 판이에요.")
 	game = replay(session["seed"], moves)
 	detail = {"max_tile": max(game.board), "moves": game.moves, "seconds": round(time.time() - session["t"])}
 	return JsonResponse({"ok": True, "score": game.score, **detail, **_save(request, "2048", game.score, detail), "leaderboard": leaderboard("2048", request.user)})
@@ -129,7 +137,8 @@ def typing_submit(request):
 	typed = data.get("typed")
 	if not isinstance(typed, list) or len(typed) != typing.ROUND:
 		return _err("입력한 문장 수가 맞지 않아요.")
-	cache.delete(key)
+	if not _consume(key):
+		return _err("이미 등록된 연습이에요.")
 	targets = [typing.TEXTS[session["lang"]][i] for i in session["idx"]]
 	# 시간은 서버 기준 (시작 뒤 3초 세는 동안은 빼 줌) — 브라우저가 보낸 시간보다 짧게는 인정 안 함
 	server = time.time() - session["t"] - 3
@@ -190,7 +199,8 @@ def sudoku_submit(request):
 		return _err("게임 정보가 없어요. 새 문제로 다시 해 주세요.")
 	if not sudoku.is_solved(session["puzzle"], session["solution"], str(data.get("grid") or "")):
 		return _err("아직 답이 맞지 않아요.")  # 판은 그대로 두고 계속 풀 수 있게
-	cache.delete(key)
+	if not _consume(key):
+		return _err("이미 등록된 판이에요.")
 	ms = round((time.time() - session["t"]) * 1000)
 	board = f"sudoku-{session['level']}"
 	detail = {"level": session["level"], "hints": session["hints"]}
@@ -227,7 +237,8 @@ def mines_open(request):
 		session["t"] = time.time()  # 시간은 첫 칸을 연 순간부터
 	res = {"ok": True, "shown": {str(i): n for i, n in shown.items()}, "state": b.state}
 	if b.state in ("won", "lost"):
-		cache.delete(key)
+		if not _consume(key):
+			return _err("이미 끝난 판이에요.")
 		res["mines"] = sorted(b.mines)
 		res["boom"] = b.boom
 		ms = round((time.time() - session["t"]) * 1000)
@@ -269,7 +280,8 @@ def trace_draw(request):
 	session["scores"].append(got)
 	res = {"ok": True, "i": i, "score": got, "label": trace.SHAPES[shape][0], "done": len(session["scores"]) == trace.ROUND}
 	if res["done"]:
-		cache.delete(key)
+		if not _consume(key):
+			return _err("이미 등록된 판이에요.")
 		total = sum(session["scores"])
 		board = f"trace-{session['mode']}"
 		res.update(total=total, scores=session["scores"], **_save(request, board, total, {"scores": session["scores"], "shapes": session["shapes"]}),
