@@ -352,7 +352,7 @@
                         {% if item.venue %}<p class="text-[12px] text-[#6e6e73] truncate">{{ item.venue }}</p>{% endif %}
                         {% if item.authors %}<p class="mt-1 text-[11px] text-[#8e8e93] truncate">{{ item.authors }}</p>{% endif %}
                         <div class="mt-2 flex items-center gap-3 flex-wrap">
-                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% endif %}
+                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% elif item.is_pending %}<span class="text-[11px] font-medium text-[#b26a00]">{{ item.get_status_display }}</span>{% endif %}
                             {% if item.doi %}<span class="text-[11px] text-[#8e8e93]">DOI: {{ item.doi }}</span>{% endif %}
                             {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="text-[11px] font-semibold text-[#0066cc] hover:underline">자세히 →</a>{% endif %}
                         </div>
@@ -394,7 +394,7 @@
                         {% if item.venue %}<p class="text-[12px] text-[#6e6e73] truncate">{{ item.venue }}</p>{% endif %}
                         {% if item.authors %}<p class="mt-1 text-[11px] text-[#8e8e93] truncate">{{ item.authors }}</p>{% endif %}
                         <div class="mt-2 flex items-center gap-3 flex-wrap">
-                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% endif %}
+                            {% if item.date %}<span class="text-[11px] font-medium text-[#8e8e93]">{{ item.date|date:"Y.m" }}</span>{% elif item.is_pending %}<span class="text-[11px] font-medium text-[#b26a00]">{{ item.get_status_display }}</span>{% endif %}
                             {% if item.doi %}<span class="text-[11px] text-[#8e8e93]">DOI: {{ item.doi }}</span>{% endif %}
                             {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="text-[11px] font-semibold text-[#0066cc] hover:underline">자세히 →</a>{% endif %}
                         </div>
@@ -431,7 +431,7 @@
                     {% if item.venue %}<p class="mt-1 text-[12px] text-[#6e6e73]">{{ item.venue }}</p>{% endif %}
                     {% if item.authors %}<p class="mt-1 text-[12px] text-[#8e8e93]">저자: {{ item.authors }}</p>{% endif %}
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
-                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% endif %}
+                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% elif item.is_pending %}<span class="text-[#b26a00]">{{ item.get_status_display }}</span>{% endif %}
                         {% if item.doi %}<span>DOI: {{ item.doi }}</span>{% endif %}
                         {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
                     </div>
@@ -477,7 +477,7 @@
                     {% if item.venue %}<p class="mt-1 text-[12px] text-[#6e6e73]">{{ item.venue }}</p>{% endif %}
                     {% if item.authors %}<p class="mt-1 text-[12px] text-[#8e8e93]">저자: {{ item.authors }}</p>{% endif %}
                     <div class="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#8e8e93]">
-                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% endif %}
+                        {% if item.date %}<span>{{ item.date|date:"Y.m" }}</span>{% elif item.is_pending %}<span class="text-[#b26a00]">{{ item.get_status_display }}</span>{% endif %}
                         {% if item.doi %}<span>DOI: {{ item.doi }}</span>{% endif %}
                         {% if item.url %}<a href="{{ item.url }}" target="_blank" rel="noreferrer" class="font-semibold text-[#0066cc] hover:underline">링크</a>{% endif %}
                     </div>

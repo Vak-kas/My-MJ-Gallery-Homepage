@@ -427,6 +427,13 @@ class Publication(models.Model):
     ]
 
     PENDING_STATUSES = ("under_review", "submitted", "in_prep")  # 발행일을 안 받는 상태
+    # 이력서(CV)에서 쓰는 영어 표기 — Studio 폼의 "아직 출판되지 않았어요" 선택지에 같이 보여 줌
+    STATUS_CV_TERMS = {
+        "accepted": "Accepted · In press",
+        "under_review": "Under review",
+        "submitted": "Submitted",
+        "in_prep": "In preparation",
+    }
 
     publication_type = models.CharField(max_length=20, choices=PUBLICATION_TYPE_CHOICES, default="international")
     publication_kind = models.CharField(max_length=20, choices=PUBLICATION_KIND_CHOICES, default="journal")
