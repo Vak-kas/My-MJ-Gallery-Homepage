@@ -49,8 +49,6 @@
     
 </main>
 
-<button id="back-to-top-btn" type="button" aria-label="상단으로 이동" class="back-to-top-btn" hidden>↑</button>
-
 <style>
     @font-face {
         font-family: "Sogang University";
@@ -652,29 +650,6 @@
         margin-bottom: 2.5rem;
     }
 
-    .back-to-top-btn {
-        position: fixed;
-        right: 20px;
-        bottom: 20px;
-        z-index: 70;
-        width: 46px;
-        height: 46px;
-        border-radius: 9999px;
-        border: 1px solid rgba(0, 0, 0, 0.12);
-        background: rgba(255, 255, 255, 0.92);
-        color: #1d1d1f;
-        font-size: 18px;
-        font-weight: 700;
-        line-height: 1;
-        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.14);
-        backdrop-filter: blur(6px);
-        transition: transform .18s ease, background .18s ease;
-    }
-
-    .back-to-top-btn:hover {
-        transform: translateY(-1px);
-        background: #ffffff;
-    }
 </style>
 
 <script>
@@ -774,7 +749,6 @@
     const homeNavLink = document.getElementById('home-link');
     const heroSection = document.querySelector('[data-section="hero"]');
     const sideToc = document.getElementById('side-toc');
-    const backToTopBtn = document.getElementById('back-to-top-btn');
     const HERO_NAV_PEEK_MS = 1800;
     let heroNavPeekUntil = 0;
     let heroNavHideTimer = null;
@@ -918,21 +892,10 @@
         }
     };
 
-    const updateBackToTopButton = () => {
-        if (!backToTopBtn) return;
-        const visible = window.scrollY > 560;
-        backToTopBtn.hidden = !visible;
-    };
-
     buildSideToc();
     updateSectionTransitions();
     updateQuickNavStyle();
     updateSideTocActive();
-    updateBackToTopButton();
-
-    backToTopBtn?.addEventListener('click', () => {
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    });
 
     const heroCopyBtn = document.querySelector('.hero-social-link--copy');
     const heroCopyToast = document.getElementById('hero-copy-toast');
@@ -989,7 +952,6 @@
         updateSectionTransitions();
         updateQuickNavStyle();
         updateSideTocActive();
-        updateBackToTopButton();
     }, { passive: true });
 
     window.addEventListener('wheel', (e) => {
@@ -1010,7 +972,6 @@
         updateSectionTransitions();
         updateQuickNavStyle();
         updateSideTocActive();
-        updateBackToTopButton();
     });
 
     const reveals = document.querySelectorAll('.reveal');

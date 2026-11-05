@@ -77,8 +77,8 @@
 
         .theme-toggle-btn {
             position: fixed;
-            right: 20px;
-            bottom: 20px;
+            right: 26px;
+            bottom: 90px;   /* 맨 아래 칸(20px)은 스크롤 게이지 맨 위로 버튼 */
             z-index: 80;
             display: inline-flex;
             align-items: center;
@@ -95,10 +95,6 @@
             backdrop-filter: blur(8px);
             box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
             transition: background .2s ease, transform .2s ease;
-        }
-
-        .theme-toggle-btn.is-stacked {
-            bottom: 76px;
         }
 
         .theme-toggle-btn:hover {
@@ -236,6 +232,7 @@
     <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="다크모드 토글">
         <span id="theme-toggle-icon">🌙</span>
     </button>
+    {% include "components/scroll_top.html" %}
 
     <script>
         // 글 저장 후 에디터가 아닌 페이지로 넘어왔다면 저장 성공 → 에디터 자동저장본 정리
@@ -261,10 +258,6 @@
                 icon.textContent = isDark ? "☀️" : "🌙";
                 btn.setAttribute("aria-label", isDark ? "라이트모드로 전환" : "다크모드로 전환");
             };
-
-            if (document.getElementById("back-to-top-btn")) {
-                btn.classList.add("is-stacked");
-            }
 
             applyThemeLabel();
 
