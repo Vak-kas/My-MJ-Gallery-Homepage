@@ -210,9 +210,9 @@
                             <input type="month" name="date" value="{{ editing_publication.date|date:'Y-m'|default:'' }}" class="h-[44px] w-full rounded-full border border-black/[0.08] px-4 text-[14px] disabled:cursor-not-allowed disabled:bg-[#f2f2f7] disabled:text-[#8e8e93]" data-pub-date>
                             {# 아직 안 나온 논문: 체크하면 발행일 대신 상태(심사중 등)를 고르고, 카드에는 상태 배지가 붙음 #}
                             <input type="hidden" name="status" value="{{ editing_publication.status|default:'published' }}" data-pub-status>
-                            <label class="mt-2 flex cursor-pointer items-center gap-2 text-[13px] text-[#1d1d1f]">
-                                <input type="checkbox" class="h-4 w-4 rounded border-black/[0.2] accent-[#0066cc]" data-pub-unpublished{% if editing_publication and editing_publication.status != 'published' %} checked{% endif %}>
-                                아직 출판되지 않았어요 <span class="text-[11px] text-[#8e8e93]">(CV 의 in press · under review 등)</span>
+                            <label class="mt-2 flex cursor-pointer items-start gap-2 text-[13px] text-[#1d1d1f]">
+                                <input type="checkbox" class="mt-0.5 h-4 w-4 shrink-0 rounded border-black/[0.2] accent-[#0066cc]" data-pub-unpublished{% if editing_publication and editing_publication.status != 'published' %} checked{% endif %}>
+                                <span class="break-keep"><span class="whitespace-nowrap">아직 출판되지 않았어요</span> <span class="whitespace-nowrap text-[11px] text-[#8e8e93]">(CV 의 in press · under review 등)</span></span>
                             </label>
                             <div class="mt-2 hidden" data-pub-unpublished-box>
                                 <select class="h-[40px] w-full rounded-full border border-black/[0.08] px-4 text-[13px] outline-none focus:border-[#0066cc]" data-pub-status-pick>

@@ -167,8 +167,6 @@ html.theme-dark .ud-go { background-color: #171a20 !important; color: #0b8ace !i
 html.theme-dark .hero-copy-toast { background-color: rgba(23, 26, 32, 0.92) !important; color: #e5e7eb !important; }
 html.theme-dark .section-flash { background: radial-gradient(1000px 300px at 50% 30%, rgba(59, 130, 246, 0.18), transparent 70%),
             linear-gradient(180deg, rgba(17, 19, 24, 0.55), rgba(17, 19, 24, 0.08)) !important; }
-html.theme-dark .back-to-top-btn { background-color: rgba(23, 26, 32, 0.92) !important; color: #e5e7eb !important; }
-html.theme-dark .back-to-top-btn:hover { background-color: #171a20 !important; }
 html.theme-dark .activity-detail-indicator::after { background: linear-gradient(115deg, transparent 20%, rgba(17, 19, 24, .75) 50%, transparent 80%) !important; }
 html.theme-dark .activity-attachment-popover { background-color: rgba(23, 26, 32, 0.95) !important; }
 html.theme-dark .award-marquee-outer::before { background: linear-gradient(to right, rgba(17, 19, 24, 0.92) 0%, rgba(17, 19, 24, 0) 100%) !important; }
