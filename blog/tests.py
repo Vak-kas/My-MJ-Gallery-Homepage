@@ -791,3 +791,33 @@ class PostIndexMarkupTests(TestCase):
 		self.assertContains(res, 'id="post-toc-mobile"')
 		self.assertNotContains(res, "post-toc-bars")
 		self.assertNotContains(res, "{#")
+
+
+class CollectionCardsTests(TestCase):
+	"""블로그 허브 컬렉션 카드: 카테고리·시리즈, Secret 은 관리자에게만, 검색어와 무관한 전체 개수"""
+
+	def setUp(self):
+		from django.utils import timezone
+		from blog.models import Series
+		self.admin = get_user_model().objects.create_superuser("col", "c@x.kr", "pw-for-tests-only")
+		self.series = Series.objects.create(name="HackRF 입문", slug="hackrf", author=self.admin)
+		now = timezone.now()
+		for i, cat in enumerate(["tech", "tech", "life", "secret"]):
+			Post.objects.create(title=f"{cat} 글 {i}", slug=f"c{i}", category=cat, content="x", author=self.admin,
+				is_published=True, published_at=now, series=self.series if i < 2 else None, series_order=i + 1 if i < 2 else None)
+		Post.objects.create(title="초안", slug="draft", category="tech", content="x", author=self.admin, is_published=False)
+
+	def test_cards_for_visitor_and_admin(self):
+		res = self.client.get(reverse("blog:index"), {"q": "없는검색어"})
+		cards = {c["title"]: c for c in res.context["collections"]}
+		self.assertEqual(cards["Tech"]["count"], 2)   # 검색어와 상관없이 전체
+		self.assertEqual(cards["Life"]["count"], 1)
+		self.assertNotIn("Secret", cards)
+		self.assertEqual(cards["HackRF 입문"]["count"], 2)
+		self.assertEqual(cards["HackRF 입문"]["kind"], "series")
+		self.assertEqual(len(cards["Tech"]["recent"]), 2)
+		self.assertContains(res, "컬렉션")
+		self.assertNotContains(res, "초안")
+		self.client.force_login(self.admin)
+		cards = {c["title"]: c for c in self.client.get(reverse("blog:index")).context["collections"]}
+		self.assertEqual(cards["Secret"]["count"], 1)

@@ -498,15 +498,6 @@ def index(request):
 		order_fields = ("-published_at", "-id")
 
 	all_posts = list(feed_qs.order_by(*order_fields))
-	recent_badge_cutoff = timezone.now() - timedelta(days=3)
-
-	def _preview_posts(category: str):
-		posts = [post for post in all_posts if post.category == category][:3]
-		for post in posts:
-			published_at = post.published_at or post.created_at
-			post.is_new_badge = bool(published_at and published_at >= recent_badge_cutoff)
-		return posts
-
 	def _query_link(**updates):
 		params = {}
 		if search_query:
@@ -543,13 +534,10 @@ def index(request):
 	feed_end_page = min(feed_total_pages, feed_page.number + 2)
 	feed_page_numbers = list(range(feed_start_page, feed_end_page + 1))
 	feed_page_links = [(num, _query_link(page=num)) for num in feed_page_numbers]
-	tech_posts = _preview_posts(Post.CATEGORY_TECH)
-	board_posts = _preview_posts(Post.CATEGORY_BOARD)
-	life_posts = _preview_posts(Post.CATEGORY_LIFE)
-	secret_posts = _preview_posts(Post.CATEGORY_SECRET)
 
 	from studio import site_settings
 	from .weekly import weekly_stats
+	from .collections import build_collections
 
 	context = {
 		"weekly": weekly_stats(site_settings.load()["blog_goals"], include_secret=request.user.is_superuser),
@@ -579,14 +567,7 @@ def index(request):
 		"feed_next_qs": _query_link(page=feed_page.next_page_number()) if feed_page.has_next() else "",
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
-		"tech_posts": tech_posts,
-		"board_posts": board_posts,
-		"life_posts": life_posts,
-		"secret_posts": secret_posts,
-		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
-		"board_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_BOARD),
-		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
-		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
+		"collections": build_collections(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
 	}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/index.html", context)
