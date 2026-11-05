@@ -300,8 +300,12 @@ html.theme-dark .post-index__back:hover { color: #4ea1ff; }
 .post-index__major:hover .post-index__num { border-color: #0066cc; color: #0066cc; }
 .post-index__item.is-current .post-index__num { border-color: #0066cc; background: #0066cc; color: #fff; transform: scale(1.06); }
 .post-index__item.is-current > .post-index__major .post-index__text { color: #0066cc; opacity: 1; visibility: visible; clip-path: inset(0 0 0 0); white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
-.post-index__subs { display: none; margin: 4px 0 2px 13px; padding-left: 15px; border-left: 1.5px solid #e5e5ea; }
-.post-index__item.is-current .post-index__subs { display: block; }
+/* 작은 제목: 평소엔 접혀 있고, 큰 제목에 마우스를 대면(또는 키보드로 들어가면) 아래로 펼쳐짐 → 떼면 다시 접힘 */
+.post-index__subwrap { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows .32s cubic-bezier(.4, 0, .2, 1), opacity .2s ease; }
+.post-index__subwrap > .post-index__subs { min-height: 0; overflow: hidden; }
+.post-index.is-open .post-index__item:hover .post-index__subwrap, .post-index__item:focus-within .post-index__subwrap { grid-template-rows: 1fr; opacity: 1; }
+.post-index__subs { margin: 4px 0 2px 13px; padding-left: 15px; border-left: 1.5px solid #e5e5ea; }
+@media (prefers-reduced-motion: reduce) { .post-index__subwrap { transition: none; } }
 .post-index__sub { display: flex; align-items: center; gap: 8px; padding: 3px 4px 3px 0; color: #6e6e73; text-decoration: none; font-size: 12px; line-height: 1.4; }
 .post-index__dot { flex: none; width: 6px; height: 6px; border-radius: 9999px; background: #c7c7cc; transition: background .2s, transform .2s; }
 .post-index__sub .post-index__text { padding-top: 0; font-size: 12px; font-weight: 500; }
@@ -386,7 +390,12 @@ html.theme-dark .post-index.is-open .post-index__major:hover .post-index__text, 
             return;
         }
         const g = groups[groups.length - 1];
-        if (!g.sublist) { g.sublist = el('ol', 'post-index__subs'); g.li.appendChild(g.sublist); }
+        if (!g.sublist) {
+            const wrap = el('div', 'post-index__subwrap');
+            g.sublist = el('ol', 'post-index__subs');
+            wrap.appendChild(g.sublist);
+            g.li.appendChild(wrap);
+        }
         const li = el('li');
         const a = el('a', 'post-index__sub');
         a.href = `#${it.id}`;
