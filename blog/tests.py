@@ -826,54 +826,44 @@ class CollectionCardsTests(TestCase):
 
 
 class KnowledgeMapTests(TestCase):
-	"""연결 지도: 같은 시리즈(앞뒤)·본문 링크·태그 공유로 글끼리 선, 너무 넓은 태그는 빼고, Secret 은 관리자에게만"""
+	"""Topic Map: Tech 글만, 태그(표기 차이 무시·제목 말머리 포함)가 비슷한 글끼리 묶고 대표 태그로 이름, 시리즈·본문 링크 선"""
 
 	def setUp(self):
 		from django.utils import timezone
 		from blog.models import Series, Tag
 		self.admin = get_user_model().objects.create_superuser("km", "k@x.kr", "pw-for-tests-only")
 		now = timezone.now()
-		mk = lambda slug, cat="tech", content="x", **kw: Post.objects.create(title=slug, slug=slug, category=cat, content=content, author=self.admin, is_published=True, published_at=now, **kw)
+		tag = lambda n: Tag.objects.get_or_create(name=n, defaults={"slug": f"t-{Tag.objects.count()}"})[0]
+		def mk(slug, title, tags, cat="tech", content="x", **kw):
+			p = Post.objects.create(title=title, slug=slug, category=cat, content=content, author=self.admin, is_published=True, published_at=now, **kw)
+			p.tags.set([tag(t) for t in tags])
+			return p
 		s = Series.objects.create(name="S", slug="s", author=self.admin)
-		self.a = mk("a", series=s, series_order=1)
-		self.b = mk("b", series=s, series_order=2)
-		self.c = mk("c", series=s, series_order=3)
-		self.d = mk("d", cat="life", content='{"href": "/blog/post/a/"}')
-		self.e = mk("e")
-		self.f = mk("f")
-		self.alone = mk("alone")
-		self.sec = mk("sec", cat="secret", content='{"href": "/blog/post/e/"}')
-		t = Tag.objects.create(name="hackrf", slug="hackrf")
-		self.e.tags.add(t); self.f.tags.add(t)
-		wide = Tag.objects.create(name="wide", slug="wide")
-		for i in range(13):
-			mk(f"w{i}").tags.add(wide)
+		mk("w1", "[wifi] OFDM 기초", ["OFDM", "802.11"])
+		mk("w2", "Wi-Fi 채널", ["Wi-Fi", "802.11", "채널"])
+		mk("w3", "WiFi 7 펑처링", ["WIFI", "OFDMA", "802.11"])
+		mk("g1", "5G 시스템 구조", ["5G", "3GPP", "gNB"], series=s, series_order=1)
+		mk("g2", "5G NR 스택", ["5G", "3GPP", "RRC"], series=s, series_order=2, content='{"href": "/blog/post/w1/"}')
+		mk("lone", "강화학습 논문", ["강화학습"])
+		mk("life", "일상 글", ["5G", "3GPP"], cat="life")
 
-	def pairs(self, m):
-		ids = {n["id"]: n["title"] for n in m["nodes"]}
-		return {tuple(sorted((ids[e["a"]], ids[e["b"]]))): e["kinds"] for e in m["edges"]}
-
-	def test_edges_and_visibility(self):
+	def test_groups_names_and_edges(self):
 		from blog.views import _published_posts_qs
 		from blog.knowledge_map import build_map
-		qs = _published_posts_qs().exclude(category="secret")
-		m = build_map(qs)
-		p = self.pairs(m)
-		self.assertEqual(p[("a", "b")], ["series"])
-		self.assertEqual(p[("b", "c")], ["series"])
-		self.assertNotIn(("a", "c"), p)          # 시리즈는 앞뒤 글끼리만
-		self.assertEqual(p[("a", "d")], ["link"])
-		self.assertEqual(p[("e", "f")], ["tag"])
-		self.assertFalse(any(k[0].startswith("w") and k[1].startswith("w") for k in p))   # 13개 달린 태그는 뺌
-		alone = next(n for n in m["nodes"] if n["title"] == "alone")
-		self.assertFalse(alone["connected"])
-		self.assertNotIn("sec", [n["title"] for n in m["nodes"]])
-		self.assertNotIn("secret", [h["key"] for h in m["hubs"]])
-		admin_map = build_map(_published_posts_qs(), include_secret=True)
-		self.assertIn(("e", "sec"), self.pairs(admin_map))
+		m = build_map(_published_posts_qs())
+		titles = {n["id"]: n["title"] for n in m["nodes"]}
+		self.assertNotIn("일상 글", titles.values())          # Tech 만
+		groups = {h["label"]: sorted(titles[n["id"]] for n in m["nodes"] if n["hub"] == h["key"]) for h in m["hubs"]}
+		self.assertEqual(groups["Wi-Fi"], sorted(["[wifi] OFDM 기초", "Wi-Fi 채널", "WiFi 7 펑처링"]))
+		self.assertEqual(groups["5G"], ["5G NR 스택", "5G 시스템 구조"])
+		self.assertEqual(groups["기타"], ["강화학습 논문"])
+		pairs = {tuple(sorted((titles[e["a"]], titles[e["b"]]))): e["kinds"] for e in m["edges"]}
+		self.assertIn("series", pairs[("5G NR 스택", "5G 시스템 구조")])
+		self.assertIn("link", pairs[("5G NR 스택", "[wifi] OFDM 기초")])
+		self.assertEqual(m["stats"]["groups"], 2)
 
 	def test_hub_page_renders_map(self):
 		res = self.client.get(reverse("blog:index"))
-		self.assertContains(res, "연결 지도")
+		self.assertContains(res, "Topic Map")
 		self.assertContains(res, 'id="kmap-data"')
-		self.assertNotContains(res, '"title": "sec"')
+		self.assertNotContains(res, "연결 지도")

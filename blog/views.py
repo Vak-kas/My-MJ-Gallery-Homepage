@@ -569,7 +569,7 @@ def index(request):
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
 		"collections": build_collections(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
-		"knowledge_map": build_map(_accessible_posts_qs(request), include_secret=request.user.is_superuser),
+		"knowledge_map": build_map(_accessible_posts_qs(request)),
 	}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/index.html", context)

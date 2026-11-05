@@ -1,23 +1,26 @@
 {% comment %}
-블로그 허브 "연결 지도" — 카테고리 = 큰 원, 글 = 둘레의 점, 글끼리 연결(같은 시리즈·본문 링크·태그 공유) = 파란 점선 (blog/knowledge_map.py)
-점에 마우스를 올리면 제목·연결 이유, 누르면 그 글로. 허브에 올리면 그 카테고리 글만 강조.
-구성은 minter-v1.com (github.com/Minter-v1/Minter-blog) 의 지식 지도를 참고해 바닐라 JS·SVG 로 직접 구현
+블로그 허브 "Topic Map" — Tech 글을 태그가 비슷한 것끼리 자동으로 묶음(blog/knowledge_map.py).
+묶음 = 큰 원(대표 태그), 글 = 둘레의 점, 글끼리 연결(같은 시리즈·본문 링크·태그 비슷함) = 파란 점선.
+점에 마우스를 올리면 제목·태그·연결 이유, 누르면 그 글로. 묶음에 올리면 그 묶음 글만 강조. 바닐라 JS·SVG
 {% endcomment %}
 {% if knowledge_map.nodes %}
 <section class="mt-10" aria-labelledby="kmap-title">
     <div class="flex flex-wrap items-end justify-between gap-3">
-        <h2 id="kmap-title" class="text-[24px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">연결 지도</h2>
+        <div>
+            <p class="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0066cc]">Tech</p>
+            <h2 id="kmap-title" class="mt-1 text-[24px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">Topic Map</h2>
+        </div>
         <p class="kmap-legend">
-            <span><i class="kmap-legend__dot is-on"></i>연결됨 <b>{{ knowledge_map.stats.connected }}</b></span>
-            <span><i class="kmap-legend__dot"></i>연결 없음 <b>{{ knowledge_map.stats.alone }}</b></span>
-            <span><i class="kmap-legend__line"></i>연관 연결 <b>{{ knowledge_map.stats.edges }}</b></span>
+            <span>주제 묶음 <b>{{ knowledge_map.stats.groups }}</b></span>
+            <span><i class="kmap-legend__dot is-on"></i>글 <b>{{ knowledge_map.stats.posts }}</b></span>
+            <span><i class="kmap-legend__line"></i>이어진 글 <b>{{ knowledge_map.stats.edges }}</b></span>
         </p>
     </div>
-    <div id="kmap" class="kmap mt-4" role="img" aria-label="블로그 글 연결 지도: 카테고리마다 글이 모여 있고, 같은 시리즈·본문 링크·같은 태그로 이어진 글끼리 선으로 연결돼 있어요">
+    <div id="kmap" class="kmap mt-4" role="img" aria-label="Tech 글 주제 지도: 태그가 비슷한 글끼리 묶여 있고, 같은 시리즈·본문 링크·비슷한 태그로 이어진 글끼리 선으로 연결돼 있어요">
         <svg id="kmap-svg" class="kmap__svg"></svg>
         <div id="kmap-tip" class="kmap__tip" hidden></div>
     </div>
-    <p class="mt-2 text-[12px] text-[#8e8e93]">같은 시리즈 · 본문에서 다른 글 링크 · 같은 태그로 이어진 글끼리 선이 생겨요. 점을 누르면 그 글로 가요.</p>
+    <p class="mt-2 text-[12px] text-[#8e8e93]">Tech 글을 태그가 비슷한 것끼리 자동으로 묶었어요. 원 이름은 그 묶음에서 가장 많이 쓴 태그예요. 점을 누르면 그 글로 가요.</p>
     {{ knowledge_map|json_script:"kmap-data" }}
 </section>
 <style>
@@ -36,7 +39,8 @@
     .kmap__svg .dot.is-on { fill: #0066cc; }
     .kmap__svg .dot.is-off { fill: #c7c7cc; }
     .kmap__svg .hub-ring { fill: #fff; stroke: rgba(0, 0, 0, .08); stroke-width: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .08)); }
-    .kmap__svg .hub-icon { font-size: 26px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .kmap__svg .hub-icon { font-size: 15px; font-weight: 700; fill: #0066cc; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .kmap__svg .hub.is-etc .hub-icon { fill: #8e8e93; }
     .kmap__svg .hub-label { font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; pointer-events: none; }
     .kmap__svg .hub-count { fill: #8e8e93; font-weight: 500; }
     .kmap__svg .hub { cursor: pointer; }
@@ -45,6 +49,7 @@
     .kmap.is-focus .rel.is-lit { stroke-width: 2; }
     .kmap__tip { position: absolute; z-index: 2; max-width: 260px; padding: 8px 12px; border-radius: 12px; background: rgba(29, 29, 31, .92); color: #fff; font-size: 12px; line-height: 1.5; pointer-events: none; box-shadow: 0 10px 30px rgba(0, 0, 0, .2); }
     .kmap__tip b { display: block; font-size: 13px; }
+    .kmap__tip i { display: block; font-style: normal; color: #9cc8ff; }
     html.theme-dark .kmap { background-color: #171a20; border-color: rgba(255, 255, 255, .08); background-image: radial-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px); }
     html.theme-dark .kmap__svg .spoke { stroke: rgba(255, 255, 255, .14); }
     html.theme-dark .kmap__svg .hub-ring { fill: #22262e; stroke: rgba(255, 255, 255, .12); }
@@ -52,6 +57,7 @@
     html.theme-dark .kmap__svg .dot.is-on { fill: #4ea1ff; }
     html.theme-dark .kmap__svg .dot.is-off { fill: #4b5060; }
     html.theme-dark .kmap-legend b { color: #f3f4f6; }
+    html.theme-dark .kmap__svg .hub-icon { fill: #4ea1ff; }
 </style>
 <script>
 (() => {
@@ -60,7 +66,7 @@
     if (!box || !svg || !data.nodes.length) return;
     const NS = 'http://www.w3.org/2000/svg';
     const mk = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
-    const KIND = { series: '같은 시리즈', link: '본문 링크', tag: '같은 태그' };
+    const KIND = { series: '같은 시리즈', link: '본문 링크', tag: '비슷한 태그' };
     const hubs = data.hubs.filter((h) => h.count > 0 || data.hubs.length <= 3);
     const byId = new Map(data.nodes.map((n) => [n.id, n]));
 
@@ -149,6 +155,7 @@
                 const why = n.why ? [...n.why].map((k) => KIND[k]).join(' · ') : '연결된 글 없음';
                 tip.innerHTML = '';
                 const t = document.createElement('b'); t.textContent = n.title; tip.appendChild(t);
+                if (n.tags && n.tags.length) { const g = document.createElement('i'); g.textContent = n.tags.map((x) => `#${x}`).join(' '); tip.appendChild(g); }
                 tip.appendChild(document.createTextNode(n.peers ? `${n.peers.size}개 글과 연결 · ${why}` : why));
                 tip.hidden = false;
                 const bx = box.clientWidth, tw = tip.offsetWidth;
@@ -161,9 +168,9 @@
         });
         hubs.forEach((h) => {
             const c = hubPos.get(h.key);
-            const a = mk('a', { href: h.url, class: 'hub', 'aria-label': `${h.label} ${h.count}개` }, gHub);
+            const a = mk('a', { href: h.url, class: `hub${h.key === 'etc' ? ' is-etc' : ''}`, 'aria-label': `${h.label} ${h.count}개${h.tags.length ? ' · ' + h.tags.join(', ') : ''}` }, gHub);
             mk('circle', { cx: c.x, cy: c.y, r: 36, class: 'hub-ring' }, a);
-            mk('text', { x: c.x, y: c.y, class: 'hub-icon' }, a).textContent = h.icon;
+            mk('text', { x: c.x, y: c.y, class: 'hub-icon' }, a).textContent = h.key === 'etc' ? '…' : '#';
             const label = mk('text', { x: c.x, y: c.y + 58, class: 'hub-label' }, a);
             label.textContent = `${h.label} `;
             mk('tspan', { class: 'hub-count' }, label).textContent = h.count;
