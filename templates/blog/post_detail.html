@@ -7,7 +7,7 @@
 
 <main class="mx-auto max-w-[1320px] px-6 py-12 lg:py-16">
     <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
-        <a href="{% url 'blog:index' %}#feed" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+        <a href="{% url 'blog:index' %}#feed" data-back-to-list class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
             <span class="text-[18px]">←</span>
             <span>목록으로</span>
         </a>
@@ -139,6 +139,7 @@
     </article>
     {# 넓은 화면 왼쪽 번호 목차: 평소엔 번호와 지금 읽는 큰 제목만, 마우스를 올리면 전체 제목·작은 제목 글씨까지 #}
     <aside id="post-toc" class="post-index" aria-label="이 글의 목차" hidden>
+        <a href="{% url 'blog:index' %}#feed" data-back-to-list class="post-index__back"><span aria-hidden="true">←</span> 목록으로</a>
         <p class="post-index__head"><span class="post-index__ring" aria-hidden="true"></span>Index</p>
         <ol class="post-index__list"></ol>
     </aside>
@@ -284,10 +285,14 @@ html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background
     .post-layout.has-index { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
     .post-layout.has-index .post-index { display: block; order: -1; position: sticky; top: 96px; }
 }
+.post-index__back { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 18px 2px; padding: 6px 12px 6px 10px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.08); background: #fff; font-size: 13px; color: #6e6e73; text-decoration: none; transition: color .15s, border-color .15s; }
+.post-index__back:hover { color: #0066cc; border-color: rgba(0,102,204,.35); }
+html.theme-dark .post-index__back { background: #171a20; border-color: rgba(255,255,255,.12); color: #a1a1aa; }
+html.theme-dark .post-index__back:hover { color: #4ea1ff; }
 .post-index__head { display: flex; align-items: center; gap: 8px; margin: 0 0 14px 2px; font-size: 15px; font-weight: 700; letter-spacing: -.01em; color: #1d1d1f; }
 .post-index__ring { position: relative; width: 18px; height: 18px; border-radius: 9999px; border: 1.5px solid #0066cc; }
 .post-index__ring::after { content: ""; position: absolute; inset: 5px; border-radius: 9999px; background: #0066cc; }
-.post-index__list { max-height: calc(100vh - 170px); overflow-y: auto; padding: 2px 4px 8px 2px; scrollbar-width: thin; }
+.post-index__list { max-height: calc(100vh - 225px); overflow-y: auto; padding: 2px 4px 8px 2px; scrollbar-width: thin; }
 .post-index__item + .post-index__item { margin-top: 6px; }
 .post-index__major { display: flex; align-items: flex-start; gap: 10px; padding: 4px 6px 4px 0; border-radius: 10px; color: #6e6e73; text-decoration: none; }
 .post-index__num { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 9999px; border: 1.5px solid #d2d2d7; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: #8e8e93; background: #fff; transition: background .2s, border-color .2s, color .2s, transform .2s; }
@@ -323,6 +328,18 @@ html.theme-dark .post-index__subs { border-color: rgba(255,255,255,.12); }
 html.theme-dark .post-index__dot { background: rgba(255,255,255,.28); }
 html.theme-dark .post-index:hover .post-index__major:hover .post-index__text, html.theme-dark .post-index:hover .post-index__sub:hover .post-index__text { color: #f3f4f6; }
 </style>
+<script>
+(() => {
+    // "목록으로": 블로그 목록(허브·카테고리·전체·시리즈·검색 결과)에서 들어왔으면 그 페이지·필터 그대로 돌아감
+    try {
+        const ref = document.referrer && new URL(document.referrer);
+        if (ref && ref.origin === location.origin && ref.pathname.startsWith('/blog/') && !ref.pathname.startsWith('/blog/post/') && !/\/(write|edit)\//.test(ref.pathname)) {
+            const back = ref.pathname + ref.search + (ref.pathname === '/blog/' && !ref.hash ? '#feed' : ref.hash);
+            document.querySelectorAll('[data-back-to-list]').forEach((a) => { a.href = back; });
+        }
+    } catch (e) { /* 그대로 허브로 */ }
+})();
+</script>
 <script>
 (() => {
     // 본문의 h1~h4 를 모아 목차를 만든다. 넓은 화면은 왼쪽 번호 목차, 좁은 화면은 본문 위 접이식 목차

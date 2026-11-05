@@ -790,6 +790,8 @@ class PostIndexMarkupTests(TestCase):
 		self.assertContains(res, 'class="post-index"')
 		self.assertContains(res, 'id="post-toc-mobile"')
 		self.assertNotContains(res, "post-toc-bars")
+		self.assertContains(res, 'class="post-index__back"')
+		self.assertContains(res, "data-back-to-list class=", count=2)
 		self.assertNotContains(res, "{#")
 
 
