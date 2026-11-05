@@ -21,8 +21,10 @@ ADMIN_LIVE_LIMITS = {"ttl_minutes": 360, "max_viewers": 20}
 
 
 def can_create_streams(user):
-	"""데이터 전송 방 만들기: 로그인한(승인된) 회원."""
-	return bool(user and user.is_authenticated and user.is_active)
+	"""데이터 전송 방 만들기: 로그인한(승인된) 회원. ⚠ 위험 회원은 안 됨."""
+	from accounts.models import is_restricted
+
+	return bool(user and user.is_authenticated and user.is_active and not is_restricted(user))
 
 
 def can_manage_streams(user):
@@ -42,6 +44,10 @@ TIER_LABELS = {"anon": "비로그인", "member": "일반 회원", "vip": "⭐ VI
 
 def is_vip(user):
 	if not (user and user.is_authenticated and user.is_active):
+		return False
+	from accounts.models import is_restricted
+
+	if is_restricted(user):
 		return False
 	cached = getattr(user, "_mj_is_vip", None)
 	if cached is None:

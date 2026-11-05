@@ -29,6 +29,7 @@
                         {% elif status.0 == 'rejected' %}<span class="rounded-full bg-black/[0.06] px-2.5 py-1 text-[#6e6e73]">거절됨</span>
                         {% else %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[#c4271d]">정지</span>{% endif %}
                         {% if is_vip %}<span class="rounded-full bg-[#f5c400]/20 px-2.5 py-1 text-[#8a6d00]">⭐ VIP 회원</span>{% endif %}
+                        {% if restriction %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 font-semibold text-[#c4271d]">⚠ 위험 (쓰기 차단)</span>{% endif %}
                         {% if must_change %}<span class="rounded-full bg-[#ff3b30]/10 px-2.5 py-1 text-[#c4271d]" title="{{ must_change.created_at|date:'Y.m.d H:i' }} {{ must_change.issued_by.username|default:'' }} 발급">🔑 임시 비밀번호 상태</span>{% endif %}
                         <span class="text-[#8e8e93]">가입 {{ target.date_joined|date:"Y.m.d H:i" }} · 마지막 로그인 {{ target.last_login|date:"Y.m.d H:i"|default:"-" }}</span>
                     </div>
@@ -160,6 +161,13 @@
                         {% endif %}
                         <form method="post">{% csrf_token %}<input type="hidden" name="action" value="{% if is_vip %}vip_off{% else %}vip_on{% endif %}"><button class="w-full rounded-xl border border-black/[0.1] px-3 py-2 hover:bg-[#f5f5f7]">{% if is_vip %}⭐ VIP 해제{% else %}⭐ VIP 회원으로{% endif %}</button></form>
                     </div>
+
+                    <form method="post" class="mt-4 space-y-2 rounded-xl border {% if restriction %}border-[#ff3b30]/40 bg-[#fff0ef]{% else %}border-black/[0.08]{% endif %} p-3 text-[12px]">{% csrf_token %}
+                        <p class="font-semibold {% if restriction %}text-[#c4271d]{% endif %}">⚠ 위험 회원 {% if restriction %}<span class="font-normal text-[#8e8e93]">· {{ restriction.created_at|date:"Y.m.d" }} {{ restriction.created_by.username|default:"" }}</span>{% endif %}</p>
+                        <p class="leading-4 text-[#8e8e93]">정지와 달리 로그인은 그대로 되지만 글·댓글·방명록·도구 등 <b>쓰기 동작이 전부 막히고</b> VIP 도 해제돼요. 본인 화면에는 아무 표시도 없어요(관리자만 봄).</p>
+                        {% if restriction %}<p class="text-[#1d1d1f]">이유: {{ restriction.reason|default:"(없음)" }}</p><button name="action" value="unrestrict" class="w-full rounded-lg border border-black/[0.1] px-2 py-2 hover:bg-[#f5f5f7]">위험 해제</button>
+                        {% else %}<input type="text" name="reason" placeholder="이유 (선택, 관리자만 봄)" class="h-9 w-full rounded-lg border border-black/[0.1] px-2 outline-none focus:border-[#ff3b30]"><button name="action" value="restrict" class="w-full rounded-lg border border-[#ff3b30]/30 px-2 py-2 text-[#c4271d] hover:bg-[#ff3b30]/5">⚠ 위험 회원으로 지정</button>{% endif %}
+                    </form>
 
                     <form method="post" class="mt-4 space-y-2 rounded-xl border border-[#ff3b30]/20 bg-[#fff6f5] p-3 text-[12px]">{% csrf_token %}<input type="hidden" name="action" value="reset_password">
                         <p class="font-semibold text-[#c4271d]">🔑 비밀번호 초기화</p>

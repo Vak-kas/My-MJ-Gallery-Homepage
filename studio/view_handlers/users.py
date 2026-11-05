@@ -8,7 +8,7 @@ from django.utils import timezone
 
 import secrets
 
-from accounts.models import MustChangePassword, SignupRequest
+from accounts.models import AccountRestriction, MustChangePassword, SignupRequest
 from blog.models import Comment, GuestbookEntry, Post
 from tools.models import SecretNote, ShortLink
 from tools.permissions import VIP_GROUP, set_vip
@@ -22,6 +22,7 @@ STATES = [
     ("active", "활성"),
     ("vip", "⭐ VIP 회원"),
     ("inactive", "정지·거절"),
+    ("restricted", "⚠ 위험"),
     ("admin", "관리자"),
 ]
 UNVERIFIED = Q(signup_request__status=SignupRequest.STATUS_PENDING, signup_request__email_verified_at__isnull=True) & ~Q(signup_request__verify_token="")
@@ -41,6 +42,16 @@ def _purge_user_content(user):
     ShortLink.objects.filter(owner=user).delete()
     SecretNote.objects.filter(created_by=user).delete()
     return counts
+
+
+def _set_restricted(user, on, admin, reason=""):
+    """⚠ 위험: 쓰기 동작 전부 차단 + VIP 해제. 본인 화면엔 아무 표시 없음."""
+    if on:
+        AccountRestriction.objects.update_or_create(user=user, defaults={"reason": (reason or "")[:200], "created_by": admin})
+        set_vip(user, False)
+    else:
+        AccountRestriction.objects.filter(user=user).delete()
+    user._mj_restricted = bool(on)
 
 
 def _decide(targets, status, admin):
@@ -104,6 +115,10 @@ def users(request):
         elif action == "suspend":
             targets.update(is_active=False)
             messages.success(request, f"{count}명 정지: {names}")
+        elif action in {"restrict", "unrestrict"}:
+            for user in targets:
+                _set_restricted(user, action == "restrict", request.user, request.POST.get("reason", ""))
+            messages.success(request, f"{count}명 {'⚠ 위험 회원으로 지정 (쓰기 전부 차단, 본인에겐 안 보임)' if action == 'restrict' else '위험 해제'}: {names}")
         elif action in {"purge", "delete"}:
             if (request.POST.get("confirm") or "").strip() != "DELETE":
                 messages.error(request, "삭제 작업은 확인 문구(DELETE) 입력이 필요합니다.")
@@ -129,8 +144,9 @@ def users(request):
     keyword = (request.GET.get("q") or "").strip()
     state = (request.GET.get("state") or "").strip()
     vip_q = Q(groups__name=VIP_GROUP)
-    qs = User.objects.select_related("signup_request").annotate(
+    qs = User.objects.select_related("signup_request", "restriction").annotate(
         is_vip=Exists(User.groups.through.objects.filter(user_id=OuterRef("pk"), group__name=VIP_GROUP)),
+        is_restricted=Exists(AccountRestriction.objects.filter(user_id=OuterRef("pk"))),
         post_count=Count("blog_posts", distinct=True),
         comment_count=Count("blog_comments", distinct=True),
         guestbook_count=Count("guestbook_entries", distinct=True),
@@ -147,6 +163,7 @@ def users(request):
         "active": User.objects.filter(is_active=True).count(),
         "vip": User.objects.filter(vip_q).distinct().count(),
         "inactive": User.objects.filter(is_active=False).exclude(PENDING).exclude(UNVERIFIED).count(),
+        "restricted": AccountRestriction.objects.count(),
         "admin": User.objects.filter(is_superuser=True).count(),
     }
     if state == "pending":
@@ -159,6 +176,8 @@ def users(request):
         qs = qs.filter(is_vip=True)
     elif state == "inactive":
         qs = qs.filter(is_active=False).exclude(PENDING).exclude(UNVERIFIED)
+    elif state == "restricted":
+        qs = qs.filter(is_restricted=True)
     elif state == "admin":
         qs = qs.filter(is_superuser=True)
     else:
@@ -261,6 +280,9 @@ def user_detail(request, id):
         elif action in {"vip_on", "vip_off"}:
             set_vip(target, action == "vip_on")
             messages.success(request, "⭐ VIP 회원으로 지정했어요." if action == "vip_on" else "VIP 회원을 해제했어요.")
+        elif action in {"restrict", "unrestrict"}:
+            _set_restricted(target, action == "restrict", request.user, request.POST.get("reason", ""))
+            messages.success(request, "⚠ 위험 회원으로 지정했어요. 로그인은 되지만 글·댓글·도구 등 쓰기가 전부 막히고, 본인에겐 아무 표시도 안 돼요." if action == "restrict" else "위험을 해제했어요.")
         elif action in {"purge", "delete"}:
             if (request.POST.get("confirm") or "").strip() != "DELETE":
                 messages.error(request, "삭제 작업은 확인 문구(DELETE) 입력이 필요합니다.")
@@ -307,6 +329,7 @@ def user_detail(request, id):
     return render(request, "studio/user_detail.html", {
         "target": target, "signup": signup, "protected": protected, "status": status, "is_vip": is_vip(target),
         "must_change": MustChangePassword.objects.filter(user=target).select_related("issued_by").first(),
+        "restriction": AccountRestriction.objects.filter(user=target).select_related("created_by").first(),
         "counts": counts,
         "recent_posts": list(Post.objects.filter(author=target).order_by("-id")[:8]),
         "recent_comments": list(Comment.objects.filter(author=target).select_related("post").order_by("-id")[:8]),

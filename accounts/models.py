@@ -163,3 +163,25 @@ def logout_everywhere(user, keep_session_key=None) -> int:
 			n += 1
 	TwoFactor.objects.filter(user=user).update(trust_version=models.F("trust_version") + 1)
 	return n
+
+
+class AccountRestriction(models.Model):
+	"""⚠ 위험 회원: 로그인은 그대로 되지만 글·댓글·방명록·도구 등 쓰기 동작이 전부 막힘. 본인 화면엔 표시 안 함(관리자만 봄)."""
+
+	user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="restriction")
+	reason = models.CharField("이유 (관리자 메모)", max_length=200, blank=True)
+	created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f"{self.user} 위험 ({self.created_at:%Y-%m-%d})"
+
+
+def is_restricted(user) -> bool:
+	if not (user and user.is_authenticated):
+		return False
+	cached = getattr(user, "_mj_restricted", None)
+	if cached is None:
+		cached = AccountRestriction.objects.filter(user=user).exists()
+		user._mj_restricted = cached
+	return cached
