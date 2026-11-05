@@ -6,6 +6,8 @@ from django import template
 from django.utils.html import escape
 from django.utils.safestring import mark_safe
 
+from webmail.sanitize import INLINE_ATTRS, INLINE_TAGS, sanitize_html
+
 from blog.content import (
     TIPTAP_FORMAT,
     parse_content,
@@ -90,12 +92,17 @@ def _collect_block_text(block):
     return ""
 
 
+def _inline(value):
+    """옛 Editor.js 블록의 인라인 HTML — 서식·링크만 남기고 script·on* 속성·img 등은 제거 (저장형 XSS 방지)."""
+    return sanitize_html(str(value or ""), tags=INLINE_TAGS, attrs=INLINE_ATTRS)
+
+
 def _render_list_items(items, style):
     parts = []
     list_cls = "list-decimal" if style == "ordered" else "list-disc"
     for item in items:
         if isinstance(item, dict):
-            text = item.get("content", "")
+            text = _inline(item.get("content", ""))
             sub = item.get("items", [])
             sub_html = ""
             if sub:
@@ -103,7 +110,7 @@ def _render_list_items(items, style):
                 sub_html = f'<{sub_tag} class="{list_cls} pl-5 mt-1">{_render_list_items(sub, style)}</{sub_tag}>'
             parts.append(f"<li class='mb-1'>{text}{sub_html}</li>")
         else:
-            parts.append(f"<li class='mb-1'>{item}</li>")
+            parts.append(f"<li class='mb-1'>{_inline(item)}</li>")
     return "".join(parts)
 
 
@@ -154,13 +161,13 @@ def render_editorjs(content):
         d = block.get("data", {})
 
         if t == "paragraph":
-            text = d.get("html") or d.get("text", "")
+            text = _inline(d.get("html") or d.get("text", ""))
             align = d.get("alignment", "left")
             a_cls = f"text-{align}" if align in ("left", "center", "right", "justify") else ""
             html.append(f'<p class="mb-4 leading-[1.85] {a_cls}">{text}</p>')
 
         elif t in {"header", "h1", "h2", "h3"}:
-            text = d.get("html") or d.get("text", "")
+            text = _inline(d.get("html") or d.get("text", ""))
             level = 1 if t == "h1" else 2 if t == "h2" else 3 if t == "h3" else max(1, min(6, int(d.get("level", 2))))
             sizes = {
                 1: "text-[2rem] font-bold mt-10 mb-4 tracking-tight",
@@ -185,7 +192,7 @@ def render_editorjs(content):
             rows = []
             for item in d.get("items", []):
                 checked = item.get("checked", False)
-                text = item.get("text", "")
+                text = _inline(item.get("text", ""))
                 icon = "✅" if checked else "⬜"
                 strike = "line-through text-[#aeaeb2]" if checked else ""
                 rows.append(
@@ -196,8 +203,8 @@ def render_editorjs(content):
             html.append(f'<ul class="mb-4 space-y-0.5">{"".join(rows)}</ul>')
 
         elif t == "quote":
-            text = d.get("html") or d.get("text", "")
-            caption = d.get("caption", "")
+            text = _inline(d.get("html") or d.get("text", ""))
+            caption = _inline(d.get("caption", ""))
             cap = f'<footer class="mt-2 text-sm not-italic text-[#8e8e93]">— {caption}</footer>' if caption else ""
             html.append(
                 f'<blockquote class="border-l-4 border-[#d2d2d7] pl-5 py-1 italic text-[#6e6e73] my-5">'
@@ -229,7 +236,7 @@ def render_editorjs(content):
         elif t == "image":
             url = d.get("url") or d.get("file", {}).get("url") or d.get("src")
             if url:
-                caption = d.get("caption", "")
+                caption = _inline(d.get("caption", ""))
                 html.append(
                     f'<figure class="my-5 overflow-hidden rounded-2xl border border-[#e5e5ea] bg-[#f9f9fb]">'
                     f'<img src="{escape(url)}" alt="{escape(d.get("alt", ""))}" class="block w-full h-auto object-contain" />'

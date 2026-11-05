@@ -16,8 +16,10 @@
 - 공통 상단 내비게이션 (관리자에게만 Studio · 🔔 알림 표시)
 
 ### 1.2 블로그
-- 카테고리: `Tech`, `Board`, `Life`, `Secret(관리자)` — 카테고리 페이지(`/blog/tech/` 등)는 카드 격자 30개씩 페이지, 맨 앞 "전체" 탭(`/blog/all/`)은 모든 카테고리를 한곳에(허브 피드의 "전체 글 보기 →" 버튼, "내가 쓴 글 보기"는 켜면 "내 글만 ✓"). 템플릿은 `blog/category.html` 하나
+- 카테고리: `Tech`, `Free`(자유게시판, DB 값·URL 은 `board` 그대로), `Life`, `Secret(관리자)` — 카테고리 페이지(`/blog/tech/` 등)는 카드 격자 30개씩 페이지, 맨 앞 "전체" 탭(`/blog/all/`)은 모든 카테고리를 한곳에(허브 피드의 "전체 글 보기 →" 버튼, "내가 쓴 글 보기"는 켜면 "내 글만 ✓"). 템플릿은 `blog/category.html` 하나
 - 통합 검색(제목/요약/본문/태그), 정렬(최신·오래된·인기), 페이지당 개수 선택, 페이지네이션, 내 글만 보기
+- 글쓰기 권한: 일반 회원은 `Free`(자유게시판)에만 쓸 수 있고(글쓰기 폼의 카테고리 선택에도 Free 만 보임, 서버에서도 `Post.allowed_categories` 로 검사 — 수정 때 다른 카테고리로 옮기는 것도 막음), 관리자는 모든 카테고리
+- 옛 Editor.js 형식(`{"blocks": [...]}`) 글의 인라인 HTML(문단·제목·목록·체크리스트·인용·캡션)은 보여 줄 때 `webmail.sanitize.sanitize_html` 로 서식 태그(b/i/u/s/code/mark/sup/sub/a/br/span)와 `href`·`title` 속성만 남김 — `<img onerror>`·`<script>`·`on*` 속성·`style` 은 제거 (저장형 XSS 방지). Tiptap 형식은 원래부터 서버에서 다시 그리므로 안전
 - 사이드 위젯: 인기글, 태그, 최근 댓글, 방명록
 - 공개 범위: `public` 전체공개 / `private` 비공개 / `protected` 비밀번호 보호
   - 보호글 비밀번호 5회 실패 시 10분 차단, 잠금 해제 전 조회수 미증가, 카드·상세 내용 마스킹
@@ -52,6 +54,7 @@
   - 블로그 글: 제목·요약·대표 이미지(커버 → 본문 첫 사진 → **제목이 들어간 카드 이미지 자동 생성**), 비밀번호 글은 내용·이미지 숨김
   - Tool 목록·각 도구·블로그·카테고리·갤러리·시리즈·라이브 방송 링크도 **페이지 전용 카드**를 자동 생성 (`/og/<종류>/<키>.png`, `media/og/` 에 저장·재사용)
   - 카드 글꼴: 나눔고딕(SIL OFL, `blog/fonts/`), 기본 이미지 `static/images/og-default.png`
+- 에디터 링크 카드용 `GET /blog/api/url-preview/?url=` 는 **로그인 회원만**, `http(s)` 만, 호스트를 직접 풀어 루프백·사설·링크로컬·예약 대역(IPv4/IPv6, IPv4-mapped 포함)·IP 직접 지정·`localhost`/`.local`/`.internal` 은 거부 (SSRF 방지). 리다이렉트는 자동 추적 대신 최대 3번 직접 따라가며 **매 단계 같은 검사**, 응답은 512KB 까지만 읽고 `html.parser` 로 `<title>`·`<meta>` 만 추출, 회원당 분당 60회, 오류는 고정 문구("미리보기를 만들 수 없는 주소예요")만 돌려주고 자세한 내용은 로그
 - `/sitemap.xml`(공개 페이지·글, Settings 에서 닫은 메뉴 제외), `/robots.txt`(관리·공유 링크 크롤링 금지), 개인·공유 페이지는 noindex
 - **📱 앱으로 설치 (PWA)**: `/manifest.webmanifest`(이름·아이콘 192/512·maskable·주소창 없이 열기·꾹 누르면 클립보드·논문 찾기·Tool·Game 바로가기), `/sw.js` 서비스 워커(정적 파일과 '연결이 끊겼어요' 화면 `/offline/` 만 저장 — 개인 정보가 섞일 수 있는 HTML 은 저장 안 함, 버전은 `main/pwa.py` 의 `SW_VERSION`), 아이폰용 `apple-touch-icon`. 꼬리말의 **📱 앱으로 설치** → `/app/` 안내(안드로이드·크롬은 버튼, 아이폰은 공유 → 홈 화면에 추가 그림 안내, 이미 앱이면 숨김). 아이콘은 `static/images/app/`(로고 SVG 를 PyMuPDF 로 그림)
 - **다크 모드**: `scripts/gen_dark_css.py` 가 템플릿 전체의 색(클래스·`<style>`)을 훑어 `static/css/theme-dark.css` 를 자동 생성 — 밝은 배경은 어둡게, 대비가 모자란 글자는 밝게

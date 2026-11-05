@@ -19,7 +19,7 @@ XBOLD = FONT_DIR / "NanumGothic-ExtraBold.ttf"
 GOLD = (212, 175, 55)
 WHITE = (245, 245, 247)
 MUTED = (170, 170, 180)
-ACCENT = {"tech": ((10, 132, 255), "TECH"), "board": ((249, 115, 22), "BOARD"),
+ACCENT = {"tech": ((10, 132, 255), "TECH"), "board": ((249, 115, 22), "FREE"),
           "life": ((16, 185, 129), "LIFE"), "secret": ((239, 68, 68), "SECRET")}
 
 
