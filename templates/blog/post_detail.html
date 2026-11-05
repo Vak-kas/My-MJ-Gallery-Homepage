@@ -309,8 +309,8 @@ html.theme-dark .post-index__back:hover { color: #4ea1ff; }
 .post-index__sub.on .post-index__text { color: #0066cc; }
 .post-index__sub[data-l="3"] { padding-left: 12px; }
 /* 마우스를 올리거나 키보드로 들어오면 전체 제목·작은 제목 글씨까지 */
-/* 펼치기: is-expanded = 줄바꿈(자리 잡기), is-open = 글자 보이기. 열 땐 글자가 왼쪽에서 오른쪽으로 써지듯 드러남(위에서부터 조금씩 늦게, --d), 닫을 땐 바로 */
-.post-index.is-open .post-index__text, .post-index:focus-within .post-index__text { opacity: 1; visibility: visible; clip-path: inset(0 0 0 0); transition: clip-path .5s cubic-bezier(.4, 0, .2, 1) var(--d, 0ms), opacity .15s ease var(--d, 0ms), visibility 0s, color .2s; }
+/* 펼치기: is-expanded = 줄바꿈(자리 잡기), is-open = 글자 보이기. 열 땐 마우스를 대자마자 글자가 왼쪽에서 오른쪽으로 써지듯 드러남(모든 줄 동시에), 닫을 땐 바로 */
+.post-index.is-open .post-index__text, .post-index:focus-within .post-index__text { opacity: 1; visibility: visible; clip-path: inset(0 0 0 0); transition: clip-path .38s cubic-bezier(.4, 0, .2, 1), opacity .12s ease, visibility 0s, color .2s; }
 @media (prefers-reduced-motion: reduce) { .post-index__text { transition: none !important; } }
 .post-index.is-expanded .post-index__major .post-index__text, .post-index:focus-within .post-index__major .post-index__text { white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .post-index.is-open .post-index__major:hover .post-index__text { color: #1d1d1f; }
@@ -411,8 +411,6 @@ html.theme-dark .post-index.is-open .post-index__major:hover .post-index__text, 
     }
     aside.hidden = false;
     layout.classList.add('has-index');
-    // 제목마다 차례 지연(--d): 열 때 위에서부터 하나씩 들어오게
-    aside.querySelectorAll('.post-index__text').forEach((t, i) => t.style.setProperty('--d', `${Math.min(i, 14) * 30}ms`));
     // 마우스를 올리면 펼쳐지며 글자가 써지듯 나타나고, 벗어나면 바로 접힘
     let foldTimer = 0;
     aside.addEventListener('mouseenter', () => {

@@ -164,7 +164,27 @@ html.theme-dark kbd { background: #1d2027; border-color: rgba(255,255,255,.2); }
 /* 오른쪽 아래 떠 있는 버튼 + 패널 */
 .mail-fab { position: fixed; right: 20px; bottom: 148px; z-index: 80; display: inline-flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.08); background: rgba(255,255,255,.9); color: #1d1d1f; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: transform .2s, background .2s; }
 .mail-fab:hover { transform: translateY(-1px); background: #fff; color: #0066cc; }
-.mail-fab svg { display: block; }
+.mail-fab svg { display: block; overflow: visible; }
+/* 뻐꾸기시계: 마우스를 올리면 봉투 뚜껑이 열리며 새가 고개를 내밀고 날갯짓 → 다시 들어감. 새 메일이 오면 새가 날아와 앉음(.is-arrive, mail.js) */
+.cuckoo__body { fill: #fff; }
+.cuckoo__flap { transform-box: view-box; transform-origin: 12px 8.6px; }
+.cuckoo__bird { transform: translateY(8px); }
+.cuckoo__fill { fill: #fff; stroke-width: 1.4; }
+.cuckoo__beak { fill: #f5b301; stroke: none; }
+.cuckoo__eye { fill: currentColor; stroke: none; }
+.cuckoo__wing { stroke-width: 1.4; transform-box: fill-box; transform-origin: 0% 100%; }
+.mail-fab:hover .cuckoo__flap, .mail-fab:focus-visible .cuckoo__flap { animation: cuckooFlap 1.25s ease-in-out; }
+.mail-fab:hover .cuckoo__bird, .mail-fab:focus-visible .cuckoo__bird { animation: cuckooPop 1.25s cubic-bezier(.3, .7, .3, 1); }
+.mail-fab:hover .cuckoo__wing, .mail-fab:focus-visible .cuckoo__wing { animation: cuckooWing .22s ease-in-out .3s 3 alternate; }
+.mail-fab.is-arrive .cuckoo__bird { animation: cuckooArrive 1.4s cubic-bezier(.25, .7, .3, 1); }
+.mail-fab.is-arrive .cuckoo__flap { animation: cuckooFlap 1.4s ease-in-out; }
+.mail-fab.is-arrive .cuckoo__wing { animation: cuckooWing .16s ease-in-out 5 alternate; }
+@keyframes cuckooFlap { 0%, 100% { transform: none; } 14%, 78% { transform: scaleY(-1); } }
+@keyframes cuckooPop { 0% { transform: translateY(8px); } 22% { transform: translateY(-1.5px); } 30% { transform: translateY(0); } 70% { transform: translateY(0) rotate(-6deg); } 100% { transform: translateY(8px); } }
+@keyframes cuckooWing { from { transform: rotate(0); } to { transform: rotate(-38deg); } }
+@keyframes cuckooArrive { 0% { transform: translate(14px, -16px) scale(.8); opacity: 0; } 15% { opacity: 1; } 55% { transform: translate(0, -1px); } 70% { transform: translate(0, 0); } 100% { transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .mail-fab .cuckoo__flap, .mail-fab .cuckoo__bird, .mail-fab .cuckoo__wing { animation: none !important; } }
+html.theme-dark .cuckoo__body, html.theme-dark .cuckoo__fill { fill: #1e232d; }
 .mail-fab__badge { position: absolute; top: -5px; right: -5px; min-width: 18px; padding: 0 5px; border-radius: 999px; background: #ff3b30; color: #fff; font-size: 11px; font-weight: 600; line-height: 18px; text-align: center; }
 html.theme-dark .mail-fab { border-color: rgba(255,255,255,.2); background: rgba(30,35,45,.86); color: #f3f4f6; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
 .mail-panel { position: fixed; right: 20px; bottom: 212px; z-index: 81; width: min(460px, calc(100vw - 32px)); height: min(640px, calc(100vh - 160px)); display: flex; flex-direction: column; border: 1px solid rgba(0,0,0,.1); border-radius: 18px; background: #fff; box-shadow: 0 18px 50px rgba(0,0,0,.22); overflow: hidden; }
