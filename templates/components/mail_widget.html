@@ -3,7 +3,7 @@
 <meta name="mj-csrf" content="{{ csrf_token }}">
 <link rel="stylesheet" href="{% static_v 'mail/mail.css' %}">
 <button id="mail-fab" type="button" class="mail-fab" aria-label="메일" aria-expanded="false" aria-controls="mail-panel" title="메일함">
-    ✉<span class="mail-fab__badge" data-mail-unread hidden></span>
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5"/></svg><span class="mail-fab__badge" data-mail-unread hidden></span>
 </button>
 <div id="mail-panel" class="mail-panel" hidden>
     <div class="mail-panel__head">
@@ -20,7 +20,7 @@
         let app = null;
         // 글 보기의 맨 아래로(⌄) 버튼과 겹치지 않게 한 칸 위로 (아래부터 맨 위로 게이지 · 다크모드 · 이 버튼 순)
         const stacked = document.querySelector('.post-jump') ? 1 : 0;
-        if (stacked) { fab.style.bottom = `${146 + stacked * 56}px`; panel.style.bottom = `${202 + stacked * 56}px`; }
+        if (stacked) { fab.style.bottom = `${148 + stacked * 64}px`; panel.style.bottom = `${212 + stacked * 64}px`; }
         const setOpen = (open) => {
             panel.hidden = !open; fab.setAttribute('aria-expanded', String(open));
             try { localStorage.setItem('mj:mail:open', open ? '1' : '0'); } catch { /* ignore */ }
