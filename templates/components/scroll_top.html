@@ -1,6 +1,8 @@
-{# 모든 페이지 오른쪽 아래 "맨 위로" 버튼.
+{% comment %}
+모든 페이지 오른쪽 아래 "맨 위로" 버튼.
    바깥 링이 스크롤한 비율만큼 차오르고, 안쪽 원에서 별이 위로 솟음. 화면 높이의 60% 넘게 내려오면 나타남.
-   구성은 minter-v1.com (github.com/Minter-v1/Minter-blog, app/components/back-to-top.tsx) 을 참고해 바닐라 JS 로 직접 구현 #}
+   구성은 minter-v1.com (github.com/Minter-v1/Minter-blog, app/components/back-to-top.tsx) 을 참고해 바닐라 JS 로 직접 구현
+{% endcomment %}
 <button id="scroll-top-btn" type="button" class="scroll-top" aria-label="맨 위로" title="맨 위로" tabindex="-1">
     <svg class="scroll-top__ring" viewBox="0 0 58 58" aria-hidden="true">
         <defs>
