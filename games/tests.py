@@ -3,6 +3,7 @@ from django.core.cache import cache
 from django.test import TestCase
 from django.urls import reverse
 
+from .models import Score
 from .registry import CATEGORIES, GAMES
 
 
@@ -364,3 +365,37 @@ class SoloPuzzleTests(TestCase):
 		self.assertEqual(trace.score("star", [trace.SHAPES["star"][1]]), 100)
 		scribble = [[[x / 20, y / 20] for x in range(21)] for y in range(21)]  # 판 전체를 칠하기
 		self.assertLess(trace.score("star", scribble), 30)
+
+
+class ScoreApiRobustnessTests(TestCase):
+	"""2026-11-05 사전 점검 로그에서 나온 두 가지: JSON 배열 본문 500, 같은 토큰 동시 제출 중복 저장"""
+
+	def setUp(self):
+		cache.clear()
+		self.user = get_user_model().objects.create_user("carol", "c@example.com", "pw-for-tests-only")
+
+	def tearDown(self):
+		cache.clear()
+
+	def _post(self, name, raw):
+		return self.client.post(reverse(f"games:{name}"), raw, content_type="application/json")
+
+	def test_non_object_json_body_is_400_not_500(self):
+		for name in ("2048_submit", "typing_start", "sudoku_start", "typing_submit", "sudoku_submit", "mines_open", "trace_draw"):
+			for raw in ("[]", "[1,2]", '"str"', "123", "null"):
+				res = self._post(name, raw)
+				self.assertLess(res.status_code, 500, (name, raw))
+
+	def test_same_token_saves_only_once(self):
+		import json
+		from unittest import mock
+		self.client.force_login(self.user)
+		s = self._post("2048_start", "{}").json()
+		body = json.dumps({"token": s["token"], "moves": "LDRD" * 6})
+		# 두 요청이 동시에 cache.get 을 통과한 상황: 두 번째 delete 는 False 를 돌려줘야 하고 저장도 한 번만
+		with mock.patch("games.scores.cache.delete", side_effect=[True, False]):
+			first = self._post("2048_submit", body).json()
+			second = self._post("2048_submit", body).json()
+		self.assertTrue(first["ok"])
+		self.assertFalse(second["ok"])
+		self.assertEqual(Score.objects.filter(user=self.user, board="2048").count(), 1)
