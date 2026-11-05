@@ -149,25 +149,35 @@
         /* 다크모드 버튼: 낮·밤이 반반 그려진 원판(버튼 지름의 2배, 중심 = 버튼 아래 끝)이 버튼 창 뒤에 있음.
            평소엔 위 절반 = 지금 모드(☀️ 라이트 / 🌙 다크), 마우스를 올리면 원판이 180도 돌아 아래 절반 = 바뀔 모드와 그 하늘이 올라옴
            (라이트면 🌙 밤하늘·별, 다크면 ☀️ 낮 하늘·구름), 떼면 되돌아옴. 누르면 그 모습 그대로 모드가 바뀜 */
-        .theme-toggle-btn { overflow: hidden; }
+        .theme-toggle-btn { overflow: hidden; border-color: rgba(255, 255, 255, .7) !important; }
         .theme-dial { position: absolute; width: 104px; height: 104px; left: calc(50% - 52px); top: calc(100% - 52px); border-radius: 50%; transform-origin: 50% 50%; transition: transform .75s cubic-bezier(.45, .05, .2, 1); pointer-events: none; }
-        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, transparent 50%, #182050 50%, #2b3a78 100%); }
-        .theme-dial__sky::after { content: ""; position: absolute; left: 50%; top: 75%; width: 2px; height: 2px; border-radius: 50%; background: #fff;
-            box-shadow: -14px 12px 0 0 #fff, 13px 15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
-        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, transparent 50%, #3d9bff 50%, #8fd0ff 80%, #d6efff 100%); }
-        html.theme-dark .theme-dial__sky::after { width: 12px; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .95); left: 34%; top: 80%;
-            box-shadow: 4px 3px 0 1px rgba(255, 255, 255, .95), 24px -15px 0 -1px rgba(255, 255, 255, .85), 29px -12px 0 0 rgba(255, 255, 255, .85); }
+        /* 원판 = 낮 하늘 반 + 밤하늘 반 (지평선 = 원판 가운데). 라이트: 위 낮(☀️·구름) / 아래 밤(🌙·별), 다크: 위 밤 / 아래 낮 */
+        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, #3d9bff 0%, #9fd6ff 42%, #d9f0ff 50%, #2b3a78 50%, #121735 100%); }
+        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, #121735 0%, #2b3a78 50%, #d9f0ff 50%, #9fd6ff 58%, #3d9bff 100%); }
+        /* 별(밤 쪽)·구름(낮 쪽) — ::before 는 위 절반, ::after 는 아래 절반 */
+        .theme-dial__sky::before, .theme-dial__sky::after { content: ""; position: absolute; left: 50%; }
+        .theme-dial__sky::before { width: 11px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .95); top: 17%; margin-left: -20px;
+            box-shadow: 4px -3px 0 1px rgba(255, 255, 255, .95), 25px 13px 0 -1px rgba(255, 255, 255, .8), 30px 10px 0 0 rgba(255, 255, 255, .8); }
+        .theme-dial__sky::after { top: 75%; width: 2px; height: 2px; border-radius: 50%; background: #fff; box-shadow: -14px 12px 0 0 #fff, 13px 15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
+        html.theme-dark .theme-dial__sky::before { top: 25%; width: 2px; height: 2px; border-radius: 50%; background: #fff; margin-left: 0; box-shadow: -14px -12px 0 0 #fff, 13px -15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
+        html.theme-dark .theme-dial__sky::after { width: 11px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .95); top: 80%; margin-left: -20px;
+            box-shadow: 4px 3px 0 1px rgba(255, 255, 255, .95), 25px -13px 0 -1px rgba(255, 255, 255, .8), 30px -10px 0 0 rgba(255, 255, 255, .8); }
+        .theme-dial__now { filter: drop-shadow(0 0 5px rgba(255, 225, 140, .55)); }
+        /* 돌기 시작하면 지금 쪽(위 절반) 구름·별은 살짝 사라짐 — 기울어진 구름이 번개처럼 보이지 않게 */
+        .theme-dial__sky::before { transition: opacity .25s ease; }
+        .theme-toggle-btn:hover .theme-dial__sky::before, .theme-toggle-btn.is-flipping .theme-dial__sky::before { opacity: 0; }
+        /* 올라오는 쪽(아래 절반) 구름·별은 다 돈 뒤에 나타남 */
+        .theme-dial__sky::after { opacity: 0; transition: opacity .2s ease; }
+        .theme-toggle-btn:hover .theme-dial__sky::after, .theme-toggle-btn.is-flipping .theme-dial__sky::after { opacity: 1; transition: opacity .35s ease .55s; }
         .theme-dial__now, .theme-dial__next { position: absolute; left: 50%; font-size: 22px; line-height: 1; }
         .theme-dial__now { top: 25%; transform: translate(-50%, -50%); }
         .theme-dial__next { top: 75%; transform: translate(-50%, -50%) rotate(180deg); filter: drop-shadow(0 0 6px rgba(255, 225, 140, .75)); }
-        .theme-toggle-btn:hover .theme-dial, .theme-toggle-btn:focus-visible .theme-dial, .theme-toggle-btn.is-flipping .theme-dial { transform: rotate(180deg); }
-        .theme-toggle-btn:hover .theme-dial__sky::after, .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeTwinkle 1.6s ease-in-out infinite; }
-        html.theme-dark .theme-toggle-btn:hover .theme-dial__sky::after, html.theme-dark .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeCloud 3.2s ease-in-out infinite; }
+        .theme-toggle-btn:hover .theme-dial, .theme-toggle-btn:focus-visible .theme-dial, .theme-toggle-btn.is-flipping .theme-dial { transform: rotate(-180deg); }   /* 반시계 방향 */
+        html.theme-dark .theme-toggle-btn:hover .theme-dial__sky::after, html.theme-dark .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeCloud 3.2s ease-in-out .8s infinite; }
         /* 방금 바꾼 뒤(마우스가 아직 위에 있어도)는 새 모드 위 절반으로 바로 */
         .theme-toggle-btn.is-settled .theme-dial { transform: none !important; transition: none !important; }
-        @keyframes themeTwinkle { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
         @keyframes themeCloud { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(4px); } }
-        @media (prefers-reduced-motion: reduce) { .theme-dial { transition: none; } .theme-dial__sky::after { animation: none !important; } }
+        @media (prefers-reduced-motion: reduce) { .theme-dial { transition: none; } .theme-dial__sky::before, .theme-dial__sky::after { animation: none !important; } }
 
         .site-global-nav {
             position: fixed;
