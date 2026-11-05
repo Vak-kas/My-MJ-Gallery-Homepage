@@ -64,6 +64,7 @@
 - 에디터 링크 카드용 `GET /blog/api/url-preview/?url=` 는 **로그인 회원만**, `http(s)` 만, 호스트를 직접 풀어 루프백·사설·링크로컬·예약 대역(IPv4/IPv6, IPv4-mapped 포함)·IP 직접 지정·`localhost`/`.local`/`.internal` 은 거부 (SSRF 방지). 리다이렉트는 자동 추적 대신 최대 3번 직접 따라가며 **매 단계 같은 검사**, 응답은 512KB 까지만 읽고 `html.parser` 로 `<title>`·`<meta>` 만 추출, 회원당 분당 60회, 오류는 고정 문구("미리보기를 만들 수 없는 주소예요")만 돌려주고 자세한 내용은 로그
 - `/sitemap.xml`(공개 페이지·글, Settings 에서 닫은 메뉴 제외), `/robots.txt`(관리·공유 링크 크롤링 금지), 개인·공유 페이지는 noindex
 - **📱 앱으로 설치 (PWA)**: `/manifest.webmanifest`(이름·아이콘 192/512·maskable·주소창 없이 열기·꾹 누르면 클립보드·논문 찾기·Tool·Game 바로가기), `/sw.js` 서비스 워커(정적 파일과 '연결이 끊겼어요' 화면 `/offline/` 만 저장 — 개인 정보가 섞일 수 있는 HTML 은 저장 안 함, 버전은 `main/pwa.py` 의 `SW_VERSION`), 아이폰용 `apple-touch-icon`. 꼬리말의 **📱 앱으로 설치** → `/app/` 안내(안드로이드·크롬은 버튼, 아이폰은 공유 → 홈 화면에 추가 그림 안내, 이미 앱이면 숨김). 아이콘은 `static/images/app/`(로고 SVG 를 PyMuPDF 로 그림)
+- **사이트 글꼴**: [Pretendard](https://github.com/orioncactus/pretendard)(SIL OFL 1.1) — `base.html` 에서 jsDelivr 의 dynamic subset 을 불러 화면에 쓰인 글자 조각만 받음(한 번 받으면 브라우저 캐시). 맥은 지금과 비슷하고 윈도우도 맑은 고딕 대신 같은 모양. 받기 전에는 기기 글꼴(애플 산돌고딕 네오·맑은 고딕)로 먼저 보임. 홈의 서강대 글꼴·코드용 고정폭 글꼴·QR 저장 파일 글꼴은 그대로
 - **다크 모드**: `scripts/gen_dark_css.py` 가 템플릿 전체의 색(클래스·`<style>`)을 훑어 `static/css/theme-dark.css` 를 자동 생성 — 밝은 배경은 어둡게, 대비가 모자란 글자는 밝게
 
 ### 1.5 Gallery
