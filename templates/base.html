@@ -2,9 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    {# 사이트 글꼴: Pretendard (SIL OFL 1.1, github.com/orioncactus/pretendard) — 맥·윈도우 같은 모양. 쓰는 글자 조각만 받는 dynamic subset #}
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" crossorigin>
+    {# 사이트 글꼴: IBM Plex Sans KR (SIL OFL 1.1) — Google Fonts, 한글은 글자 조각(unicode-range)만 받음. 맥·윈도우 같은 모양 #}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@300;400;500;600;700&display=swap">
     {% with m=meta|default:default_meta %}
     <title>{% block title %}{{ m.title|default:"서민재 갤러리" }}{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -51,15 +52,59 @@
     <link rel="alternate icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 120%22><rect width=%22120%22 height=%22120%22 fill=%22%23ffffff%22 rx=%2228%22/><circle cx=%2260%22 cy=%2260%22 r=%2248%22 fill=%22none%22 stroke=%22%23d4af37%22 stroke-width=%222.5%22 opacity=%220.9%22/><text x=%2238%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%23d4af37%22 letter-spacing=%22-3%22>M</text><text x=%2275%22 y=%2278%22 font-family=%22Georgia, serif%22 font-size=%2258%22 font-weight=%22700%22 fill=%22%231a1a1a%22 letter-spacing=%22-2%22>J</text></svg>">
 
     <script>
+        // 다크모드 자동 전환: 서울 기준 해가 지면 다크모드, 해가 뜨면 라이트모드 (화면이 그려지기 전에 적용해 깜빡임 없음)
+        // 버튼으로 바꾸면 그 모드는 다음 일출·일몰까지만 유지되고 다시 자동, 자동과 같은 쪽으로 누르면 바로 자동
         (() => {
-            try {
-                const storedTheme = localStorage.getItem("theme-mode");
-                if (storedTheme === "dark") {
-                    document.documentElement.classList.add("theme-dark");
-                }
-            } catch (e) {
-                // ignore storage errors
+            const LAT = 37.5665, LON = 126.978, MIN = 60e3, KEY = "theme-override";
+            const rad = Math.PI / 180;
+            function sunTimes(at) {
+                // NOAA 근사식. at 이 속한 서울 날짜의 일출·일몰 (Date)
+                const kst = new Date(at.getTime() + 9 * 3600e3);
+                const base = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+                const doy = Math.round((base - Date.UTC(kst.getUTCFullYear(), 0, 0)) / 864e5);
+                const g = 2 * Math.PI / 365 * (doy - 1);
+                const eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+                const decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+                const ha = Math.acos(Math.cos(90.833 * rad) / (Math.cos(LAT * rad) * Math.cos(decl)) - Math.tan(LAT * rad) * Math.tan(decl)) / rad;
+                const rise = base - 9 * 3600e3 + (720 - 4 * (LON + ha) - eqt + 540) * MIN;
+                const set = base - 9 * 3600e3 + (720 - 4 * (LON - ha) - eqt + 540) * MIN;
+                return { rise: new Date(rise), set: new Date(set) };
             }
+            function info(now = new Date()) {
+                const t = sunTimes(now), n = now.getTime(), r = t.rise.getTime(), st = t.set.getTime();
+                const autoDark = n < r || n >= st;
+                const next = n < r ? r : n < st ? st : sunTimes(new Date(n + 864e5)).rise.getTime();
+                return { ...t, autoDark, next };
+            }
+            function readOverride() {
+                try {
+                    localStorage.removeItem("theme-mode");   // 예전 방식(영구 고정)은 정리
+                    const o = JSON.parse(localStorage.getItem(KEY) || "null");
+                    if (o && o.until > Date.now()) return o;
+                    localStorage.removeItem(KEY);
+                } catch (e) { /* ignore */ }
+                return null;
+            }
+            function apply() {
+                const i = info(), o = readOverride();
+                const dark = o ? o.mode === "dark" : i.autoDark;
+                const root = document.documentElement;
+                root.classList.toggle("theme-dark", dark);
+                root.dataset.themeAuto = o ? "manual" : "auto";
+                return { ...i, dark, override: o };
+            }
+            function toggle() {
+                const i = info();
+                const wantDark = !document.documentElement.classList.contains("theme-dark");
+                try {
+                    if (wantDark === i.autoDark) localStorage.removeItem(KEY);   // 자동과 같은 쪽 → 바로 자동
+                    else localStorage.setItem(KEY, JSON.stringify({ mode: wantDark ? "dark" : "light", until: i.next }));
+                } catch (e) { /* ignore */ }
+                return apply();
+            }
+            window.MJTheme = { apply, toggle, info, sunTimes };
+            apply();
+            setInterval(() => { const before = document.documentElement.classList.contains("theme-dark"); const st = apply(); if (before !== st.dark) window.dispatchEvent(new Event("mj-theme-change")); }, MIN);
         })();
     </script>
 
@@ -67,14 +112,14 @@
 
     <style>
         body {
-            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            font-family: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
             background: #f5f5f7;
             color: #1d1d1f;
             transition: background-color .25s ease, color .25s ease;
         }
 
         .apple-display {
-            font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+            font-family: "IBM Plex Sans KR", -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
             letter-spacing: -0.03em;
         }
 
@@ -101,23 +146,41 @@
         .theme-toggle-btn:hover {
             transform: translateY(-1px);
         }
-        /* 마우스를 올리면 원이 밤하늘로 바뀌고 별이 반짝임 (다크모드에선 해 → 새벽빛) */
+        /* 다크모드 버튼: 낮·밤이 반반 그려진 원판(버튼 지름의 2배, 중심 = 버튼 아래 끝)이 버튼 창 뒤에 있음.
+           평소엔 위 절반 = 지금 모드(☀️ 라이트 / 🌙 다크), 마우스를 올리면 원판이 180도 돌아 아래 절반 = 바뀔 모드와 그 하늘이 올라옴
+           (라이트면 🌙 밤하늘·별, 다크면 ☀️ 낮 하늘·구름), 떼면 되돌아옴. 누르면 그 모습 그대로 모드가 바뀜 */
         .theme-toggle-btn { overflow: hidden; }
-        .theme-toggle-icon { position: relative; z-index: 1; font-size: 22px; line-height: 1; transition: transform .35s cubic-bezier(.22, .61, .36, 1); }
-        .theme-toggle-btn::before, .theme-toggle-btn::after { content: ""; position: absolute; pointer-events: none; opacity: 0; transition: opacity .3s ease; }
-        .theme-toggle-btn::before { inset: 0; border-radius: inherit; background: radial-gradient(circle at 35% 30%, #2b3a78, #121735 75%); }
-        .theme-toggle-btn::after { top: 50%; left: 50%; width: 2px; height: 2px; border-radius: 50%; background: #fff;
-            box-shadow: -14px -12px 0 0 #fff, 13px -15px 0 -.3px #fff, -17px 6px 0 -.4px #dfe8ff, 15px 9px 0 0 #fff, -5px 16px 0 -.4px #dfe8ff, 6px -19px 0 -.5px #fff, 19px -3px 0 -.4px #dfe8ff; }
-        .theme-toggle-btn:hover { background: #121735; border-color: rgba(120, 140, 255, .35); }
-        .theme-toggle-btn:hover::before { opacity: 1; }
-        .theme-toggle-btn:hover::after { opacity: 1; animation: themeTwinkle 1.6s ease-in-out infinite; }
-        .theme-toggle-btn:hover .theme-toggle-icon { transform: rotate(-14deg) scale(1.08); filter: drop-shadow(0 0 6px rgba(255, 220, 120, .65)); }
-        @keyframes themeTwinkle { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
-        html.theme-dark .theme-toggle-btn::before { background: radial-gradient(circle at 35% 30%, #ffd88a, #ff9a6b 60%, #c85a7c); }
-        html.theme-dark .theme-toggle-btn::after { display: none; }
-        html.theme-dark .theme-toggle-btn:hover { background: #ff9a6b; }
-        html.theme-dark .theme-toggle-btn:hover .theme-toggle-icon { transform: rotate(25deg) scale(1.08); filter: drop-shadow(0 0 6px rgba(255, 240, 200, .8)); }
-        @media (prefers-reduced-motion: reduce) { .theme-toggle-btn:hover::after { animation: none; } .theme-toggle-icon { transition: none; } }
+        .theme-dial { position: absolute; width: 104px; height: 104px; left: calc(50% - 52px); top: calc(100% - 52px); border-radius: 50%; transform-origin: 50% 50%; transition: transform .75s cubic-bezier(.45, .05, .2, 1); pointer-events: none; }
+        /* 원판 = 낮 하늘 반 + 밤하늘 반, 가운데(지평선)는 노을빛 띠로 부드럽게 이어짐. 라이트: 위 낮(☀️·구름) / 아래 밤(🌙·별), 다크: 위 밤 / 아래 낮 */
+        .theme-dial__sky { position: absolute; inset: 0; border-radius: 50%; background: linear-gradient(180deg, #3d9bff 0%, #8ccaff 30%, #cfe9ff 39%, #ffd9a8 45%, #f39ab2 50%, #8a6fb8 55%, #3a4488 63%, #1b2350 78%, #121735 100%); }
+        html.theme-dark .theme-dial__sky { background: linear-gradient(180deg, #121735 0%, #1b2350 22%, #3a4488 37%, #8a6fb8 45%, #f39ab2 50%, #ffd9a8 55%, #cfe9ff 61%, #8ccaff 70%, #3d9bff 100%); }
+        /* 별(밤 쪽)·구름(낮 쪽) — ::before 는 위 절반, ::after 는 아래 절반 */
+        .theme-dial__sky::before, .theme-dial__sky::after { content: ""; position: absolute; left: 50%; }
+        .theme-dial__sky::before { width: 11px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .95); top: 17%; margin-left: -20px;
+            box-shadow: 4px -3px 0 1px rgba(255, 255, 255, .95), 25px 13px 0 -1px rgba(255, 255, 255, .8), 30px 10px 0 0 rgba(255, 255, 255, .8); }
+        .theme-dial__sky::after { top: 75%; width: 2px; height: 2px; border-radius: 50%; background: #fff; box-shadow: -14px 12px 0 0 #fff, 13px 15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
+        html.theme-dark .theme-dial__sky::before { top: 25%; width: 2px; height: 2px; border-radius: 50%; background: #fff; margin-left: 0; box-shadow: -14px -12px 0 0 #fff, 13px -15px 0 -.3px #fff, -17px -6px 0 -.4px #dfe8ff, 15px -9px 0 0 #fff, -5px -16px 0 -.4px #dfe8ff, 6px 19px 0 -.5px #fff, 19px 3px 0 -.4px #dfe8ff; }
+        html.theme-dark .theme-dial__sky::after { width: 11px; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .95); top: 80%; margin-left: -20px;
+            box-shadow: 4px 3px 0 1px rgba(255, 255, 255, .95), 25px -13px 0 -1px rgba(255, 255, 255, .8), 30px -10px 0 0 rgba(255, 255, 255, .8); }
+        /* 평소엔 하늘 없이 버튼 색 그대로(지금 모드 아이콘만), 마우스를 올리면 하늘이 나타나며 원판이 돎 */
+        .theme-dial__sky { opacity: 0; transition: opacity .3s ease; }
+        .theme-toggle-btn:hover .theme-dial__sky, .theme-toggle-btn:focus-visible .theme-dial__sky, .theme-toggle-btn.is-flipping .theme-dial__sky { opacity: 1; }
+        .theme-toggle-btn.is-settled .theme-dial__sky { opacity: 0 !important; transition: none !important; }
+        /* 돌기 시작하면 지금 쪽(위 절반) 구름·별은 살짝 사라짐 — 기울어진 구름이 번개처럼 보이지 않게 */
+        .theme-dial__sky::before { transition: opacity .25s ease; }
+        .theme-toggle-btn:hover .theme-dial__sky::before, .theme-toggle-btn.is-flipping .theme-dial__sky::before { opacity: 0; }
+        /* 올라오는 쪽(아래 절반) 구름·별은 다 돈 뒤에 나타남 */
+        .theme-dial__sky::after { opacity: 0; transition: opacity .2s ease; }
+        .theme-toggle-btn:hover .theme-dial__sky::after, .theme-toggle-btn.is-flipping .theme-dial__sky::after { opacity: 1; transition: opacity .35s ease .55s; }
+        .theme-dial__now, .theme-dial__next { position: absolute; left: 50%; font-size: 22px; line-height: 1; }
+        .theme-dial__now { top: 25%; transform: translate(-50%, -50%); }
+        .theme-dial__next { top: 75%; transform: translate(-50%, -50%) rotate(180deg); filter: drop-shadow(0 0 6px rgba(255, 225, 140, .75)); }
+        .theme-toggle-btn:hover .theme-dial, .theme-toggle-btn:focus-visible .theme-dial, .theme-toggle-btn.is-flipping .theme-dial { transform: rotate(-180deg); }   /* 반시계 방향 */
+        html.theme-dark .theme-toggle-btn:hover .theme-dial__sky::after, html.theme-dark .theme-toggle-btn.is-flipping .theme-dial__sky::after { animation: themeCloud 3.2s ease-in-out .8s infinite; }
+        /* 방금 바꾼 뒤(마우스가 아직 위에 있어도)는 새 모드 위 절반으로 바로 */
+        .theme-toggle-btn.is-settled .theme-dial { transform: none !important; transition: none !important; }
+        @keyframes themeCloud { 0%, 100% { transform: translateX(-3px); } 50% { transform: translateX(4px); } }
+        @media (prefers-reduced-motion: reduce) { .theme-dial { transition: none; } .theme-dial__sky::before, .theme-dial__sky::after { animation: none !important; } }
 
         .site-global-nav {
             position: fixed;
@@ -247,7 +310,7 @@
     {% if webmail_enabled and not hide_mail_widget %}{% include "components/mail_widget.html" %}{% elif not user.is_superuser and not hide_contact_widget %}{% include "components/contact_widget.html" %}{% endif %}
 
     <button id="theme-toggle-btn" type="button" class="theme-toggle-btn" aria-label="다크모드 토글">
-        <span id="theme-toggle-icon" class="theme-toggle-icon">🌙</span>
+        <span id="theme-toggle-icon" class="theme-dial" aria-hidden="true"><span class="theme-dial__sky"></span><span class="theme-dial__now">☀️</span><span class="theme-dial__next">🌙</span></span>
     </button>
     {% include "components/scroll_top.html" %}
     {% if user.is_authenticated %}
@@ -282,23 +345,43 @@
             const icon = document.getElementById("theme-toggle-icon");
             if (!btn || !icon) return;
 
+            const hm = (d) => d.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Seoul" });
             const applyThemeLabel = () => {
+                const st = window.MJTheme ? window.MJTheme.apply() : null;
                 const isDark = document.documentElement.classList.contains("theme-dark");
-                icon.textContent = isDark ? "☀️" : "🌙";
+                icon.querySelector(".theme-dial__now").textContent = isDark ? "🌙" : "☀️";   // 앞면 = 지금 모드
+                icon.querySelector(".theme-dial__next").textContent = isDark ? "☀️" : "🌙";    // 뒷면 = 바뀔 모드
                 btn.setAttribute("aria-label", isDark ? "라이트모드로 전환" : "다크모드로 전환");
+                if (st) {
+                    const when = hm(new Date(st.next));
+                    btn.title = st.override
+                        ? `직접 고른 ${isDark ? "다크" : "라이트"}모드 — ${when}부터 다시 자동 (한 번 더 누르면 바로 자동)`
+                        : `자동 (서울 일출 ${hm(st.rise)} · 일몰 ${hm(st.set)}) — ${when}에 ${st.autoDark ? "라이트" : "다크"}모드로`;
+                }
             };
 
             applyThemeLabel();
+            window.addEventListener("mj-theme-change", applyThemeLabel);
 
-            btn.addEventListener("click", () => {
-                const isDark = document.documentElement.classList.toggle("theme-dark");
-                try {
-                    localStorage.setItem("theme-mode", isDark ? "dark" : "light");
-                } catch (e) {
-                    // ignore storage errors
-                }
+            let flipTimer = 0;
+            const doSwitch = () => {
+                if (window.MJTheme) window.MJTheme.toggle();
+                else document.documentElement.classList.toggle("theme-dark");
+                btn.classList.remove("is-flipping");
+                btn.classList.add("is-settled");   // 원판을 새 모드 위 절반으로 바로 — 마우스를 떼면 풀림
                 applyThemeLabel();
+            };
+            btn.addEventListener("click", () => {
+                clearTimeout(flipTimer);
+                const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+                // 마우스를 올려 원판이 이미 돌아가 바뀔 모드가 보이면 그대로 바꾸고, 아니면(휴대폰·키보드·방금 바꾼 뒤) 먼저 돌린 다음 바꿈
+                if (reduce || (btn.matches(":hover") && !btn.classList.contains("is-settled"))) { doSwitch(); return; }
+                btn.classList.remove("is-settled");
+                void btn.offsetWidth;
+                btn.classList.add("is-flipping");
+                flipTimer = setTimeout(doSwitch, 750);
             });
+            btn.addEventListener("mouseleave", () => btn.classList.remove("is-settled"));
         })();
     </script>
 </body>
