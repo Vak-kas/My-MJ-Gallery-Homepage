@@ -107,15 +107,23 @@ def _public_target(host):
 
 def _parse_ports(raw):
 	ports = []
-	for part in re.split(r"[\s,]+", (raw or "").strip()):
+	raw = "" if raw is None else raw
+	if not isinstance(raw, str) or len(raw) > 200:
+		raise CheckError("포트 번호가 올바르지 않아요.")
+	for part in re.split(r"[\s,]+", raw.strip()):
 		if not part:
 			continue
 		if "-" in part:
 			a, _, b = part.partition("-")
-			if not (a.isdigit() and b.isdigit()):
+			if not (a.isdigit() and b.isdigit()) or len(a) > 5 or len(b) > 5:
 				raise CheckError(f"포트 범위가 올바르지 않아요: {part}")
-			ports.extend(range(int(a), int(b) + 1))
-		elif part.isdigit():
+			lo, hi = int(a), int(b)
+			if lo < 1 or hi > 65535 or lo > hi:
+				raise CheckError("포트는 1~65535 사이여야 해요.")
+			if hi - lo + 1 > MAX_PORTS:   # 범위를 먼저 리스트로 만들면 1-400000000 같은 값으로 메모리를 다 먹을 수 있었음
+				raise CheckError(f"포트는 한 번에 {MAX_PORTS}개까지 확인할 수 있어요.")
+			ports.extend(range(lo, hi + 1))
+		elif part.isdigit() and len(part) <= 5:
 			ports.append(int(part))
 		else:
 			raise CheckError(f"포트 번호가 올바르지 않아요: {part}")
@@ -249,6 +257,8 @@ def netcheck_run(request):
 	try:
 		data = json.loads(request.body or b"{}")
 	except ValueError:
+		return _error("요청 형식이 올바르지 않아요.")
+	if not isinstance(data, dict):
 		return _error("요청 형식이 올바르지 않아요.")
 	kind = data.get("type")
 	if kind not in CHECKS:

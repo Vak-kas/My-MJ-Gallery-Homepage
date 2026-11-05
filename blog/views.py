@@ -129,8 +129,23 @@ def _unlock_attempt_key(post: Post) -> str:
 	return str(post.id)
 
 
+UNLOCK_POST_HOURLY_MAX = 60   # 글 하나에 모든 IP 합쳐 1시간 시도 상한 (여러 IP 로 나눠 대입하는 것 방지)
+
+
+def _unlock_cache_keys(request, post: Post):
+	return f"blog_unlock:ip:{post.id}:{client_ip(request)}", f"blog_unlock:post:{post.id}"
+
+
 def _is_unlock_temporarily_blocked(request, post: Post):
+	"""세션 + IP·글 단위 캐시 + 글 전체 상한 (세션만 보면 쿠키를 버리고 무한히 시도할 수 있었음)"""
 	now_ts = int(timezone.now().timestamp())
+	ip_key, post_key = _unlock_cache_keys(request, post)
+	ip_entry = cache.get(ip_key) or {}
+	ip_blocked = int(ip_entry.get("blocked_until", 0) or 0)
+	if ip_blocked > now_ts:
+		return True, ip_blocked - now_ts
+	if (cache.get(post_key) or 0) >= UNLOCK_POST_HOURLY_MAX:
+		return True, UNLOCK_BLOCK_SECONDS
 	bucket = _unlock_attempt_bucket(request)
 	entry = bucket.get(_unlock_attempt_key(post), {})
 	blocked_until = int(entry.get("blocked_until", 0) or 0)
@@ -163,10 +178,18 @@ def _register_unlock_failure(request, post: Post):
 		"blocked_until": blocked_until,
 	}
 	request.session["blog_unlock_attempts"] = bucket
-	return blocked_until
+
+	ip_key, post_key = _unlock_cache_keys(request, post)
+	ip_entry = cache.get(ip_key) or {}
+	ip_count = int(ip_entry.get("count", 0) or 0) + 1
+	ip_blocked = now_ts + UNLOCK_BLOCK_SECONDS if ip_count >= UNLOCK_MAX_ATTEMPTS else 0
+	cache.set(ip_key, {"count": ip_count, "blocked_until": ip_blocked}, UNLOCK_WINDOW_SECONDS + UNLOCK_BLOCK_SECONDS)
+	cache.set(post_key, (cache.get(post_key) or 0) + 1, 3600)
+	return max(blocked_until, ip_blocked)
 
 
 def _clear_unlock_failure(request, post: Post):
+	cache.delete(_unlock_cache_keys(request, post)[0])
 	bucket = _unlock_attempt_bucket(request)
 	key = _unlock_attempt_key(post)
 	if key in bucket:
@@ -482,8 +505,9 @@ def index(request):
 	if search_query:
 		feed_qs = feed_qs.filter(
 			Q(title__icontains=search_query)
-			| Q(summary__icontains=search_query)
-			| Q(content__icontains=search_query)
+			# 보호글은 요약·본문으로 찾지 않음 (검색 결과로 비밀번호 없이 본문을 한 글자씩 알아낼 수 있었음)
+			| (Q(summary__icontains=search_query) & ~Q(visibility=Post.VISIBILITY_PROTECTED))
+			| (Q(content__icontains=search_query) & ~Q(visibility=Post.VISIBILITY_PROTECTED))
 			| Q(tags__name__icontains=search_query)
 		).distinct()
 

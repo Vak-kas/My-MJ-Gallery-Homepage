@@ -128,11 +128,7 @@
                                     </div>
                                     <p class="mt-2 text-[15px] font-semibold text-[#1d1d1f]">{{ post.title }}</p>
                                     <p class="mt-1 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">
-                                        {% if post.summary %}
-                                        {{ post.summary }}
-                                        {% else %}
-                                        {{ post.content|editorjs_excerpt:90 }}
-                                        {% endif %}
+                                        {{ post|post_teaser:90 }}
                                     </p>
                                     <div class="mt-2 flex flex-wrap items-center gap-2 text-[12px] text-[#8e8e93]">
                                         <span>{{ post.author.username|default:"익명" }}</span>
@@ -160,11 +156,7 @@
                                     <div class="truncate text-[15px] font-semibold text-[#1d1d1f]">{{ post.title }}</div>
                                     <div class="mt-1 flex items-center gap-2 text-[12px] text-[#8e8e93]">
                                         <span class="truncate">
-                                            {% if post.summary %}
-                                            {{ post.summary }}
-                                            {% else %}
-                                            {{ post.content|editorjs_excerpt:110 }}
-                                            {% endif %}
+                                            {{ post|post_teaser:110 }}
                                         </span>
                                     </div>
                                 </div>
@@ -252,11 +244,7 @@
                                 <span class="shrink-0 text-[12px] text-[#8e8e93]">{{ post.published_at|date:"m.d" }}</span>
                             </div>
                             <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">
-                                {% if post.summary %}
-                                {{ post.summary }}
-                                {% else %}
-                                {{ post.content|editorjs_excerpt:88 }}
-                                {% endif %}
+                                {{ post|post_teaser:88 }}
                             </p>
                             <div class="mt-3 flex items-center justify-between text-[12px] text-[#8e8e93]">
                                 <span>{{ post.author.username|default:"익명" }}</span>
@@ -296,11 +284,7 @@
                                 <span class="shrink-0 text-[12px] text-[#8e8e93]">{{ post.published_at|date:"m.d" }}</span>
                             </div>
                             <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">
-                                {% if post.summary %}
-                                {{ post.summary }}
-                                {% else %}
-                                {{ post.content|editorjs_excerpt:88 }}
-                                {% endif %}
+                                {{ post|post_teaser:88 }}
                             </p>
                             <div class="mt-3 flex items-center justify-between text-[12px] text-[#8e8e93]">
                                 <span>{{ post.author.username|default:"익명" }}</span>
@@ -340,11 +324,7 @@
                                 <span class="shrink-0 text-[12px] text-[#8e8e93]">{{ post.published_at|date:"m.d" }}</span>
                             </div>
                             <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">
-                                {% if post.summary %}
-                                {{ post.summary }}
-                                {% else %}
-                                {{ post.content|editorjs_excerpt:88 }}
-                                {% endif %}
+                                {{ post|post_teaser:88 }}
                             </p>
                             <div class="mt-3 flex items-center justify-between text-[12px] text-[#8e8e93]">
                                 <span>{{ post.author.username|default:"익명" }}</span>
@@ -387,11 +367,7 @@
                                 <span class="shrink-0 text-[12px] text-[#8e8e93]">{{ post.published_at|date:"m.d" }}</span>
                             </div>
                             <p class="mt-2 line-clamp-2 text-[13px] leading-relaxed text-[#6e6e73]">
-                                {% if post.summary %}
-                                {{ post.summary }}
-                                {% else %}
-                                {{ post.content|editorjs_excerpt:96 }}
-                                {% endif %}
+                                {{ post|post_teaser:96 }}
                             </p>
                             <div class="mt-3 flex items-center justify-between text-[12px] text-[#8e8e93]">
                                 <span>{{ post.author.username|default:"익명" }}</span>

@@ -22,6 +22,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 from security.utils import client_ip
 
 from .permissions import quota_multiplier, tier
+from main.jsonbody import loads_object
 
 MAX_BYTES = 4 * 1024 * 1024
 MAX_PIXELS = 25_000_000
@@ -106,7 +107,7 @@ def run_tesseract(img):
 @require_POST
 def ocr_free(request):
 	try:
-		body = json.loads(request.body or b"{}")
+		body = loads_object(request.body)
 		raw = base64.b64decode(str(body.get("image") or ""), validate=True)
 	except (ValueError, binascii.Error):
 		return _error("사진을 읽지 못했어요.")

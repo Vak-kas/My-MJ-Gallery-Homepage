@@ -4,7 +4,9 @@
     <article class="flex h-full flex-col rounded-[18px] border border-black/[0.08] bg-white p-5 transition-shadow hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]">
         {% with cover_from_content=post.content|editorjs_cover_image %}
         <div class="mb-4 overflow-hidden rounded-2xl border border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff] {% if compact %}aspect-[4/3]{% else %}aspect-[16/10]{% endif %}">
-            {% if cover_from_content %}
+            {% if post.visibility == 'protected' %}
+            <div class="flex h-full w-full items-center justify-center text-[28px]" aria-label="보호글">🔒</div>
+            {% elif cover_from_content %}
             <img src="{{ cover_from_content }}" alt="{{ post.title }}" class="h-full w-full object-cover" />
             {% elif post.cover_image %}
             <img src="{{ post.cover_image.url }}" alt="{{ post.title }}" class="h-full w-full object-cover" />

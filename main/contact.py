@@ -13,6 +13,7 @@ from django.views.decorators.http import require_POST
 from notifications.models import Notification
 from notifications.service import notify
 from security.utils import client_ip
+from main.jsonbody import loads_object
 
 _EMAIL_RE = re.compile(r"^[^@\s<>]+@[^@\s<>]+\.[^@\s<>]+$")
 LIMIT_PER_HOUR = 3
@@ -21,18 +22,18 @@ LIMIT_PER_HOUR = 3
 @require_POST
 def contact_submit(request):
 	try:
-		payload = json.loads(request.body or b"{}")
+		payload = loads_object(request.body)
 	except ValueError:
 		return JsonResponse({"ok": False, "error": "요청이 이상해요"}, status=400)
-	if (payload.get("website") or "").strip():  # 봇용 함정 칸
+	if str(payload.get("website") or "").strip():  # 봇용 함정 칸
 		return JsonResponse({"ok": True})
-	message = (payload.get("message") or "").strip()
+	message = str(payload.get("message") or "").strip()
 	if len(message) < 5:
 		return JsonResponse({"ok": False, "error": "내용을 조금 더 적어 주세요 (5자 이상)"}, status=400)
 	if len(message) > 3000:
 		return JsonResponse({"ok": False, "error": "내용은 3000자까지예요"}, status=400)
 	name = (payload.get("name") or "").strip()[:60]
-	email = (payload.get("email") or "").strip()[:254]
+	email = str(payload.get("email") or "").strip()[:254]
 	if email and not _EMAIL_RE.match(email):
 		return JsonResponse({"ok": False, "error": "답장 받을 메일 주소가 이상해요"}, status=400)
 	user = request.user if request.user.is_authenticated else None
@@ -46,7 +47,7 @@ def contact_submit(request):
 	cache.set(key, (cache.get(key) or 0) + 1, 3600)
 
 	who = f"{name or '익명'}{' <' + email + '>' if email else ''}{' · @' + user.username if user else ' · 비로그인'}"
-	body = f"{message}\n\n--\n보낸 사람: {who}\nIP: {ip}\n페이지: {(payload.get('page') or '')[:200]}"
+	body = f"{message}\n\n--\n보낸 사람: {who}\nIP: {ip}\n페이지: {str(payload.get('page') or '')[:200]}"
 	mail = EmailMessage(f"[MJ Gallery 문의] {message[:40]}{'…' if len(message) > 40 else ''}", body, settings.DEFAULT_FROM_EMAIL, [settings.CONTACT_EMAIL],
 	                    reply_to=[email] if email else None, headers={"X-MJ-Kind": "contact"})
 	try:

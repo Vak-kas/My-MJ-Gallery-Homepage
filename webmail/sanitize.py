@@ -27,7 +27,19 @@ ALLOWED_ATTRS = {
 }
 _URL_OK = re.compile(r"^(https?:|mailto:)", re.I)
 _IMG_OK = re.compile(r"^(https?:|cid:|data:image/)", re.I)
-_STYLE_BAD = re.compile(r"(expression\s*\(|javascript:|url\s*\(|@import|behavior\s*:|-moz-binding)", re.I)
+_STYLE_BAD = re.compile(
+	r"(expression\s*\(|javascript:|url\s*\(|image(-set)?\s*\(|-webkit-image-set|cross-fade\s*\(|element\s*\(|src\s*\(|"
+	r"@import|behavior\s*:|-moz-binding|position\s*:\s*(fixed|sticky))",
+	re.I,
+)
+
+
+def _style_ok(value):
+	"""style 속성 검사. CSS 이스케이프(\\75 rl( 같은)·주석(/* */)으로 url( 검사를 피해 외부 그림을 불러오던 것(열람 추적) 막음.
+	역슬래시가 있으면 통째로 버림, 주석은 지우고 검사. 화면을 덮는 position:fixed 도 막음"""
+	if "\\" in value:
+		return False
+	return not _STYLE_BAD.search(re.sub(r"/\*.*?\*/", "", value, flags=re.S))
 
 
 class _Cleaner(HTMLParser):
@@ -64,7 +76,7 @@ class _Cleaner(HTMLParser):
 				if not self.show_images and not value.strip().lower().startswith(("cid:", "data:")):
 					name = "data-src"
 			elif name == "style":
-				if _STYLE_BAD.search(value):
+				if not _style_ok(value):
 					continue
 			cleaned.append(f' {name}="{html.escape(value, quote=True)}"')
 		if tag == "a":
@@ -72,6 +84,9 @@ class _Cleaner(HTMLParser):
 		self.out.append(f"<{tag}{''.join(cleaned)}>")
 
 	def handle_startendtag(self, tag, attrs):
+		# <svg/> 처럼 스스로 닫힌 버릴 태그는 skip 을 올리지 않음 (올리면 닫는 태그가 없어 뒤 본문이 통째로 사라졌음)
+		if tag.lower() in DROP_WITH_CONTENT:
+			return
 		self.handle_starttag(tag, attrs)
 
 	def handle_endtag(self, tag):

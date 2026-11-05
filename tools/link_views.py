@@ -17,6 +17,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from .models import SecretNote, ShortLink, short_code
+from main.jsonbody import loads_object
 
 MAX_LINKS_PER_USER = 200
 LINK_TTL_DAYS = {"": None, "1": 1, "7": 7, "30": 30}
@@ -121,7 +122,7 @@ def secret(request):
 @require_POST
 def secret_create(request):
 	try:
-		data = json.loads(request.body or b"{}")
+		data = loads_object(request.body)
 	except ValueError:
 		return JsonResponse({"error": "요청 형식이 올바르지 않아요."}, status=400)
 	ciphertext = (data.get("ciphertext") or "").strip()

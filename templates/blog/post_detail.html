@@ -21,7 +21,9 @@
     <article class="min-w-0 overflow-hidden rounded-[28px] border border-black/[0.08] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
         {% with cover_from_content=post.content|editorjs_cover_image %}
         <div class="border-b border-black/[0.06] bg-gradient-to-br from-[#f8f8fa] to-[#eef2ff]">
-            {% if cover_from_content %}
+            {% if is_locked_post %}
+            <div class="flex h-[260px] items-center justify-center text-[40px] lg:h-[360px]" aria-label="보호글">🔒</div>
+            {% elif cover_from_content %}
             <img src="{{ cover_from_content }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
             {% elif post.cover_image %}
             <img src="{{ post.cover_image.url }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
