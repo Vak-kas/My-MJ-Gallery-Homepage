@@ -696,3 +696,80 @@ class MemberCategoryTests(TestCase):
 		for cat in ("tech", "board", "life", "secret"):
 			self._post(cat)
 			self.assertTrue(Post.objects.filter(category=cat).exists(), cat)
+
+
+class WeeklyRecordTests(TestCase):
+	"""블로그 허브 이번 주 기록: 관리자 글만, 월요일 시작 주, 목표, 연속 기록, Secret 은 관리자에게만"""
+
+	def setUp(self):
+		from django.utils import timezone
+		self.tz = timezone
+		self.admin = get_user_model().objects.create_superuser("owner", "o@x.kr", "pw-for-tests-only")
+		self.member = get_user_model().objects.create_user("m", "m@x.kr", "pw-for-tests-only")
+		self.today = timezone.localdate()
+
+	def tearDown(self):
+		from django.core.cache import cache
+		from studio import site_settings
+		cache.delete(site_settings.CACHE_KEY)  # 개발 서버와 같은 파일 캐시를 쓰므로 테스트 값이 남지 않게
+
+	def _post(self, days_ago, category="tech", author=None, published=True):
+		from datetime import datetime, time, timedelta
+		day = self.today - timedelta(days=days_ago)
+		at = self.tz.make_aware(datetime.combine(day, time(12)))
+		return Post.objects.create(
+			title=f"t{Post.objects.count()}", slug=f"s{Post.objects.count()}", category=category, content="x",
+			author=author or self.admin, is_published=published, published_at=at,
+		)
+
+	def test_counts_streak_and_goals(self):
+		from blog.weekly import weekly_stats
+		monday_offset = self.today.weekday()
+		self._post(0, "tech")
+		self._post(0, "life")
+		self._post(monday_offset + 1, "tech")        # 지난주 (일요일)
+		self._post(monday_offset + 8, "tech")        # 2주 전
+		self._post(0, "board", author=self.member)   # 회원 글은 안 셈
+		self._post(0, "secret")
+		self._post(0, "tech", published=False)       # 초안은 안 셈
+		w = weekly_stats({"tech": 1, "life": 2, "board": 0, "secret": 0})
+		self.assertEqual(w["total"], 2)
+		self.assertEqual(w["goal_total"], 3)
+		self.assertEqual({r["key"]: (r["count"], r["goal"]) for r in w["rows"]}, {"tech": (1, 1), "life": (1, 2)})
+		self.assertEqual(w["streak"], 3)
+		self.assertEqual(len(w["bars"]), 26)
+		self.assertTrue(w["bars"][-1]["current"])
+		self.assertEqual(w["bars"][-1]["count"], 2)
+		admin_view = weekly_stats({"tech": 1}, include_secret=True)
+		self.assertEqual(admin_view["total"], 3)
+		self.assertIn("secret", [r["key"] for r in admin_view["rows"]])
+
+	def test_streak_continues_from_last_week_when_this_week_empty(self):
+		from blog.weekly import weekly_stats
+		monday_offset = self.today.weekday()
+		self._post(monday_offset + 1)
+		self._post(monday_offset + 8)
+		self.assertEqual(weekly_stats({})["streak"], 2)
+		self.assertEqual(weekly_stats({})["total"], 0)
+
+	def test_hub_shows_card_and_studio_saves_goals(self):
+		self._post(0, "tech")
+		res = self.client.get(reverse("blog:index"))
+		self.assertContains(res, "이번 주 기록")
+		self.assertContains(res, "최근 26주")
+		self.client.force_login(self.admin)
+		page = self.client.get(reverse("studio:settings"))
+		self.assertContains(page, "블로그 주간 목표")
+		data = {"blog_goal_tech": "3", "blog_goal_board": "0", "blog_goal_life": "99", "blog_goal_secret": "x"}
+		for item in page.context["nav_items"]:
+			data.setdefault("nav_order", [])
+			data["nav_order"].append(item["key"])
+			data[f"nav_state_{item['key']}"] = item["state"]
+			data[f"nav_label_{item['key']}"] = item["label"]
+		data["home_order"] = [s["key"] for s in page.context["home_sections"]]
+		self.client.post(reverse("studio:settings"), data)
+		from studio import site_settings
+		goals = site_settings.load()["blog_goals"]
+		self.assertEqual(goals["tech"], 3)
+		self.assertEqual(goals["life"], site_settings.BLOG_GOAL_MAX)
+		self.assertEqual(goals["secret"], 0)

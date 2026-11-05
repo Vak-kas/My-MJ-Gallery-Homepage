@@ -75,6 +75,21 @@
                         {% endfor %}
                     </ul>
                 </section>
+
+                <section class="rounded-[22px] border border-black/[0.06] bg-white p-6">
+                    <h2 class="text-[17px] font-semibold">블로그 주간 목표</h2>
+                    <p class="mt-1 text-[13px] leading-5 text-[#8e8e93]">블로그 허브 맨 위 "이번 주 기록" 카드에 나오는 카테고리별 목표예요. 내가 쓴 글만 세요. 0 이면 그 주에 쓴 글이 있을 때만 줄이 보여요. Secret 은 나에게만 보여요.</p>
+                    <div class="mt-4 grid gap-2 sm:grid-cols-2">
+                        {% for g in blog_goals %}
+                        <label class="flex items-center gap-3 rounded-2xl border border-black/[0.08] bg-[#fbfbfd] px-4 py-3">
+                            <span class="text-[14px] font-medium">{{ g.label }}</span>
+                            <span class="ml-auto text-[12px] text-[#8e8e93]">주</span>
+                            <input type="number" name="blog_goal_{{ g.key }}" value="{{ g.goal }}" min="0" max="{{ blog_goal_max }}" class="h-9 w-20 rounded-full border border-black/[0.1] px-3 text-right text-[14px] outline-none focus:border-[#0066cc]">
+                            <span class="text-[12px] text-[#8e8e93]">개</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </section>
             </div>
 
             <div class="sticky bottom-6 mt-6 flex items-center justify-end gap-3">

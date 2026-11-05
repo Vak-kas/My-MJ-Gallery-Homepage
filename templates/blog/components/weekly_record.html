@@ -1,0 +1,66 @@
+{% comment %}
+블로그 허브 "이번 주 기록" — 관리자가 쓴 글의 이번 주 개수·카테고리별 목표·최근 26주 막대·연속 기록 (blog/weekly.py)
+   구성은 minter-v1.com (github.com/Minter-v1/Minter-blog) 의 주간 기록 카드를 참고해 직접 구현
+{% endcomment %}
+<section class="weekly-record mt-8 rounded-[20px] border border-black/[0.08] bg-white p-6" aria-label="이번 주 기록">
+    <div class="grid gap-8 lg:grid-cols-[minmax(0,320px)_minmax(0,1fr)]">
+        <div>
+            <p class="text-[13px] text-[#8e8e93]">이번 주 기록</p>
+            <p class="mt-1 flex items-baseline gap-2">
+                <span class="text-[44px] font-semibold leading-none tracking-[-0.04em] text-[#1d1d1f]">{{ weekly.total }}</span><span class="text-[18px] font-semibold text-[#1d1d1f]">개</span>
+                {% if weekly.goal_total %}<span class="ml-1 text-[13px] text-[#8e8e93]">목표 {{ weekly.goal_total }}개</span>{% endif %}
+            </p>
+            <div class="mt-4 h-2 overflow-hidden rounded-full bg-[#f2f2f7]" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ weekly.percent }}">
+                <div class="weekly-record__fill h-full rounded-full" style="width: {{ weekly.percent }}%"></div>
+            </div>
+            <ul class="mt-5 space-y-2.5">
+                {% for row in weekly.rows %}
+                <li class="flex items-center gap-3 text-[14px]">
+                    <span class="w-5 text-center" aria-hidden="true">{{ row.icon }}</span>
+                    <span class="text-[#1d1d1f]">{{ row.label }}</span>
+                    <span class="ml-auto tabular-nums"><b class="{% if row.done %}text-[#0066cc]{% else %}text-[#1d1d1f]{% endif %}">{{ row.count }}</b>{% if row.goal %}<span class="text-[#8e8e93]"> / {{ row.goal }}</span>{% endif %}</span>
+                </li>
+                {% empty %}
+                <li class="text-[13px] text-[#8e8e93]">이번 주에는 아직 글이 없어요.</li>
+                {% endfor %}
+            </ul>
+            {% if weekly.streak %}
+            <p class="mt-5 inline-flex items-center gap-1.5 rounded-full bg-[#f2f2f7] px-3 py-1.5 text-[13px] font-semibold text-[#1d1d1f]"><span aria-hidden="true">🔥</span>{{ weekly.streak }}주 연속</p>
+            {% endif %}
+        </div>
+        <div class="min-w-0">
+            <p class="text-[13px] text-[#8e8e93]">최근 26주</p>
+            <div class="weekly-record__chart mt-4" role="img" aria-label="최근 26주 동안 주마다 쓴 글 수 막대 그래프">
+                {% for bar in weekly.bars %}
+                <div class="weekly-record__col" title="{{ bar.title }}">
+                    <div class="weekly-record__track">
+                        {% if bar.count %}<span class="weekly-record__bar{% if bar.current %} is-current{% endif %}" style="height: {{ bar.height }}%"></span>{% else %}<span class="weekly-record__zero"></span>{% endif %}
+                    </div>
+                    <span class="weekly-record__label{% if bar.current %} is-current{% endif %}">{{ bar.label }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+<style>
+    .weekly-record__fill { background: linear-gradient(90deg, #9cc8ff, #0066cc); }
+    .weekly-record__chart { display: grid; grid-template-columns: repeat(26, minmax(0, 1fr)); gap: 6px; align-items: end; }
+    .weekly-record__col { display: flex; flex-direction: column; align-items: stretch; min-width: 0; }
+    .weekly-record__track { position: relative; height: 140px; display: flex; align-items: flex-end; }
+    .weekly-record__bar { display: block; width: 100%; min-height: 10px; border-radius: 6px; background: #9cc8ff; transition: filter .15s; }
+    .weekly-record__bar.is-current { background: #0066cc; }
+    .weekly-record__col:hover .weekly-record__bar { filter: brightness(.92); }
+    .weekly-record__zero { display: block; width: 100%; height: 5px; border-radius: 3px; background: #e5e5ea; }
+    .weekly-record__label { margin-top: 8px; height: 16px; font-size: 11px; color: #8e8e93; white-space: nowrap; overflow: visible; }
+    .weekly-record__label.is-current { color: #0066cc; font-weight: 600; text-align: right; direction: rtl; }
+    @media (max-width: 640px) {
+        .weekly-record__chart { gap: 3px; }
+        .weekly-record__track { height: 96px; }
+        .weekly-record__label { font-size: 10px; }
+    }
+    html.theme-dark .weekly-record__zero { background: rgba(255, 255, 255, .12); }
+    html.theme-dark .weekly-record__bar { background: #3d6fb0; }
+    html.theme-dark .weekly-record__bar.is-current { background: #4ea1ff; }
+    html.theme-dark .weekly-record__label.is-current { color: #4ea1ff; }
+</style>

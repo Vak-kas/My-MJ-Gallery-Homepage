@@ -18,6 +18,7 @@
 ### 1.2 블로그
 - 카테고리: `Tech`, `Free`(자유게시판, DB 값·URL 은 `board` 그대로), `Life`, `Secret(관리자)` — 카테고리 페이지(`/blog/tech/` 등)는 카드 격자 30개씩 페이지, 맨 앞 "전체" 탭(`/blog/all/`)은 모든 카테고리를 한곳에(허브 피드의 "전체 글 보기 →" 버튼, "내가 쓴 글 보기"는 켜면 "내 글만 ✓"). 템플릿은 `blog/category.html` 하나
 - 통합 검색(제목/요약/본문/태그), 정렬(최신·오래된·인기), 페이지당 개수 선택, 페이지네이션, 내 글만 보기
+- **이번 주 기록** 카드(허브 맨 위, `blog/weekly.py`·`blog/components/weekly_record.html`): 관리자가 쓴 발행 글을 월요일 시작 주(서울 시간)로 세어 이번 주 개수·목표 대비 진행 막대, 카테고리별 `개수 / 목표`(목표 달성은 파란 숫자), 🔥 N주 연속(이번 주에 아직 안 썼으면 지난주까지), 최근 26주 막대(이번 주 진한 파랑, 마우스 올리면 그 주 날짜·개수). 목표는 Studio › 설정 › **블로그 주간 목표**(카테고리별 0~50, 0 이면 그 주에 쓴 글이 있을 때만 줄 표시, `SiteSetting.blog_goals`). Secret 은 관리자에게만
 - 글쓰기 권한: 일반 회원은 `Free`(자유게시판)에만 쓸 수 있고(글쓰기 폼의 카테고리 선택에도 Free 만 보임, 서버에서도 `Post.allowed_categories` 로 검사 — 수정 때 다른 카테고리로 옮기는 것도 막음), 관리자는 모든 카테고리
 - 옛 Editor.js 형식(`{"blocks": [...]}`) 글의 인라인 HTML(문단·제목·목록·체크리스트·인용·캡션)은 보여 줄 때 `webmail.sanitize.sanitize_html` 로 서식 태그(b/i/u/s/code/mark/sup/sub/a/br/span)와 `href`·`title` 속성만 남김 — `<img onerror>`·`<script>`·`on*` 속성·`style` 은 제거 (저장형 XSS 방지). Tiptap 형식은 원래부터 서버에서 다시 그리므로 안전
 - 사이드 위젯: 인기글, 태그, 최근 댓글, 방명록
@@ -530,6 +531,14 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 ### 7.x 메일 서버
 서버에 메일함 하나(`mjseo@smjgallery.kr`): Postfix(받기·보내기) + Dovecot(IMAP 993) + OpenDKIM + rspamd (+ Roundcube `mail.smjgallery.kr`, 예비용 — 평소엔 사이트 안 `/mail/` 웹메일을 씀). 사이트의 가입 인증·비밀번호 재설정 메일도 여기로 나간다(`.env` `EMAIL_HOST=localhost`, `EMAIL_PORT=25`, `EMAIL_USE_TLS=False`). 설치·DNS·AWS 25번 포트 해제 순서는 [scripts/mailserver/README.md](scripts/mailserver/README.md). 메일함은 `.env` `MAIL_BACKUP_DIR` 로 S3 백업에 포함. 확인은 `manage.py send_test_mail 주소`.
 
-## 8) 라이선스
+## 8) 참고한 사이트
+
+디자인·구성을 보고 이 사이트에 맞게 직접 다시 만든 것들입니다. 코드를 복사하지 않았고, 각 파일 주석에도 출처를 적었습니다.
+
+| 기능 | 참고 | 우리 쪽 파일 |
+|---|---|---|
+| 블로그 이번 주 기록 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/weekly.py`, `templates/blog/components/weekly_record.html` |
+
+## 9) 라이선스
 
 개인 포트폴리오 프로젝트 용도입니다. 필요 시 별도 라이선스를 추가하세요.

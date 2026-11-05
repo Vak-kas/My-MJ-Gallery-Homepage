@@ -495,6 +495,7 @@ class SiteSetting(models.Model):
 
     nav_items = models.JSONField(default=list, blank=True)
     home_sections = models.JSONField(default=list, blank=True)
+    blog_goals = models.JSONField("블로그 주간 목표", default=dict, blank=True)  # {"tech": 1, "life": 1, ...}
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
