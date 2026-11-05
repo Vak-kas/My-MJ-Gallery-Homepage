@@ -541,7 +541,8 @@ class KeygenPageTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertContains(resp, "crypto.getRandomValues")
 		self.assertContains(resp, "서버로 전송되지 않아요")
-		self.assertNotContains(resp, "fetch(")  # 키를 어디에도 보내지 않음
+		# 키를 어디에도 보내지 않음 (모든 페이지에 붙는 💬 문의 위젯의 /contact/ 전송만 예외)
+		self.assertNotRegex(resp.content.decode(), r'fetch\((?!"/contact/")')
 
 
 class FileRoomPageTests(TestCase):

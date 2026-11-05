@@ -144,8 +144,8 @@
         draw();
         $('tr-title').innerHTML = '&nbsp;';
         $('tr-dots').innerHTML = '';
-        const what = mode === 'trace' ? '연한 도형 위를 그대로 따라 그려요.' : `도형이 {{ memory_seconds }}초 동안 보였다가 사라져요. 기억해서 같은 자리에 그려요!`;
-        setOver(`<p class="text-[44px]">${mode === 'trace' ? '✏️' : '🧠'}</p><p class="text-[18px] font-bold">${mode === 'trace' ? '따라 그리기' : '보고 기억해서 그리기'}</p><p class="text-[14px] text-[#6e6e73]">${what}<br>도형 {{ round }}개, 하나에 100점.</p><button class="gm-btn primary" data-start>시작</button>`, true);
+        const what = mode === 'trace' ? '연한 도형 위를 그대로 따라 그려요.' : `도형이 ${'{{ memory_seconds|escapejs }}'}초 동안 보였다가 사라져요. 기억해서 같은 자리에 그려요!`;
+        setOver(`<p class="text-[44px]">${mode === 'trace' ? '✏️' : '🧠'}</p><p class="text-[18px] font-bold">${mode === 'trace' ? '따라 그리기' : '보고 기억해서 그리기'}</p><p class="text-[14px] text-[#6e6e73]">${what}<br>도형 ${'{{ round|escapejs }}'}개, 하나에 100점.</p><button class="gm-btn primary" data-start>시작</button>`, true);
         buttons();
     }
 

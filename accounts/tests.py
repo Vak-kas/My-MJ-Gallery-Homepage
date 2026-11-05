@@ -453,3 +453,20 @@ class TwoFactorEmailTests(TestCase):
         self.assertEqual(res["Location"], reverse("accounts:two_factor_verify"))
         self.assertEqual(logout_everywhere(self.user), 0)
 
+
+
+class AdminLoginRedirectTests(TestCase):
+	"""/admin/login/ 은 2단계 인증·잠금이 있는 사이트 로그인으로 (Django 기본 관리자 로그인 우회 방지)"""
+
+	def test_get_and_post_go_to_site_login(self):
+		from django.contrib.auth import get_user_model
+		get_user_model().objects.create_superuser("boss2", "b@x.kr", "pw-for-tests-only")
+		res = self.client.get("/admin/login/?next=/admin/")
+		self.assertEqual(res.status_code, 302)
+		self.assertTrue(res["Location"].startswith("/accounts/login/?next=%2Fadmin%2F"))
+		res = self.client.post("/admin/login/", {"username": "boss2", "password": "pw-for-tests-only"})
+		self.assertEqual(res.status_code, 302)
+		self.assertNotIn("_auth_user_id", self.client.session)   # 여기서는 로그인되지 않음
+		res = self.client.get("/admin/login/?next=https://evil.example/")
+		self.assertIn("next=%2Fadmin%2F", res["Location"])
+		self.assertEqual(self.client.get("/admin/").status_code, 302)

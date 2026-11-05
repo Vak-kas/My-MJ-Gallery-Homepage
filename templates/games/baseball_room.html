@@ -433,7 +433,7 @@
         const url = $('bb-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('bb-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('bb-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('bb-kakao').addEventListener('click', () => mjShare({ title: `⚾ 숫자 야구 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bb-copy').dataset.url, button: '숫자 야구 하러 가기' }));
+    $('bb-kakao').addEventListener('click', () => mjShare({ title: `⚾ 숫자 야구 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bb-copy').dataset.url, button: '숫자 야구 하러 가기' }));
     render();
     window.__baseball = { state: () => S, seat: () => mySeat, send, feed: handle };
 })();

@@ -617,7 +617,7 @@
         const url = $('bs-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('bs-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('bs-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('bs-kakao').addEventListener('click', () => mjShare({ title: `🏴‍☠️ 함대 격침 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bs-copy').dataset.url, button: '함대 격침 하러 가기' }));
+    $('bs-kakao').addEventListener('click', () => mjShare({ title: `🏴‍☠️ 함대 격침 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('bs-copy').dataset.url, button: '함대 격침 하러 가기' }));
     render();
     window.__battleship = { state: () => S, seat: () => mySeat, send, feed: handle, placing: () => placing, randomPlace, fxDone: () => pendingFx };
 })();

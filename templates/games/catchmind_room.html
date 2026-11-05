@@ -289,7 +289,7 @@
         const url = $('cm-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('cm-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('cm-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('cm-kakao').addEventListener('click', () => mjShare({ title: `🎨 그림 맞추기 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('cm-copy').dataset.url, button: '그림 맞추러 가기' }));
+    $('cm-kakao').addEventListener('click', () => mjShare({ title: `🎨 그림 맞추기 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('cm-copy').dataset.url, button: '그림 맞추러 가기' }));
     redraw();
     window.__cm = { state: () => S, send, strokes: () => strokes };
 })();

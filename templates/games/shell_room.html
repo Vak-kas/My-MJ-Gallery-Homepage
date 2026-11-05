@@ -533,7 +533,7 @@
         const url = $('sh-copy').dataset.url;
         try { await navigator.clipboard.writeText(url); $('sh-copy').textContent = '✓ 복사됨'; setTimeout(() => { $('sh-copy').textContent = '🔗 초대 링크 복사'; }, 1400); } catch (e) { prompt('링크를 복사하세요', url); }
     });
-    $('sh-kakao').addEventListener('click', () => mjShare({ title: `🥤 야바위 — {{ room.title|escapejs }}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('sh-copy').dataset.url, button: '야바위 하러 가기' }));
+    $('sh-kakao').addEventListener('click', () => mjShare({ title: `🥤 야바위 — ${'{{ room.title|escapejs }}'}`, text: '링크를 열고 닉네임만 넣으면 바로 같이 할 수 있어요.', url: $('sh-copy').dataset.url, button: '야바위 하러 가기' }));
     buildCups(3);
     window.__shell = { state: () => S, seat: () => mySeat, send, feed: handle, fxDone: () => pendingFx, slots: () => slots.map((c) => c.dataset.slot) };
 })();
