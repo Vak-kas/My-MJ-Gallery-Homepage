@@ -20,8 +20,8 @@
 - 통합 검색(제목/요약/본문/태그), 정렬(최신·오래된·인기), 페이지당 개수 선택, 페이지네이션, 내 글만 보기
 - **이번 주 기록** 카드(허브 맨 아래, `blog/weekly.py`·`blog/components/weekly_record.html`): 관리자가 쓴 발행 글을 월요일 시작 주(서울 시간)로 세어 이번 주 개수·목표 대비 진행 막대, 카테고리별 `개수 / 목표`(목표 달성은 파란 숫자), 🔥 N주 연속(이번 주에 아직 안 썼으면 지난주까지), 최근 26주 막대(이번 주 진한 파랑, 마우스 올리면 그 주 날짜·개수). 목표는 Studio › 설정 › **블로그 주간 목표**(카테고리별 0~50, 0 이면 그 주에 쓴 글이 있을 때만 줄 표시, `SiteSetting.blog_goals`). Secret 은 관리자에게만
 - **컬렉션** 카드(글 목록 아래, `blog/collections.py`·`blog/components/collections.html`): 카테고리(Tech·Free·Life, 관리자에겐 Secret)와 최근 글이 올라온 시리즈(최대 6개)를 같은 모양의 카드로 — 아이콘·글 수·이름·설명·최근 글 3개(3일 안의 글은 N 표시)·전체 보기. 검색어와 상관없이 볼 수 있는 글 전체 기준, 넘치면 가로로 밀어서 봄. 예전 허브 오른쪽의 카테고리별 큰 미리보기 카드를 대신함
-- **연결 지도**(컬렉션 아래, `blog/knowledge_map.py`·`blog/components/knowledge_map.html`): 카테고리를 큰 원, 글을 둘레의 점으로 두고 글끼리 연결을 파란 점선으로 — **같은 시리즈**(앞뒤 편끼리)·**본문 링크**(본문·링크 카드에 다른 글 주소 `/blog/post/<slug>/`)·**같은 태그**(글이 12개 넘게 달린 넓은 태그는 뺌), 글마다 강한 연결 6개까지, 최근 글 300개. 연결된 글은 파란 점·없는 글은 회색, 위에 연결됨·연결 없음·연관 연결 수. 점에 올리면 제목·몇 개 글과 왜 이어졌는지·이어진 점만 강조, 누르면 그 글로, 허브에 올리면 그 카테고리 글만 강조, 키보드 Tab 으로도. 바닐라 JS·SVG, 배치는 새로고침해도 같음, 다크모드 대응. Secret 은 관리자에게만
-- 허브 순서: 제목·통합 검색 → 인기글·게시글 목록(위젯 + 피드) → 컬렉션 → 연결 지도 → 이번 주 기록 (글이 먼저)
+- **Topic Map**(컬렉션 아래, `blog/knowledge_map.py`·`blog/components/knowledge_map.html`): **Tech 글을 태그가 비슷한 것끼리 자동으로 묶음**. 글마다 태그 + 제목 말머리(`[wifi] ...`)를 모으고 띄어쓰기·하이픈·대소문자를 무시(`WIFI`·`Wi-Fi`·`wifi` 는 하나), 드문 태그일수록 무게(IDF)를 크게 둔 "태그가 적은 쪽 대비 겹친 비율"로 비슷함을 재고 평균 연결 군집으로 묶음(최대 8묶음, 혼자 남은 글은 "기타"). 묶음 이름은 가장 많이 나온 태그 → 제목에도 나오는 태그 → 더 드문 태그 순, 표기는 제목에 쓰인 모양. 묶음 = 큰 원(#), 글 = 둘레 점, 같은 시리즈·본문 링크·비슷한 태그로 이어진 글끼리 파란 점선(글마다 6개까지). 점에 올리면 제목·태그·이어진 이유, 누르면 그 글로, 묶음에 올리면 그 묶음 강조. 바닐라 JS·SVG, 다크모드
+- 허브 순서: 제목·통합 검색 → 인기글·게시글 목록(위젯 + 피드) → 컬렉션 → Topic Map → 이번 주 기록 (글이 먼저)
 - 글쓰기 권한: 일반 회원은 `Free`(자유게시판)에만 쓸 수 있고(글쓰기 폼의 카테고리 선택에도 Free 만 보임, 서버에서도 `Post.allowed_categories` 로 검사 — 수정 때 다른 카테고리로 옮기는 것도 막음), 관리자는 모든 카테고리
 - 옛 Editor.js 형식(`{"blocks": [...]}`) 글의 인라인 HTML(문단·제목·목록·체크리스트·인용·캡션)은 보여 줄 때 `webmail.sanitize.sanitize_html` 로 서식 태그(b/i/u/s/code/mark/sup/sub/a/br/span)와 `href`·`title` 속성만 남김 — `<img onerror>`·`<script>`·`on*` 속성·`style` 은 제거 (저장형 XSS 방지). Tiptap 형식은 원래부터 서버에서 다시 그리므로 안전
 - 사이드 위젯: 인기글, 태그, 최근 댓글, 방명록
@@ -546,7 +546,7 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 |---|---|---|
 | 블로그 이번 주 기록 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/weekly.py`, `templates/blog/components/weekly_record.html` |
 | 블로그 컬렉션 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/collections.py`, `templates/blog/components/collections.html` |
-| 블로그 연결 지도 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/knowledge_map.py`, `templates/blog/components/knowledge_map.html` |
+| 블로그 Topic Map(지도 모양) | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/knowledge_map.py`, `templates/blog/components/knowledge_map.html` |
 | 글 보기 왼쪽 번호 목차(Contents) | [hamsik.kr](https://www.hamsik.kr/) · [apkool12/eunsik-portfolio](https://github.com/apkool12/eunsik-portfolio) | `templates/blog/post_detail.html` |
 
 ## 9) 라이선스
