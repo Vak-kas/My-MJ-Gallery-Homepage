@@ -137,6 +137,22 @@
             return btn;
         }
         function goFolder(key) { state.sentInfo = null; state.folder = key; state.page = 1; state.q = ''; state.adv = {}; state.filter = 'all'; state.selected.clear(); state.current = null; state.cursor = -1; renderFolders(); renderRead(); loadList(); setPane('list'); }
+        // 지금 보는 폴더·페이지·열어 둔 메일을 기억 → 새로고침해도 그대로 (전에는 늘 받은편지함으로 돌아갔음)
+        // 전체 화면: 주소 끝 #f=폴더&p=쪽&m=메일번호 / 작은 패널: 브라우저에 마지막 폴더만
+        const LOC_KEY = 'mj:mail:mini-folder';
+        function readLocation() {
+            if (mode !== 'full') return { f: store.get(LOC_KEY, ''), p: 1, m: 0 };
+            const q = new URLSearchParams(location.hash.slice(1));
+            return { f: q.get('f') || '', p: Math.max(1, parseInt(q.get('p'), 10) || 1), m: parseInt(q.get('m'), 10) || 0 };
+        }
+        function saveLocation() {
+            if (mode !== 'full') { store.set(LOC_KEY, state.folder); return; }
+            const parts = [`f=${encodeURIComponent(state.folder)}`];
+            if (state.page > 1) parts.push(`p=${state.page}`);
+            if (state.current && state.current.uid) parts.push(`m=${state.current.uid}`);
+            const hash = `#${parts.join('&')}`;
+            if (location.hash !== hash) history.replaceState(null, '', location.pathname + location.search + hash);
+        }
         async function loadFolders() {
             try {
                 const r = await api('state');
@@ -266,6 +282,7 @@
             return sel;
         }
         async function loadList() {
+            saveLocation();
             state.list = null; renderList();
             try { state.list = await api('list', { query: listQuery() }); remember(state.list.items.map((m) => m.from)); }
             catch (e) { say(e.message, true); state.list = { items: [], total: 0, pages: 1 }; }
@@ -304,6 +321,7 @@
 
         // ── 읽기 ──
         function renderRead() {
+            saveLocation();
             readEl.innerHTML = '';
             const m = state.current;
             if (state.compose) { readEl.append(state.compose); return; }
@@ -599,8 +617,12 @@
             root.addEventListener('keydown', (e) => { if (e.key === 'Escape' && state.compose) { state.compose = null; renderRead(); setPane('list'); } });
         }
 
+        const startLoc = readLocation();
+        if (startLoc.f) { state.folder = startLoc.f; state.page = startLoc.p; }
         renderFolders(); renderList(); renderRead(); setPane('list');
-        loadFolders(); loadList();
+        // 주소에 적힌 폴더가 없어졌으면(라벨 삭제 등) 받은편지함으로
+        loadFolders().then(() => { if (state.folders.length && !state.folders.some((f) => f.key === state.folder)) goFolder('inbox'); });
+        loadList().then(() => { if (startLoc.m && mode === 'full') openMessage(startLoc.m); });   // 열어 두었던 메일도 다시 열기
         let lastUnread = null;
         watchUnread((n) => { if (lastUnread !== null && n !== lastUnread && state.folder === 'inbox' && !document.hidden && !state.compose && !state.selected.size) { loadList(); loadFolders(); } lastUnread = n; });
         return { reload: () => { loadList(); loadFolders(); }, compose: openCompose, go: goFolder, settings: openSettings };
