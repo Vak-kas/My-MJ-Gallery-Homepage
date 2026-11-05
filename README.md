@@ -19,6 +19,7 @@
 - 카테고리: `Tech`, `Free`(자유게시판, DB 값·URL 은 `board` 그대로), `Life`, `Secret(관리자)` — 카테고리 페이지(`/blog/tech/` 등)는 카드 격자 30개씩 페이지, 맨 앞 "전체" 탭(`/blog/all/`)은 모든 카테고리를 한곳에(허브 피드의 "전체 글 보기 →" 버튼, "내가 쓴 글 보기"는 켜면 "내 글만 ✓"). 템플릿은 `blog/category.html` 하나
 - 통합 검색(제목/요약/본문/태그), 정렬(최신·오래된·인기), 페이지당 개수 선택, 페이지네이션, 내 글만 보기
 - **이번 주 기록** 카드(허브 맨 위, `blog/weekly.py`·`blog/components/weekly_record.html`): 관리자가 쓴 발행 글을 월요일 시작 주(서울 시간)로 세어 이번 주 개수·목표 대비 진행 막대, 카테고리별 `개수 / 목표`(목표 달성은 파란 숫자), 🔥 N주 연속(이번 주에 아직 안 썼으면 지난주까지), 최근 26주 막대(이번 주 진한 파랑, 마우스 올리면 그 주 날짜·개수). 목표는 Studio › 설정 › **블로그 주간 목표**(카테고리별 0~50, 0 이면 그 주에 쓴 글이 있을 때만 줄 표시, `SiteSetting.blog_goals`). Secret 은 관리자에게만
+- **컬렉션** 카드(이번 주 기록 아래, `blog/collections.py`·`blog/components/collections.html`): 카테고리(Tech·Free·Life, 관리자에겐 Secret)와 최근 글이 올라온 시리즈(최대 6개)를 같은 모양의 카드로 — 아이콘·글 수·이름·설명·최근 글 3개(3일 안의 글은 N 표시)·전체 보기. 검색어와 상관없이 볼 수 있는 글 전체 기준, 넘치면 가로로 밀어서 봄. 예전 허브 오른쪽의 카테고리별 큰 미리보기 카드를 대신함
 - 글쓰기 권한: 일반 회원은 `Free`(자유게시판)에만 쓸 수 있고(글쓰기 폼의 카테고리 선택에도 Free 만 보임, 서버에서도 `Post.allowed_categories` 로 검사 — 수정 때 다른 카테고리로 옮기는 것도 막음), 관리자는 모든 카테고리
 - 옛 Editor.js 형식(`{"blocks": [...]}`) 글의 인라인 HTML(문단·제목·목록·체크리스트·인용·캡션)은 보여 줄 때 `webmail.sanitize.sanitize_html` 로 서식 태그(b/i/u/s/code/mark/sup/sub/a/br/span)와 `href`·`title` 속성만 남김 — `<img onerror>`·`<script>`·`on*` 속성·`style` 은 제거 (저장형 XSS 방지). Tiptap 형식은 원래부터 서버에서 다시 그리므로 안전
 - 사이드 위젯: 인기글, 태그, 최근 댓글, 방명록
@@ -541,6 +542,7 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 |---|---|---|
 | 스크롤 게이지 맨 위로 버튼 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `templates/components/scroll_top.html` |
 | 블로그 이번 주 기록 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/weekly.py`, `templates/blog/components/weekly_record.html` |
+| 블로그 컬렉션 카드 | [minter-v1.com](https://www.minter-v1.com/) · [Minter-v1/Minter-blog](https://github.com/Minter-v1/Minter-blog) | `blog/collections.py`, `templates/blog/components/collections.html` |
 | 글 보기 왼쪽 번호 목차(Index) | [hamsik.kr](https://www.hamsik.kr/) · [apkool12/eunsik-portfolio](https://github.com/apkool12/eunsik-portfolio) | `templates/blog/post_detail.html` |
 
 ## 9) 라이선스
