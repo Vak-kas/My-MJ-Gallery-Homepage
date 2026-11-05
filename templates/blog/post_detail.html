@@ -248,14 +248,13 @@
     </section>
     {% endif %}
 </main>
-{# 따라다니는 맨 위/맨 아래 버튼 (다크모드 버튼 위에 쌓임) #}
+{# 따라다니는 맨 아래로 버튼 (맨 위로는 모든 페이지 공통 스크롤 게이지 버튼이 맡음) #}
 <div class="post-jump" aria-label="페이지 이동">
-    <button id="post-jump-top" type="button" class="post-jump__btn" title="맨 위로" aria-label="맨 위로" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
     <button id="post-jump-bottom" type="button" class="post-jump__btn" title="맨 아래로" aria-label="맨 아래로" hidden><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
 </div>
 <style>
 #post-body :is(h1, h2, h3, h4)[id] { scroll-margin-top: 96px; }
-.post-jump { position: fixed; right: 20px; bottom: 76px; z-index: 80; display: flex; flex-direction: column; gap: 10px; }
+.post-jump { position: fixed; right: 26px; bottom: 146px; z-index: 80; display: flex; flex-direction: column; gap: 10px; }
 .post-jump__btn { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; padding: 0; border-radius: 9999px; border: 1px solid rgba(0,0,0,.12); background: rgba(255,255,255,.9); color: #1d1d1f; line-height: 1; backdrop-filter: blur(8px); box-shadow: 0 8px 24px rgba(0,0,0,.12); transition: background .2s, transform .2s, opacity .2s; }
 .post-jump__btn:hover { transform: translateY(-1px); background: #fff; }
 /* 다크모드: 투명 배경 그림(검은 선 도식)이 안 보이지 않게 그림 뒤는 밝게 */
@@ -435,15 +434,13 @@ html.theme-dark .post-index:hover .post-index__major:hover .post-index__text, ht
 </script>
 <script>
 (() => {
-    // 맨 위/맨 아래 버튼: 맨 위에선 ⌃ 숨기고 맨 아래에선 ⌄ 숨김
-    const top = document.getElementById('post-jump-top'), bottom = document.getElementById('post-jump-bottom');
-    if (!top || !bottom) return;
+    // 맨 아래로 버튼: 맨 아래에선 숨김
+    const bottom = document.getElementById('post-jump-bottom');
+    if (!bottom) return;
     const update = () => {
         const y = window.scrollY, max = document.documentElement.scrollHeight - window.innerHeight;
-        top.hidden = y < 200;
         bottom.hidden = max < 200 || y > max - 200;
     };
-    top.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
     bottom.addEventListener('click', () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }));
     let raf = 0;
     window.addEventListener('scroll', () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; update(); }); }, { passive: true });

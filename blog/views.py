@@ -548,7 +548,11 @@ def index(request):
 	life_posts = _preview_posts(Post.CATEGORY_LIFE)
 	secret_posts = _preview_posts(Post.CATEGORY_SECRET)
 
+	from studio import site_settings
+	from .weekly import weekly_stats
+
 	context = {
+		"weekly": weekly_stats(site_settings.load()["blog_goals"], include_secret=request.user.is_superuser),
 		"active_tab": "hub",
 		"show_secret": request.user.is_superuser,
 		"current_sort": current_sort,
