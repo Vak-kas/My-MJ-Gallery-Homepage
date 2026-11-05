@@ -399,3 +399,23 @@ class ScoreApiRobustnessTests(TestCase):
 		self.assertTrue(first["ok"])
 		self.assertFalse(second["ok"])
 		self.assertEqual(Score.objects.filter(user=self.user, board="2048").count(), 1)
+
+
+class RoomTitleXssTests(TestCase):
+	"""템플릿 값을 JS 백틱 문자열에 넣을 때 escapejs 는 ${ } 를 막지 못함 (2026-11-05 점검: 방 제목 `${import(...)}`)
+	→ 백틱 안에서는 반드시 ${'{{ 값|escapejs }}'} 처럼 작은따옴표 문자열로 감싸야 함. 모든 템플릿 원본을 줄 단위로 검사"""
+
+	def test_no_raw_template_value_inside_backticks(self):
+		import pathlib
+		import re
+		root = pathlib.Path(__file__).resolve().parent.parent / "templates"
+		bad = []
+		for path in root.rglob("*.html"):
+			for no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+				if "`" not in line or "{{" not in line:
+					continue
+				safe = re.sub(r"\$\{'\{\{[^}]*\}\}'\}", "", line)   # ${'{{ ... }}'} 은 안전
+				for seg in re.findall(r"`([^`]*)`", safe):
+					if re.search(r"(?<!\$)\{\{", seg):   # JS 의 ${{ … }} (객체) 는 제외
+						bad.append(f"{path.relative_to(root)}:{no}")
+		self.assertEqual(bad, [], "백틱 문자열 안에 감싸지 않은 템플릿 값")

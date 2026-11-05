@@ -15,6 +15,16 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
+from django.shortcuts import redirect as _redirect
+from django.utils.http import url_has_allowed_host_and_scheme, urlencode as _urlencode
+
+
+def _admin_login_redirect(request):
+    nxt = request.GET.get("next") or "/admin/"
+    if not url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        nxt = "/admin/"
+    return _redirect(f"/accounts/login/?{_urlencode({'next': nxt})}")
+
 from django.urls import path, include, re_path
 
 from django.contrib.sitemaps.views import sitemap
@@ -44,6 +54,8 @@ urlpatterns = [
     path('app/', pwa.install, name='pwa_install'),
     path('og/<str:kind>/<str:key>.png', og_card, name='og_card'),
     path('', include('main.urls')),
+    # Django 기본 관리자 로그인은 2단계 인증·로그인 실패 잠금을 거치지 않으므로 사이트 로그인으로 넘김
+    path('admin/login/', _admin_login_redirect),
     path('admin/', admin.site.urls),
     path('accounts/', include('accounts.urls')),
     path('studio/', include('studio.urls')),

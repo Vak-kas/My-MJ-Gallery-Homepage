@@ -515,6 +515,11 @@ GitHub Actions 워크플로우: [.github/workflows/deploy.yml](.github/workflows
 
 ## 7) 운영 메모
 
+### 7.0 보안 메모 (2026-11-05 점검 뒤 고친 것)
+- **업로드**: 글 커버·본문 이미지는 Pillow 로 열어 다시 그려 저장하고 이름은 uuid (`blog/views.py _reencode_image`). HTML·SVG 등 이미지가 아닌 파일은 거절 — 공개 `/media/` 에서 같은 출처 스크립트가 돌지 않게
+- **JS 안 템플릿 값**: 백틱 문자열에는 `${'{{ 값|escapejs }}'}` 처럼 작은따옴표 문자열로만 넣음 (`escapejs` 는 `${ }` 를 막지 못함). `games/tests.py RoomTitleXssTests` 가 모든 템플릿을 줄 단위로 검사
+- **관리자 로그인**: `/admin/login/` 은 사이트 로그인(2단계 인증·실패 잠금)으로 넘김 (`config/urls.py`)
+
 - 관리 명령
   - `python manage.py run_scheduled` — 예약 작업 (위 cron), 업타임·트래픽·정리를 한 번에
   - `python manage.py backup_s3` — 지금 S3 백업 (run_scheduled 가 매일 `BACKUP_HOUR` 시 이후 자동 실행) / `--list` DB 백업 목록 / `--download DIR` 최근 DB + 사진·파일 전부 내려받기

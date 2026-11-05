@@ -37,6 +37,7 @@ UNLOCK_MAX_ATTEMPTS = 5
 UNLOCK_WINDOW_SECONDS = 10 * 60
 UNLOCK_BLOCK_SECONDS = 10 * 60
 COVER_IMAGE_MAX_BYTES = 10 * 1024 * 1024
+COVER_IMAGE_MAX_SIDE = 2400
 MATH_OCR_MAX_BYTES = 8 * 1024 * 1024
 GUESTBOOK_DAILY_LIMIT = 10
 INLINE_IMAGE_MAX_BYTES = 20 * 1024 * 1024
@@ -720,6 +721,45 @@ def math_ocr(request):
 	return JsonResponse({"latex": latex})
 
 
+def _reencode_image(upload, max_side):
+	"""올린 파일을 Pillow 로 열어 다시 그려 저장할 내용을 만듦 → (ContentFile, 확장자) 또는 None.
+	이미지가 아니면(HTML·SVG·스크립트 등) None. 확장자·파일 이름은 사용자 값을 쓰지 않음 (저장형 XSS 방지)"""
+	try:
+		img = Image.open(upload)
+		img.verify()
+		upload.seek(0)
+		img = Image.open(upload)
+		if (img.format or "").upper() not in {"JPEG", "PNG", "GIF", "WEBP", "BMP", "MPO"}:
+			return None
+		if (img.format or "").upper() == "GIF" and getattr(img, "is_animated", False):
+			# 움짤은 재인코딩하면 애니메이션이 깨지므로 원본 그대로 (확장자는 .gif 고정 — 이미지로만 서빙됨)
+			upload.seek(0)
+			return ContentFile(upload.read()), "gif"
+		img = ImageOps.exif_transpose(img)
+		img.thumbnail((max_side, max_side))
+		has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
+		buf = BytesIO()
+		if has_alpha:
+			img.convert("RGBA").save(buf, format="PNG", optimize=True)
+			ext = "png"
+		else:
+			img.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
+			ext = "jpg"
+		return ContentFile(buf.getvalue()), ext
+	except Exception:
+		return None
+
+
+def _cover_file(upload):
+	"""커버 이미지 → 다시 그린 파일(이름은 uuid). 이미지가 아니면 None"""
+	result = _reencode_image(upload, COVER_IMAGE_MAX_SIDE)
+	if not result:
+		return None
+	content, ext = result
+	content.name = f"{uuid4().hex}.{ext}"
+	return content
+
+
 @login_required
 def image_upload(request):
 	"""본문 이미지를 파일로 저장하고 URL을 반환 (base64로 본문에 박히면 글 용량이 폭증함)"""
@@ -733,31 +773,14 @@ def image_upload(request):
 	if getattr(image, "size", 0) > INLINE_IMAGE_MAX_BYTES:
 		return JsonResponse({"error": "이미지는 20MB 이하만 업로드할 수 있습니다."}, status=400)
 
-	try:
-		img = Image.open(image)
-		is_gif = (img.format or "").upper() == "GIF" and getattr(img, "is_animated", False)
-		if is_gif:
-			# 움짤은 재인코딩하면 애니메이션이 깨지므로 원본 그대로 저장
-			image.seek(0)
-			payload, ext = image.read(), "gif"
-		else:
-			img = ImageOps.exif_transpose(img)
-			img.thumbnail((INLINE_IMAGE_MAX_SIDE, INLINE_IMAGE_MAX_SIDE))
-			has_alpha = img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info)
-			buf = BytesIO()
-			if has_alpha:
-				img.convert("RGBA").save(buf, format="PNG", optimize=True)
-				ext = "png"
-			else:
-				img.convert("RGB").save(buf, format="JPEG", quality=85, optimize=True)
-				ext = "jpg"
-			payload = buf.getvalue()
-	except Exception:
+	result = _reencode_image(image, INLINE_IMAGE_MAX_SIDE)
+	if not result:
 		return JsonResponse({"error": "이미지 파일을 읽을 수 없습니다."}, status=400)
+	content, ext = result
 
 	name = default_storage.save(
 		f"blog/inline/{timezone.now():%Y/%m}/{uuid4().hex}.{ext}",
-		ContentFile(payload),
+		content,
 	)
 	return JsonResponse({"url": default_storage.url(name)})
 
@@ -1030,6 +1053,13 @@ def post_create(request):
 			form_data = dict(request.POST)
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
+		if cover_image:
+			cover_image = _cover_file(cover_image)
+			if cover_image is None:
+				messages.error(request, "커버 이미지는 JPG·PNG·GIF·WEBP 이미지만 올릴 수 있습니다.")
+				form_data = dict(request.POST)
+				form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
+				return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
 		if existing_draft:
 			post = existing_draft
@@ -1111,6 +1141,11 @@ def post_edit(request, slug: str):
 		if cover_image and getattr(cover_image, "size", 0) > COVER_IMAGE_MAX_BYTES:
 			messages.error(request, "커버 이미지는 10MB 이하만 업로드할 수 있습니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
+		if cover_image:
+			cover_image = _cover_file(cover_image)
+			if cover_image is None:
+				messages.error(request, "커버 이미지는 JPG·PNG·GIF·WEBP 이미지만 올릴 수 있습니다.")
+				return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
 		post.title = title
 		post.category = category
