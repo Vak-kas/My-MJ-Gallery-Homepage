@@ -3,7 +3,20 @@
 <meta name="mj-csrf" content="{{ csrf_token }}">
 <link rel="stylesheet" href="{% static_v 'mail/mail.css' %}">
 <button id="mail-fab" type="button" class="mail-fab" aria-label="메일" aria-expanded="false" aria-controls="mail-panel" title="메일함">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="m4.5 7.5 7.5 5.5 7.5-5.5"/></svg><span class="mail-fab__badge" data-mail-unread hidden></span>
+    <svg class="cuckoo" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <defs><clipPath id="cuckoo-out"><rect x="-6" y="-14" width="36" height="21.6"/></clipPath></defs>
+        <rect class="cuckoo__body" x="3.5" y="7.5" width="17" height="12" rx="2.5"/>
+        <path class="cuckoo__flap" d="M4.6 9.2 12 14.6l7.4-5.4"/>
+        {# 뻐꾸기: 봉투 윗변 위로 나온 부분만 보임 (clip) #}
+        <g clip-path="url(#cuckoo-out)"><g class="cuckoo__bird">
+            <path class="cuckoo__fill" d="M8.4 4.3 5.4 2.6l.7 3.1Z"/>
+            <ellipse class="cuckoo__fill" cx="11.4" cy="4.7" rx="3.7" ry="2.5"/>
+            <circle class="cuckoo__fill" cx="14.7" cy="2.7" r="2"/>
+            <path class="cuckoo__beak" d="M16.5 2.3 18.7 2.9 16.5 3.5Z"/>
+            <circle class="cuckoo__eye" cx="15.2" cy="2.4" r=".45"/>
+            <path class="cuckoo__wing" d="M9.4 4.6c1.3-1.5 3.1-1.6 4.3-.3"/>
+        </g></g>
+    </svg><span class="mail-fab__badge" data-mail-unread hidden></span>
 </button>
 <div id="mail-panel" class="mail-panel" hidden>
     <div class="mail-panel__head">

@@ -55,10 +55,18 @@
     // ── 안 읽은 메일 수: 화면의 모든 [data-mail-unread] 배지에 반영, 1분마다 ──
     const unreadWatchers = new Set();
     let unreadTimer = 0;
+    let lastUnread = null;
     async function refreshUnread() {
         try {
             const { unread } = await api('unread');
             document.querySelectorAll('[data-mail-unread]').forEach((b) => { b.hidden = !unread; b.textContent = unread > 99 ? '99+' : unread; });
+            // 새 메일이 늘었으면 떠 있는 메일 버튼의 뻐꾸기가 날아와 앉음 (처음 읽을 때는 안 함)
+            const fab = document.getElementById('mail-fab');
+            if (fab && lastUnread !== null && unread > lastUnread) {
+                fab.classList.remove('is-arrive'); void fab.offsetWidth; fab.classList.add('is-arrive');
+                setTimeout(() => fab.classList.remove('is-arrive'), 1500);
+            }
+            lastUnread = unread;
             unreadWatchers.forEach((fn) => fn(unread));
         } catch { /* 연결 안 되면 조용히 */ }
     }
