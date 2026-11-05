@@ -1,0 +1,180 @@
+{% comment %}
+블로그 허브 "연결 지도" — 카테고리 = 큰 원, 글 = 둘레의 점, 글끼리 연결(같은 시리즈·본문 링크·태그 공유) = 파란 점선 (blog/knowledge_map.py)
+점에 마우스를 올리면 제목·연결 이유, 누르면 그 글로. 허브에 올리면 그 카테고리 글만 강조.
+구성은 minter-v1.com (github.com/Minter-v1/Minter-blog) 의 지식 지도를 참고해 바닐라 JS·SVG 로 직접 구현
+{% endcomment %}
+{% if knowledge_map.nodes %}
+<section class="mt-10" aria-labelledby="kmap-title">
+    <div class="flex flex-wrap items-end justify-between gap-3">
+        <h2 id="kmap-title" class="text-[24px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">연결 지도</h2>
+        <p class="kmap-legend">
+            <span><i class="kmap-legend__dot is-on"></i>연결됨 <b>{{ knowledge_map.stats.connected }}</b></span>
+            <span><i class="kmap-legend__dot"></i>연결 없음 <b>{{ knowledge_map.stats.alone }}</b></span>
+            <span><i class="kmap-legend__line"></i>연관 연결 <b>{{ knowledge_map.stats.edges }}</b></span>
+        </p>
+    </div>
+    <div id="kmap" class="kmap mt-4" role="img" aria-label="블로그 글 연결 지도: 카테고리마다 글이 모여 있고, 같은 시리즈·본문 링크·같은 태그로 이어진 글끼리 선으로 연결돼 있어요">
+        <svg id="kmap-svg" class="kmap__svg"></svg>
+        <div id="kmap-tip" class="kmap__tip" hidden></div>
+    </div>
+    <p class="mt-2 text-[12px] text-[#8e8e93]">같은 시리즈 · 본문에서 다른 글 링크 · 같은 태그로 이어진 글끼리 선이 생겨요. 점을 누르면 그 글로 가요.</p>
+    {{ knowledge_map|json_script:"kmap-data" }}
+</section>
+<style>
+    .kmap-legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: #6e6e73; }
+    .kmap-legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .kmap-legend b { color: #1d1d1f; font-variant-numeric: tabular-nums; }
+    .kmap-legend__dot { width: 10px; height: 10px; border-radius: 9999px; background: #c7c7cc; }
+    .kmap-legend__dot.is-on { background: #0066cc; }
+    .kmap-legend__line { width: 18px; border-top: 2px dashed #6aa7ff; }
+    .kmap { position: relative; height: 480px; overflow: hidden; border-radius: 28px; border: 1px solid rgba(0, 0, 0, .06); background-color: #fff; background-image: radial-gradient(rgba(0, 0, 0, .09) 1px, transparent 1px); background-size: 22px 22px; }
+    @media (max-width: 640px) { .kmap { height: 400px; } }
+    .kmap__svg { width: 100%; height: 100%; display: block; }
+    .kmap__svg .spoke { stroke: rgba(0, 0, 0, .1); stroke-width: 1; stroke-dasharray: 2 4; }
+    .kmap__svg .rel { fill: none; stroke: #6aa7ff; stroke-width: 1.4; stroke-dasharray: 4 5; opacity: .55; transition: opacity .15s; }
+    .kmap__svg .dot { cursor: pointer; transition: r .15s, opacity .15s; }
+    .kmap__svg .dot.is-on { fill: #0066cc; }
+    .kmap__svg .dot.is-off { fill: #c7c7cc; }
+    .kmap__svg .hub-ring { fill: #fff; stroke: rgba(0, 0, 0, .08); stroke-width: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .08)); }
+    .kmap__svg .hub-icon { font-size: 26px; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
+    .kmap__svg .hub-label { font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; pointer-events: none; }
+    .kmap__svg .hub-count { fill: #8e8e93; font-weight: 500; }
+    .kmap__svg .hub { cursor: pointer; }
+    .kmap.is-focus .dot, .kmap.is-focus .spoke, .kmap.is-focus .rel { opacity: .12; }
+    .kmap.is-focus .is-lit { opacity: 1 !important; }
+    .kmap.is-focus .rel.is-lit { stroke-width: 2; }
+    .kmap__tip { position: absolute; z-index: 2; max-width: 260px; padding: 8px 12px; border-radius: 12px; background: rgba(29, 29, 31, .92); color: #fff; font-size: 12px; line-height: 1.5; pointer-events: none; box-shadow: 0 10px 30px rgba(0, 0, 0, .2); }
+    .kmap__tip b { display: block; font-size: 13px; }
+    html.theme-dark .kmap { background-color: #171a20; border-color: rgba(255, 255, 255, .08); background-image: radial-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px); }
+    html.theme-dark .kmap__svg .spoke { stroke: rgba(255, 255, 255, .14); }
+    html.theme-dark .kmap__svg .hub-ring { fill: #22262e; stroke: rgba(255, 255, 255, .12); }
+    html.theme-dark .kmap__svg .hub-label { fill: #f3f4f6; }
+    html.theme-dark .kmap__svg .dot.is-on { fill: #4ea1ff; }
+    html.theme-dark .kmap__svg .dot.is-off { fill: #4b5060; }
+    html.theme-dark .kmap-legend b { color: #f3f4f6; }
+</style>
+<script>
+(() => {
+    const box = document.getElementById('kmap'), svg = document.getElementById('kmap-svg'), tip = document.getElementById('kmap-tip');
+    const data = JSON.parse(document.getElementById('kmap-data').textContent);
+    if (!box || !svg || !data.nodes.length) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    const mk = (tag, attrs, parent) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (parent) parent.appendChild(n); return n; };
+    const KIND = { series: '같은 시리즈', link: '본문 링크', tag: '같은 태그' };
+    const hubs = data.hubs.filter((h) => h.count > 0 || data.hubs.length <= 3);
+    const byId = new Map(data.nodes.map((n) => [n.id, n]));
+
+    // 글자 seed 로 만든 고정 난수 (새로고침해도 같은 배치)
+    const rand = (seed) => { let s = seed % 2147483647 || 1; return () => (s = (s * 48271) % 2147483647) / 2147483647; };
+
+    const layout = () => {
+        const W = box.clientWidth, H = box.clientHeight, pad = 26;
+        const hubPos = new Map();
+        hubs.forEach((h, i) => {
+            const x = W * (i + 0.5) / hubs.length;
+            const y = H * (hubs.length > 1 ? (i % 2 ? 0.64 : 0.38) : 0.5);
+            hubPos.set(h.key, { x, y });
+        });
+        const groups = new Map();
+        data.nodes.forEach((n) => { if (!groups.has(n.hub)) groups.set(n.hub, []); groups.get(n.hub).push(n); });
+        const pts = [];
+        groups.forEach((list, key) => {
+            const c = hubPos.get(key);
+            if (!c) return;
+            const r = rand(key.length * 7919 + list.length);
+            const span = Math.min(W / Math.max(hubs.length, 1) / 2 - 14, H / 2 - 30);
+            list.forEach((n, i) => {
+                const ring = 84 + (i % 3) * 24 + Math.min(list.length, 30) * 1.1;
+                const a = (i / list.length) * Math.PI * 2 + r() * 0.6;
+                const rad = Math.max(78, Math.min(ring, span + 40));
+                n.x = n.hx = c.x + Math.cos(a) * rad;
+                n.y = n.hy = c.y + Math.sin(a) * rad * 0.85;
+                pts.push(n);
+            });
+        });
+        // 점끼리 겹치지 않게 조금 밀어내고, 허브 원과도 떨어뜨림
+        for (let it = 0; it < 80; it++) {
+            for (let i = 0; i < pts.length; i++) {
+                const p = pts[i];
+                for (let j = i + 1; j < pts.length; j++) {
+                    const q = pts[j], dx = q.x - p.x, dy = q.y - p.y, d = Math.hypot(dx, dy) || 0.01;
+                    if (d < 16) { const m = (16 - d) / 2 / d; p.x -= dx * m; p.y -= dy * m; q.x += dx * m; q.y += dy * m; }
+                }
+                hubPos.forEach((c) => {
+                    const dx = p.x - c.x, dy = p.y - c.y, d = Math.hypot(dx, dy) || 0.01;
+                    if (d < 70) { p.x = c.x + dx / d * 70; p.y = c.y + dy / d * 70; }
+                    // 허브 아래 이름표 자리(가로 ±56, 세로 +42~+72)는 비워 둠
+                    if (Math.abs(p.x - c.x) < 56 && p.y > c.y + 40 && p.y < c.y + 74) p.y = c.y + 76;
+                });
+                p.x += (p.hx - p.x) * 0.02; p.y += (p.hy - p.y) * 0.02;
+                p.x = Math.max(pad, Math.min(W - pad, p.x)); p.y = Math.max(pad, Math.min(H - pad, p.y));
+            }
+        }
+        return hubPos;
+    };
+
+    const draw = () => {
+        svg.textContent = '';
+        const hubPos = layout();
+        const gSpoke = mk('g', {}, svg), gRel = mk('g', {}, svg), gDot = mk('g', {}, svg), gHub = mk('g', {}, svg);
+        const lines = new Map();   // node id → [line 요소]
+        const add = (id, el) => { if (!lines.has(id)) lines.set(id, []); lines.get(id).push(el); };
+        data.nodes.forEach((n) => {
+            const c = hubPos.get(n.hub);
+            if (!c || n.x == null) return;
+            n.spoke = mk('line', { x1: c.x, y1: c.y, x2: n.x, y2: n.y, class: 'spoke' }, gSpoke);
+        });
+        data.edges.forEach((e) => {
+            const a = byId.get(e.a), b = byId.get(e.b);
+            if (!a || !b || a.x == null || b.x == null) return;
+            const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2 - Math.min(60, Math.abs(a.x - b.x) * 0.15);
+            const path = mk('path', { d: `M${a.x},${a.y} Q${mx},${my} ${b.x},${b.y}`, class: 'rel' }, gRel);
+            path.dataset.kinds = e.kinds.join(',');
+            add(a.id, path); add(b.id, path);
+            (a.peers ||= new Set()).add(b.id); (b.peers ||= new Set()).add(a.id);
+            (a.why ||= new Set()); e.kinds.forEach((k) => a.why.add(k));
+            (b.why ||= new Set()); e.kinds.forEach((k) => b.why.add(k));
+        });
+        const focus = (lit) => { box.classList.add('is-focus'); lit.forEach((el) => el.classList.add('is-lit')); };
+        const blur = () => { box.classList.remove('is-focus'); svg.querySelectorAll('.is-lit').forEach((el) => el.classList.remove('is-lit')); tip.hidden = true; };
+        data.nodes.forEach((n) => {
+            if (n.x == null) return;
+            const a = mk('a', { href: n.url, 'aria-label': n.title }, gDot);
+            n.dot = mk('circle', { cx: n.x, cy: n.y, r: 6, class: `dot ${n.connected ? 'is-on' : 'is-off'}` }, a);
+            const show = () => {
+                const lit = [n.dot, n.spoke, ...(lines.get(n.id) || [])];
+                (n.peers || []).forEach((pid) => { const p = byId.get(pid); if (p?.dot) lit.push(p.dot); });
+                focus(lit.filter(Boolean));
+                n.dot.setAttribute('r', 8);
+                const why = n.why ? [...n.why].map((k) => KIND[k]).join(' · ') : '연결된 글 없음';
+                tip.innerHTML = '';
+                const t = document.createElement('b'); t.textContent = n.title; tip.appendChild(t);
+                tip.appendChild(document.createTextNode(n.peers ? `${n.peers.size}개 글과 연결 · ${why}` : why));
+                tip.hidden = false;
+                const bx = box.clientWidth, tw = tip.offsetWidth;
+                tip.style.left = `${Math.min(Math.max(8, n.x - tw / 2), bx - tw - 8)}px`;
+                tip.style.top = `${n.y > 90 ? n.y - tip.offsetHeight - 14 : n.y + 16}px`;
+            };
+            const hide = () => { n.dot.setAttribute('r', 6); blur(); };
+            a.addEventListener('mouseenter', show); a.addEventListener('focus', show);
+            a.addEventListener('mouseleave', hide); a.addEventListener('blur', hide);
+        });
+        hubs.forEach((h) => {
+            const c = hubPos.get(h.key);
+            const a = mk('a', { href: h.url, class: 'hub', 'aria-label': `${h.label} ${h.count}개` }, gHub);
+            mk('circle', { cx: c.x, cy: c.y, r: 36, class: 'hub-ring' }, a);
+            mk('text', { x: c.x, y: c.y, class: 'hub-icon' }, a).textContent = h.icon;
+            const label = mk('text', { x: c.x, y: c.y + 58, class: 'hub-label' }, a);
+            label.textContent = `${h.label} `;
+            mk('tspan', { class: 'hub-count' }, label).textContent = h.count;
+            const mine = data.nodes.filter((n) => n.hub === h.key);
+            a.addEventListener('mouseenter', () => focus(mine.flatMap((n) => [n.dot, n.spoke]).filter(Boolean)));
+            a.addEventListener('mouseleave', blur);
+        });
+    };
+    draw();
+    let t = 0, lastW = box.clientWidth;
+    window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(() => { if (box.clientWidth !== lastW) { lastW = box.clientWidth; draw(); } }, 200); });
+})();
+</script>
+{% endif %}
