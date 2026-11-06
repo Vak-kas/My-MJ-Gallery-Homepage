@@ -42,7 +42,7 @@ ALWAYS_OPEN = [re.compile(p) for p in (
 )]
 
 # 블로그 허브 "이번 주 기록" 카드의 카테고리별 주간 목표 (0 이면 그 줄은 그 주에 쓴 글이 있을 때만 보임)
-BLOG_GOAL_DEFAULTS = {"tech": 1, "board": 0, "life": 1, "secret": 0}
+BLOG_GOAL_DEFAULTS = {"tech": 1, "paper": 0, "life": 1, "secret": 0}
 BLOG_GOAL_MAX = 50
 
 HOME_SECTION_DEFAULTS = [

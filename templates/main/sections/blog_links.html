@@ -5,7 +5,7 @@
                 <div>
                     <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">NEXT STEP</p>
                     <h3 class="mt-3 text-[32px] font-semibold tracking-[-0.03em] text-[#1d1d1f] md:text-[44px]">더 자세한 내용을 보고 싶다면</h3>
-                    <p class="mt-3 text-[16px] leading-[1.6] text-[#6e6e73]">카테고리별 페이지에서 기술 글, 자유게시판, 일기 콘텐츠를 확인하세요.</p>
+                    <p class="mt-3 text-[16px] leading-[1.6] text-[#6e6e73]">카테고리별 페이지에서 기술 글, 논문 리뷰, 일상 글을 확인하세요.</p>
                 </div>
             </div>
 
@@ -17,18 +17,18 @@
                     <p class="mt-1 text-[13px] text-[#6e6e73]">트러블슈팅 · 아키텍처</p>
                 </a>
 
-                <a href="{% url 'blog:board' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
+                <a href="{% url 'blog:paper' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
                     <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
-                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Free Board</p>
-                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">자유게시판</p>
-                    <p class="mt-1 text-[13px] text-[#6e6e73]">일상/공지/자유 글</p>
+                    <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Paper Review</p>
+                    <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">논문 리뷰</p>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">읽은 논문 정리</p>
                 </a>
 
                 <a href="{% url 'blog:life' %}" class="group relative overflow-hidden rounded-[18px] border border-black/[0.08] bg-[#fbfbfd] px-5 py-4 transition hover:border-[#0066cc]/25 hover:bg-white">
                     <img src="{% static 'images/mj-logo.svg' %}" alt="" aria-hidden="true" class="pointer-events-none absolute right-3 top-3 h-5 w-5 opacity-20">
                     <p class="text-[12px] uppercase tracking-[0.18em] text-[#0066cc]">Life</p>
                     <p class="mt-2 text-[17px] font-semibold text-[#1d1d1f]">라이프 블로그</p>
-                    <p class="mt-1 text-[13px] text-[#6e6e73]">기록 · 생각 · 메모</p>
+                    <p class="mt-1 text-[13px] text-[#6e6e73]">일상 · 후기 · 자유 글</p>
                 </a>
             </div>
         </div>

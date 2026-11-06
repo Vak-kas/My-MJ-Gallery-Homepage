@@ -657,7 +657,7 @@ class UrlPreviewSsrfTests(TestCase):
 
 
 class MemberCategoryTests(TestCase):
-	"""일반 회원은 Free(자유게시판)에만, 관리자는 모든 카테고리에 글을 씀"""
+	"""일반 회원은 Life 에만(옛 자유게시판이 Life 로 합쳐짐), 관리자는 모든 카테고리에 글을 씀"""
 
 	def setUp(self):
 		self.member = get_user_model().objects.create_user(username="member", password="pw-for-tests-only")
@@ -668,32 +668,32 @@ class MemberCategoryTests(TestCase):
 			"title": f"{category} 글", "category": category, "content": "본문", "submit_action": "publish",
 		})
 
-	def test_member_only_board(self):
+	def test_member_only_life(self):
 		self.client.force_login(self.member)
-		for cat in ("tech", "life", "secret"):
+		for cat in ("tech", "paper", "secret", "board"):
 			self._post(cat)
 			self.assertFalse(Post.objects.filter(category=cat).exists(), cat)
-		self._post("board")
-		self.assertTrue(Post.objects.filter(category="board", author=self.member).exists())
+		self._post("life")
+		self.assertTrue(Post.objects.filter(category="life", author=self.member).exists())
 
-	def test_member_form_shows_only_board(self):
+	def test_member_form_shows_only_life(self):
 		self.client.force_login(self.member)
 		res = self.client.get(reverse("blog:post_create"))
-		self.assertEqual(res.context["categories"], [("board", "Free")])
+		self.assertEqual(res.context["categories"], [("life", "Life")])
 
 	def test_member_cannot_move_post_to_other_category(self):
 		self.client.force_login(self.member)
-		self._post("board")
+		self._post("life")
 		post = Post.objects.get(author=self.member)
 		self.client.post(reverse("blog:post_edit", args=[post.slug]), {
 			"title": post.title, "category": "tech", "content": "본문", "submit_action": "publish",
 		})
 		post.refresh_from_db()
-		self.assertEqual(post.category, "board")
+		self.assertEqual(post.category, "life")
 
 	def test_admin_all_categories(self):
 		self.client.force_login(self.admin)
-		for cat in ("tech", "board", "life", "secret"):
+		for cat in ("tech", "paper", "life", "secret"):
 			self._post(cat)
 			self.assertTrue(Post.objects.filter(category=cat).exists(), cat)
 
@@ -729,10 +729,10 @@ class WeeklyRecordTests(TestCase):
 		self._post(0, "life")
 		self._post(monday_offset + 1, "tech")        # 지난주 (일요일)
 		self._post(monday_offset + 8, "tech")        # 2주 전
-		self._post(0, "board", author=self.member)   # 회원 글은 안 셈
+		self._post(0, "life", author=self.member)    # 회원 글은 안 셈
 		self._post(0, "secret")
 		self._post(0, "tech", published=False)       # 초안은 안 셈
-		w = weekly_stats({"tech": 1, "life": 2, "board": 0, "secret": 0})
+		w = weekly_stats({"tech": 1, "life": 2, "paper": 0, "secret": 0})
 		self.assertEqual(w["total"], 2)
 		self.assertEqual(w["goal_total"], 3)
 		self.assertEqual({r["key"]: (r["count"], r["goal"]) for r in w["rows"]}, {"tech": (1, 1), "life": (1, 2)})
@@ -760,7 +760,7 @@ class WeeklyRecordTests(TestCase):
 		self.client.force_login(self.admin)
 		page = self.client.get(reverse("studio:settings"))
 		self.assertContains(page, "블로그 주간 목표")
-		data = {"blog_goal_tech": "3", "blog_goal_board": "0", "blog_goal_life": "99", "blog_goal_secret": "x"}
+		data = {"blog_goal_tech": "3", "blog_goal_paper": "0", "blog_goal_life": "99", "blog_goal_secret": "x"}
 		for item in page.context["nav_items"]:
 			data.setdefault("nav_order", [])
 			data["nav_order"].append(item["key"])
@@ -847,7 +847,7 @@ class CoverUploadTests(TestCase):
 		self.client.force_login(self.member)
 
 	def _post(self, upload):
-		return self.client.post(reverse("blog:post_create"), {"title": "커버 글", "category": "board", "content": "x", "submit_action": "publish", "cover_image": upload})
+		return self.client.post(reverse("blog:post_create"), {"title": "커버 글", "category": "life", "content": "x", "submit_action": "publish", "cover_image": upload})
 
 	def test_html_cover_rejected(self):
 		from django.core.files.uploadedfile import SimpleUploadedFile
@@ -863,3 +863,51 @@ class CoverUploadTests(TestCase):
 			self._post(SimpleUploadedFile("evil.html.png", buf.getvalue(), content_type="image/png"))
 			post = Post.objects.get(title="커버 글")
 			self.assertRegex(post.cover_image.name, r"^blog/covers/[0-9a-f]{32}\.jpg$")
+
+
+from django.utils import timezone  # noqa: E402
+
+
+class PaperCategoryTests(TestCase):
+	"""논문 리뷰 카테고리 Paper 와, Life 로 합쳐진 옛 Free(자유게시판) 주소"""
+
+	def setUp(self):
+		self.admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+		self.paper = Post.objects.create(title="[논문 리뷰] 어떤 논문", slug="paper-1", category=Post.CATEGORY_PAPER, author=self.admin,
+			content="", is_published=True, published_at=timezone.now())
+
+	def test_paper_page_and_hub_card(self):
+		res = self.client.get(reverse("blog:paper"))
+		self.assertEqual(res.status_code, 200)
+		self.assertContains(res, "어떤 논문")
+		self.assertEqual(res.context["page_title"], "Paper")
+		self.assertIn("Paper", [t["label"] for t in res.context["category_tabs"]])
+		self.assertNotIn("Free", [t["label"] for t in res.context["category_tabs"]])
+		hub = self.client.get(reverse("blog:index"))
+		self.assertEqual(hub.context["paper_count"], 1)
+		self.assertContains(hub, reverse("blog:paper"))
+		self.assertNotContains(hub, "자유게시판")
+
+	def test_old_board_url_redirects_to_life(self):
+		res = self.client.get("/blog/board/")
+		self.assertEqual(res.status_code, 301)
+		self.assertEqual(res["Location"], reverse("blog:life"))
+
+	def test_migration_moves_free_to_life_and_paper_review_out_of_tech(self):
+		import importlib
+		from django.apps import apps as global_apps
+		mig = importlib.import_module("blog.migrations.0014_paper_category_merge_free")
+		free = Post.objects.create(title="샤프 후기", slug="free-1", category="board", author=self.admin, content="")
+		review = Post.objects.create(title="[논문 리뷰] 다른 논문", slug="tech-review", category="tech", author=self.admin, content="")
+		tech = Post.objects.create(title="Wi-Fi 기초", slug="tech-1", category="tech", author=self.admin, content="")
+		from studio.models import SiteSetting
+		row = SiteSetting.objects.first() or SiteSetting.objects.create()
+		row.blog_goals = {"tech": 1, "board": 2}
+		row.save()
+		mig.forwards(global_apps, None)
+		for p in (free, review, tech):
+			p.refresh_from_db()
+		self.assertEqual((free.category, review.category, tech.category), ("life", "paper", "tech"))
+		self.assertEqual(Post.objects.count(), 4)   # 지운 글 없음
+		row.refresh_from_db()
+		self.assertNotIn("board", row.blog_goals)
