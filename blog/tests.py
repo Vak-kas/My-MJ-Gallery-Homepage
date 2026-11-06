@@ -803,6 +803,10 @@ class PostIndexMarkupTests(TestCase):
 		self.assertNotContains(res, "post-toc-bars")
 		self.assertContains(res, 'class="post-index__back"')
 		self.assertContains(res, "data-back-to-list class=", count=2)
+		# 왼쪽 목차가 있으면 위쪽 "목록으로" 는 숨기고 목차를 그 자리로 끌어올림 (버튼이 둘 보이지 않게)
+		self.assertContains(res, 'id="post-head"')
+		self.assertContains(res, "main:has(.post-layout.has-index) .post-head__back { visibility: hidden; }")
+		self.assertContains(res, "--post-head-lift")
 		self.assertNotContains(res, "{#")
 
 

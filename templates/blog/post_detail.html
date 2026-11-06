@@ -6,8 +6,8 @@
 {% include "components/main_nav.html" with nav_active="blog" %}
 
 <main class="mx-auto max-w-[1320px] px-6 py-12 lg:py-16">
-    <div class="mb-8 flex flex-wrap items-center justify-between gap-3">
-        <a href="{% url 'blog:index' %}#feed" data-back-to-list class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+    <div id="post-head" class="mb-8 flex flex-wrap items-center justify-between gap-3">
+        <a href="{% url 'blog:index' %}#feed" data-back-to-list class="post-head__back inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
             <span class="text-[18px]">←</span>
             <span>목록으로</span>
         </a>
@@ -285,7 +285,9 @@ html.theme-dark .post-jump__btn { border-color: rgba(255,255,255,.2); background
 .post-index { display: none; }
 @media (min-width: 1280px) {
     .post-layout.has-index { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 36px; align-items: start; }
-    .post-layout.has-index .post-index { display: block; order: -1; position: sticky; top: 96px; }
+    .post-layout.has-index .post-index { display: block; order: -1; position: sticky; top: 96px; margin-top: calc(-1 * var(--post-head-lift, 0px)); }
+    /* 왼쪽 목차가 있으면 위쪽 "목록으로" 는 숨기고, 목차를 그만큼 끌어올려 목차의 "목록으로" 가 그 자리에 오게 함 (내리면 목차와 함께 따라옴) */
+    main:has(.post-layout.has-index) .post-head__back { visibility: hidden; }
 }
 .post-index__back { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 18px 2px; padding: 6px 12px 6px 10px; border-radius: 9999px; border: 1px solid rgba(0,0,0,.08); background: #fff; font-size: 13px; color: #6e6e73; text-decoration: none; transition: color .15s, border-color .15s; }
 .post-index__back:hover { color: #0066cc; border-color: rgba(0,102,204,.35); }
@@ -420,6 +422,15 @@ html.theme-dark .post-index.is-open .post-index__major:hover .post-index__text, 
     }
     aside.hidden = false;
     layout.classList.add('has-index');
+    // 위쪽 줄(목록으로·조회·좋아요) 높이만큼 목차를 끌어올림 — 맨 위에선 목차의 "목록으로" 가 원래 링크 자리에
+    const head = document.getElementById('post-head');
+    const lift = () => {
+        if (!head) return;
+        const gap = layout.getBoundingClientRect().top - head.getBoundingClientRect().top;
+        layout.style.setProperty('--post-head-lift', `${Math.max(0, Math.round(gap))}px`);
+    };
+    lift();
+    window.addEventListener('resize', lift);
     // 마우스를 올리면 펼쳐지며 글자가 써지듯 나타나고, 벗어나면 바로 접힘
     let foldTimer = 0;
     aside.addEventListener('mouseenter', () => {
