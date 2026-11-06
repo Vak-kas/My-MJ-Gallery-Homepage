@@ -122,8 +122,8 @@ class NotificationTests(TestCase):
     def test_member_activity_notifies(self):
         Comment.objects.create(post=self.post, author=self.member, author_name="member", content="좋아요")
         GuestbookEntry.objects.create(author=self.member, author_name="member", message="안녕")
-        Post.objects.create(category="board", title="회원 글", slug="p2", author=self.member, published_at=timezone.now())
-        Post.objects.create(category="board", title="임시", slug="p3", author=self.member, is_published=False)
+        Post.objects.create(category="life", title="회원 글", slug="p2", author=self.member, published_at=timezone.now())
+        Post.objects.create(category="life", title="임시", slug="p3", author=self.member, is_published=False)
         kinds = sorted(Notification.objects.values_list("kind", flat=True))
         self.assertEqual(kinds, ["comment", "guestbook", "post"])
 

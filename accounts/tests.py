@@ -162,7 +162,7 @@ class RecoveryTests(TestCase):
 
     def test_delete_account_removes_user_and_content(self):
         from blog.models import Post
-        Post.objects.create(title="내 글", slug="my-post", category="board", author=self.u, content="x")
+        Post.objects.create(title="내 글", slug="my-post", category="life", author=self.u, content="x")
         self.client.login(username="minjae", password="Old-pw-12345")
         res = self.client.get(reverse("accounts:delete"))
         self.assertContains(res, "<b>1</b>")

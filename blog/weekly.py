@@ -17,7 +17,7 @@ from .models import Post
 WEEKS = 26
 CATEGORY_ICONS = {
 	Post.CATEGORY_TECH: "🛠️",
-	Post.CATEGORY_BOARD: "💬",
+	Post.CATEGORY_PAPER: "📄",
 	Post.CATEGORY_LIFE: "🌿",
 	Post.CATEGORY_SECRET: "🔒",
 }

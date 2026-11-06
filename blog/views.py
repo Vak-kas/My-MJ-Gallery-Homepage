@@ -409,8 +409,8 @@ CATEGORY_PAGES = {
 	# 탭 → (URL 이름, 제목, 설명). None 은 모든 카테고리
 	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
 	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
-	Post.CATEGORY_BOARD: ("blog:board", "Free", "자유게시판 · 회원 누구나 글을 쓸 수 있는 공간입니다."),
-	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상/라이프 블로그 목록입니다."),
+	Post.CATEGORY_PAPER: ("blog:paper", "Paper", "논문 리뷰 · 읽은 논문을 정리한 글입니다."),
+	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상 · 후기 · 자유 글 목록입니다. 회원 누구나 글을 쓸 수 있어요."),
 	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
 }
 CATEGORY_PAGE_SIZE = 30
@@ -602,11 +602,11 @@ def index(request):
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
 		"tech_posts": _preview_posts(Post.CATEGORY_TECH),
-		"board_posts": _preview_posts(Post.CATEGORY_BOARD),
+		"paper_posts": _preview_posts(Post.CATEGORY_PAPER),
 		"life_posts": _preview_posts(Post.CATEGORY_LIFE),
 		"secret_posts": _preview_posts(Post.CATEGORY_SECRET),
 		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
-		"board_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_BOARD),
+		"paper_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_PAPER),
 		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
 		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
 		"knowledge_map": build_map(_accessible_posts_qs(request)),
@@ -832,8 +832,13 @@ def tech(request):
 	return _category_page(request, Post.CATEGORY_TECH)
 
 
+def paper(request):
+	return _category_page(request, Post.CATEGORY_PAPER)
+
+
 def board(request):
-	return _category_page(request, Post.CATEGORY_BOARD)
+	"""옛 자유게시판 주소 — Life 로 합쳐져서 영구 이동"""
+	return redirect("blog:life", permanent=True)
 
 
 def life(request):
