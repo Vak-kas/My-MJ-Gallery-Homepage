@@ -65,10 +65,10 @@ class Post(models.Model):
 
 	@classmethod
 	def allowed_categories(cls, user):
-		"""글을 쓸 수 있는 카테고리 — 관리자는 전부, 일반 회원은 Life 만 (옛 자유게시판이 Life 로 합쳐짐)"""
+		"""글을 쓸 수 있는 카테고리 — 관리자만 전부, 일반 회원은 글쓰기 없음"""
 		if getattr(user, "is_superuser", False):
 			return {value for value, _ in cls.CATEGORY_CHOICES}
-		return {cls.CATEGORY_LIFE}
+		return set()
 	title = models.CharField(max_length=200)
 	cover_image = models.ImageField(upload_to="blog/covers/", blank=True, null=True)
 	author = models.ForeignKey(
