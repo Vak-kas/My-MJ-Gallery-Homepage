@@ -39,10 +39,10 @@
     .kmap__svg .dot.is-on { fill: #0066cc; }
     .kmap__svg .dot.is-off { fill: #c7c7cc; }
     .kmap__svg .hub-ring { fill: #fff; stroke: rgba(0, 0, 0, .08); stroke-width: 1; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, .08)); }
-    .kmap__svg .hub-icon { font-size: 15px; font-weight: 700; fill: #0066cc; text-anchor: middle; dominant-baseline: central; pointer-events: none; }
-    .kmap__svg .hub.is-etc .hub-icon { fill: #8e8e93; }
-    .kmap__svg .hub-label { font-size: 14px; font-weight: 600; fill: #1d1d1f; text-anchor: middle; pointer-events: none; }
-    .kmap__svg .hub-count { fill: #8e8e93; font-weight: 500; }
+    /* 원 안 = 묶음 이름(대표 태그), 원 아래 = 글 수 */
+    .kmap__svg .hub-name { font-weight: 700; fill: #0066cc; text-anchor: middle; dominant-baseline: central; letter-spacing: -.02em; pointer-events: none; }
+    .kmap__svg .hub.is-etc .hub-name { fill: #8e8e93; }
+    .kmap__svg .hub-count { font-size: 12px; font-weight: 500; fill: #8e8e93; text-anchor: middle; pointer-events: none; }
     .kmap__svg .hub { cursor: pointer; }
     .kmap.is-focus .dot, .kmap.is-focus .spoke, .kmap.is-focus .rel { opacity: .12; }
     .kmap.is-focus .is-lit { opacity: 1 !important; }
@@ -53,11 +53,11 @@
     html.theme-dark .kmap { background-color: #171a20; border-color: rgba(255, 255, 255, .08); background-image: radial-gradient(rgba(255, 255, 255, .08) 1px, transparent 1px); }
     html.theme-dark .kmap__svg .spoke { stroke: rgba(255, 255, 255, .14); }
     html.theme-dark .kmap__svg .hub-ring { fill: #22262e; stroke: rgba(255, 255, 255, .12); }
-    html.theme-dark .kmap__svg .hub-label { fill: #f3f4f6; }
+    html.theme-dark .kmap__svg .hub-count { fill: #a1a1aa; }
     html.theme-dark .kmap__svg .dot.is-on { fill: #4ea1ff; }
     html.theme-dark .kmap__svg .dot.is-off { fill: #4b5060; }
     html.theme-dark .kmap-legend b { color: #f3f4f6; }
-    html.theme-dark .kmap__svg .hub-icon { fill: #4ea1ff; }
+    html.theme-dark .kmap__svg .hub-name { fill: #4ea1ff; }
 </style>
 <script>
 (() => {
@@ -170,10 +170,12 @@
             const c = hubPos.get(h.key);
             const a = mk('a', { href: h.url, class: `hub${h.key === 'etc' ? ' is-etc' : ''}`, 'aria-label': `${h.label} ${h.count}개${h.tags.length ? ' · ' + h.tags.join(', ') : ''}` }, gHub);
             mk('circle', { cx: c.x, cy: c.y, r: 36, class: 'hub-ring' }, a);
-            mk('text', { x: c.x, y: c.y, class: 'hub-icon' }, a).textContent = h.key === 'etc' ? '…' : '#';
-            const label = mk('text', { x: c.x, y: c.y + 58, class: 'hub-label' }, a);
-            label.textContent = `${h.label} `;
-            mk('tspan', { class: 'hub-count' }, label).textContent = h.count;
+            // 원(지름 72) 안에 들어가게 이름 길이에 따라 글자 크기를 줄이고, 아주 길면 줄임표
+            const name = [...h.label].length > 12 ? [...h.label].slice(0, 11).join('') + '…' : h.label;
+            const len = [...name].reduce((n, ch) => n + (/[\u3131-\uD79D]/.test(ch) ? 1.6 : 1), 0);   // 한글은 넓게 셈
+            const size = len <= 5 ? 16 : len <= 8 ? 13 : len <= 11 ? 11 : len <= 14 ? 9.5 : 8.5;
+            mk('text', { x: c.x, y: c.y, class: 'hub-name', 'font-size': size }, a).textContent = name;
+            mk('text', { x: c.x, y: c.y + 54, class: 'hub-count' }, a).textContent = `${h.count}편`;
             const mine = data.nodes.filter((n) => n.hub === h.key);
             a.addEventListener('mouseenter', () => focus(mine.flatMap((n) => [n.dot, n.spoke]).filter(Boolean)));
             a.addEventListener('mouseleave', blur);
