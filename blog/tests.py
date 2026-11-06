@@ -593,7 +593,7 @@ class LegacyEditorJsXssTests(SimpleTestCase):
 
 class UrlPreviewSsrfTests(TestCase):
 	def setUp(self):
-		self.user = get_user_model().objects.create_user(username="previewer", password="pw-for-tests-only")
+		self.user = get_user_model().objects.create_superuser(username="previewer", password="pw-for-tests-only", email="p@x.kr")
 		self.url = reverse("blog:url_preview")
 
 	def test_requires_login(self):
@@ -657,7 +657,7 @@ class UrlPreviewSsrfTests(TestCase):
 
 
 class MemberCategoryTests(TestCase):
-	"""일반 회원은 Life 에만(옛 자유게시판이 Life 로 합쳐짐), 관리자는 모든 카테고리에 글을 씀"""
+	"""블로그 글쓰기는 관리자만. 일반 회원은 글쓰기·수정·에디터 API 모두 404, 허브에 글쓰기 버튼도 없음"""
 
 	def setUp(self):
 		self.member = get_user_model().objects.create_user(username="member", password="pw-for-tests-only")
@@ -668,28 +668,39 @@ class MemberCategoryTests(TestCase):
 			"title": f"{category} 글", "category": category, "content": "본문", "submit_action": "publish",
 		})
 
-	def test_member_only_life(self):
+	def test_member_cannot_write(self):
 		self.client.force_login(self.member)
-		for cat in ("tech", "paper", "secret", "board"):
-			self._post(cat)
-			self.assertFalse(Post.objects.filter(category=cat).exists(), cat)
-		self._post("life")
-		self.assertTrue(Post.objects.filter(category="life", author=self.member).exists())
+		self.assertEqual(self.client.get(reverse("blog:post_create")).status_code, 404)
+		for cat in ("tech", "paper", "life", "secret"):
+			self.assertEqual(self._post(cat).status_code, 404)
+		self.assertFalse(Post.objects.exists())
+		self.assertEqual(Post.allowed_categories(self.member), set())
 
-	def test_member_form_shows_only_life(self):
+	def test_member_cannot_edit_old_post_but_can_delete_it(self):
+		post = Post.objects.create(title="옛 회원 글", slug="old-member", category="life", author=self.member, content="x")
 		self.client.force_login(self.member)
-		res = self.client.get(reverse("blog:post_create"))
-		self.assertEqual(res.context["categories"], [("life", "Life")])
-
-	def test_member_cannot_move_post_to_other_category(self):
-		self.client.force_login(self.member)
-		self._post("life")
-		post = Post.objects.get(author=self.member)
-		self.client.post(reverse("blog:post_edit", args=[post.slug]), {
-			"title": post.title, "category": "tech", "content": "본문", "submit_action": "publish",
+		res = self.client.post(reverse("blog:post_edit", args=[post.slug]), {
+			"title": "바꿈", "category": "tech", "content": "본문", "submit_action": "publish",
 		})
+		self.assertEqual(res.status_code, 404)
 		post.refresh_from_db()
-		self.assertEqual(post.category, "life")
+		self.assertEqual((post.title, post.category), ("옛 회원 글", "life"))
+		self.client.post(reverse("blog:post_delete", args=[post.slug]))
+		self.assertFalse(Post.objects.filter(pk=post.pk).exists())
+
+	def test_member_cannot_use_editor_apis(self):
+		self.client.force_login(self.member)
+		self.assertEqual(self.client.get(reverse("blog:url_preview"), {"url": "https://example.com/"}).status_code, 404)
+		self.assertEqual(self.client.post(reverse("blog:image_upload")).status_code, 404)
+		self.assertEqual(self.client.post(reverse("blog:math_ocr")).status_code, 404)
+
+	def test_write_button_only_for_admin(self):
+		write = reverse("blog:post_create")
+		self.assertNotContains(self.client.get(reverse("blog:index")), write)
+		self.client.force_login(self.member)
+		self.assertNotContains(self.client.get(reverse("blog:index")), write)
+		self.client.force_login(self.admin)
+		self.assertContains(self.client.get(reverse("blog:index")), write)
 
 	def test_admin_all_categories(self):
 		self.client.force_login(self.admin)
@@ -843,7 +854,7 @@ class CoverUploadTests(TestCase):
 	"""커버 이미지: 이미지가 아니면 거절, 이미지는 다시 그려 uuid 이름으로 (HTML 커버로 저장형 XSS 방지)"""
 
 	def setUp(self):
-		self.member = get_user_model().objects.create_user("cov", "c@x.kr", "pw-for-tests-only")
+		self.member = get_user_model().objects.create_superuser("cov", "c@x.kr", "pw-for-tests-only")
 		self.client.force_login(self.member)
 
 	def _post(self, upload):

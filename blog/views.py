@@ -1,3 +1,4 @@
+from functools import wraps
 import ipaddress
 import logging
 import socket
@@ -216,6 +217,16 @@ def _single_post_qs(request):
 	return qs.filter(is_published=True).exclude(category=Post.CATEGORY_SECRET).exclude(visibility=Post.VISIBILITY_PRIVATE)
 
 
+def admin_only(view):
+	"""블로그 글쓰기·수정과 에디터 API 는 관리자만 (회원 글쓰기는 막음). 그 밖의 사람에겐 없는 주소처럼 404"""
+	@wraps(view)
+	def wrapped(request, *args, **kwargs):
+		if not request.user.is_superuser:
+			raise Http404("Not found")
+		return view(request, *args, **kwargs)
+	return wrapped
+
+
 def _can_manage_post(request, post: Post) -> bool:
 	return request.user.is_authenticated and (
 		request.user.is_superuser or post.author_id == request.user.id
@@ -410,7 +421,7 @@ CATEGORY_PAGES = {
 	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
 	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
 	Post.CATEGORY_PAPER: ("blog:paper", "Paper", "논문 리뷰 · 읽은 논문을 정리한 글입니다."),
-	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상 · 후기 · 자유 글 목록입니다. 회원 누구나 글을 쓸 수 있어요."),
+	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상 · 후기 · 자유 글 목록입니다."),
 	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
 }
 CATEGORY_PAGE_SIZE = 30
@@ -679,6 +690,7 @@ PREVIEW_ERROR = {"error": "미리보기를 만들 수 없는 주소예요"}
 
 @require_GET
 @login_required
+@admin_only
 def url_preview(request):
 	"""에디터 링크 카드용 OG 메타데이터. 로그인 회원만, 공개 주소만, 리다이렉트는 매 단계 재검사, 512KB 까지만 읽고, 오류 내용은 로그에만."""
 	url = (request.GET.get("url") or "").strip()[:2000]
@@ -738,6 +750,7 @@ def url_preview(request):
 
 
 @login_required
+@admin_only
 def math_ocr(request):
 	if request.method != "POST":
 		return JsonResponse({"error": "method not allowed"}, status=405)
@@ -800,6 +813,7 @@ def _cover_file(upload):
 
 
 @login_required
+@admin_only
 def image_upload(request):
 	"""본문 이미지를 파일로 저장하고 URL을 반환 (base64로 본문에 박히면 글 용량이 폭증함)"""
 	if request.method != "POST":
@@ -1046,6 +1060,7 @@ def _build_unique_slug(title: str, exclude_post_id=None):
 
 
 @login_required
+@admin_only
 def post_create(request):
 	draft_id_param = (request.GET.get("draft") or "").strip()
 	selected_draft = None
@@ -1155,6 +1170,7 @@ def post_create(request):
 
 
 @login_required
+@admin_only
 def post_edit(request, slug: str):
 	post = get_object_or_404(Post.objects.prefetch_related("tags"), slug=slug)
 	if not _can_manage_post(request, post):
