@@ -926,3 +926,26 @@ class PaperCategoryTests(TestCase):
 		self.assertEqual(Post.objects.count(), 4)   # 지운 글 없음
 		row.refresh_from_db()
 		self.assertNotIn("board", row.blog_goals)
+
+
+class PaperTitlePrefixMigrationTests(TestCase):
+	"""마이그레이션 0015: Paper 글 제목의 "[논문 리뷰]" 말머리만 빼고 주소·수정 시각·다른 카테고리 글은 그대로"""
+
+	def test_strips_prefix_only_on_paper_posts(self):
+		import importlib
+		from django.apps import apps as global_apps
+		mig = importlib.import_module("blog.migrations.0015_strip_paper_review_prefix")
+		admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+		paper = Post.objects.create(title="[논문 리뷰] Intelligent Frequency Reuse", slug="paper-review-slug", category="paper", author=admin, content="")
+		tech = Post.objects.create(title="[논문 리뷰] 테크에 남은 글", slug="tech-slug", category="tech", author=admin, content="")
+		before = Post.objects.get(pk=paper.pk).updated_at
+		mig.forwards(global_apps, None)
+		paper.refresh_from_db()
+		tech.refresh_from_db()
+		self.assertEqual(paper.title, "Intelligent Frequency Reuse")
+		self.assertEqual(paper.slug, "paper-review-slug")
+		self.assertEqual(paper.updated_at, before)
+		self.assertEqual(tech.title, "[논문 리뷰] 테크에 남은 글")
+		mig.backwards(global_apps, None)
+		paper.refresh_from_db()
+		self.assertEqual(paper.title, "[논문 리뷰] Intelligent Frequency Reuse")
