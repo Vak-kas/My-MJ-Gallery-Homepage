@@ -14,6 +14,7 @@ urlpatterns = [
     path("series/<str:slug>/", views.series_detail, name="series"),
     path("all/", views.all_posts, name="all"),
     path("tech/", views.tech, name="tech"),
+    path("algorithm/", views.algorithm, name="algorithm"),
     path("paper/", views.paper, name="paper"),
     path("board/", views.board, name="board"),   # 옛 자유게시판 → /blog/life/
     path("life/", views.life, name="life"),

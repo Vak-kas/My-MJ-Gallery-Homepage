@@ -10,11 +10,13 @@ from django.core.files.storage import default_storage
 from django.urls import reverse
 
 BLUE, GREEN, ORANGE, PURPLE, GOLD = (10, 132, 255), (16, 185, 129), (249, 115, 22), (139, 92, 246), (212, 175, 55)
+TEAL = (13, 148, 136)
 
 PAGES = {
-    "blog": {"title": "Blog", "subtitle": "기술 글 · 논문 리뷰 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
-    "all": {"title": "All Posts", "subtitle": "기술 · 논문 리뷰 · 일상 — 모든 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
+    "blog": {"title": "Blog", "subtitle": "기술 글 · 알고리즘 · 논문 리뷰 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
+    "all": {"title": "All Posts", "subtitle": "기술 · 알고리즘 · 논문 리뷰 · 일상 — 모든 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
     "tech": {"title": "Tech Blog", "subtitle": "트러블슈팅 · 네트워크 · 보안", "pill": "TECH", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
+    "algorithm": {"title": "Algorithm", "subtitle": "문제 풀이 · 개념 정리", "pill": "ALGORITHM", "accent": TEAL, "eyebrow": "SMJ GALLERY · BLOG"},
     "paper": {"title": "Paper Review", "subtitle": "읽은 논문 정리 · 리뷰", "pill": "PAPER", "accent": PURPLE, "eyebrow": "SMJ GALLERY · BLOG"},
     "life": {"title": "Life", "subtitle": "일상 · 후기 · 자유 글", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
     "gallery": {"title": "Gallery", "subtitle": "사진으로 남긴 순간들", "pill": "PHOTO", "accent": GOLD, "eyebrow": "SMJ GALLERY"},

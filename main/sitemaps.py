@@ -16,7 +16,7 @@ class StaticSitemap(Sitemap):
 	def items(self):
 		names = ["main:home"]
 		if _open("blog"):
-			names += ["blog:index", "blog:all", "blog:tech", "blog:paper", "blog:life"]
+			names += ["blog:index", "blog:all", "blog:tech", "blog:algorithm", "blog:paper", "blog:life"]
 		if _open("photo"):
 			names.append("main:photos")
 		if _open("tool"):
