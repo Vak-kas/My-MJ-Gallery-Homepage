@@ -15,7 +15,7 @@
     <h1 class="apple-display mt-4 text-[56px] font-semibold tracking-[-0.04em]">{{ page_title }}.</h1>
     <p class="mt-4 text-[18px] text-[#6e6e73]">{{ page_desc }} <span class="text-[#8e8e93]">· {{ total_posts }}개</span></p>
 
-    {# 카테고리 탭: 전체 · Tech · Algorithm · Paper · Life · (관리자) Secret #}
+    {# 카테고리 탭: 전체 + Studio › Categories 순서대로 (관리자 전용은 관리자에게만) #}
     <div class="mt-8 flex flex-wrap gap-2">
         {% for tab in category_tabs %}
         <a href="{{ tab.url }}" class="rounded-full px-4 py-1.5 text-[12px] {% if tab.key == active_tab %}bg-[#0066cc] font-semibold text-white{% elif tab.secret %}border border-red-300 bg-red-50 font-semibold text-red-700{% else %}border border-black/[0.1] text-[#1d1d1f]{% endif %}">{{ tab.label }}</a>

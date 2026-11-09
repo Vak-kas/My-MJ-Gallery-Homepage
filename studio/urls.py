@@ -58,6 +58,11 @@ urlpatterns = [
     path('server/logs/', views.server_logs, name='server_logs'),
     path('ai/', views.ai_usage, name='ai'),
     path('settings/', views.site_settings_view, name='settings'),
+    path('categories/', views.categories, name='categories'),
+    path('categories/create/', views.category_create, name='category_create'),
+    path('categories/<int:id>/update/', views.category_update, name='category_update'),
+    path('categories/<int:id>/move/', views.category_move, name='category_move'),
+    path('categories/<int:id>/delete/', views.category_delete, name='category_delete'),
     path('posts/<int:id>/visibility/', views.post_visibility_update, name='post_visibility_update'),
     path('posts/<int:id>/delete/', views.post_delete, name='post_delete'),
 

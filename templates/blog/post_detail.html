@@ -40,7 +40,7 @@
 
         <div class="border-b border-black/[0.06] px-6 py-5 lg:px-10 lg:py-7">
             <div class="flex flex-wrap items-center gap-2">
-                <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0066cc]">{{ post.get_category_display }}</span>
+                <span class="cat-badge rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]" style="--cat: {{ post.category_info.color }}; --cat-soft: {{ post.category_info.soft_color }};">{{ post.category_info.name }}</span>
                 {% if post.is_published %}
                 <span class="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-[11px] font-semibold text-green-700">Published</span>
                 {% else %}

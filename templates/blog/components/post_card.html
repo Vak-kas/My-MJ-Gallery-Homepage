@@ -22,7 +22,7 @@
         {% endwith %}
 
         <div class="flex items-center justify-between gap-3">
-            <span class="rounded-full bg-[#f2f2f7] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0066cc]">{{ post.get_category_display }}</span>
+            <span class="cat-badge rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em]" style="--cat: {{ post.category_info.color }}; --cat-soft: {{ post.category_info.soft_color }};">{{ post.category_info.name }}</span>
             <div class="flex items-center gap-2">
                 {% if post.visibility == 'protected' %}
                 <span class="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700">🔒 보호글</span>

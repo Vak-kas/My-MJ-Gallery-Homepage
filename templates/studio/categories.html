@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">BLOG CATEGORIES</p>
+            <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[36px] lg:text-[44px]">카테고리</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">블로그 카테고리를 만들고, 이름·색·순서와 어디에 보일지를 정해요. 저장하면 사이트에 바로 반영돼요.</p>
+        </section>
+
+        {% if orphans %}
+        <div class="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-[14px] text-amber-900">
+            표에 없는 카테고리 값을 가진 글이 있어요(공개 목록엔 안 보임):
+            {% for slug, n in orphans %}<b class="font-mono">{{ slug }}</b> {{ n }}편{% if not forloop.last %}, {% endif %}{% endfor %}.
+            같은 주소로 카테고리를 만들면 다시 보여요.
+        </div>
+        {% endif %}
+
+        {# 카테고리 목록 #}
+        <ul class="space-y-3">
+            {% for c in items %}
+            <li id="cat-{{ c.id }}" class="rounded-[22px] border border-black/[0.06] bg-white p-5">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex flex-col">
+                        <form method="post" action="{% url 'studio:category_move' c.id %}">{% csrf_token %}<input type="hidden" name="direction" value="up"><button type="submit" class="rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="위로" {% if forloop.first %}disabled{% endif %}>▲</button></form>
+                        <form method="post" action="{% url 'studio:category_move' c.id %}">{% csrf_token %}<input type="hidden" name="direction" value="down"><button type="submit" class="rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="아래로" {% if forloop.last %}disabled{% endif %}>▼</button></form>
+                    </div>
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl text-[18px]" style="background: {{ c.soft_color }};">{{ c.icon }}</span>
+                    <div class="min-w-0">
+                        <p class="text-[17px] font-semibold" style="color: {{ c.color }};">{{ c.name }}</p>
+                        <a href="{{ c.url }}" target="_blank" class="font-mono text-[12px] text-[#8e8e93] hover:text-[#0066cc]">/blog/{{ c.slug }}/ ↗</a>
+                    </div>
+                    <div class="ml-auto flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+                        <span class="rounded-full bg-black/[0.05] px-2.5 py-1 text-[#6e6e73]">글 {{ c.post_count }}편</span>
+                        {% if c.is_private %}<span class="rounded-full bg-red-50 px-2.5 py-1 text-red-600">🔒 관리자 전용</span>{% endif %}
+                        {% if c.show_on_hub %}<span class="rounded-full bg-[#eef3ff] px-2.5 py-1 text-[#0066cc]">허브 카드</span>{% endif %}
+                        {% if c.show_on_home and not c.is_private %}<span class="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[#059669]">홈 바로가기</span>{% endif %}
+                        {% if c.in_topic_map %}<span class="rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[#7c3aed]">Topic Map</span>{% endif %}
+                        {% if c.weekly_goal %}<span class="rounded-full bg-[#fff7ed] px-2.5 py-1 text-[#c2410c]">주 {{ c.weekly_goal }}개</span>{% endif %}
+                    </div>
+                    <a href="?edit={{ c.id }}#cat-{{ c.id }}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] hover:bg-[#f5f5f7]">수정</a>
+                </div>
+                {% if c.description %}<p class="mt-2 pl-[88px] text-[13px] text-[#6e6e73]">{{ c.description }}</p>{% endif %}
+
+                {% if editing_id == c.id %}
+                <div class="mt-5 border-t border-black/[0.06] pt-5">
+                    {% include "studio/components/category_form.html" with c=c submit_label="저장" %}
+
+                    <details class="mt-6 rounded-2xl border border-red-200 bg-red-50/50 px-4 py-3">
+                        <summary class="cursor-pointer text-[13px] font-semibold text-red-700">이 카테고리 지우기</summary>
+                        <form method="post" action="{% url 'studio:category_delete' c.id %}" class="mt-3 space-y-3 text-[13px]">
+                            {% csrf_token %}
+                            {% if c.post_count %}
+                            <label class="block">글 {{ c.post_count }}편을 옮길 카테고리
+                                <select name="move_to" required class="ml-2 h-9 rounded-lg border border-black/[0.1] bg-white px-2">
+                                    {% for o in items %}{% if o.id != c.id %}<option value="{{ o.slug }}">{{ o.name }}</option>{% endif %}{% endfor %}
+                                </select>
+                            </label>
+                            {% else %}
+                            <p class="text-[#6e6e73]">이 카테고리에는 글이 없어요.</p>
+                            {% endif %}
+                            <label class="block">확인을 위해 주소 <b class="font-mono">{{ c.slug }}</b> 를 입력
+                                <input type="text" name="confirm" autocomplete="off" required class="ml-2 h-9 w-40 rounded-lg border border-black/[0.1] bg-white px-3 font-mono">
+                            </label>
+                            <button type="submit" class="rounded-full bg-red-600 px-5 py-2 font-semibold text-white">{% if c.post_count %}글 옮기고 지우기{% else %}지우기{% endif %}</button>
+                        </form>
+                    </details>
+                </div>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+
+        {# 새 카테고리 #}
+        <section class="mt-8 rounded-[22px] border border-black/[0.06] bg-white p-6">
+            <h2 class="text-[17px] font-semibold">새 카테고리</h2>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">목록 맨 아래에 추가돼요. 주소는 나중에 바꿔도 글이 같이 따라가요(옛 주소 링크는 끊겨요).</p>
+            <div class="mt-4">
+                {% include "studio/components/category_form.html" with c=None submit_label="만들기" %}
+            </div>
+        </section>
+        </main>
+    </div>
+</div>
+{% endblock %}

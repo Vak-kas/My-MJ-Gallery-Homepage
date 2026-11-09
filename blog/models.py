@@ -21,6 +21,48 @@ class Tag(models.Model):
 		return name[:40]
 
 
+class Category(models.Model):
+	"""블로그 카테고리 — Studio › Categories 에서 추가·수정·순서·노출을 정함.
+
+	글(Post.category)에는 slug 문자열이 들어감. slug 는 주소 /blog/<slug>/ 이기도 함.
+	"""
+
+	slug = models.SlugField("주소", max_length=30, unique=True)
+	name = models.CharField("이름", max_length=30)
+	description = models.CharField("설명", max_length=120, blank=True)
+	color = models.CharField("색", max_length=7, default="#0066cc")   # #rrggbb
+	icon = models.CharField("아이콘", max_length=8, default="📝", blank=True)   # 이번 주 기록에 쓰는 이모지
+	order = models.PositiveIntegerField(default=0)
+	is_private = models.BooleanField("관리자 전용", default=False)   # Secret 처럼 나만 보는 카테고리
+	show_on_hub = models.BooleanField("블로그 허브 카드", default=True)
+	show_on_home = models.BooleanField("홈 블로그 바로가기", default=True)
+	in_topic_map = models.BooleanField("Topic Map 포함", default=False)
+	weekly_goal = models.PositiveSmallIntegerField("주간 목표", default=0)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ["order", "id"]
+
+	def __str__(self):
+		return self.name
+
+	def save(self, *args, **kwargs):
+		super().save(*args, **kwargs)
+		from .categories import clear_cache
+		clear_cache()
+
+	def delete(self, *args, **kwargs):
+		result = super().delete(*args, **kwargs)
+		from .categories import clear_cache
+		clear_cache()
+		return result
+
+	@property
+	def soft_color(self):
+		"""배지·카드 배경용 연한 색 (같은 색에 투명도 10%)"""
+		return f"{self.color}1a"
+
+
 class Series(models.Model):
 	"""글 묶음 (예: HackRF 입문 1~5편)."""
 
@@ -49,28 +91,31 @@ class Post(models.Model):
 		(VISIBILITY_PROTECTED, "일부공개(비밀번호)"),
 	]
 
+	# 처음부터 있던 카테고리 slug (카테고리 자체는 Category 표에서 관리 — Studio › Categories)
 	CATEGORY_TECH = "tech"
-	CATEGORY_ALGORITHM = "algorithm"   # 알고리즘 문제 풀이·개념
-	CATEGORY_PAPER = "paper"   # 논문 리뷰 (옛 Free 자유게시판 "board" 는 Life 로 합침)
+	CATEGORY_ALGORITHM = "algorithm"
+	CATEGORY_PAPER = "paper"
 	CATEGORY_LIFE = "life"
 	CATEGORY_SECRET = "secret"
 
-	CATEGORY_CHOICES = [
-		(CATEGORY_TECH, "Tech"),
-		(CATEGORY_ALGORITHM, "Algorithm"),
-		(CATEGORY_PAPER, "Paper"),
-		(CATEGORY_LIFE, "Life"),
-		(CATEGORY_SECRET, "Secret"),
-	]
-
-	category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, db_index=True)
+	category = models.CharField(max_length=30, db_index=True)   # Category.slug
 
 	@classmethod
 	def allowed_categories(cls, user):
-		"""글을 쓸 수 있는 카테고리 — 관리자만 전부, 일반 회원은 글쓰기 없음"""
+		"""글을 쓸 수 있는 카테고리 slug — 관리자만 전부, 일반 회원은 글쓰기 없음"""
 		if getattr(user, "is_superuser", False):
-			return {value for value, _ in cls.CATEGORY_CHOICES}
+			from .categories import slugs
+			return set(slugs())
 		return set()
+
+	@property
+	def category_info(self):
+		"""이 글의 Category (지워진 카테고리면 이름만 slug 인 임시 값)"""
+		from .categories import get
+		return get(self.category)
+
+	def get_category_display(self):
+		return self.category_info.name
 	title = models.CharField(max_length=200)
 	cover_image = models.ImageField(upload_to="blog/covers/", blank=True, null=True)
 	author = models.ForeignKey(

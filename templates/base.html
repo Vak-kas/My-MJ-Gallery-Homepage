@@ -267,6 +267,16 @@
             border-bottom-color: rgba(255, 255, 255, 0.12);
             background: rgba(15, 18, 24, 0.88);
         }
+
+        /* 블로그 카테고리 색 (Studio › Categories 의 색을 --cat 으로 넘겨받음) */
+        .cat-badge, .hub-cat .hub-cat__pill { color: var(--cat); background-color: var(--cat-soft); }
+        .hub-cat .hub-cat__eyebrow { color: var(--cat); }
+        .hub-cat .hub-cat__new { background-color: var(--cat); }
+        .hub-cat .hub-cat__post:hover { background-color: var(--cat-soft); }
+        .hub-cat.hub-cat--private { border-color: color-mix(in srgb, var(--cat) 35%, transparent); background-color: color-mix(in srgb, var(--cat) 4%, #fff); }
+        html.theme-dark .cat-badge, html.theme-dark .hub-cat .hub-cat__pill, html.theme-dark .hub-cat .hub-cat__eyebrow { color: color-mix(in srgb, var(--cat) 70%, #fff); }
+        html.theme-dark .hub-cat .hub-cat__post:hover { background-color: color-mix(in srgb, var(--cat) 14%, #1d2027) !important; }
+        html.theme-dark .hub-cat.hub-cat--private { background-color: color-mix(in srgb, var(--cat) 8%, #171a20) !important; border-color: color-mix(in srgb, var(--cat) 40%, transparent) !important; }
     </style>
     <link rel="stylesheet" href="{% static 'css/theme-dark.css' %}?v=1">
 </head>

@@ -1,9 +1,9 @@
 """블로그 허브의 "이번 주 기록" 카드 — 사이트 주인(관리자)이 쓴 글을 주 단위로 셈.
 
 - 주는 월요일 시작, 서울 시간 기준
-- 카테고리별 이번 주 글 수 / 목표 (목표는 Studio > 설정 > 블로그 주간 목표)
+- 카테고리별 이번 주 글 수 / 목표 (목표·아이콘은 Studio › Categories)
 - 최근 26주 막대, 연속 기록(이번 주에 아직 안 썼으면 지난주까지 이어진 만큼)
-- Secret 카테고리는 관리자에게만 보임
+- 관리자 전용 카테고리(Secret 등)는 관리자에게만 보임
 
 구성은 minter-v1.com (github.com/Minter-v1/Minter-blog) 의 주간 기록 카드를 참고해 직접 구현
 """
@@ -12,23 +12,18 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from . import categories
 from .models import Post
 
 WEEKS = 26
-CATEGORY_ICONS = {
-	Post.CATEGORY_TECH: "🛠️",
-	Post.CATEGORY_ALGORITHM: "🧩",
-	Post.CATEGORY_PAPER: "📄",
-	Post.CATEGORY_LIFE: "🌿",
-	Post.CATEGORY_SECRET: "🔒",
-}
 
 
 def week_start(day):
 	return day - timedelta(days=day.weekday())
 
 
-def weekly_stats(goals, include_secret=False, today=None):
+def weekly_stats(goals=None, include_secret=False, today=None):
+	"""goals 를 안 주면 각 카테고리의 주간 목표(Category.weekly_goal)를 씀"""
 	today = today or timezone.localdate()
 	this_week = week_start(today)
 	first_week = this_week - timedelta(weeks=WEEKS - 1)
@@ -39,7 +34,7 @@ def weekly_stats(goals, include_secret=False, today=None):
 		published_at__date__gte=first_week,
 	)
 	if not include_secret:
-		qs = qs.exclude(category=Post.CATEGORY_SECRET)
+		qs = qs.filter(category__in=categories.public_slugs())
 
 	per_week = [0] * WEEKS
 	this_week_by_cat = {}
@@ -52,13 +47,13 @@ def weekly_stats(goals, include_secret=False, today=None):
 				this_week_by_cat[category] = this_week_by_cat.get(category, 0) + 1
 
 	rows = []
-	for value, label in Post.CATEGORY_CHOICES:
-		if value == Post.CATEGORY_SECRET and not include_secret:
+	for c in categories.all_categories():
+		if c.is_private and not include_secret:
 			continue
-		goal = int(goals.get(value) or 0)
-		count = this_week_by_cat.get(value, 0)
+		goal = int((goals.get(c.slug) if goals is not None else c.weekly_goal) or 0)
+		count = this_week_by_cat.get(c.slug, 0)
 		if goal or count:
-			rows.append({"key": value, "label": label, "icon": CATEGORY_ICONS.get(value, "📝"), "count": count, "goal": goal, "done": goal and count >= goal})
+			rows.append({"key": c.slug, "label": c.name, "icon": c.icon, "count": count, "goal": goal, "done": goal and count >= goal})
 
 	total = per_week[-1]
 	goal_total = sum(r["goal"] for r in rows)

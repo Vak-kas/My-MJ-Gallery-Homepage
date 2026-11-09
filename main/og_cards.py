@@ -10,15 +10,10 @@ from django.core.files.storage import default_storage
 from django.urls import reverse
 
 BLUE, GREEN, ORANGE, PURPLE, GOLD = (10, 132, 255), (16, 185, 129), (249, 115, 22), (139, 92, 246), (212, 175, 55)
-TEAL = (13, 148, 136)
 
 PAGES = {
-    "blog": {"title": "Blog", "subtitle": "기술 글 · 알고리즘 · 논문 리뷰 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
-    "all": {"title": "All Posts", "subtitle": "기술 · 알고리즘 · 논문 리뷰 · 일상 — 모든 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
-    "tech": {"title": "Tech Blog", "subtitle": "트러블슈팅 · 네트워크 · 보안", "pill": "TECH", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
-    "algorithm": {"title": "Algorithm", "subtitle": "문제 풀이 · 개념 정리", "pill": "ALGORITHM", "accent": TEAL, "eyebrow": "SMJ GALLERY · BLOG"},
-    "paper": {"title": "Paper Review", "subtitle": "읽은 논문 정리 · 리뷰", "pill": "PAPER", "accent": PURPLE, "eyebrow": "SMJ GALLERY · BLOG"},
-    "life": {"title": "Life", "subtitle": "일상 · 후기 · 자유 글", "pill": "LIFE", "accent": GREEN, "eyebrow": "SMJ GALLERY · BLOG"},
+    "blog": {"title": "Blog", "subtitle": "기술 글 · 일상 기록", "pill": "BLOG", "accent": BLUE, "eyebrow": "SMJ GALLERY"},
+    "all": {"title": "All Posts", "subtitle": "모든 카테고리의 글", "pill": "ALL", "accent": BLUE, "eyebrow": "SMJ GALLERY · BLOG"},
     "gallery": {"title": "Gallery", "subtitle": "사진으로 남긴 순간들", "pill": "PHOTO", "accent": GOLD, "eyebrow": "SMJ GALLERY"},
     "games": {"title": "Game", "subtitle": "사다리타기 · 돌림판 · 2048 · 한글 타자 연습", "pill": "GAME", "accent": GREEN, "eyebrow": "SMJ GALLERY"},
 }
@@ -62,9 +57,33 @@ def game_spec(slug):
             "eyebrow": "SMJ GALLERY · GAME", "footer": " · ".join(game.get("tags", []))}
 
 
+def _category_names():
+    from blog.categories import all_categories
+
+    return " · ".join(c.name for c in all_categories() if not c.is_private)
+
+
+def category_spec(slug):
+    """블로그 카테고리 목록 카드 — 이름·설명·색은 Studio › Categories 값. 관리자 전용은 없음"""
+    from blog.categories import exists, get, hex_to_rgb
+
+    if not exists(slug):
+        return None
+    info = get(slug)
+    if info.is_private:
+        return None
+    return {"title": info.name, "subtitle": info.description, "pill": info.name.upper(), "accent": hex_to_rgb(info.color),
+            "eyebrow": "SMJ GALLERY · BLOG"}
+
+
 def spec(kind, key):
     if kind == "page":
-        return PAGES.get(key)
+        page = PAGES.get(key)
+        if page and key in ("blog", "all"):   # 카테고리 이름은 Studio 에서 바뀌므로 그때그때
+            page = {**page, "subtitle": _category_names() or page["subtitle"]}
+        return page
+    if kind == "category":
+        return category_spec(key)
     if kind == "tool":
         return tool_spec(key)
     if kind == "series":

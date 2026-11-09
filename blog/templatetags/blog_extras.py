@@ -348,3 +348,11 @@ def post_teaser(post, length=90):
     if post.summary:
         return post.summary
     return editorjs_excerpt(post.content, length)
+
+
+@register.simple_tag
+def home_blog_categories():
+	"""홈 "블로그 바로가기" 에 보일 카테고리 — Studio › Categories 에서 홈 바로가기를 켠 공개 카테고리"""
+	from blog import categories
+
+	return [c for c in categories.all_categories() if c.show_on_home and not c.is_private]
