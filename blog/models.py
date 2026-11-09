@@ -50,12 +50,14 @@ class Post(models.Model):
 	]
 
 	CATEGORY_TECH = "tech"
+	CATEGORY_ALGORITHM = "algorithm"   # 알고리즘 문제 풀이·개념
 	CATEGORY_PAPER = "paper"   # 논문 리뷰 (옛 Free 자유게시판 "board" 는 Life 로 합침)
 	CATEGORY_LIFE = "life"
 	CATEGORY_SECRET = "secret"
 
 	CATEGORY_CHOICES = [
 		(CATEGORY_TECH, "Tech"),
+		(CATEGORY_ALGORITHM, "Algorithm"),
 		(CATEGORY_PAPER, "Paper"),
 		(CATEGORY_LIFE, "Life"),
 		(CATEGORY_SECRET, "Secret"),

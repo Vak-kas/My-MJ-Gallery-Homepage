@@ -420,6 +420,7 @@ CATEGORY_PAGES = {
 	# 탭 → (URL 이름, 제목, 설명). None 은 모든 카테고리
 	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
 	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
+	Post.CATEGORY_ALGORITHM: ("blog:algorithm", "Algorithm", "알고리즘 · 문제 풀이와 개념 정리 글입니다."),
 	Post.CATEGORY_PAPER: ("blog:paper", "Paper", "논문 리뷰 · 읽은 논문을 정리한 글입니다."),
 	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상 · 후기 · 자유 글 목록입니다."),
 	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
@@ -613,10 +614,12 @@ def index(request):
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
 		"tech_posts": _preview_posts(Post.CATEGORY_TECH),
+		"algorithm_posts": _preview_posts(Post.CATEGORY_ALGORITHM),
 		"paper_posts": _preview_posts(Post.CATEGORY_PAPER),
 		"life_posts": _preview_posts(Post.CATEGORY_LIFE),
 		"secret_posts": _preview_posts(Post.CATEGORY_SECRET),
 		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
+		"algorithm_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_ALGORITHM),
 		"paper_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_PAPER),
 		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
 		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
@@ -844,6 +847,10 @@ def all_posts(request):
 
 def tech(request):
 	return _category_page(request, Post.CATEGORY_TECH)
+
+
+def algorithm(request):
+	return _category_page(request, Post.CATEGORY_ALGORITHM)
 
 
 def paper(request):

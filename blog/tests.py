@@ -671,7 +671,7 @@ class MemberCategoryTests(TestCase):
 	def test_member_cannot_write(self):
 		self.client.force_login(self.member)
 		self.assertEqual(self.client.get(reverse("blog:post_create")).status_code, 404)
-		for cat in ("tech", "paper", "life", "secret"):
+		for cat in ("tech", "algorithm", "paper", "life", "secret"):
 			self.assertEqual(self._post(cat).status_code, 404)
 		self.assertFalse(Post.objects.exists())
 		self.assertEqual(Post.allowed_categories(self.member), set())
@@ -704,7 +704,7 @@ class MemberCategoryTests(TestCase):
 
 	def test_admin_all_categories(self):
 		self.client.force_login(self.admin)
-		for cat in ("tech", "paper", "life", "secret"):
+		for cat in ("tech", "algorithm", "paper", "life", "secret"):
 			self._post(cat)
 			self.assertTrue(Post.objects.filter(category=cat).exists(), cat)
 
@@ -949,3 +949,28 @@ class PaperTitlePrefixMigrationTests(TestCase):
 		mig.backwards(global_apps, None)
 		paper.refresh_from_db()
 		self.assertEqual(paper.title, "[논문 리뷰] Intelligent Frequency Reuse")
+
+
+class AlgorithmCategoryTests(TestCase):
+	"""알고리즘 카테고리: 목록 페이지·탭·허브 카드·홈 바로가기"""
+
+	def setUp(self):
+		self.admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+		Post.objects.create(title="백준 1753 최단경로", slug="boj-1753", category=Post.CATEGORY_ALGORITHM, author=self.admin,
+			content="", is_published=True, published_at=timezone.now())
+
+	def test_algorithm_page_tab_and_hub_card(self):
+		res = self.client.get(reverse("blog:algorithm"))
+		self.assertEqual(res.status_code, 200)
+		self.assertContains(res, "백준 1753 최단경로")
+		self.assertEqual(res.context["page_title"], "Algorithm")
+		labels = [t["label"] for t in res.context["category_tabs"]]
+		self.assertEqual(labels[:5], ["전체", "Tech", "Algorithm", "Paper", "Life"])
+		hub = self.client.get(reverse("blog:index"))
+		self.assertEqual(hub.context["algorithm_count"], 1)
+		self.assertContains(hub, reverse("blog:algorithm"))
+		self.assertContains(hub, "bg-[#f0fdfa] text-[#0d9488]")
+
+	def test_not_in_topic_map(self):
+		from blog.knowledge_map import build_map
+		self.assertEqual(build_map(Post.objects.all())["nodes"], [])   # Topic Map 은 Tech 글만
