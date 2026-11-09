@@ -99,6 +99,7 @@ from .community import community
 from .users import users, user_detail
 from .security import security, security_ip
 from .settings import site_settings_view
+from .categories import categories, category_create, category_update, category_move, category_delete
 from .analytics import analytics, analytics_live
 from .server import server, server_logs
 from .ai_usage import ai_usage

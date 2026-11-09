@@ -41,8 +41,7 @@ ALWAYS_OPEN = [re.compile(p) for p in (
     r"^/blog/api/",                                 # 에디터 API (관리자 글쓰기)
 )]
 
-# 블로그 허브 "이번 주 기록" 카드의 카테고리별 주간 목표 (0 이면 그 줄은 그 주에 쓴 글이 있을 때만 보임)
-BLOG_GOAL_DEFAULTS = {"tech": 1, "algorithm": 0, "paper": 0, "life": 1, "secret": 0}
+# 블로그 카테고리별 주간 목표는 Studio › Categories (blog.Category.weekly_goal) 로 옮김
 BLOG_GOAL_MAX = 50
 
 HOME_SECTION_DEFAULTS = [
@@ -82,7 +81,6 @@ def load():
         data = {
             "nav": _merge(row.nav_items if row else [], NAV_DEFAULTS, ("label", "state")),
             "home": _merge(row.home_sections if row else [], HOME_SECTION_DEFAULTS, ("enabled",)),
-            "blog_goals": {**BLOG_GOAL_DEFAULTS, **{k: v for k, v in ((row.blog_goals or {}) if row else {}).items() if k in BLOG_GOAL_DEFAULTS}},
         }
         for item in data["nav"]:
             if item.get("fixed"):
@@ -93,13 +91,11 @@ def load():
     return data
 
 
-def save(nav, home, blog_goals=None):
+def save(nav, home):
     from .models import SiteSetting
     row = SiteSetting.objects.first() or SiteSetting()
     row.nav_items = [{"key": i["key"], "label": i["label"], "state": i["state"]} for i in nav]
     row.home_sections = [{"key": s["key"], "enabled": s["enabled"]} for s in home]
-    if blog_goals is not None:
-        row.blog_goals = {k: max(0, min(BLOG_GOAL_MAX, int(v))) for k, v in blog_goals.items() if k in BLOG_GOAL_DEFAULTS}
     row.save()
     cache.delete(CACHE_KEY)
 

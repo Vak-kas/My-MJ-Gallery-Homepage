@@ -21,18 +21,23 @@ def _game_meta(url_name):
 	return None
 
 
-CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "all"): ("page", "all"), ("blog", "tech"): ("page", "tech"), ("blog", "algorithm"): ("page", "algorithm"), ("blog", "paper"): ("page", "paper"),
-			 ("blog", "life"): ("page", "life"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
+def _category_meta(slug):
+	"""블로그 카테고리 목록 페이지 — 이름·설명·카드 이미지는 Studio › Categories 값 (관리자 전용은 기본값)"""
+	from blog import categories
+
+	if not categories.exists(slug) or categories.is_private(slug):
+		return None
+	info = categories.get(slug)
+	return seo.build(info.name, info.description or None, og_cards.image_url("category", slug), path="")
+
+
+CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "all"): ("page", "all"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
 			 ("games", "index"): ("page", "games")}
 
 
 PAGE_TITLES = {
-	("blog", "index"): ("Blog", "기술 글, 알고리즘, 논문 리뷰, 일상 기록을 모은 서민재의 블로그."),
+	("blog", "index"): ("Blog", "기술 글과 일상 기록을 모은 서민재의 블로그."),
 	("blog", "all"): ("All Posts", "모든 카테고리의 글을 한곳에서."),
-	("blog", "tech"): ("Tech Blog", "트러블슈팅·네트워크·보안 등 기술 글."),
-	("blog", "algorithm"): ("Algorithm", "알고리즘 문제 풀이와 개념 정리."),
-	("blog", "paper"): ("Paper Review", "읽은 논문을 정리한 리뷰 글."),
-	("blog", "life"): ("Life", "일상 · 후기 · 자유 글."),
 	("tools", "index"): ("Tool", "살면서 ‘이런 게 있었으면’ 싶었던 것들을 직접 만들어 모아둔 곳. 문서·사진·학점, 파일 공유, 네트워크, 개발 도구."),
 	("main", "photos"): ("Gallery", "사진 갤러리."),
 	("games", "index"): ("Game", "사다리타기·돌림판 같은 모임 게임, 2048·한글 타자 연습 랭킹, 같이 하는 게임."),
@@ -47,6 +52,8 @@ def seo_meta(request):
 		title, desc = PAGE_TITLES[(ns, name)]
 		card = CARD_KEYS.get((ns, name))
 		meta = seo.build(title, desc, og_cards.image_url(*card) if card else None, path=request.path)
+	elif (ns, name) == ("blog", "category"):
+		meta = _category_meta(match.kwargs.get("slug", ""))
 	elif ns == "tools":
 		meta = _tool_meta(name)
 	elif ns == "games":

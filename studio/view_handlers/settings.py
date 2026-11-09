@@ -1,8 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import redirect, render
 
-from blog.models import Post
-
 from .. import site_settings
 from .common import admin_view
 
@@ -34,11 +32,7 @@ def site_settings_view(request):
         if len(nav) != len(current["nav"]) or len(home) != len(current["home"]):
             messages.error(request, "설정이 올바르지 않습니다. 새로고침 후 다시 저장해 주세요.")
             return redirect("studio:settings")
-        goals = {}
-        for key in site_settings.BLOG_GOAL_DEFAULTS:
-            raw = (request.POST.get(f"blog_goal_{key}") or "").strip()
-            goals[key] = int(raw) if raw.isdigit() else current["blog_goals"].get(key, 0)
-        site_settings.save(nav, home, goals)
+        site_settings.save(nav, home)
         messages.success(request, "설정을 저장했어요. 사이트에 바로 반영돼요.")
         return redirect("studio:settings")
 
@@ -46,9 +40,4 @@ def site_settings_view(request):
         "nav_items": current["nav"],
         "nav_states": site_settings.NAV_STATES,
         "home_sections": current["home"],
-        "blog_goals": [
-            {"key": value, "label": label, "goal": current["blog_goals"].get(value, 0)}
-            for value, label in Post.CATEGORY_CHOICES
-        ],
-        "blog_goal_max": site_settings.BLOG_GOAL_MAX,
     })

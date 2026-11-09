@@ -19,13 +19,19 @@ XBOLD = FONT_DIR / "NanumGothic-ExtraBold.ttf"
 GOLD = (212, 175, 55)
 WHITE = (245, 245, 247)
 MUTED = (170, 170, 180)
-ACCENT = {"tech": ((10, 132, 255), "TECH"), "algorithm": ((13, 148, 136), "ALGORITHM"), "paper": ((139, 92, 246), "PAPER"),
-          "life": ((16, 185, 129), "LIFE"), "secret": ((239, 68, 68), "SECRET")}
+
+def _accent(post):
+    """카드 배지 색·글자 — 카테고리 색과 이름 (Studio › Categories)"""
+    from .categories import hex_to_rgb
+
+    info = post.category_info
+    return hex_to_rgb(info.color), info.name.upper()
 
 
 def cache_key(post):
     author = post.author.get_full_name() or post.author.username if post.author else ""
-    raw = f"v1|{post.title}|{post.category}|{author}|{post.published_at or post.created_at:%Y-%m-%d}"
+    info = post.category_info
+    raw = f"v1|{post.title}|{post.category}|{info.name}|{info.color}|{author}|{post.published_at or post.created_at:%Y-%m-%d}"
     return hashlib.sha1(raw.encode()).hexdigest()[:10]
 
 
@@ -64,7 +70,7 @@ def _wrap(draw, text, font, max_width, max_lines):
 
 
 def render(post):
-    accent, label = ACCENT.get(post.category, ((10, 132, 255), post.category.upper()))
+    accent, label = _accent(post)
     author = post.author.get_full_name() or post.author.username if post.author else ""
     when = timezone.localtime(post.published_at).strftime("%Y.%m.%d") if post.published_at else ""
     return render_card(title=post.title, pill=label, accent=accent, eyebrow="SMJ GALLERY · BLOG",

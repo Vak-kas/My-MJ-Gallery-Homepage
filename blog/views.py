@@ -29,6 +29,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from urllib.parse import urlencode, urljoin, urlparse
 
+from . import categories
 from .models import Comment, CommentLike, GuestbookEntry, Post, PostLike, Series, Tag
 from security.utils import client_ip, user_agent
 from main.seo import post_meta
@@ -207,14 +208,14 @@ def _accessible_posts_qs(request):
 	qs = _published_posts_qs()
 	if request.user.is_superuser:
 		return qs
-	return qs.exclude(category=Post.CATEGORY_SECRET).exclude(visibility=Post.VISIBILITY_PRIVATE)
+	return qs.filter(category__in=categories.public_slugs()).exclude(visibility=Post.VISIBILITY_PRIVATE)
 
 
 def _single_post_qs(request):
 	qs = Post.objects.select_related("author").prefetch_related("tags", "comments")
 	if request.user.is_superuser:
 		return qs
-	return qs.filter(is_published=True).exclude(category=Post.CATEGORY_SECRET).exclude(visibility=Post.VISIBILITY_PRIVATE)
+	return qs.filter(is_published=True, category__in=categories.public_slugs()).exclude(visibility=Post.VISIBILITY_PRIVATE)
 
 
 def admin_only(view):
@@ -353,7 +354,7 @@ def _write_page_context(request, form_data=None, selected_draft=None, editing_po
 			.order_by("name")
 			.values("name", "post_count", "published_count", "last_order")[:100]
 		],
-		"categories": [(v, l) for v, l in Post.CATEGORY_CHOICES if v in Post.allowed_categories(request.user)],
+		"categories": [(c.slug, c.name) for c in categories.all_categories() if c.slug in Post.allowed_categories(request.user)],
 		"form_data": form_data or {},
 		"draft_posts": list(draft_posts_qs.order_by("-updated_at", "-id")[:20]),
 		"selected_draft": selected_draft,
@@ -381,7 +382,7 @@ def _sidebar_context(request):
 
 	tag_filter = Q(posts__is_published=True)
 	if not request.user.is_superuser:
-		tag_filter &= ~Q(posts__category=Post.CATEGORY_SECRET) & ~Q(posts__visibility=Post.VISIBILITY_PRIVATE)   # 비공개 글 태그도 숨김
+		tag_filter &= Q(posts__category__in=categories.public_slugs()) & ~Q(posts__visibility=Post.VISIBILITY_PRIVATE)   # 비공개 글 태그도 숨김
 
 	tags = list(
 		Tag.objects.annotate(
@@ -396,7 +397,7 @@ def _sidebar_context(request):
 		post__is_published=True,
 	)
 	if not request.user.is_superuser:
-		recent_comment_qs = recent_comment_qs.exclude(post__category=Post.CATEGORY_SECRET).filter(
+		recent_comment_qs = recent_comment_qs.filter(post__category__in=categories.public_slugs()).filter(
 			post__visibility=Post.VISIBILITY_PUBLIC
 		)
 
@@ -416,38 +417,32 @@ def _sidebar_context(request):
 	}
 
 
-CATEGORY_PAGES = {
-	# 탭 → (URL 이름, 제목, 설명). None 은 모든 카테고리
-	"all": ("blog:all", "All", "모든 카테고리의 글을 한곳에서 봅니다."),
-	Post.CATEGORY_TECH: ("blog:tech", "Tech", "기술 콘텐츠 목록입니다."),
-	Post.CATEGORY_ALGORITHM: ("blog:algorithm", "Algorithm", "알고리즘 · 문제 풀이와 개념 정리 글입니다."),
-	Post.CATEGORY_PAPER: ("blog:paper", "Paper", "논문 리뷰 · 읽은 논문을 정리한 글입니다."),
-	Post.CATEGORY_LIFE: ("blog:life", "Life", "일상 · 후기 · 자유 글 목록입니다."),
-	Post.CATEGORY_SECRET: ("blog:secret", "Secret", "너드인의 새벽 · 관리자 전용 비공개 공간입니다."),
-}
 CATEGORY_PAGE_SIZE = 30
 
 
 def _category_page(request, category):
-	"""카테고리 카드 목록(전체 = "all"). 30개씩 페이지, 관리자만 Secret."""
-	if category == Post.CATEGORY_SECRET and not request.user.is_superuser:
-		raise Http404("Not found")
+	"""카테고리 카드 목록(전체 = "all"). 30개씩 페이지. 표에 없는 카테고리는 404, 관리자 전용은 관리자에게만."""
+	if category == "all":
+		page_title, page_desc = "All", "모든 카테고리의 글을 한곳에서 봅니다."
+	else:
+		info = categories.get(category)
+		if not categories.exists(category) or (info.is_private and not request.user.is_superuser):
+			raise Http404("Not found")
+		page_title, page_desc = info.name, info.description
 
 	qs = _accessible_posts_qs(request)
 	if category != "all":
 		qs = qs.filter(category=category)
 	qs = qs.annotate(visible_comment_count=Count("comments", filter=Q(comments__is_visible=True), distinct=True)).order_by("-published_at", "-id")
 	page = Paginator(qs, CATEGORY_PAGE_SIZE).get_page(request.GET.get("page"))
-	_, page_title, page_desc = CATEGORY_PAGES[category]
 
-	tabs = []
-	for key, (url_name, label, _desc) in CATEGORY_PAGES.items():
-		if key == Post.CATEGORY_SECRET and not request.user.is_superuser:
-			continue
-		tabs.append({"key": key, "url": reverse(url_name), "label": "전체" if key == "all" else label, "secret": key == Post.CATEGORY_SECRET})
+	tabs = [{"key": "all", "url": reverse("blog:all"), "label": "전체", "secret": False}]
+	for c in categories.visible_to(request.user):
+		tabs.append({"key": c.slug, "url": reverse("blog:category", args=[c.slug]), "label": c.name, "secret": c.is_private, "color": c.color})
 
 	context = {
 		"active_tab": category,
+		"category": None if category == "all" else categories.get(category),
 		"posts": list(page.object_list),
 		"page": page,
 		"page_title": page_title,
@@ -581,12 +576,11 @@ def index(request):
 	feed_page_numbers = list(range(feed_start_page, feed_end_page + 1))
 	feed_page_links = [(num, _query_link(page=num)) for num in feed_page_numbers]
 
-	from studio import site_settings
 	from .weekly import weekly_stats
 	from .knowledge_map import build_map
 
 	context = {
-		"weekly": weekly_stats(site_settings.load()["blog_goals"], include_secret=request.user.is_superuser),
+		"weekly": weekly_stats(include_secret=request.user.is_superuser),
 		"active_tab": "hub",
 		"show_secret": request.user.is_superuser,
 		"current_sort": current_sort,
@@ -613,16 +607,12 @@ def index(request):
 		"feed_next_qs": _query_link(page=feed_page.next_page_number()) if feed_page.has_next() else "",
 		"feed_posts": feed_posts,
 		"all_posts": all_posts,
-		"tech_posts": _preview_posts(Post.CATEGORY_TECH),
-		"algorithm_posts": _preview_posts(Post.CATEGORY_ALGORITHM),
-		"paper_posts": _preview_posts(Post.CATEGORY_PAPER),
-		"life_posts": _preview_posts(Post.CATEGORY_LIFE),
-		"secret_posts": _preview_posts(Post.CATEGORY_SECRET),
-		"tech_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_TECH),
-		"algorithm_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_ALGORITHM),
-		"paper_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_PAPER),
-		"life_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_LIFE),
-		"secret_count": sum(1 for post in all_posts if post.category == Post.CATEGORY_SECRET),
+		# 허브 카테고리 카드: Studio › Categories 에서 "블로그 허브 카드" 를 켠 것만, 관리자 전용은 관리자에게만
+		"hub_categories": [
+			{"info": c, "posts": _preview_posts(c.slug), "count": sum(1 for post in all_posts if post.category == c.slug),
+			 "url": reverse("blog:category", args=[c.slug])}
+			for c in categories.visible_to(request.user) if c.show_on_hub
+		],
 		"knowledge_map": build_map(_accessible_posts_qs(request)),
 	}
 	context.update(_sidebar_context(request))
@@ -845,29 +835,13 @@ def all_posts(request):
 	return _category_page(request, "all")
 
 
-def tech(request):
-	return _category_page(request, Post.CATEGORY_TECH)
-
-
-def algorithm(request):
-	return _category_page(request, Post.CATEGORY_ALGORITHM)
-
-
-def paper(request):
-	return _category_page(request, Post.CATEGORY_PAPER)
+def category_page(request, slug):
+	return _category_page(request, slug)
 
 
 def board(request):
 	"""옛 자유게시판 주소 — Life 로 합쳐져서 영구 이동"""
-	return redirect("blog:life", permanent=True)
-
-
-def life(request):
-	return _category_page(request, Post.CATEGORY_LIFE)
-
-
-def secret(request):
-	return _category_page(request, Post.CATEGORY_SECRET)
+	return redirect("blog:category", "life", permanent=True)
 
 
 def post_detail(request, slug: str):
@@ -1102,14 +1076,14 @@ def post_create(request):
 		submit_action = (request.POST.get("submit_action") or "publish").strip()
 		is_published = submit_action != "draft"
 
-		if not title or category not in dict(Post.CATEGORY_CHOICES):
+		if not title or not categories.exists(category):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
 			form_data = dict(request.POST)
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
 
 		if category not in Post.allowed_categories(request.user):
-			messages.error(request, "일반 회원은 Free(자유게시판)에만 글을 쓸 수 있습니다.")
+			messages.error(request, "이 카테고리에는 글을 쓸 수 없습니다.")
 			form_data = dict(request.POST)
 			form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 			return render(request, "blog/write.html", _write_page_context(request, form_data, selected_draft=selected_draft))
@@ -1197,12 +1171,12 @@ def post_edit(request, slug: str):
 		form_data = {key: value[-1] if isinstance(value, list) else value for key, value in form_data.items()}
 		form_data["cover_image"] = post.cover_image.url if post.cover_image else ""
 
-		if not title or category not in dict(Post.CATEGORY_CHOICES):
+		if not title or not categories.exists(category):
 			messages.error(request, "제목과 카테고리는 필수입니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
 		if category not in Post.allowed_categories(request.user):
-			messages.error(request, "일반 회원은 Free(자유게시판)에만 글을 쓸 수 있습니다.")
+			messages.error(request, "이 카테고리에는 글을 쓸 수 없습니다.")
 			return render(request, "blog/write.html", _write_page_context(request, form_data, editing_post=post))
 
 		if cover_image and getattr(cover_image, "size", 0) > COVER_IMAGE_MAX_BYTES:
@@ -1263,7 +1237,7 @@ def post_og_image(request, slug: str):
 
 	post = Post.objects.select_related("author").filter(slug=slug).first()
 	if (not post or not post.is_published or post.visibility != Post.VISIBILITY_PUBLIC
-			or post.category == Post.CATEGORY_SECRET):
+			or categories.is_private(post.category)):
 		return redirect(static("images/og-default.png"))
 	from django.core.files.storage import default_storage
 	response = FileResponse(default_storage.open(get_or_create(post), "rb"), content_type="image/png")

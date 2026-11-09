@@ -5,6 +5,7 @@ from django.utils.feedgenerator import Rss201rev2Feed
 from main.seo import DEFAULT_DESCRIPTION, post_meta
 from studio import site_settings
 
+from .categories import public_slugs
 from .models import Post
 
 
@@ -22,7 +23,7 @@ class LatestPostsFeed(Feed):
 		if site_settings.nav_state("blog") != "public":
 			return []
 		return (Post.objects.filter(is_published=True, visibility=Post.VISIBILITY_PUBLIC)
-				.exclude(category=Post.CATEGORY_SECRET).select_related("author").prefetch_related("tags")
+				.filter(category__in=public_slugs()).select_related("author").prefetch_related("tags")
 				.order_by("-published_at")[:20])
 
 	def item_title(self, post):

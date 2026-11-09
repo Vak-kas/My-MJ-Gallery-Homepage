@@ -149,7 +149,7 @@ class PageCardTests(TestCase):
 
 	def test_pages_use_own_cards(self):
 		for path, card in (("/tools/", "/og/tool/index.png"), ("/tools/qrcode/", "/og/tool/qrcode.png"),
-						   ("/blog/", "/og/page/blog.png"), ("/blog/tech/", "/og/page/tech.png"), ("/photos/", "/og/page/gallery.png")):
+						   ("/blog/", "/og/page/blog.png"), ("/blog/tech/", "/og/category/tech.png"), ("/photos/", "/og/page/gallery.png")):
 			html = self.client.get(path).content.decode()
 			self.assertIn(f'content="https://smjgallery.kr{card}?v=', html, path)
 

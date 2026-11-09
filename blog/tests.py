@@ -434,7 +434,7 @@ class TagTests(TestCase):
 		p = self.post("글", "#3GPP, ##5G, 5G , #, 3gpp")
 		self.assertEqual(sorted(t.name for t in p.tags.all()), ["3GPP", "5G"])
 		self.assertFalse(Tag.objects.filter(name__startswith="#").exists())
-		res = self.client.get(reverse("blog:tech"))
+		res = self.client.get(reverse("blog:category", args=["tech"]))
 		self.assertNotContains(res, "##")
 		# 수정 화면에는 # 없는 이름으로 채워짐
 		res = self.client.get(reverse("blog:post_edit", args=[p.slug]))
@@ -465,7 +465,7 @@ class TagTests(TestCase):
 		self.assertContains(res, "HackRF 입문 — 발행 1편")
 		self.assertContains(res, "새 시리즈 만들기")
 		# 목록 카드에 시리즈 표시
-		res = self.client.get(reverse("blog:tech"))
+		res = self.client.get(reverse("blog:category", args=["tech"]))
 		self.assertContains(res, "📚 HackRF 입문 · 1편")
 
 
@@ -535,23 +535,23 @@ class CategoryPageTests(TestCase):
 		res = self.client.get(reverse("blog:all"))
 		self.assertEqual(res.status_code, 200)
 		self.assertEqual(sorted(p.title for p in res.context["posts"]), ["글 life", "글 tech"])
-		self.assertNotContains(res, reverse("blog:secret"))
+		self.assertNotContains(res, reverse("blog:category", args=["secret"]))
 		self.assertEqual(res.context["active_tab"], "all")
 
 	def test_admin_sees_secret_in_all_tab(self):
 		self.client.force_login(self.admin)
 		res = self.client.get(reverse("blog:all"))
 		self.assertIn("글 secret", [p.title for p in res.context["posts"]])
-		self.assertContains(res, reverse("blog:secret"))
+		self.assertContains(res, reverse("blog:category", args=["secret"]))
 
 	def test_category_tab_filters(self):
-		res = self.client.get(reverse("blog:life"))
+		res = self.client.get(reverse("blog:category", args=["life"]))
 		# 옆 "인기글 순위" 위젯에는 다른 카테고리도 나오니 카드 목록으로 판정
 		self.assertEqual([p.title for p in res.context["posts"]], ["글 life"])
 		self.assertContains(res, reverse("blog:all"))
 
 	def test_secret_hidden_from_anonymous(self):
-		self.assertEqual(self.client.get(reverse("blog:secret")).status_code, 404)
+		self.assertEqual(self.client.get(reverse("blog:category", args=["secret"])).status_code, 404)
 
 	def test_pagination_after_30(self):
 		from django.utils import timezone
@@ -763,27 +763,20 @@ class WeeklyRecordTests(TestCase):
 		self.assertEqual(weekly_stats({})["streak"], 2)
 		self.assertEqual(weekly_stats({})["total"], 0)
 
-	def test_hub_shows_card_and_studio_saves_goals(self):
+	def test_hub_shows_card_and_goal_comes_from_category(self):
+		from blog.models import Category
+		from blog.weekly import weekly_stats
 		self._post(0, "tech")
 		res = self.client.get(reverse("blog:index"))
 		self.assertContains(res, "이번 주 기록")
 		self.assertContains(res, "최근 26주")
+		Category.objects.filter(slug="life").update(weekly_goal=0)
+		Category.objects.get(slug="tech").save()   # 캐시 비우기
+		rows = {r["key"]: r["goal"] for r in weekly_stats()["rows"]}
+		self.assertEqual(rows, {"tech": 1})
 		self.client.force_login(self.admin)
 		page = self.client.get(reverse("studio:settings"))
-		self.assertContains(page, "블로그 주간 목표")
-		data = {"blog_goal_tech": "3", "blog_goal_paper": "0", "blog_goal_life": "99", "blog_goal_secret": "x"}
-		for item in page.context["nav_items"]:
-			data.setdefault("nav_order", [])
-			data["nav_order"].append(item["key"])
-			data[f"nav_state_{item['key']}"] = item["state"]
-			data[f"nav_label_{item['key']}"] = item["label"]
-		data["home_order"] = [s["key"] for s in page.context["home_sections"]]
-		self.client.post(reverse("studio:settings"), data)
-		from studio import site_settings
-		goals = site_settings.load()["blog_goals"]
-		self.assertEqual(goals["tech"], 3)
-		self.assertEqual(goals["life"], site_settings.BLOG_GOAL_MAX)
-		self.assertEqual(goals["secret"], 0)
+		self.assertContains(page, reverse("studio:categories"))
 
 
 class PostIndexMarkupTests(TestCase):
@@ -892,21 +885,21 @@ class PaperCategoryTests(TestCase):
 			content="", is_published=True, published_at=timezone.now())
 
 	def test_paper_page_and_hub_card(self):
-		res = self.client.get(reverse("blog:paper"))
+		res = self.client.get(reverse("blog:category", args=["paper"]))
 		self.assertEqual(res.status_code, 200)
 		self.assertContains(res, "어떤 논문")
 		self.assertEqual(res.context["page_title"], "Paper")
 		self.assertIn("Paper", [t["label"] for t in res.context["category_tabs"]])
 		self.assertNotIn("Free", [t["label"] for t in res.context["category_tabs"]])
 		hub = self.client.get(reverse("blog:index"))
-		self.assertEqual(hub.context["paper_count"], 1)
-		self.assertContains(hub, reverse("blog:paper"))
+		self.assertEqual({h["info"].slug: h["count"] for h in hub.context["hub_categories"]}["paper"], 1)
+		self.assertContains(hub, reverse("blog:category", args=["paper"]))
 		self.assertNotContains(hub, "자유게시판")
 
 	def test_old_board_url_redirects_to_life(self):
 		res = self.client.get("/blog/board/")
 		self.assertEqual(res.status_code, 301)
-		self.assertEqual(res["Location"], reverse("blog:life"))
+		self.assertEqual(res["Location"], reverse("blog:category", args=["life"]))
 
 	def test_migration_moves_free_to_life_and_paper_review_out_of_tech(self):
 		import importlib
@@ -960,17 +953,142 @@ class AlgorithmCategoryTests(TestCase):
 			content="", is_published=True, published_at=timezone.now())
 
 	def test_algorithm_page_tab_and_hub_card(self):
-		res = self.client.get(reverse("blog:algorithm"))
+		res = self.client.get(reverse("blog:category", args=["algorithm"]))
 		self.assertEqual(res.status_code, 200)
 		self.assertContains(res, "백준 1753 최단경로")
 		self.assertEqual(res.context["page_title"], "Algorithm")
 		labels = [t["label"] for t in res.context["category_tabs"]]
 		self.assertEqual(labels[:5], ["전체", "Tech", "Algorithm", "Paper", "Life"])
 		hub = self.client.get(reverse("blog:index"))
-		self.assertEqual(hub.context["algorithm_count"], 1)
-		self.assertContains(hub, reverse("blog:algorithm"))
-		self.assertContains(hub, "bg-[#f0fdfa] text-[#0d9488]")
+		self.assertEqual({h["info"].slug: h["count"] for h in hub.context["hub_categories"]}["algorithm"], 1)
+		self.assertContains(hub, reverse("blog:category", args=["algorithm"]))
+		self.assertContains(hub, "--cat: #0d9488")
 
 	def test_not_in_topic_map(self):
 		from blog.knowledge_map import build_map
 		self.assertEqual(build_map(Post.objects.all())["nodes"], [])   # Topic Map 은 Tech 글만
+
+
+class StudioCategoryTests(TestCase):
+	"""Studio › Categories: 카테고리 추가·수정·순서·삭제와, 그 설정이 블로그·홈·피드에 반영되는지"""
+
+	def setUp(self):
+		from blog.models import Category
+		self.Category = Category
+		self.admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+		self.member = get_user_model().objects.create_user(username="member", password="pw-for-tests-only")
+		self.client.force_login(self.admin)
+
+	def _create(self, **over):
+		data = {"name": "Algo Study", "slug": "algo-study", "description": "스터디 기록", "color": "#ff8800", "icon": "🧠",
+			"weekly_goal": "2", "show_on_hub": "on", "show_on_home": "on"}
+		data.update(over)
+		return self.client.post(reverse("studio:category_create"), data)
+
+	def _post(self, category, title="글"):
+		return Post.objects.create(title=title, slug=f"p-{Post.objects.count()}", category=category, author=self.admin,
+			content="", is_published=True, published_at=timezone.now())
+
+	def test_seeded_categories_in_order(self):
+		self.assertEqual(list(self.Category.objects.values_list("slug", flat=True)), ["tech", "algorithm", "paper", "life", "secret"])
+		secret = self.Category.objects.get(slug="secret")
+		self.assertTrue(secret.is_private)
+		self.assertTrue(self.Category.objects.get(slug="tech").in_topic_map)
+
+	def test_only_admin_can_manage(self):
+		self.client.force_login(self.member)
+		self.assertNotEqual(self.client.get(reverse("studio:categories")).status_code, 200)
+		self._create()
+		self.assertFalse(self.Category.objects.filter(slug="algo-study").exists())
+
+	def test_create_shows_everywhere(self):
+		res = self._create()
+		self.assertEqual(res.status_code, 302)
+		cat = self.Category.objects.get(slug="algo-study")
+		self.assertEqual((cat.name, cat.color, cat.icon, cat.weekly_goal, cat.order), ("Algo Study", "#ff8800", "🧠", 2, 5))
+		self._post("algo-study", "스터디 1주차")
+		page = self.client.get(reverse("blog:category", args=["algo-study"]))
+		self.assertEqual(page.status_code, 200)
+		self.assertContains(page, "스터디 1주차")
+		self.assertEqual(page.context["page_title"], "Algo Study")
+		self.client.logout()
+		hub = self.client.get(reverse("blog:index"))
+		self.assertIn("algo-study", [h["info"].slug for h in hub.context["hub_categories"]])
+		self.assertContains(hub, "--cat: #ff8800")
+		self.assertContains(self.client.get("/"), reverse("blog:category", args=["algo-study"]))
+		self.assertContains(self.client.get("/sitemap.xml"), "/blog/algo-study/")
+		self.client.force_login(self.admin)
+		write = self.client.get(reverse("blog:post_create"))
+		self.assertIn(("algo-study", "Algo Study"), write.context["categories"])
+
+	def test_bad_slugs_rejected(self):
+		for slug in ("write", "all", "Tech", "1abc", "tech", "가나"):
+			self._create(slug=slug, name=f"x-{slug}")
+			self.assertFalse(self.Category.objects.filter(name=f"x-{slug}").exists(), slug)
+		self._create(color="red")
+		self.assertFalse(self.Category.objects.filter(slug="algo-study").exists())
+
+	def test_hub_and_home_toggles(self):
+		self._create(show_on_hub="", show_on_home="")
+		self.client.logout()
+		hub = self.client.get(reverse("blog:index"))
+		self.assertNotIn("algo-study", [h["info"].slug for h in hub.context["hub_categories"]])
+		self.assertNotContains(self.client.get("/"), "/blog/algo-study/")
+		self.assertEqual(self.client.get(reverse("blog:category", args=["algo-study"])).status_code, 200)   # 목록 페이지·탭은 그대로
+
+	def test_private_category_hidden_from_public(self):
+		self._create(is_private="on")
+		post = self._post("algo-study", "나만 보는 글")
+		self.client.logout()
+		self.assertEqual(self.client.get(reverse("blog:category", args=["algo-study"])).status_code, 404)
+		self.assertEqual(self.client.get(reverse("blog:post_detail", args=[post.slug])).status_code, 404)
+		self.assertNotContains(self.client.get(reverse("blog:all")), "나만 보는 글")
+		self.assertNotContains(self.client.get("/sitemap.xml"), "/blog/algo-study/")
+		self.client.force_login(self.admin)
+		self.assertContains(self.client.get(reverse("blog:category", args=["algo-study"])), "나만 보는 글")
+
+	def test_slug_change_moves_posts(self):
+		cat = self.Category.objects.get(slug="paper")
+		post = self._post("paper")
+		self.client.post(reverse("studio:category_update", args=[cat.id]), {
+			"name": "Papers", "slug": "papers", "description": "", "color": "#8b5cf6", "icon": "📄", "weekly_goal": "0", "show_on_hub": "on"})
+		post.refresh_from_db()
+		self.assertEqual(post.category, "papers")
+		self.assertEqual(self.client.get(reverse("blog:category", args=["papers"])).context["page_title"], "Papers")
+		self.assertEqual(self.client.get("/blog/paper/").status_code, 404)
+
+	def test_move_up_down(self):
+		life = self.Category.objects.get(slug="life")
+		self.client.post(reverse("studio:category_move", args=[life.id]), {"direction": "up"})
+		self.assertEqual(list(self.Category.objects.values_list("slug", flat=True)), ["tech", "algorithm", "life", "paper", "secret"])
+		tabs = self.client.get(reverse("blog:all")).context["category_tabs"]
+		self.assertEqual([t["key"] for t in tabs][:5], ["all", "tech", "algorithm", "life", "paper"])
+
+	def test_delete_moves_posts_and_needs_confirm(self):
+		cat = self.Category.objects.get(slug="algorithm")
+		post = self._post("algorithm")
+		self.client.post(reverse("studio:category_delete", args=[cat.id]), {"move_to": "tech", "confirm": "wrong"})
+		self.assertTrue(self.Category.objects.filter(id=cat.id).exists())
+		self.client.post(reverse("studio:category_delete", args=[cat.id]), {"confirm": "algorithm"})   # 옮길 곳 없음
+		self.assertTrue(self.Category.objects.filter(id=cat.id).exists())
+		self.client.post(reverse("studio:category_delete", args=[cat.id]), {"move_to": "tech", "confirm": "algorithm"})
+		self.assertFalse(self.Category.objects.filter(id=cat.id).exists())
+		post.refresh_from_db()
+		self.assertEqual(post.category, "tech")
+		self.assertEqual(Post.objects.count(), 1)   # 글은 지우지 않음
+
+	def test_topic_map_follows_flag(self):
+		from blog.knowledge_map import build_map
+		self._post("paper", "논문 글")
+		self.assertEqual(build_map(Post.objects.all())["nodes"], [])
+		cat = self.Category.objects.get(slug="paper")
+		cat.in_topic_map = True
+		cat.save()
+		self.assertEqual([n["title"] for n in build_map(Post.objects.all())["nodes"]], ["논문 글"])
+
+	def test_studio_page_lists_counts(self):
+		self._post("tech")
+		page = self.client.get(reverse("studio:categories"))
+		self.assertEqual(page.status_code, 200)
+		self.assertEqual({c.slug: c.post_count for c in page.context["items"]}["tech"], 1)
+		self.assertContains(page, "새 카테고리")

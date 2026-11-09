@@ -1,0 +1,35 @@
+{# Studio › Categories 의 추가·수정 폼. c 가 없으면 새로 만들기 #}
+<form method="post" action="{% if c %}{% url 'studio:category_update' c.id %}{% else %}{% url 'studio:category_create' %}{% endif %}" class="grid gap-4 md:grid-cols-2">
+    {% csrf_token %}
+    <label class="block text-[13px] font-medium">이름
+        <input type="text" name="name" value="{{ c.name|default:'' }}" maxlength="30" required placeholder="예: Algorithm" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <label class="block text-[13px] font-medium">주소 <span class="font-normal text-[#8e8e93]">(/blog/주소/ · 영어 소문자·숫자·-)</span>
+        <input type="text" name="slug" value="{{ c.slug|default:'' }}" maxlength="30" required pattern="[a-z][a-z0-9\-]{0,29}" placeholder="예: algorithm" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 font-mono text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <label class="block text-[13px] font-medium md:col-span-2">설명 <span class="font-normal text-[#8e8e93]">(허브 카드·목록 페이지·링크 미리보기에 나옴)</span>
+        <input type="text" name="description" value="{{ c.description|default:'' }}" maxlength="120" placeholder="예: 문제 풀이 · 개념 정리" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <div class="flex flex-wrap items-end gap-4">
+        <label class="block text-[13px] font-medium">색
+            <input type="color" name="color" value="{{ c.color|default:'#0066cc' }}" class="mt-1 block h-10 w-16 cursor-pointer rounded-xl border border-black/[0.1] bg-white p-1">
+        </label>
+        <label class="block text-[13px] font-medium">아이콘
+            <input type="text" name="icon" value="{{ c.icon|default:'📝' }}" maxlength="8" class="mt-1 block h-10 w-16 rounded-xl border border-black/[0.1] bg-[#fbfbfd] text-center text-[18px] outline-none focus:border-[#0066cc]">
+        </label>
+        <label class="block text-[13px] font-medium">주간 목표
+            <span class="mt-1 flex items-center gap-1.5"><input type="number" name="weekly_goal" value="{{ c.weekly_goal|default:0 }}" min="0" max="{{ goal_max }}" class="h-10 w-20 rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 text-right text-[14px] outline-none focus:border-[#0066cc]"><span class="text-[12px] text-[#8e8e93]">개</span></span>
+        </label>
+    </div>
+    <fieldset class="grid gap-2 text-[13px] sm:grid-cols-2">
+        <label class="flex items-center gap-2"><input type="checkbox" name="show_on_hub" {% if not c or c.show_on_hub %}checked{% endif %}> 블로그 허브에 카드로 보이기</label>
+        <label class="flex items-center gap-2"><input type="checkbox" name="show_on_home" {% if not c or c.show_on_home %}checked{% endif %}> 홈 "블로그 바로가기"에 보이기</label>
+        <label class="flex items-center gap-2"><input type="checkbox" name="in_topic_map" {% if c.in_topic_map %}checked{% endif %}> Topic Map 에 넣기</label>
+        <label class="flex items-center gap-2"><input type="checkbox" name="is_private" {% if c.is_private %}checked{% endif %}> 🔒 관리자 전용 (나만 보기)</label>
+    </fieldset>
+    <div class="flex items-center gap-3 md:col-span-2">
+        <button type="submit" class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white">{{ submit_label }}</button>
+        {% if c %}<a href="{% url 'studio:categories' %}#cat-{{ c.id }}" class="text-[13px] text-[#6e6e73] hover:text-[#1d1d1f]">취소</a>{% endif %}
+        <p class="text-[12px] text-[#8e8e93]">주간 목표 0 이면 "이번 주 기록"에 그 주에 쓴 글이 있을 때만 줄이 보여요. 관리자 전용 카테고리는 홈·사이트맵·RSS 에 안 나와요.</p>
+    </div>
+</form>

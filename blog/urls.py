@@ -13,13 +13,10 @@ urlpatterns = [
     path("post/<str:slug>/delete/", views.post_delete, name="post_delete"),
     path("series/<str:slug>/", views.series_detail, name="series"),
     path("all/", views.all_posts, name="all"),
-    path("tech/", views.tech, name="tech"),
-    path("algorithm/", views.algorithm, name="algorithm"),
-    path("paper/", views.paper, name="paper"),
     path("board/", views.board, name="board"),   # 옛 자유게시판 → /blog/life/
-    path("life/", views.life, name="life"),
-    path("secret/", views.secret, name="secret"),
     path("api/url-preview/", views.url_preview, name="url_preview"),
     path("api/math-ocr/", views.math_ocr, name="math_ocr"),
     path("api/image-upload/", views.image_upload, name="image_upload"),
+    # 카테고리 목록 (Studio › Categories 에서 만든 카테고리, 주소 = slug). 다른 주소와 안 겹치게 맨 끝
+    path("<slug:slug>/", views.category_page, name="category"),
 ]

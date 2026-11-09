@@ -42,9 +42,20 @@ def post_terms(post):
 	return terms   # 정규화한 키 → 보여 줄 이름
 
 
+def _hub_url():
+	"""묶음 원을 누르면 갈 곳: Topic Map 카테고리가 하나면 그 목록, 여럿이면 전체"""
+	from . import categories
+
+	slugs = categories.topic_map_slugs()
+	return reverse("blog:category", args=[slugs[0]]) if len(slugs) == 1 else reverse("blog:all")
+
+
 def build_map(posts_qs):
+	from . import categories
+
+	hub_url = _hub_url()
 	posts = list(
-		posts_qs.filter(category=Post.CATEGORY_TECH)
+		posts_qs.filter(category__in=categories.topic_map_slugs())
 		.order_by("-published_at", "-id")
 		.only("id", "title", "slug", "category", "series", "series_order", "content", "published_at")
 		.prefetch_related("tags")[:POST_LIMIT]
@@ -104,11 +115,11 @@ def build_map(posts_qs):
 		# 이름: 많이 나온 태그 → 제목에도 나오는 태그 → 더 드문 태그
 		top = sorted(counts, key=lambda k: (-counts[k], -in_titles[k], df[k], k))[:3]
 		key = f"g{gi}"
-		hubs.append({"key": key, "label": display[top[0]], "tags": [display[k] for k in top], "count": len(members), "icon": "#", "url": reverse("blog:tech")})
+		hubs.append({"key": key, "label": display[top[0]], "tags": [display[k] for k in top], "count": len(members), "icon": "#", "url": hub_url})
 		for m in members:
 			hub_of[m] = key
 	if rest:
-		hubs.append({"key": "etc", "label": "기타", "tags": [], "count": len(rest), "icon": "…", "url": reverse("blog:tech")})
+		hubs.append({"key": "etc", "label": "기타", "tags": [], "count": len(rest), "icon": "…", "url": hub_url})
 		for m in rest:
 			hub_of[m] = "etc"
 
