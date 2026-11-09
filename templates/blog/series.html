@@ -4,7 +4,7 @@
 {% include "components/main_nav.html" with nav_active="blog" %}
 
 <main class="mx-auto max-w-[860px] px-6 py-14">
-    <a href="{% url 'blog:index' %}" class="text-[13px] text-[#0066cc]">← 블로그</a>
+    <p class="flex gap-4 text-[13px]"><a href="{% url 'blog:index' %}" class="text-[#0066cc]">← 블로그</a><a href="{% url 'blog:series_list' %}" class="text-[#0066cc]">📚 전체 시리즈</a></p>
     <p class="mt-6 text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">SERIES</p>
     <h1 class="mt-2 text-[40px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">📚 {{ series.name }}</h1>
     <p class="mt-2 text-[15px] text-[#6e6e73]">{% if series.description %}{{ series.description }} · {% endif %}{{ series_parts|length }}편{% if series.author %} · {{ series.author.first_name|default:series.author.username }}{% endif %}</p>

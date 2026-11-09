@@ -11,6 +11,7 @@ urlpatterns = [
     path("post/<str:slug>/og.png", views.post_og_image, name="post_og"),
     path("post/<str:slug>/edit/", views.post_edit, name="post_edit"),
     path("post/<str:slug>/delete/", views.post_delete, name="post_delete"),
+    path("series/", views.series_list, name="series_list"),
     path("series/<str:slug>/", views.series_detail, name="series"),
     path("all/", views.all_posts, name="all"),
     path("board/", views.board, name="board"),   # 옛 자유게시판 → /blog/life/

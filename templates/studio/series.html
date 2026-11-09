@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="min-h-screen bg-[#f5f5f7] text-[#1d1d1f]">
+    <div class="flex">
+        {% include "components/studio_sidebar.html" %}
+
+        <main class="lg:ml-[260px] min-w-0 flex-1 px-5 sm:px-8 lg:px-14 pt-8 lg:pt-12 pb-24">
+        {% include "components/studio_messages.html" %}
+        <div class="mb-8">
+            <a href="{% url 'studio:index' %}" class="inline-flex items-center gap-2 text-[15px] text-[#6e6e73] transition hover:text-[#1d1d1f]">
+                <span class="text-[18px]">←</span>
+                <span>Studio로 돌아가기</span>
+            </a>
+        </div>
+
+        <section class="mb-8">
+            <p class="text-[12px] uppercase tracking-[0.28em] text-[#0066cc]">BLOG SERIES</p>
+            <h1 class="mt-4 text-[30px] font-semibold tracking-[-0.04em] sm:text-[36px] lg:text-[44px]">시리즈</h1>
+            <p class="mt-3 text-[16px] text-[#6e6e73]">유튜브 재생목록처럼 글을 묶어요. 시리즈 순서·노출과 시리즈 안 편 순서를 여기서 정해요. <a href="{% url 'blog:series_list' %}" target="_blank" class="text-[#0066cc]">/blog/series/ ↗</a></p>
+        </section>
+
+        <ul class="space-y-3">
+            {% for s in items %}
+            <li id="series-{{ s.id }}" class="rounded-[22px] border border-black/[0.06] bg-white p-5">
+                <div class="flex flex-wrap items-center gap-3">
+                    <div class="flex flex-col">
+                        <form method="post" action="{% url 'studio:series_move' s.id %}">{% csrf_token %}<input type="hidden" name="direction" value="up"><button type="submit" class="rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="위로" {% if forloop.first %}disabled{% endif %}>▲</button></form>
+                        <form method="post" action="{% url 'studio:series_move' s.id %}">{% csrf_token %}<input type="hidden" name="direction" value="down"><button type="submit" class="rounded px-1 text-[12px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="아래로" {% if forloop.last %}disabled{% endif %}>▼</button></form>
+                    </div>
+                    <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#f0f0ff] text-[18px]">📚</span>
+                    <div class="min-w-0">
+                        <p class="text-[17px] font-semibold">{{ s.name }}</p>
+                        <a href="{{ s.url }}" target="_blank" class="break-all font-mono text-[12px] text-[#8e8e93] hover:text-[#0066cc]">/blog/series/{{ s.slug }}/ ↗</a>
+                    </div>
+                    <div class="ml-auto flex flex-wrap items-center gap-1.5 text-[11px] font-semibold">
+                        <span class="rounded-full bg-black/[0.05] px-2.5 py-1 text-[#6e6e73]">발행 {{ s.published_count }}편{% if s.draft_count %} · 임시 {{ s.draft_count }}편{% endif %}</span>
+                        {% if s.is_listed %}<span class="rounded-full bg-[#f5f3ff] px-2.5 py-1 text-[#7c3aed]">모음</span>{% else %}<span class="rounded-full bg-black/[0.05] px-2.5 py-1 text-[#8e8e93]">모음에서 숨김</span>{% endif %}
+                        {% if s.show_on_hub and s.is_listed %}<span class="rounded-full bg-[#eef3ff] px-2.5 py-1 text-[#0066cc]">허브</span>{% endif %}
+                    </div>
+                    <a href="?open={{ s.id }}#series-{{ s.id }}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] hover:bg-[#f5f5f7]">편 관리</a>
+                    <a href="?edit={{ s.id }}#series-{{ s.id }}" class="rounded-full border border-black/[0.1] px-4 py-1.5 text-[13px] hover:bg-[#f5f5f7]">수정</a>
+                </div>
+                {% if s.description %}<p class="mt-2 pl-[88px] text-[13px] text-[#6e6e73]">{{ s.description }}</p>{% endif %}
+
+                {% if open_id == s.id %}
+                <div class="mt-5 border-t border-black/[0.06] pt-5">
+                    <p class="text-[13px] font-semibold">편 순서 <span class="font-normal text-[#8e8e93]">— ▲▼ 로 바꾸면 1편부터 번호를 다시 매겨요</span></p>
+                    <ol class="mt-3 space-y-2">
+                        {% for p in s.parts %}
+                        <li class="flex items-center gap-3 rounded-xl bg-[#f8f8fa] px-3 py-2 text-[14px]">
+                            <div class="flex flex-col">
+                                <form method="post" action="{% url 'studio:series_part_move' s.id %}">{% csrf_token %}<input type="hidden" name="post_id" value="{{ p.id }}"><input type="hidden" name="direction" value="up"><button type="submit" class="rounded px-1 text-[11px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="앞으로" {% if forloop.first %}disabled{% endif %}>▲</button></form>
+                                <form method="post" action="{% url 'studio:series_part_move' s.id %}">{% csrf_token %}<input type="hidden" name="post_id" value="{{ p.id }}"><input type="hidden" name="direction" value="down"><button type="submit" class="rounded px-1 text-[11px] leading-4 text-[#6e6e73] hover:bg-black/[0.06] disabled:opacity-30" aria-label="뒤로" {% if forloop.last %}disabled{% endif %}>▼</button></form>
+                            </div>
+                            <span class="w-8 shrink-0 text-right text-[#8e8e93]">{{ p.series_order|default:"-" }}편</span>
+                            <a href="{% url 'blog:post_detail' p.slug %}" target="_blank" class="min-w-0 flex-1 truncate hover:text-[#0066cc]">{{ p.title }}</a>
+                            {% if not p.is_published %}<span class="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700">임시</span>{% endif %}
+                            <form method="post" action="{% url 'studio:series_part_remove' s.id %}">{% csrf_token %}<input type="hidden" name="post_id" value="{{ p.id }}"><button type="submit" class="shrink-0 rounded-full px-3 py-1 text-[12px] text-red-600 hover:bg-red-50">빼기</button></form>
+                        </li>
+                        {% empty %}
+                        <li class="rounded-xl border border-dashed border-black/[0.1] px-3 py-4 text-[13px] text-[#8e8e93]">아직 글이 없어요.</li>
+                        {% endfor %}
+                    </ol>
+                    <form method="post" action="{% url 'studio:series_part_add' s.id %}" class="mt-4 flex flex-wrap items-center gap-2 text-[13px]">
+                        {% csrf_token %}
+                        <select name="post_id" required class="h-10 min-w-0 max-w-full flex-1 rounded-xl border border-black/[0.1] bg-white px-3">
+                            <option value="">시리즈에 없는 글 중에서 골라 마지막 편으로 넣기…</option>
+                            {% for p in free_posts %}<option value="{{ p.id }}">{% if not p.is_published %}[임시] {% endif %}{{ p.title }}{% if p.published_at %} · {{ p.published_at|date:"Y.m.d" }}{% endif %}</option>{% endfor %}
+                        </select>
+                        <button type="submit" class="rounded-full bg-[#1d1d1f] px-5 py-2 font-semibold text-white">넣기</button>
+                    </form>
+                </div>
+                {% endif %}
+
+                {% if editing_id == s.id %}
+                <div class="mt-5 border-t border-black/[0.06] pt-5">
+                    {% include "studio/components/series_form.html" with s=s submit_label="저장" %}
+
+                    <details class="mt-6 rounded-2xl border border-red-200 bg-red-50/50 px-4 py-3">
+                        <summary class="cursor-pointer text-[13px] font-semibold text-red-700">이 시리즈 지우기</summary>
+                        <form method="post" action="{% url 'studio:series_delete' s.id %}" class="mt-3 space-y-3 text-[13px]">
+                            {% csrf_token %}
+                            <p class="text-[#6e6e73]">글 {{ s.post_count }}편은 지우지 않고 시리즈에서만 빠져요.</p>
+                            <label class="block">확인을 위해 이름 <b>{{ s.name }}</b> 을 입력
+                                <input type="text" name="confirm" autocomplete="off" required class="ml-2 h-9 w-56 max-w-full rounded-lg border border-black/[0.1] bg-white px-3">
+                            </label>
+                            <button type="submit" class="rounded-full bg-red-600 px-5 py-2 font-semibold text-white">시리즈 지우기</button>
+                        </form>
+                    </details>
+                </div>
+                {% endif %}
+            </li>
+            {% empty %}
+            <li class="rounded-[22px] border border-dashed border-black/[0.1] bg-white p-6 text-[14px] text-[#8e8e93]">아직 시리즈가 없어요. 아래에서 만들거나 글쓰기 화면에서 시리즈 이름을 넣으면 생겨요.</li>
+            {% endfor %}
+        </ul>
+
+        <section class="mt-8 rounded-[22px] border border-black/[0.06] bg-white p-6">
+            <h2 class="text-[17px] font-semibold">새 시리즈</h2>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">목록 맨 아래에 추가돼요. 글쓰기 화면의 "📚 시리즈" 에서도 바로 고를 수 있어요.</p>
+            <div class="mt-4">
+                {% include "studio/components/series_form.html" with s=None submit_label="만들기" %}
+            </div>
+        </section>
+        </main>
+    </div>
+</div>
+{% endblock %}

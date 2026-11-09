@@ -1092,3 +1092,138 @@ class StudioCategoryTests(TestCase):
 		self.assertEqual(page.status_code, 200)
 		self.assertEqual({c.slug: c.post_count for c in page.context["items"]}["tech"], 1)
 		self.assertContains(page, "새 카테고리")
+
+
+class SeriesHubTests(TestCase):
+	"""시리즈 모음(/blog/series/)·블로그 허브 시리즈 칸과 Studio › Series 관리"""
+
+	def setUp(self):
+		from blog.models import Series
+		self.Series = Series
+		self.admin = get_user_model().objects.create_superuser(username="boss", password="pw-for-tests-only", email="b@x.kr")
+		self.member = get_user_model().objects.create_user(username="member", password="pw-for-tests-only")
+
+	def _post(self, title, series=None, order=None, category="tech", published=True, visibility=Post.VISIBILITY_PUBLIC):
+		return Post.objects.create(title=title, slug=f"p-{Post.objects.count()}", category=category, author=self.admin, content="",
+			is_published=published, published_at=timezone.now() if published else None, visibility=visibility,
+			series=series, series_order=order)
+
+	def _series(self, name="HackRF 입문", slug="hackrf", **kw):
+		return self.Series.objects.create(author=self.admin, name=name, slug=slug, **kw)
+
+	def test_series_list_shows_cards_in_order(self):
+		a = self._series("A 시리즈", "a", order=1)
+		b = self._series("B 시리즈", "b", order=0, description="두 번째로 만든 것")
+		for n in range(1, 5):
+			self._post(f"A-{n}편", a, n)
+		self._post("B-1편", b, 1)
+		res = self.client.get(reverse("blog:series_list"))
+		self.assertEqual(res.status_code, 200)
+		names = [c["series"].name for c in res.context["series_cards"]]
+		self.assertEqual(names, ["B 시리즈", "A 시리즈"])
+		card = res.context["series_cards"][1]
+		self.assertEqual((card["count"], card["more"]), (4, 1))
+		self.assertEqual([p.title for p in card["preview"]], ["A-1편", "A-2편", "A-3편"])
+		self.assertContains(res, "+ 1편 더")
+		self.assertContains(res, reverse("blog:series", args=["a"]))
+		self.assertContains(res, "두 번째로 만든 것")
+
+	def test_hidden_empty_and_private_series_not_listed(self):
+		hidden = self._series("숨긴 것", "hidden", is_listed=False)
+		self._post("숨김-1", hidden, 1)
+		self._series("빈 것", "empty")
+		draft_only = self._series("임시만", "draft-only")
+		self._post("임시", draft_only, 1, published=False)
+		secret = self._series("비밀", "secret-series")
+		self._post("비밀글", secret, 1, category="secret")
+		res = self.client.get(reverse("blog:series_list"))
+		self.assertEqual(res.context["series_cards"], [])
+		self.assertNotContains(res, "숨긴 것")
+		# 관리자는 관리자 전용 카테고리 글 시리즈도 봄 (숨긴 시리즈는 여전히 안 보임)
+		self.client.force_login(self.admin)
+		res = self.client.get(reverse("blog:series_list"))
+		self.assertEqual([c["series"].name for c in res.context["series_cards"]], ["비밀"])
+
+	def test_hub_section_respects_show_on_hub(self):
+		on = self._series("허브 시리즈", "on")
+		off = self._series("허브 끔", "off", show_on_hub=False)
+		self._post("1편", on, 1)
+		self._post("1편", off, 1)
+		res = self.client.get(reverse("blog:index"))
+		self.assertEqual([c["series"].name for c in res.context["hub_series"]], ["허브 시리즈"])
+		self.assertContains(res, "시리즈로 이어 읽기")
+		self.assertContains(res, reverse("blog:series_list"))
+		# 시리즈가 없으면 칸 자체가 없음
+		on.delete()
+		self.assertNotContains(self.client.get(reverse("blog:index")), "시리즈로 이어 읽기")
+
+	def test_protected_post_cover_not_used(self):
+		s = self._series()
+		p = self._post("보호글", s, 1, visibility=Post.VISIBILITY_PROTECTED)
+		p.cover_image = "blog/covers/x.png"
+		p.save()
+		card = self.client.get(reverse("blog:series_list")).context["series_cards"][0]
+		self.assertEqual(card["cover"], "")
+
+	def test_seo_and_sitemap(self):
+		s = self._series()
+		self._post("1편", s, 1)
+		res = self.client.get(reverse("blog:series_list"))
+		self.assertContains(res, "<title>Series")
+		self.assertContains(res, "/og/page/series.png")
+		sitemap = self.client.get("/sitemap.xml").content.decode()
+		self.assertIn("/blog/series/</loc>", sitemap)
+		self.assertIn("/blog/series/hackrf/</loc>", sitemap)
+
+	def test_studio_admin_only(self):
+		self.assertEqual(self.client.get(reverse("studio:series")).status_code, 302)
+		self.client.force_login(self.member)
+		self.assertNotEqual(self.client.get(reverse("studio:series")).status_code, 200)
+		self.client.force_login(self.admin)
+		self.assertEqual(self.client.get(reverse("studio:series")).status_code, 200)
+
+	def test_studio_create_update_move_delete(self):
+		self.client.force_login(self.admin)
+		old = self._series("기존", "old", order=0)
+		self.client.post(reverse("studio:series_create"), {"name": "새 시리즈", "slug": "", "description": "설명", "is_listed": "on", "show_on_hub": "on"})
+		new = self.Series.objects.get(name="새 시리즈")
+		self.assertEqual((new.slug, new.author, new.order), ("새-시리즈", self.admin, 1))
+		# 같은 이름·주소는 거절
+		self.client.post(reverse("studio:series_create"), {"name": "새 시리즈", "slug": "other"})
+		self.client.post(reverse("studio:series_create"), {"name": "다른", "slug": "old"})
+		self.assertEqual(self.Series.objects.count(), 2)
+		# 수정: 주소·노출
+		self.client.post(reverse("studio:series_update", args=[new.id]), {"name": "새 시리즈 2", "slug": "new-two", "description": ""})
+		new.refresh_from_db()
+		self.assertEqual((new.name, new.slug, new.is_listed, new.show_on_hub), ("새 시리즈 2", "new-two", False, False))
+		# 순서
+		self.client.post(reverse("studio:series_move", args=[new.id]), {"direction": "up"})
+		self.assertEqual(list(self.Series.objects.values_list("id", flat=True)), [new.id, old.id])
+		# 삭제: 이름 확인 필요, 글은 남고 연결만 끊김
+		p = self._post("남는 글", old, 1)
+		self.client.post(reverse("studio:series_delete", args=[old.id]), {"confirm": "틀림"})
+		self.assertTrue(self.Series.objects.filter(id=old.id).exists())
+		self.client.post(reverse("studio:series_delete", args=[old.id]), {"confirm": "기존"})
+		self.assertFalse(self.Series.objects.filter(id=old.id).exists())
+		p.refresh_from_db()
+		self.assertEqual((p.series_id, p.series_order), (None, None))
+
+	def test_studio_parts_add_move_remove(self):
+		self.client.force_login(self.admin)
+		s = self._series()
+		a, b = self._post("A", s, 1), self._post("B", s, 2)
+		c = self._post("C")
+		self.client.post(reverse("studio:series_part_add", args=[s.id]), {"post_id": c.id})
+		c.refresh_from_db()
+		self.assertEqual((c.series_id, c.series_order), (s.id, 3))
+		self.client.post(reverse("studio:series_part_move", args=[s.id]), {"post_id": c.id, "direction": "up"})
+		order = list(Post.objects.filter(series=s).order_by("series_order").values_list("title", "series_order"))
+		self.assertEqual(order, [("A", 1), ("C", 2), ("B", 3)])
+		self.client.post(reverse("studio:series_part_remove", args=[s.id]), {"post_id": a.id})
+		a.refresh_from_db()
+		self.assertIsNone(a.series_id)
+		order = list(Post.objects.filter(series=s).order_by("series_order").values_list("title", "series_order"))
+		self.assertEqual(order, [("C", 1), ("B", 2)])
+		res = self.client.get(reverse("studio:series") + f"?open={s.id}")
+		self.assertContains(res, "편 순서")
+		self.assertEqual([p.title for p in [x for x in res.context["items"] if x.id == s.id][0].parts], ["C", "B"])

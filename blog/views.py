@@ -317,6 +317,49 @@ def _series_context(request, post: Post):
 	}
 
 
+def _series_cards(request, hub=False):
+	"""시리즈 모음 카드: 이 사람이 볼 수 있는 발행 글이 한 편이라도 있는 시리즈만, Studio › Series 순서대로."""
+	qs = Series.objects.filter(is_listed=True)
+	if hub:
+		qs = qs.filter(show_on_hub=True)
+	series = list(qs)
+	if not series:
+		return []
+	parts_qs = Post.objects.filter(series__in=series, is_published=True)
+	if not request.user.is_superuser:
+		parts_qs = parts_qs.filter(category__in=categories.public_slugs()).exclude(visibility=Post.VISIBILITY_PRIVATE)
+	grouped = {}
+	for post in parts_qs.order_by("series_order", "published_at", "id"):
+		grouped.setdefault(post.series_id, []).append(post)
+	cards = []
+	for s in series:
+		parts = grouped.get(s.id)
+		if not parts:
+			continue
+		# 표지는 공개 글의 커버만 (보호글 커버는 잠금 화면에서도 안 보여줌)
+		cover = next((p.cover_image.url for p in parts if p.cover_image and p.visibility == Post.VISIBILITY_PUBLIC), "")
+		cards.append({
+			"series": s,
+			"url": reverse("blog:series", args=[s.slug]),
+			"count": len(parts),
+			"preview": parts[:3],
+			"more": max(0, len(parts) - 3),
+			"first": parts[0],
+			"updated": max((p.published_at for p in parts if p.published_at), default=None),
+			"category": parts[0].category_info,
+			"cover": cover,
+		})
+	return cards
+
+
+def series_list(request):
+	"""/blog/series/ — 시리즈(재생목록) 모음"""
+	cards = _series_cards(request)
+	context = {"series_cards": cards, "total_parts": sum(c["count"] for c in cards)}
+	context.update(_sidebar_context(request))
+	return render(request, "blog/series_list.html", context)
+
+
 def series_detail(request, slug: str):
 	series = get_object_or_404(Series, slug=slug)
 	parts = list(_single_post_qs(request).filter(series=series, is_published=True).order_by("series_order", "published_at", "id"))
@@ -614,6 +657,8 @@ def index(request):
 			for c in categories.visible_to(request.user) if c.show_on_hub
 		],
 		"knowledge_map": build_map(_accessible_posts_qs(request)),
+		# 시리즈 칸: Studio › Series 에서 "블로그 허브에 보이기" 를 켠 것, 최대 6개
+		"hub_series": _series_cards(request, hub=True)[:6],
 	}
 	context.update(_sidebar_context(request))
 	return render(request, "blog/index.html", context)

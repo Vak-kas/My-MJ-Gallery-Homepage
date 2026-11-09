@@ -100,6 +100,7 @@ from .users import users, user_detail
 from .security import security, security_ip
 from .settings import site_settings_view
 from .categories import categories, category_create, category_update, category_move, category_delete
+from .series import series, series_create, series_update, series_move, series_delete, series_part_move, series_part_add, series_part_remove
 from .analytics import analytics, analytics_live
 from .server import server, server_logs
 from .ai_usage import ai_usage
