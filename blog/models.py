@@ -64,16 +64,19 @@ class Category(models.Model):
 
 
 class Series(models.Model):
-	"""글 묶음 (예: HackRF 입문 1~5편)."""
+	"""글 묶음 (예: HackRF 입문 1~5편). 유튜브 재생목록처럼 /blog/series/ 에 모아 보여주고, Studio › Series 에서 관리."""
 
 	name = models.CharField(max_length=80)
 	slug = models.SlugField(max_length=100, unique=True, allow_unicode=True)
 	description = models.CharField(max_length=200, blank=True)
 	author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="blog_series")
+	order = models.PositiveIntegerField(default=0)
+	is_listed = models.BooleanField("시리즈 모음에 보이기", default=True)
+	show_on_hub = models.BooleanField("블로그 허브에 보이기", default=True)
 	created_at = models.DateTimeField(auto_now_add=True)
 
 	class Meta:
-		ordering = ["-created_at"]
+		ordering = ["order", "-id"]
 		constraints = [models.UniqueConstraint(fields=["author", "name"], name="unique_series_name_per_author")]
 
 	def __str__(self):

@@ -1,0 +1,22 @@
+{# Studio › Series 의 추가·수정 폼. s 가 없으면 새로 만들기 #}
+<form method="post" action="{% if s %}{% url 'studio:series_update' s.id %}{% else %}{% url 'studio:series_create' %}{% endif %}" class="grid gap-4 md:grid-cols-2">
+    {% csrf_token %}
+    <label class="block text-[13px] font-medium">이름
+        <input type="text" name="name" value="{{ s.name|default:'' }}" maxlength="80" required placeholder="예: HackRF 입문" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <label class="block text-[13px] font-medium">주소 <span class="font-normal text-[#8e8e93]">(/blog/series/주소/ · 비우면 이름으로)</span>
+        <input type="text" name="slug" value="{{ s.slug|default:'' }}" maxlength="100" placeholder="예: hackrf-basics" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 font-mono text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <label class="block text-[13px] font-medium md:col-span-2">설명 <span class="font-normal text-[#8e8e93]">(시리즈 카드·시리즈 페이지·링크 미리보기에 나옴)</span>
+        <input type="text" name="description" value="{{ s.description|default:'' }}" maxlength="200" placeholder="예: SDR 장비 HackRF 로 전파를 받아 보는 입문 과정" class="mt-1 h-10 w-full rounded-xl border border-black/[0.1] bg-[#fbfbfd] px-3 text-[14px] outline-none focus:border-[#0066cc]">
+    </label>
+    <fieldset class="grid gap-2 text-[13px] sm:grid-cols-2 md:col-span-2">
+        <label class="flex items-center gap-2"><input type="checkbox" name="is_listed" {% if not s or s.is_listed %}checked{% endif %}> 📚 시리즈 모음(/blog/series/)에 보이기</label>
+        <label class="flex items-center gap-2"><input type="checkbox" name="show_on_hub" {% if not s or s.show_on_hub %}checked{% endif %}> 블로그 허브 "시리즈로 이어 읽기" 칸에 보이기</label>
+    </fieldset>
+    <div class="flex flex-wrap items-center gap-3 md:col-span-2">
+        <button type="submit" class="rounded-full bg-[#0066cc] px-6 py-2.5 text-[14px] font-semibold text-white">{{ submit_label }}</button>
+        {% if s %}<a href="{% url 'studio:series' %}#series-{{ s.id }}" class="text-[13px] text-[#6e6e73] hover:text-[#1d1d1f]">취소</a>{% endif %}
+        <p class="text-[12px] text-[#8e8e93]">숨겨도 시리즈 페이지와 글 아래 목차·이전/다음 편은 그대로 있어요. 발행된 글이 한 편도 없으면 모음에 안 나와요.</p>
+    </div>
+</form>

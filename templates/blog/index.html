@@ -249,6 +249,24 @@
         </div>
     </section>
 
+    {# 시리즈 칸 (재생목록): Studio › Series 에서 "블로그 허브에 보이기" 를 켠 시리즈 #}
+    {% if hub_series %}
+    <section id="series" class="mt-10">
+        <div class="flex items-end justify-between gap-4">
+            <div>
+                <p class="text-[12px] uppercase tracking-[0.18em] text-[#8e8e93]">Series</p>
+                <h2 class="mt-1 text-[26px] font-semibold tracking-[-0.03em] text-[#1d1d1f]">📚 시리즈로 이어 읽기</h2>
+            </div>
+            <a href="{% url 'blog:series_list' %}" class="shrink-0 text-[13px] font-semibold text-[#0066cc]">전체 시리즈 →</a>
+        </div>
+        <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {% for card in hub_series %}
+                {% include "blog/components/series_card.html" with card=card %}
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
     {# 글 목록이 먼저, 둘러보기 카드는 그 아래 #}
     {% include "blog/components/knowledge_map.html" with knowledge_map=knowledge_map %}
 

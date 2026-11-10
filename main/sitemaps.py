@@ -10,6 +10,14 @@ def _open(key):
 	return site_settings.nav_state(key) == "public"
 
 
+def _public_series_slugs():
+	"""공개 글이 한 편이라도 있고 모음에 보이는 시리즈"""
+	from blog.models import Series
+
+	return (Series.objects.filter(is_listed=True, posts__is_published=True, posts__visibility=Post.VISIBILITY_PUBLIC,
+								  posts__category__in=public_slugs()).distinct().values_list("slug", flat=True))
+
+
 class StaticSitemap(Sitemap):
 	protocol = "https"
 	changefreq = "weekly"
@@ -20,6 +28,8 @@ class StaticSitemap(Sitemap):
 			from blog.categories import all_categories
 			names += ["blog:index", "blog:all"]
 			names += [("blog:category", c.slug) for c in all_categories() if not c.is_private]
+			names.append("blog:series_list")
+			names += [("blog:series", slug) for slug in _public_series_slugs()]
 		if _open("photo"):
 			names.append("main:photos")
 		if _open("tool"):
@@ -33,7 +43,7 @@ class StaticSitemap(Sitemap):
 		return names
 
 	def location(self, item):
-		if isinstance(item, tuple):   # 카테고리 목록 (URL 이름, slug)
+		if isinstance(item, tuple):   # 카테고리·시리즈 페이지 (URL 이름, slug)
 			return reverse(item[0], args=[item[1]])
 		return reverse(item)
 

@@ -31,13 +31,14 @@ def _category_meta(slug):
 	return seo.build(info.name, info.description or None, og_cards.image_url("category", slug), path="")
 
 
-CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "all"): ("page", "all"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
+CARD_KEYS = {("blog", "index"): ("page", "blog"), ("blog", "all"): ("page", "all"), ("blog", "series_list"): ("page", "series"), ("tools", "index"): ("tool", "index"), ("main", "photos"): ("page", "gallery"),
 			 ("games", "index"): ("page", "games")}
 
 
 PAGE_TITLES = {
 	("blog", "index"): ("Blog", "기술 글과 일상 기록을 모은 서민재의 블로그."),
 	("blog", "all"): ("All Posts", "모든 카테고리의 글을 한곳에서."),
+	("blog", "series_list"): ("Series", "주제별로 이어서 읽는 글 묶음 — 처음부터 순서대로."),
 	("tools", "index"): ("Tool", "살면서 ‘이런 게 있었으면’ 싶었던 것들을 직접 만들어 모아둔 곳. 문서·사진·학점, 파일 공유, 네트워크, 개발 도구."),
 	("main", "photos"): ("Gallery", "사진 갤러리."),
 	("games", "index"): ("Game", "사다리타기·돌림판 같은 모임 게임, 2048·한글 타자 연습 랭킹, 같이 하는 게임."),
