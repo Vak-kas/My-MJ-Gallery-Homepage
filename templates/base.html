@@ -251,6 +251,33 @@
         html.theme-dark input::placeholder, html.theme-dark textarea::placeholder { color: #8b8b94; }
         /* 글 본문 형광펜: 밝은 배경 위 글자는 어둡게 */
         html.theme-dark span[style*="background-color"] { color: #1d1d1f !important; }
+        /* 블로그 글자색·배경색 (에디터 팔레트, 노션 색) — 글에는 밝은 화면용 색이 그대로 저장돼 있으니 다크모드에서만 어두운 짝으로 바꿔 보여줌.
+           저장값은 #hex 또는 rgb(r, g, b) 둘 다 있음(에디터가 다시 읽으면 rgb). 본문(#post-body)·에디터(.mj-prose)·색 고르기 패널(.mj-colors) 에서만.
+           배경 짝은 어두우니 글자는 밝게(base.html 의 "형광펜 글자 어둡게" 보다 우선), 글자색을 따로 고른 글은 아래 글자색 줄이 이김 */
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#f1f1ef" i], [style*="rgb(241, 241, 239)"]) { background-color: #2f2f2f !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#f4eeee" i], [style*="rgb(244, 238, 238)"]) { background-color: #4a3228 !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#fbecdd" i], [style*="rgb(251, 236, 221)"]) { background-color: #5c3b23 !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#fbf3db" i], [style*="rgb(251, 243, 219)"]) { background-color: #564328 !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#edf3ec" i], [style*="rgb(237, 243, 236)"]) { background-color: #243d30 !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#e7f3f8" i], [style*="rgb(231, 243, 248)"]) { background-color: #143a4e !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#f6f3f9" i], [style*="rgb(246, 243, 249)"]) { background-color: #3c2d49 !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#faf1f5" i], [style*="rgb(250, 241, 245)"]) { background-color: #4e2c3c !important; color: #e6e6ea !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#fdebec" i], [style*="rgb(253, 235, 236)"]) { background-color: #522e2a !important; color: #e6e6ea !important; }
+        /* 다른 곳에서 붙여 넣어 딸려 온 흰 배경·검은 글자는 다크모드에서 없는 것처럼 */
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="background-color: rgb(255, 255, 255)"], [style*="background-color:rgb(255, 255, 255)"], [style*="background-color:#ffffff" i], [style*="background-color: #ffffff" i], [style*="background-color:#fff;" i], [style$="background-color:#fff" i]) { background-color: transparent !important; color: inherit !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#787774" i], [style*="rgb(120, 119, 116)"]) { color: #9b9b9b !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#9f6b53" i], [style*="rgb(159, 107, 83)"]) { color: #ba856f !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#d9730d" i], [style*="rgb(217, 115, 13)"]) { color: #d9894f !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#cb912f" i], [style*="rgb(203, 145, 47)"]) { color: #d6a554 !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#448361" i], [style*="rgb(68, 131, 97)"]) { color: #5fae80 !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#337ea9" i], [style*="rgb(51, 126, 169)"]) { color: #5e9fe8 !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#9065b0" i], [style*="rgb(144, 101, 176)"]) { color: #a77fd6 !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#c14c8a" i], [style*="rgb(193, 76, 138)"]) { color: #d86aa3 !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="#d44c47" i], [style*="rgb(212, 76, 71)"]) { color: #e4605b !important; }
+        html.theme-dark :is(#post-body, .mj-prose, .mj-colors) :is([style*="color:rgb(29, 29, 31)"], [style*="color: rgb(29, 29, 31)"], [style*="color:#1d1d1f" i], [style*="color: #1d1d1f" i], [style*="color:rgb(0, 0, 0)"], [style*="color: rgb(0, 0, 0)"], [style*="color:#000000" i], [style*="color: #000000" i]) { color: inherit !important; }
+
+        /* 블로그 커버(목록 카드·시리즈 카드·글 상단): 배경이 투명한 도식 PNG 의 검은 선이 어두운 카드에 묻히지 않게 밝은 바탕 (본문 그림과 같은 색) */
+        html.theme-dark img.blog-cover { background-color: #f5f5f7; }
 
         html.theme-dark [class*="border-black"] {
             border-color: rgba(255, 255, 255, 0.14) !important;
