@@ -2,7 +2,7 @@
 <a href="{{ card.url }}" class="series-card group flex flex-col overflow-hidden rounded-[22px] border border-black/[0.08] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.03)] transition hover:-translate-y-0.5" style="--cat: {{ card.category.color }}; --cat-soft: {{ card.category.soft_color }};">
     <div class="series-card__cover relative aspect-[16/9] overflow-hidden">
         {% if card.cover %}
-        <img src="{{ card.cover }}" alt="" loading="lazy" class="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
+        <img src="{{ card.cover }}" alt="" loading="lazy" class="blog-cover h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]">
         {% else %}
         <div class="flex h-full w-full items-center justify-center pr-[34%] text-[44px]">📚</div>
         {% endif %}

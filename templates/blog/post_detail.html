@@ -26,7 +26,7 @@
             {% elif cover_from_content %}
             <img src="{{ cover_from_content }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
             {% elif post.cover_image %}
-            <img src="{{ post.cover_image.url }}" alt="{{ post.title }}" class="block h-[260px] w-full object-cover lg:h-[360px]" />
+            <img src="{{ post.cover_image.url }}" alt="{{ post.title }}" class="blog-cover block h-[260px] w-full object-cover lg:h-[360px]" />
             {% else %}
             <div class="flex h-[260px] items-center justify-center lg:h-[360px]">
                 <div class="text-center">
