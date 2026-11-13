@@ -14,3 +14,6 @@ psycopg2-binary==2.9.10
 # 실시간 스트림 중계 데몬 (relay/mj_relay.py)
 pyzmq==26.4.0
 aiohttp==3.12.15
+
+# 웹메일 받은 메일 진단: DKIM 서명 직접 검증 (dnspython 도 같이 설치됨)
+dkimpy==1.1.8

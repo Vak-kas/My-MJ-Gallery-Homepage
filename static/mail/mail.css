@@ -112,6 +112,47 @@ html.theme-dark .mjm__notice { background: rgba(255,196,61,.12); color: #ffd27a;
 .mjm__att { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--mjm-line); color: var(--mjm-accent); }
 .mjm__quickreply { display: flex; gap: 6px; padding: 12px 16px 18px; }
 
+/* 받은 메일 진단 · DMARC 보고서 */
+.mjm__diag { border-bottom: 1px solid var(--mjm-line); font-size: 13px; }
+.mjm__diag > summary { display: flex; gap: 8px; align-items: center; padding: 8px 16px; cursor: pointer; list-style: none; color: var(--mjm-text); }
+.mjm__diag > summary::-webkit-details-marker { display: none; }
+.mjm__diag > summary::after { content: '▾'; margin-left: auto; color: var(--mjm-dim); }
+.mjm__diag[open] > summary::after { content: '▴'; }
+.mjm__diag[data-verdict="ok"] > summary { background: rgba(52,199,89,.08); }
+.mjm__diag[data-verdict="warn"] > summary { background: rgba(255,149,0,.1); }
+.mjm__diag[data-verdict="bad"] > summary { background: rgba(255,59,48,.12); }
+.mjm__diag-body { padding: 4px 16px 12px; line-height: 1.6; }
+.mjm__diag-sec { margin-top: 10px; }
+.mjm__diag-sec > b { display: block; margin-bottom: 4px; font-size: 12px; color: var(--mjm-dim); }
+.mjm__diag-item { display: flex; gap: 8px; padding: 6px 0; border-top: 1px dashed var(--mjm-line); min-width: 0; overflow-wrap: anywhere; }
+.mjm__diag-item:first-of-type { border-top: 0; }
+.mjm__diag-mark { flex: none; }
+.mjm__diag-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mjm__route { margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+.mjm__route li { padding: 3px 0; }
+.mjm__route li.is-slow .mjm__dim { color: #c66a00; }
+.mjm__tls { color: #248a3d; }
+html.theme-dark .mjm__tls { color: #5dd879; }
+.mjm__headers { max-height: 320px; overflow: auto; margin: 8px 0 0; padding: 10px; border-radius: 10px; background: var(--mjm-bg2); font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-all; }
+.mjm__dmarc { margin: 0 16px 10px; padding: 12px 14px; border: 1px solid var(--mjm-line); border-radius: 14px; font-size: 13px; line-height: 1.6; }
+.mjm__dmarc.is-ok { border-color: rgba(52,199,89,.5); }
+.mjm__dmarc.is-warn { border-color: rgba(255,149,0,.6); }
+.mjm__dmarc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.mjm__dmarc-stats { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-weight: 600; }
+.mjm__dmarc-stats .is-bad { color: #d70015; }
+html.theme-dark .mjm__dmarc-stats .is-bad { color: #ff6961; }
+.mjm__dmarc-sum { margin: 6px 0; }
+.mjm__dmarc-help summary { cursor: pointer; color: var(--mjm-accent); font-size: 12px; }
+.mjm__dmarc-help p { margin: 4px 0 0; color: var(--mjm-dim); font-size: 12px; }
+.mjm__dmarc-row { margin-top: 8px; padding: 8px 10px; border-radius: 10px; background: var(--mjm-bg2); border-left: 3px solid #34c759; overflow-wrap: anywhere; }
+.mjm__dmarc-row.is-bad { border-left-color: #ff3b30; }
+.mjm__dmarc-advice { margin-top: 2px; font-size: 12px; }
+.mjm__pill { display: inline-block; padding: 0 7px; border-radius: 999px; font-size: 11px; font-weight: 600; }
+.mjm__pill.is-ok { background: rgba(52,199,89,.15); color: #248a3d; }
+.mjm__pill.is-bad { background: rgba(255,59,48,.14); color: #d70015; }
+html.theme-dark .mjm__pill.is-ok { color: #5dd879; }
+html.theme-dark .mjm__pill.is-bad { color: #ff6961; }
+
 /* 보낸 뒤 안내 */
 .mjm__sent { margin: auto; padding: 32px 24px; text-align: center; }
 .mjm__sent-icon { display: inline-flex; width: 56px; height: 56px; align-items: center; justify-content: center; border-radius: 999px; background: rgba(52,199,89,.15); color: #1e7a35; font-size: 26px; font-weight: 700; }

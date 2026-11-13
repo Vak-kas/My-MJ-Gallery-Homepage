@@ -1,5 +1,5 @@
 // MJ Mail — /mail/ 전체 화면과 오른쪽 아래 떠 있는 패널이 같이 쓰는 스크립트
-// 서버 API: /mail/api/{state,unread,list,message,action,labels,draft,send}/ (관리자 세션 + CSRF)
+// 서버 API: /mail/api/{state,unread,list,message,action,labels,draft,send,diagnose,dmarc}/ (관리자 세션 + CSRF)
 (() => {
     const API = '/mail/api/';
     const csrf = () => document.querySelector('meta[name="mj-csrf"]')?.content || (document.cookie.match(/(?:^|;\s*)csrftoken=([^;]+)/) || [])[1] || '';
@@ -369,13 +369,20 @@
                 ]), h('div', { class: 'mjm__dim mjm__readdate', text: m.date_text })]),
             ]);
             readEl.append(head);
+            if (m.folder !== 'drafts' && m.folder !== 'sent') readEl.append(diagnosePanel(m));
             if (m.has_remote_images) readEl.append(h('div', { class: 'mjm__notice' }, [h('span', { text: '추적 방지를 위해 외부 그림을 불러오지 않았어요. ' }), h('button', { type: 'button', text: '그림 보기', onclick: () => openMessage(m.uid, { images: true }) })]));
             const frame = h('iframe', { class: 'mjm__body', sandbox: 'allow-same-origin allow-popups allow-popups-to-escape-sandbox', title: '메일 본문' });
             frame.srcdoc = bodyDoc(m.body_html);
             frame.addEventListener('load', () => { try { frame.style.height = Math.min(6000, frame.contentDocument.body.scrollHeight + 30) + 'px'; } catch { /* sandbox */ } });
             readEl.append(frame);
             const files = m.attachments.filter((a) => !(a.inline && a.content_type.startsWith('image/') && m.is_html));
-            if (files.length) readEl.append(h('div', { class: 'mjm__atts' }, [h('b', { text: `첨부 ${files.length}개` }), ...files.map((a) => h('a', { class: 'mjm__att', href: a.url, download: a.filename, text: `📎 ${a.filename} (${fmtSize(a.size)})` }))]));
+            const reportBox = h('div', { class: 'mjm__dmarc-holder' });
+            if (files.length) readEl.append(h('div', { class: 'mjm__atts' }, [h('b', { text: `첨부 ${files.length}개` }), ...files.flatMap((a) => [
+                h('a', { class: 'mjm__att', href: a.url, download: a.filename, text: `📎 ${a.filename} (${fmtSize(a.size)})` }),
+                a.dmarc ? h('button', { type: 'button', class: 'mjm__mini', title: 'DMARC 집계 보고서를 사람이 읽을 수 있게', text: '📊 보고서 보기', onclick: () => dmarcCard(m, a, reportBox) }) : null,
+            ])]), reportBox);
+            const autoReport = /^report domain:/i.test(m.subject) && files.find((a) => a.dmarc);
+            if (autoReport) dmarcCard(m, autoReport, reportBox);
             if (m.folder !== 'drafts') readEl.append(h('div', { class: 'mjm__quickreply' }, [h('button', { type: 'button', text: '↩ 답장', onclick: () => openCompose({ reply: m }) }), h('button', { type: 'button', text: '↪ 전달', onclick: () => openCompose({ forward: m }) })]));
             async function one(action, extra = {}) {
                 try {
@@ -385,6 +392,68 @@
                     loadList(); loadFolders(); refreshUnread();
                 } catch (e) { say(e.message, true); }
             }
+        }
+        // ---- 받은 메일 진단 (SPF·DKIM·DMARC·전달 경로·피싱 단서) ----
+        const DIAG_ICON = { ok: '✅', warn: '⚠️', bad: '❌', none: '➖' };
+        const diagCache = new Map();
+        function diagnosePanel(m) {
+            const key = `${m.folder}:${m.uid}`;
+            const sumText = h('span', { class: 'mjm__diag-sum', text: '이 메일 믿어도 될까? — 확인하는 중…' });
+            const body = h('div', { class: 'mjm__diag-body' });
+            const box = h('details', { class: 'mjm__diag', open: store.get('mjm:diag-open', false) }, [h('summary', {}, [h('span', { class: 'mjm__diag-icon', text: '🔍' }), sumText]), body]);
+            box.addEventListener('toggle', () => store.set('mjm:diag-open', box.open));
+            const draw = (d) => {
+                box.dataset.verdict = d.verdict;
+                box.querySelector('.mjm__diag-icon').textContent = DIAG_ICON[d.verdict] || '🔍';
+                sumText.textContent = d.verdict_text;
+                body.innerHTML = '';
+                body.append(h('div', { class: 'mjm__diag-sec' }, [h('b', { text: '인증 결과' }), ...d.checks.map((c) => h('div', { class: `mjm__diag-item is-${c.status}` }, [
+                    h('span', { class: 'mjm__diag-mark', text: DIAG_ICON[c.status] }),
+                    h('div', {}, [h('div', {}, [h('b', { text: c.title }), c.source ? h('span', { class: 'mjm__dim', text: ` · ${c.source}` }) : null]), h('div', { text: c.summary }), c.detail ? h('div', { class: 'mjm__dim', text: c.detail }) : null]),
+                ]))]));
+                if (d.clues.length) body.append(h('div', { class: 'mjm__diag-sec' }, [h('b', { text: '피싱 단서' }), ...d.clues.map((c) => h('div', { class: `mjm__diag-item is-${c.status}` }, [
+                    h('span', { class: 'mjm__diag-mark', text: DIAG_ICON[c.status] }), h('div', {}, [h('div', { text: c.text }), h('div', { class: 'mjm__dim', text: c.detail })]),
+                ]))]));
+                if (d.route.length) body.append(h('div', { class: 'mjm__diag-sec' }, [
+                    h('b', { text: `전달 경로 ${d.route.length}단계${d.route_total ? ` · 모두 ${d.route_total}` : ''}` }),
+                    h('ol', { class: 'mjm__route' }, d.route.map((r) => h('li', { class: r.slow ? 'is-slow' : '' }, [
+                        h('div', {}, [h('span', { text: r.from || '(보낸 프로그램)' }), r.ip ? h('span', { class: 'mjm__dim', text: ` [${r.ip}]` }) : null, h('span', { class: 'mjm__dim', text: ' → ' }), h('span', { text: r.by || '?' })]),
+                        h('div', { class: 'mjm__dim' }, [`${r.time || '시각 모름'}${r.delay ? ` · +${r.delay}` : ''}${r.with ? ` · ${r.with}` : ''} · `, h('span', { class: r.tls ? 'mjm__tls' : '', text: r.tls ? '🔒 암호화' : r.local ? '서버 안' : '암호화 표시 없음' })]),
+                    ]))),
+                ]));
+                if (d.foreign_results.length) body.append(h('div', { class: 'mjm__diag-sec mjm__dim', text: `참고 — 다른 서버가 적은 결과(위조 가능해 판정엔 안 씀): ${d.foreign_results.map((f) => `${f.by}: ${f.results.join(', ')}`).join(' / ')}` }));
+                const pre = h('pre', { class: 'mjm__headers', hidden: true, text: d.headers });
+                body.append(h('div', { class: 'mjm__diag-sec mjm__diag-actions' }, [
+                    h('button', { type: 'button', class: 'mjm__mini', text: '원본 헤더 보기', onclick: (e) => { pre.hidden = !pre.hidden; e.target.textContent = pre.hidden ? '원본 헤더 보기' : '원본 헤더 접기'; } }),
+                    h('button', { type: 'button', class: 'mjm__mini', text: '헤더 복사', onclick: () => { navigator.clipboard?.writeText(d.headers).then(() => say('헤더를 복사했어요'), () => say('복사하지 못했어요', true)); } }),
+                    !d.dkimpy_missing ? null : h('span', { class: 'mjm__dim', text: 'DKIM 직접 검증은 서버에 dkimpy 를 설치하면 켜져요.' }),
+                ]), pre);
+            };
+            if (diagCache.has(key)) draw(diagCache.get(key));
+            else api('diagnose', { query: { folder: m.folder, uid: m.uid } }).then((d) => { diagCache.set(key, d); draw(d); }).catch((e) => { sumText.textContent = `진단하지 못했어요: ${e.message}`; });
+            return box;
+        }
+        const DISP = { none: '배달', quarantine: '스팸함', reject: '거절' };
+        async function dmarcCard(m, a, holder) {
+            holder.innerHTML = '';
+            holder.append(h('div', { class: 'mjm__dmarc mjm__dim', text: '보고서를 읽는 중…' }));
+            let r;
+            try { r = await api('dmarc', { query: { folder: m.folder, uid: m.uid, i: a.index } }); } catch (e) { holder.innerHTML = ''; holder.append(h('div', { class: 'mjm__dmarc mjm__dim', text: `보고서를 읽지 못했어요: ${e.message}` })); return; }
+            const res = (v) => h('span', { class: `mjm__pill is-${v === 'pass' ? 'ok' : 'bad'}`, text: v || '-' });
+            holder.innerHTML = '';
+            holder.append(h('div', { class: `mjm__dmarc is-${r.failed ? 'warn' : 'ok'}` }, [
+                h('div', { class: 'mjm__dmarc-head' }, [h('b', { text: `📊 DMARC 보고서 — ${r.domain}` }), h('button', { type: 'button', class: 'mjm__mini', text: '닫기', onclick: () => { holder.innerHTML = ''; } })]),
+                h('div', { class: 'mjm__dim', text: `${r.org || '보고한 곳'} · ${r.begin} ~ ${r.end} · 정책 p=${r.policy}${r.pct !== '100' ? ` (${r.pct}%)` : ''}` }),
+                h('div', { class: 'mjm__dmarc-stats' }, [h('span', { text: `모두 ${r.total}통` }), h('span', { class: 'is-ok', text: `✅ 통과 ${r.passed}` }), h('span', { class: r.failed ? 'is-bad' : '', text: `❌ 실패 ${r.failed}` })]),
+                h('p', { class: 'mjm__dmarc-sum', text: r.summary }),
+                h('details', { class: 'mjm__dmarc-help' }, [h('summary', { text: '이 보고서가 뭔가요?' }), h('p', { text: 'Google 같은 메일 서비스가 "지난 하루 동안 smjgallery.kr 이라고 적힌 메일이 어느 서버(IP)에서 몇 통 왔고, SPF(허락된 서버인지)·DKIM(전자 도장)이 맞았는지" 를 알려 주는 보고서예요. 둘 중 하나라도 보낸 사람 도메인과 맞으면 통과예요. 실패가 우리 서버 IP 가 아니면 누군가 사칭을 시도한 것이고, 우리 정책대로 처리돼요.' })]),
+                h('div', { class: 'mjm__dmarc-rows' }, r.rows.map((row) => h('div', { class: `mjm__dmarc-row is-${row.ok ? 'ok' : 'bad'}` }, [
+                    h('div', { class: 'mjm__dmarc-ip' }, [h('b', { text: row.ip || '?' }), h('span', { text: ` · ${row.count}통 · ${DISP[row.disposition] || row.disposition}` })]),
+                    h('div', { class: 'mjm__dmarc-res' }, [h('span', { text: 'SPF ' }), res(row.spf_aligned), h('span', { text: ' DKIM ' }), res(row.dkim_aligned),
+                        h('span', { class: 'mjm__dim', text: ` · From ${row.header_from}${row.envelope_from ? ` · 반송 ${row.envelope_from}` : ''}${row.dkim.length ? ` · 도장 ${row.dkim.map((d) => `${d.domain}${d.selector ? '/' + d.selector : ''}=${d.result}`).join(', ')}` : ''}` })]),
+                    h('div', { class: 'mjm__dmarc-advice', text: row.advice }),
+                ]))),
+            ]));
         }
         const rowOf = (m) => state.list?.items.find((x) => x.uid === m.uid);
         const bodyDoc = (html) => `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data:; style-src 'unsafe-inline'"><base target="_blank"><style>body{font:14px/1.65 system-ui,-apple-system,sans-serif;color:#1d1d1f;margin:14px;word-break:break-word}img{max-width:100%;height:auto}img[data-src]{display:none}blockquote{border-left:3px solid #ddd;margin:8px 0;padding-left:10px;color:#555}pre{white-space:pre-wrap}a{color:#0066cc}</style></head><body>${html}</body></html>`;
