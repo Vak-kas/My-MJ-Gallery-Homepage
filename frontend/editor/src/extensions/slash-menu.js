@@ -65,6 +65,16 @@ const createMenuRenderer = () => {
     let active = 0;
     let command = null;
     let clientRect = null;
+    let lastPointer = '';
+
+    // ↑↓ 는 목록을 다시 그리지 않고 표시만 옮김. 다시 그리면 가만히 있는 마우스 밑에 새 항목이 깔리면서
+    // 브라우저가 mouseenter 를 보내 선택이 마우스 쪽으로 되돌아갔음 (마우스가 메뉴 위에 있으면 ↑↓ 가 안 먹던 버그)
+    const setActive = (index) => {
+        active = index;
+        const rows = panel?.querySelectorAll('.mj-pop__item') || [];
+        rows.forEach((el, i) => el.classList.toggle('is-active', i === active));
+        rows[active]?.scrollIntoView({ block: 'nearest' });
+    };
 
     const draw = () => {
         if (!panel) return;
@@ -84,14 +94,17 @@ const createMenuRenderer = () => {
                 class: `mj-pop__item${index === active ? ' is-active' : ''}`,
                 onmousedown: (e) => e.preventDefault(),
                 onclick: () => command?.(item),
-                onmouseenter: () => {
-                    active = index;
-                    panel.querySelectorAll('.mj-pop__item').forEach((el, i) => el.classList.toggle('is-active', i === active));
+                // 마우스를 실제로 움직였을 때만 선택을 옮김 (스크롤·다시 그리기로 밑에 온 항목은 무시)
+                onmousemove: (e) => {
+                    const pointer = `${e.clientX},${e.clientY}`;
+                    if (pointer === lastPointer || (!e.movementX && !e.movementY)) return;
+                    lastPointer = pointer;
+                    if (active !== index) setActive(index);
                 },
             }, [h('span', { class: 'mj-pop__icon', text: item.icon }), h('span', {}, [h('b', { text: item.title }), h('small', { text: item.desc })])]);
             panel.append(row);
         });
-        panel.querySelectorAll('.mj-pop__item')[active]?.scrollIntoView({ block: 'nearest' });
+        setActive(active);
     };
 
     const place = () => {
@@ -101,6 +114,7 @@ const createMenuRenderer = () => {
     return {
         onStart: (props) => {
             panel = h('div', { class: 'mj-pop mj-slash', role: 'listbox' });
+            lastPointer = '';
             document.body.append(panel);
             items = props.items;
             command = props.command;
@@ -120,13 +134,11 @@ const createMenuRenderer = () => {
         onKeyDown: ({ event }) => {
             if (!items.length) return false;
             if (event.key === 'ArrowDown') {
-                active = (active + 1) % items.length;
-                draw();
+                setActive((active + 1) % items.length);
                 return true;
             }
             if (event.key === 'ArrowUp') {
-                active = (active - 1 + items.length) % items.length;
-                draw();
+                setActive((active - 1 + items.length) % items.length);
                 return true;
             }
             if (event.key === 'Enter' || event.key === 'Tab') {
