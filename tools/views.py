@@ -89,6 +89,10 @@ def linkbudget(request):
 	return render(request, "tools/linkbudget.html")
 
 
+def iq(request):
+	return render(request, "tools/iq.html")
+
+
 def subnet(request):
 	return render(request, "tools/subnet.html")
 
