@@ -9,6 +9,7 @@ urlpatterns = [
     path("duplex/", views.duplex, name="duplex"),
     path("subnet/", views.subnet, name="subnet"),
     path("linkbudget/", views.linkbudget, name="linkbudget"),
+    path("iq/", views.iq, name="iq"),
     path("wifi/", views.wifi, name="wifi"),
     path("satellite/", satellite.page, name="satellite"),
     path("satellite/tle/", satellite.tle, name="satellite_tle"),

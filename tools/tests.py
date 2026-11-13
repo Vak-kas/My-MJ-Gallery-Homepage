@@ -545,6 +545,20 @@ class KeygenPageTests(TestCase):
 		self.assertNotRegex(resp.content.decode(), r'fetch\((?!"/contact/")')
 
 
+class IqAnalyzerPageTests(TestCase):
+	def test_iq_page_is_public_and_reads_files_locally(self):
+		from pathlib import Path
+		from django.conf import settings
+		resp = self.client.get(reverse("tools:iq"))
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, "js/iq-analyzer.js")
+		self.assertContains(resp, "브라우저 안에서만")
+		js = (Path(settings.BASE_DIR) / "static/js/iq-analyzer.js").read_text(encoding="utf-8")
+		# 파일은 File.slice 로 브라우저에서만 읽고, 어디에도 보내지 않음
+		self.assertIn(".slice(", js)
+		self.assertNotRegex(js, r"fetch\(|XMLHttpRequest|sendBeacon")
+
+
 class FileRoomPageTests(TestCase):
 	ROOM = {**StreamViewTests.ROOM, "kind": "file", "meta": {"label": "파일 방"}, "out_socket": "PUSH"}
 

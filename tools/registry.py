@@ -302,6 +302,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "iq",
+		"url_name": "tools:iq",
+		"icon": "〰️",
+		"title": "IQ 분석기",
+		"description": "GNU Radio·SDR 로 저장한 IQ 파일(cfile·cs16·cu8·WAV·SigMF)을 열어 시간 파형·스펙트로그램·스펙트럼·성상도를 확대하며 관찰. 마커로 시간 재기, 구간 잘라 저장. 몇 GB 도 브라우저 안에서만.",
+		"tags": ["SDR", "GNU Radio"],
+		"category": "network",
+		"added": "2026-11-13T11:00",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "linkbudget",
 		"url_name": "tools:linkbudget",
 		"icon": "📡",

@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .iq-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 18px; }
+    .iq-in { border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 5px 9px; font-size: 13px; color: #1d1d1f; outline: none; font-variant-numeric: tabular-nums; }
+    .iq-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .iq-f label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 3px; }
+    .iq-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .iq-seg button { border-radius: 999px; padding: 3px 10px; font-size: 12px; color: #6e6e73; }
+    .iq-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .iq-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 3px 10px; font-size: 12px; color: #1d1d1f; }
+    .iq-btn:hover { background: #f5f5f7; }
+    .iq-h { font-size: 13px; font-weight: 700; color: #1d1d1f; }
+    .iq-sub { font-size: 12px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+    .iq-stat { border-radius: 14px; background: #f5f5f7; padding: 8px 12px; }
+    .iq-stat p:first-child { font-size: 11px; color: #8e8e93; }
+    .iq-stat p:last-child { margin-top: 2px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; word-break: break-all; }
+    .iq-drop { border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 18px; padding: 26px 16px; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .iq-drop.is-over, .iq-drop:hover { border-color: #0066cc; background: rgba(0, 102, 204, 0.04); }
+    .iq-plot { position: relative; width: 100%; }
+    .iq-plot canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    .iq-plot canvas.iq-top { cursor: crosshair; touch-action: none; }
+    #iq-ov { cursor: pointer; touch-action: none; }
+    #iq-sp { cursor: crosshair; }
+    #iq-cn { width: 100%; aspect-ratio: 1 / 1; display: block; border-radius: 12px; }
+    .iq-progress { height: 4px; border-radius: 99px; background: rgba(0, 102, 204, 0.12); overflow: hidden; }
+    .iq-progress::before { content: ""; display: block; height: 100%; width: var(--p, 0%); background: #0066cc; transition: width 0.15s; }
+    .iq-help li { margin-top: 4px; }
+    .iq-help code { border-radius: 6px; background: #f5f5f7; padding: 1px 5px; font-size: 12px; }
+    html.theme-dark .iq-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .iq-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .iq-seg, html.theme-dark .iq-stat, html.theme-dark .iq-help code { background: #111318; }
+    html.theme-dark .iq-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .iq-h { color: #e8e8ea; }
+    html.theme-dark .iq-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .iq-drop { border-color: rgba(255, 255, 255, 0.18); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-4 py-14 sm:px-6 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">IQ ANALYZER · SDR</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">IQ 분석기.</h1>
+        <p class="mt-3 max-w-[860px] text-[15px] leading-relaxed text-[#6e6e73]">GNU Radio 의 File Sink 나 SDR 프로그램으로 저장한 IQ 파일을 열어 시간 파형·스펙트로그램·스펙트럼·성상도를 확대하며 살펴봐요. <b>파일은 서버로 가지 않고 브라우저 안에서만</b> 읽어요 — 몇 GB 짜리도 필요한 부분만 읽어서 그려요.</p>
+    </div>
+
+    <section class="iq-card mt-6">
+        <div id="iq-drop" class="iq-drop">
+            <p class="text-[15px] font-semibold">📂 IQ 파일을 끌어 놓거나 눌러서 고르기</p>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">.cfile · .bin · .dat · .iq (complex float32) · .cs16 · .cs8 · .cu8 · .wav (2채널) · SigMF (.sigmf-meta + .sigmf-data 같이)</p>
+            <button type="button" id="iq-demo" class="iq-btn mt-3">🎛 예시 신호로 해 보기</button>
+            <input id="iq-file" type="file" multiple class="hidden">
+        </div>
+        <p id="iq-name" class="mt-3 text-[13px] font-semibold break-all"></p>
+        <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            <div class="iq-f"><label>샘플 형식</label>
+                <select id="iq-fmt" class="iq-in w-full">
+                    <option value="fc32">complex float32 (gr_complex)</option>
+                    <option value="sc16">complex int16 (short)</option>
+                    <option value="sc8">complex int8 (HackRF)</option>
+                    <option value="cu8">complex uint8 (RTL-SDR)</option>
+                    <option value="fc64">complex float64</option>
+                    <option value="f32">real float32 (실수)</option>
+                </select>
+            </div>
+            <div class="iq-f"><label>샘플레이트 (S/s)</label><input id="iq-fs" class="iq-in w-full" type="number" step="any" min="1" value="1000000"></div>
+            <div class="iq-f"><label>중심 주파수 (MHz)</label><input id="iq-fc" class="iq-in w-full" type="number" step="any" value="0"></div>
+            <div class="iq-f"><label>바이트 순서</label><select id="iq-le" class="iq-in w-full"><option value="le">little-endian (보통)</option><option value="be">big-endian</option></select></div>
+            <div class="iq-f"><label>앞에서 건너뛸 바이트 <span title="파일 앞에 머리말이 붙어 있으면 그 크기">ⓘ</span></label><input id="iq-skip" class="iq-in w-full" type="number" min="0" step="1" value="0"></div>
+        </div>
+        <div id="iq-progress" class="iq-progress mt-3 hidden"></div>
+        <p id="iq-progress-text" class="iq-sub mt-1"></p>
+        <p id="iq-msg" class="mt-3 text-[13px] text-[#6e6e73]"></p>
+    </section>
+
+    <section id="iq-empty" class="iq-card iq-help mt-5 text-[13px] leading-6 text-[#6e6e73]">
+        <p class="iq-h">GNU Radio 에서 저장하는 법</p>
+        <ul class="mt-1">
+            <li>· 흐름도 끝에 <b>File Sink</b> 를 달고 Type 을 <code>complex</code> 로 두면 complex float32 (<code>gr_complex</code>, 샘플당 8바이트) 파일이 돼요. 여기서 기본 형식이 이거예요.</li>
+            <li>· 파일에 샘플레이트가 안 적혀서 직접 넣어야 해요. 파일 이름에 <code>2Msps</code>·<code>fs=2e6</code>·<code>433.92MHz</code> 처럼 적어 두면 알아서 채워요.</li>
+            <li>· <b>SigMF Sink</b> (gr-sigmf) 로 저장하면 샘플레이트·중심 주파수·주석까지 읽어요. 두 파일을 같이 골라 주세요.</li>
+            <li>· 너무 크면 <b>Head</b> 블록으로 샘플 수를 정하거나, 여기서 원하는 구간만 골라 <b>💾 이 구간 저장</b> 으로 잘라 받을 수 있어요.</li>
+        </ul>
+    </section>
+
+    <div id="iq-work" class="hidden">
+        <section class="iq-card mt-5">
+            <div id="iq-info" class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6"></div>
+            <ul id="iq-notes" class="mt-2 text-[13px] text-[#c92a2a]"></ul>
+        </section>
+
+        <section class="iq-card mt-5">
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="iq-h">⏱ 시간</p>
+                <span id="iq-view-label" class="iq-sub"></span>
+                <span id="iq-view-power" class="iq-sub"></span>
+                <div class="ml-auto flex flex-wrap items-center gap-1.5">
+                    <button type="button" class="iq-btn" id="iq-left" title="왼쪽으로 (←)">◀</button>
+                    <button type="button" class="iq-btn" id="iq-zin" title="확대 (+)">＋</button>
+                    <button type="button" class="iq-btn" id="iq-zout" title="축소 (−)">－</button>
+                    <button type="button" class="iq-btn" id="iq-right" title="오른쪽으로 (→)">▶</button>
+                    <button type="button" class="iq-btn" id="iq-all" title="전체 보기 (0)">전체</button>
+                    <button type="button" class="iq-btn" id="iq-save" title="지금 보이는 구간을 같은 형식 그대로 받기">💾 이 구간 저장</button>
+                </div>
+            </div>
+            <div class="iq-plot mt-2" style="height:56px"><canvas id="iq-ov"></canvas></div>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <span class="iq-seg" id="iq-mode"><button type="button" class="is-on" data-v="iq">I · Q</button><button type="button" data-v="db">크기 (dB)</button><button type="button" data-v="phase">위상</button><button type="button" data-v="freq">순간 주파수</button></span>
+                <span id="iq-show" class="flex items-center gap-3 text-[12px]">
+                    <label class="inline-flex items-center gap-1"><input type="checkbox" id="iq-show-i" checked><span style="color:#0066cc">I</span></label>
+                    <label class="inline-flex items-center gap-1"><input type="checkbox" id="iq-show-q" checked><span style="color:#e8590c">Q</span></label>
+                    <label class="inline-flex items-center gap-1"><input type="checkbox" id="iq-show-mag"><span style="color:#2b8a3e">|x|</span></label>
+                </span>
+                <span class="ml-auto inline-flex items-center gap-1.5 text-[12px] text-[#8e8e93]">끌면 <span class="iq-seg" id="iq-drag"><button type="button" class="is-on" data-v="zoom">구간 확대</button><button type="button" data-v="pan">옆으로 이동</button></span></span>
+            </div>
+            <div class="iq-plot mt-2" style="height:260px"><canvas id="iq-time"></canvas><canvas id="iq-time-ov" class="iq-top"></canvas></div>
+            <p id="iq-time-note" class="iq-sub mt-1"></p>
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <p class="iq-h">🌈 스펙트로그램</p>
+                <span id="iq-sg-info" class="iq-sub"></span>
+                <div class="ml-auto flex flex-wrap items-center gap-2 text-[12px]">
+                    <label>FFT <select id="iq-sg-n" class="iq-in"><option value="0">자동</option><option>64</option><option>128</option><option>256</option><option>512</option><option>1024</option><option>2048</option><option>4096</option></select></label>
+                    <label>색 범위 <input id="iq-sg-lo" class="iq-in w-[70px]" type="number" step="1" placeholder="자동"> ~ <input id="iq-sg-hi" class="iq-in w-[70px]" type="number" step="1" placeholder="자동"> dB</label>
+                    <span id="iq-sg-scale" class="iq-sub"></span>
+                </div>
+            </div>
+            <div class="iq-plot mt-2" style="height:260px"><canvas id="iq-sg"></canvas><canvas id="iq-sg-ov" class="iq-top"></canvas></div>
+            <p id="iq-hover" class="iq-sub mt-2 min-h-[18px]"></p>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+                <p id="iq-marks" class="iq-sub"></p>
+                <button type="button" class="iq-btn" id="iq-marks-zoom">A~B 확대</button>
+                <button type="button" class="iq-btn" id="iq-marks-clear">마커 지우기</button>
+            </div>
+            <p class="iq-sub mt-2">휠: 확대·축소 · Shift+휠·가로 스크롤: 옆으로 · 끌기: 구간 확대 (Shift 누르면 반대로) · 한 번 누르기: 마커 · 두 번 누르기: 4배 축소 · 위 띠: 전체에서 보는 곳 옮기기 · 키보드 ← → + − 0</p>
+        </section>
+
+        <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+            <section class="iq-card min-w-0">
+                <div class="flex flex-wrap items-center gap-2">
+                    <p class="iq-h">📊 스펙트럼 <span class="font-normal text-[#8e8e93]">(보이는 구간 평균)</span></p>
+                    <div class="ml-auto flex flex-wrap items-center gap-2 text-[12px]">
+                        <label>FFT <select id="iq-sp-n" class="iq-in"><option>256</option><option>512</option><option>1024</option><option>2048</option><option selected>4096</option><option>8192</option><option>16384</option><option>32768</option><option>65536</option></select></label>
+                        <label>창 <select id="iq-sp-win" class="iq-in"><option value="hann">Hann</option><option value="blackman">Blackman-Harris</option><option value="rect">사각</option></select></label>
+                        <label class="inline-flex items-center gap-1"><input type="checkbox" id="iq-sp-max" checked>최대 유지</label>
+                        <button type="button" class="iq-btn" id="iq-sp-reset">주파수 전체</button>
+                    </div>
+                </div>
+                <div class="iq-plot mt-2" style="height:280px"><canvas id="iq-sp"></canvas></div>
+                <p id="iq-sp-hover" class="iq-sub mt-1 min-h-[18px]"></p>
+                <p id="iq-sp-info" class="iq-sub mt-1"></p>
+                <p class="iq-sub mt-1">휠로 주파수 확대(스펙트로그램도 같이), 두 번 누르면 전체.</p>
+            </section>
+            <section class="iq-card">
+                <div class="flex items-center gap-2"><p class="iq-h">✳️ 성상도</p><span class="iq-sub">보이는 구간</span></div>
+                <div class="mt-2 grid grid-cols-2 gap-2 text-[12px]">
+                    <div class="iq-f"><label>주파수 맞추기 Δf (kHz)</label><input id="iq-cn-df" class="iq-in w-full" type="number" step="any" placeholder="0"></div>
+                    <div class="iq-f"><label>심볼당 샘플 (sps)</label><input id="iq-cn-sps" class="iq-in w-full" type="number" step="any" min="1" value="1"></div>
+                    <div class="iq-f col-span-2"><label>표본 위치 (심볼 안 %)</label><input id="iq-cn-off" type="range" min="0" max="99" value="0" class="w-full"></div>
+                </div>
+                <button type="button" class="iq-btn mt-2" id="iq-sp-peak">스펙트럼 피크를 0 Hz 로</button>
+                <canvas id="iq-cn" class="mt-3"></canvas>
+                <p id="iq-cn-note" class="iq-sub mt-1"></p>
+                <p class="iq-sub mt-1">신호 하나만 보이게 시간을 확대하고, Δf 로 그 신호를 가운데로 옮긴 뒤 sps 와 표본 위치를 맞추면 점이 모여요.</p>
+            </section>
+        </div>
+    </div>
+</main>
+
+<script src="{% static 'js/iq-analyzer.js' %}?v=1"></script>
+{% endblock %}
