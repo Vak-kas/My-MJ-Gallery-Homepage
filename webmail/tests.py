@@ -473,3 +473,261 @@ class AppPasswordTests(TestCase):
 		self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "delete", "id": first.id}), content_type="application/json")
 		self.assertEqual(len(path.read_text().splitlines()), 1)
 		self.assertEqual(self.client.post(reverse("webmail:api_app_passwords"), json.dumps({"action": "create", "label": ""}), content_type="application/json").status_code, 400)
+
+
+# ---------- 받은 메일 진단 · DMARC 보고서 ----------
+
+# 테스트 전용 DKIM 키 (1024비트, 어디에도 쓰지 않음)
+TEST_DKIM_KEY = b"""-----BEGIN RSA PRIVATE KEY-----
+MIICXAIBAAKBgQCnLirMd6bD5LDEFAztUGlhz1lZ2j9849NZOOT/i0covYEFRq2D
+SDB11JR4GpCrvu1szlgGqudH0Kv7CKGXKxFFRBhpgV9lTyXXOVXiylU2bJxgfTjf
+58Anz87h3zvwM6EhEjbo81TD8WwRxnOKg5kLKTqfhnBK5QLsGUvzuzuNJwIDAQAB
+AoGBAJyJsQ91NdSVLSLcN2J6ecJY+awVnH7fgIU5rcrN6hpunwGGtW+Ix799BmwT
+S8VU6FGKQIg1vIvVC0PqSAwZCnhSeJq39eeNFk92MsNpQrQ0XjqKHZmy/TA3oYnJ
+VSaq/JNCekB7uWHMpKW1Hruak8rWmtyEJkAq9iwzJAe+xeaZAkEA1VuGww+726rq
+kP7GYPVk31D1h6ZwifSerWzs4/Ollu4UorNX4QsftFpE8WOiftzjM6IXHT/8Xoia
+08H0KJ4FcwJBAMiX+jUKgBehkb+nwcNr1eCz9EI+gzRuutiCmWdV26atX7ufEj3h
+AepREDpfGIbDTPLdVT+WwWbzTU6h7ZKIjH0CQA9AjMCzBj3s2PnmjK3vvPdN5U9+
+MXtbNmC1cbXV/BdvC6CZ64VV8z1EWrta4Qnqpn9Rbg+UPGlRoKfUrKyep0sCQHiz
+klgWQGt3yibEAADiQ2kZf5HY4cRMGNwtAbe/XxNVYbSZDDX1zdw7+QLWtABrRkMh
+UamYwjl7j3oQT88LoVUCQEd3+gYXO1g00j3Zv1X5VjQiXCiTnOdAyvL0EDIklyHP
+O0QDkMDbUwoD8rgIXmMgwkYy82XtbVQNycCfu2Fo4LU=
+-----END RSA PRIVATE KEY-----
+"""
+TEST_DKIM_PUB = b"v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCnLirMd6bD5LDEFAztUGlhz1lZ2j9849NZOOT/i0covYEFRq2DSDB11JR4GpCrvu1szlgGqudH0Kv7CKGXKxFFRBhpgV9lTyXXOVXiylU2bJxgfTjf58Anz87h3zvwM6EhEjbo81TD8WwRxnOKg5kLKTqfhnBK5QLsGUvzuzuNJwIDAQAB"
+
+GMAIL_HEADERS = (
+	"Return-Path: <hong@gmail.com>\r\n"
+	"Delivered-To: mjseo@smjgallery.kr\r\n"
+	"Received: from mail.smjgallery.kr by mail.smjgallery.kr with LMTP id abc; Thu, 12 Nov 2026 08:59:12 +0900\r\n"
+	"Authentication-Results: mail.smjgallery.kr; dkim=pass header.d=gmail.com header.s=20230601 header.b=AbCd;"
+	" spf=pass (mail.smjgallery.kr: domain of hong@gmail.com designates 209.85.1.41 as permitted sender) smtp.mailfrom=hong@gmail.com;"
+	" dmarc=pass (policy=none) header.from=gmail.com\r\n"
+	"Received: from mail-sor-f41.google.com (mail-sor-f41.google.com [209.85.1.41])\r\n"
+	"\tby mail.smjgallery.kr (Postfix) with ESMTPS id 4X1;\r\n"
+	"\tThu, 12 Nov 2026 08:59:10 +0900 (KST)\r\n"
+	"Received: by 2002:a05:6a10:1234 with SMTP id x; Wed, 11 Nov 2026 15:59:02 -0800 (PST)\r\n"
+	"Authentication-Results: mx.evil.example; dkim=pass header.d=gmail.com\r\n"
+	"From: Hong <hong@gmail.com>\r\n"
+	"To: mjseo@smjgallery.kr\r\n"
+	"Subject: hi\r\n"
+	"Date: Wed, 11 Nov 2026 15:59:00 -0800\r\n"
+	"Message-ID: <a@mail.gmail.com>\r\n"
+	"\r\n"
+	"hello\r\n"
+).encode()
+
+PHISH = (
+	"Received: from mail.smjgallery.kr by mail.smjgallery.kr with LMTP id q; Thu, 12 Nov 2026 09:00:05 +0900\r\n"
+	"Authentication-Results: mail.smjgallery.kr; dkim=none; spf=fail smtp.mailfrom=bad@evil.example; dmarc=fail (policy=reject) header.from=bank.example\r\n"
+	"Received: from evil.example (unknown [203.0.113.77]) by mail.smjgallery.kr (Postfix) with SMTP id Q; Thu, 12 Nov 2026 09:00:00 +0900\r\n"
+	"Return-Path: <bad@evil.example>\r\n"
+	"From: \"support@bank.example\" <security@bank.example>\r\n"
+	"Reply-To: steal@evil.example\r\n"
+	"Subject: verify\r\n"
+	"\r\n"
+	"click\r\n"
+).encode()
+
+
+DMARC_XML = b"""<?xml version="1.0" encoding="UTF-8" ?>
+<feedback>
+  <report_metadata><org_name>google.com</org_name><email>noreply-dmarc-support@google.com</email>
+    <report_id>17262206229751789681</report_id><date_range><begin>1794355200</begin><end>1794441599</end></date_range></report_metadata>
+  <policy_published><domain>smjgallery.kr</domain><adkim>r</adkim><aspf>r</aspf><p>reject</p><sp>reject</sp><pct>100</pct></policy_published>
+  <record><row><source_ip>43.202.189.130</source_ip><count>3</count>
+      <policy_evaluated><disposition>none</disposition><dkim>pass</dkim><spf>pass</spf></policy_evaluated></row>
+    <identifiers><header_from>smjgallery.kr</header_from></identifiers>
+    <auth_results><dkim><domain>smjgallery.kr</domain><selector>mj</selector><result>pass</result></dkim>
+      <spf><domain>smjgallery.kr</domain><result>pass</result></spf></auth_results></record>
+  <record><row><source_ip>198.51.100.23</source_ip><count>2</count>
+      <policy_evaluated><disposition>reject</disposition><dkim>fail</dkim><spf>fail</spf></policy_evaluated></row>
+    <identifiers><header_from>smjgallery.kr</header_from></identifiers>
+    <auth_results><spf><domain>smjgallery.kr</domain><result>fail</result></spf></auth_results></record>
+</feedback>
+"""
+
+
+class DiagnoseTests(SimpleTestCase):
+	def setUp(self):
+		from . import diagnose
+		self.d = diagnose
+
+	def test_helpers(self):
+		self.assertEqual(self.d.mask_ip("209.85.1.41"), "209.85.1.x")
+		self.assertEqual(self.d.mask_ip("2001:db8::1"), "2001:db8::x")
+		self.assertEqual(self.d.org_domain("mail.naver.co.kr"), "naver.co.kr")
+		self.assertTrue(self.d.aligned("bounce.mailchimp.smjgallery.kr", "smjgallery.kr"))
+		self.assertFalse(self.d.aligned("gmail.com", "smjgallery.kr"))
+		serv, res = self.d.parse_auth_results("mx.google.com; dkim=pass header.i=@a.com header.s=s1; spf=softfail (x) smtp.mailfrom=b@c.com")
+		self.assertEqual(serv, "mx.google.com")
+		self.assertEqual([(r["method"], r["result"]) for r in res], [("dkim", "pass"), ("spf", "softfail")])
+		self.assertEqual(res[1]["props"]["smtp.mailfrom"], "b@c.com")
+
+	def test_gmail_passes_and_route_is_chronological(self):
+		out = self.d.analyze(GMAIL_HEADERS, verify=False)
+		checks = {c["key"]: c for c in out["checks"]}
+		self.assertEqual(checks["spf"]["status"], "ok")
+		self.assertEqual(checks["dkim"]["status"], "ok")
+		self.assertEqual(checks["dmarc"]["status"], "ok")
+		self.assertEqual(out["verdict"], "ok")
+		self.assertEqual(out["dmarc_policy"], "none")
+		# 남이 적은 결과(mx.evil.example)는 판정에 안 쓰고 참고로만
+		self.assertEqual(out["foreign_results"][0]["by"], "mx.evil.example")
+		route = out["route"]
+		self.assertEqual(len(route), 3)
+		self.assertEqual(route[1]["from"], "mail-sor-f41.google.com")
+		self.assertEqual(route[1]["ip"], "209.85.1.x")  # 마지막 옥텟 가림
+		self.assertTrue(route[1]["tls"])
+		self.assertEqual(route[1]["delay"], "8초")
+		self.assertTrue(route[2]["local"])
+		self.assertEqual(out["route_total"], "10초")
+		self.assertNotIn("209.85.1.41", json.dumps(route))
+		self.assertIn("Return-Path", out["headers"])
+		self.assertNotIn("hello", out["headers"])
+		with mock.patch.dict("sys.modules", {"dkim": None}):
+			self.assertTrue(self.d.analyze(GMAIL_HEADERS.replace(b"From: Hong", b"DKIM-Signature: v=1; d=gmail.com; s=x; b=AA\r\nFrom: Hong"), dmarc_lookup=lambda _d: "")["dkimpy_missing"])
+
+	def test_phishing_clues(self):
+		out = self.d.analyze(PHISH, verify=False)
+		checks = {c["key"]: c["status"] for c in out["checks"]}
+		self.assertEqual(checks["spf"], "bad")
+		self.assertEqual(checks["dmarc"], "bad")
+		self.assertEqual(out["verdict"], "bad")
+		texts = " ".join(c["text"] for c in out["clues"])
+		self.assertIn("steal@evil.example", texts)      # Reply-To 다름
+		self.assertIn("support@bank.example", texts)    # 이름 칸에 다른 주소
+		self.assertIn("evil.example", texts)            # Return-Path 다름
+		self.assertIn("암호화(TLS) 없이", texts)
+
+	def test_dmarc_computed_without_our_results(self):
+		raw = b"From: a@x.example\r\nReturn-Path: <a@x.example>\r\nReceived-SPF: Pass (sender ok) envelope-from=\"a@x.example\"\r\n\r\nhi"
+		out = self.d.analyze(raw, verify=False)
+		checks = {c["key"]: c for c in out["checks"]}
+		self.assertEqual(checks["spf"]["status"], "ok")
+		self.assertEqual(checks["dmarc"]["status"], "ok")
+		self.assertEqual(checks["dmarc"]["source"], "직접 계산")
+
+	def test_dkim_verified_on_server(self):
+		try:
+			import dkim
+		except ImportError:
+			self.skipTest("dkimpy 없음")
+		body = b"From: Me <me@sign.example>\r\nTo: mjseo@smjgallery.kr\r\nSubject: signed\r\n\r\nthe body\r\n"
+		sig = dkim.sign(body, b"s1", b"sign.example", TEST_DKIM_KEY, include_headers=[b"from", b"to", b"subject"])
+		signed = sig + body
+		dns = lambda name, timeout=5: TEST_DKIM_PUB if name == b"s1._domainkey.sign.example." else None
+		with mock.patch("webmail.diagnose.lookup_dmarc_policy", return_value="reject"):
+			out = self.d.analyze(signed, dnsfunc=dns)
+		checks = {c["key"]: c for c in out["checks"]}
+		self.assertTrue(out["dkim_verified"])
+		self.assertFalse(out["dkimpy_missing"])
+		self.assertEqual(checks["dkim"]["status"], "ok")
+		self.assertIn("본문이 바뀌지 않았어요", checks["dkim"]["summary"])
+		self.assertEqual(checks["dmarc"]["status"], "ok")
+		self.assertEqual(out["dmarc_policy"], "reject")
+		# 본문을 바꾸면 변조로 잡힘
+		out = self.d.analyze(signed.replace(b"the body", b"the BODY"), dnsfunc=dns, dmarc_lookup=lambda _d: "")
+		checks = {c["key"]: c for c in out["checks"]}
+		self.assertEqual(checks["dkim"]["status"], "bad")
+		self.assertIn("본문이 바뀌었어요", checks["dkim"]["summary"])
+		self.assertEqual(out["verdict"], "bad")
+
+
+class DmarcReportTests(SimpleTestCase):
+	def setUp(self):
+		from . import dmarc
+		self.m = dmarc
+
+	def _check(self, report):
+		self.assertEqual(report["org"], "google.com")
+		self.assertEqual(report["domain"], "smjgallery.kr")
+		self.assertEqual(report["policy"], "reject")
+		self.assertEqual((report["total"], report["passed"], report["failed"]), (5, 3, 2))
+		self.assertTrue(report["begin"].startswith("2026.11."))
+		bad = report["rows"][0]  # 실패가 먼저
+		self.assertFalse(bad["ok"])
+		self.assertEqual(bad["ip"], "198.51.100.x")
+		self.assertEqual(bad["disposition"], "reject")
+		self.assertIn("사칭", bad["advice"])
+		self.assertIn("할 일은 없어요", bad["advice"])
+		good = report["rows"][1]
+		self.assertEqual(good["ip"], "43.202.189.x")
+		self.assertIn("할 일 없어요", good["advice"])
+		self.assertNotIn("43.202.189.130", json.dumps(report))
+		self.assertIn("2통이 실패", report["summary"])
+
+	def test_plain_gzip_and_zip(self):
+		import gzip
+		import io
+		import zipfile
+		self._check(self.m.parse_report(DMARC_XML))
+		self._check(self.m.parse_report(gzip.compress(DMARC_XML)))
+		buf = io.BytesIO()
+		with zipfile.ZipFile(buf, "w") as zf:
+			zf.writestr("google.com!smjgallery.kr!1794355200!1794441599.xml", DMARC_XML)
+		self._check(self.m.parse_report(buf.getvalue()))
+
+	def test_rejects_bad_input(self):
+		for data in (b"not xml", b"<html></html>", b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY a "aaa">]><feedback>&a;</feedback>', b"PK\x03\x04broken"):
+			with self.assertRaises(self.m.ReportError):
+				self.m.parse_report(data)
+
+	def test_looks_like_report(self):
+		self.assertTrue(self.m.looks_like_report("google.com!smjgallery.kr!1794355200!1794441599.zip", "application/zip"))
+		self.assertTrue(self.m.looks_like_report("x.xml.gz", "application/gzip"))
+		self.assertFalse(self.m.looks_like_report("photo.png", "image/png"))
+		self.assertFalse(self.m.looks_like_report("논문.zip", "application/octet-stream"))
+
+
+@override_settings(WEBMAIL_ENABLED=True, WEBMAIL_PASSWORD="x", WEBMAIL_USER="mjseo@smjgallery.kr")
+class DiagnoseViewTests(TestCase):
+	def setUp(self):
+		import zipfile
+		import io
+		User = get_user_model()
+		self.admin = User.objects.create_superuser("diag-admin", "a@example.com", "pw")
+		FakeMailbox.reset()
+		buf = io.BytesIO()
+		with zipfile.ZipFile(buf, "w") as zf:
+			zf.writestr("r.xml", DMARC_XML)
+		self.zip = buf.getvalue()
+		FakeMailbox.messages[("inbox", 11)] = _msg(11, subject="Report domain: smjgallery.kr Submitter: google.com",
+		                                           attachments=[{"index": 1, "filename": "google.com!smjgallery.kr!1794355200!1794441599.zip", "content_type": "application/zip",
+		                                                         "size": len(self.zip), "content_id": "", "inline": False}])
+		zip_bytes = self.zip
+
+		def fetch_raw(box, folder, uid):
+			if (folder, uid) not in FakeMailbox.messages:
+				raise WebmailError("없음")
+			return GMAIL_HEADERS
+
+		def attachment(box, folder, uid, index):
+			from .imap import Attachment
+			if (folder, uid, index) != ("inbox", 11, 1):
+				raise WebmailError("첨부를 찾을 수 없어요")
+			return Attachment(1, "r.zip", "application/zip", 0, "", False, zip_bytes)
+
+		for name, fn in (("fetch_raw", fetch_raw), ("attachment", attachment)):
+			p = mock.patch.object(FakeMailbox, name, fn, create=True)
+			p.start()
+			self.addCleanup(p.stop)
+		patcher = mock.patch("webmail.views.imap.Mailbox", FakeMailbox)
+		patcher.start()
+		self.addCleanup(patcher.stop)
+
+	def test_admin_only(self):
+		self.assertEqual(self.client.get(reverse("webmail:api_diagnose"), {"folder": "inbox", "uid": 7}).status_code, 302)
+		self.assertEqual(self.client.get(reverse("webmail:api_dmarc"), {"folder": "inbox", "uid": 11, "i": 1}).status_code, 302)
+
+	def test_diagnose_and_dmarc(self):
+		self.client.force_login(self.admin)
+		data = self.client.get(reverse("webmail:api_diagnose"), {"folder": "inbox", "uid": 7, "verify": "0"}).json()
+		self.assertTrue(data["ok"])
+		self.assertEqual(data["verdict"], "ok")
+		self.assertEqual(self.client.get(reverse("webmail:api_diagnose"), {"folder": "inbox", "uid": 999}).status_code, 502)
+		msg = self.client.get(reverse("webmail:api_message"), {"folder": "inbox", "uid": 11}).json()
+		self.assertTrue(msg["attachments"][0]["dmarc"])
+		rep = self.client.get(reverse("webmail:api_dmarc"), {"folder": "inbox", "uid": 11, "i": 1}).json()
+		self.assertEqual((rep["total"], rep["failed"]), (5, 2))
+		self.assertEqual(self.client.get(reverse("webmail:api_dmarc"), {"folder": "inbox", "uid": 11, "i": 9}).status_code, 502)

@@ -12,7 +12,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from studio.views.common import admin_view
 
-from . import imap
+from . import diagnose, dmarc, imap
 from .models import AppPassword, MailContact, ScheduledAttachment, ScheduledMail, WebmailPref, write_app_password_file
 from .sanitize import sanitize_html, text_to_html
 from .scheduled import after_send, build_message
@@ -317,6 +317,7 @@ def api_message(request):
 	msg["has_remote_images"] = "data-src=" in msg["body_html"]
 	for att in msg["attachments"]:
 		att["url"] = _attachment_url(folder, uid, att["index"])
+		att["dmarc"] = dmarc.looks_like_report(att["filename"], att["content_type"])
 	msg.pop("html", None)
 	msg["raw_url"] = _raw_url(folder, uid)
 	msg["ok"] = True
@@ -354,6 +355,34 @@ def attachment(request):
 	res["X-Content-Type-Options"] = "nosniff"
 	res["Content-Security-Policy"] = "default-src 'none'; sandbox"
 	return res
+
+
+@_api
+@require_GET
+def api_diagnose(request):
+	"""받은 메일 진단: SPF·DKIM·DMARC·전달 경로·피싱 단서 (DKIM 은 dkimpy 로 직접 검증)."""
+	folder, uid = _folder(request), _uid(request.GET.get("uid"))
+	with _mailbox() as box:
+		raw_bytes = box.fetch_raw(folder, uid)
+	return JsonResponse({"ok": True, **diagnose.analyze(raw_bytes, verify=request.GET.get("verify") != "0")})
+
+
+@_api
+@require_GET
+def api_dmarc(request):
+	"""DMARC 집계 보고서 첨부(.zip/.xml.gz/.xml)를 읽어 요약."""
+	folder, uid = _folder(request), _uid(request.GET.get("uid"))
+	try:
+		index = int(request.GET.get("i") or -1)
+	except ValueError:
+		raise _ApiError("첨부 번호가 이상해요")
+	with _mailbox() as box:
+		att = box.attachment(folder, uid, index)
+	try:
+		report = dmarc.parse_report(att.data)
+	except dmarc.ReportError as exc:
+		raise _ApiError(str(exc))
+	return JsonResponse({"ok": True, "filename": att.filename, **report})
 
 
 @admin_view

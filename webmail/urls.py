@@ -18,6 +18,8 @@ urlpatterns = [
 	path("api/contacts/", views.api_contacts, name="api_contacts"),
 	path("api/app-passwords/", views.api_app_passwords, name="api_app_passwords"),
 	path("api/schedule/", views.api_schedule, name="api_schedule"),
+	path("api/diagnose/", views.api_diagnose, name="api_diagnose"),
+	path("api/dmarc/", views.api_dmarc, name="api_dmarc"),
 	path("attachment/", views.attachment, name="attachment"),
 	path("raw/", views.raw, name="raw"),
 ]
