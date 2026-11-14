@@ -37,6 +37,16 @@
     html.theme-dark .iq-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
     html.theme-dark .iq-h { color: #e8e8ea; }
     html.theme-dark .iq-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    .iq-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 6px 0; border-top: 1px solid rgba(0, 0, 0, 0.06); font-size: 13px; }
+    .iq-pkt { border-radius: 12px; background: #f5f5f7; padding: 8px 12px; margin-top: 8px; }
+    .iq-bits { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; word-break: break-all; line-height: 1.7; }
+    .iq-guide summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+    .iq-guide ol li, .iq-guide ul li { margin-top: 6px; }
+    .iq-tbl { width: 100%; font-size: 13px; border-collapse: collapse; }
+    .iq-tbl th, .iq-tbl td { text-align: left; vertical-align: top; padding: 7px 8px; border-top: 1px solid rgba(0, 0, 0, 0.07); }
+    .iq-tbl th { font-size: 12px; color: #8e8e93; font-weight: 600; }
+    html.theme-dark .iq-pkt { background: #111318; }
+    html.theme-dark .iq-row, html.theme-dark .iq-tbl th, html.theme-dark .iq-tbl td { border-color: rgba(255, 255, 255, 0.08); }
     html.theme-dark .iq-drop { border-color: rgba(255, 255, 255, 0.18); }
 </style>
 
@@ -86,6 +96,47 @@
             <li>· 너무 크면 <b>Head</b> 블록으로 샘플 수를 정하거나, 여기서 원하는 구간만 골라 <b>💾 이 구간 저장</b> 으로 잘라 받을 수 있어요.</li>
         </ul>
     </section>
+
+
+    <details class="iq-card iq-guide mt-5" id="iq-guide" open>
+        <summary>🧭 처음이라면 — 이렇게 분석해요</summary>
+        <ol class="mt-3 list-decimal space-y-1 pl-5 text-[14px] leading-6">
+            <li><b>파일 열기 · 설정 확인</b> — 형식·샘플레이트·중심 주파수가 맞아야 해요. 맞으면 스펙트럼 바닥(잡음)이 대체로 평평하고, 이상하면 위에 ⚠️ 경고가 떠요. GNU Radio File Sink 의 <code>complex</code> 는 complex float32 예요.</li>
+            <li><b>신호 찾기</b> — 🌈 스펙트로그램은 <b>가로가 시간, 세로가 주파수, 밝을수록 센 신호</b>예요. 밝은 덩어리가 신호예요. 아래 <b>🔎 신호 찾기</b> 가 자동으로 목록을 만들어 줘요.</li>
+            <li><b>시간 확대</b> — 켜졌다 꺼지는 신호(버스트)면 목록의 <b>[확대]</b> 로 하나만 크게 봐요. 마우스 휠·끌기로도 돼요.</li>
+            <li><b>주파수 맞추기</b> — 녹음한 가운데(중심 주파수)에서 떨어진 신호는 <b>[이 신호 고르기]</b> 로 Δf(떨어진 만큼)와 대역폭을 맞춰요. 그 신호만 남기고 나머지는 걸러요.</li>
+            <li><b>변조 알아보기</b> — 아래 표처럼 모양을 보거나, <b>🔓 복조</b> 에서 [복조하기] 를 누르면 자동으로 추정해요.</li>
+            <li><b>0·1 비트 보기</b> — 복조가 되면 패킷마다 비트·HEX 가 나와요. 맨 앞 <code>1010…</code> 은 보통 프리앰블(받는 쪽이 박자를 맞추는 머리), 그 뒤가 내용이에요. 같은 패킷이 여러 번 나오면 리모컨·센서처럼 반복 전송하는 신호예요.</li>
+            <li><b>막히면 ✨AI</b> — 잰 숫자와 스펙트로그램 그림을 보고 무슨 신호 같은지, 다음에 뭘 해 보면 되는지 알려줘요 (회원).</li>
+        </ol>
+        <details class="mt-4">
+            <summary class="text-[13px]">👀 모양으로 변조 알아보기</summary>
+            <div class="mt-2 overflow-x-auto">
+                <table class="iq-tbl">
+                    <tr><th>이렇게 보이면</th><th>아마도</th><th>확인해 볼 것</th></tr>
+                    <tr><td>스펙트로그램에 같은 주파수의 짧은 막대가 끊겼다 이어지고, 시간 그래프의 크기가 켜짐/꺼짐</td><td><b>OOK·ASK</b><br><span class="iq-sub">433 MHz 리모컨·초인종·차 키</span></td><td>시간 → <b>크기 (dB)</b> 에서 켜짐·꺼짐 길이</td></tr>
+                    <tr><td>주파수 두 줄을 번갈아 가며 오감</td><td><b>FSK</b><br><span class="iq-sub">온습도 센서·무선 모듈·페이저</span></td><td>시간 → <b>순간 주파수</b> 에서 두 층</td></tr>
+                    <tr><td>크기는 일정한 넓은 띠, 성상도에 점이 2개·4개로 모임</td><td><b>BPSK·QPSK</b><br><span class="iq-sub">위성·데이터 링크</span></td><td>성상도 Δf·sps 맞추기</td></tr>
+                    <tr><td>비스듬한 선(처프)이 되풀이</td><td><b>처프·LoRa</b></td><td>스펙트로그램 확대, 기울기·길이</td></tr>
+                    <tr><td>넓고 위가 평평한 직사각형</td><td><b>OFDM</b><br><span class="iq-sub">Wi‑Fi·LTE·DAB</span></td><td>이 도구로 비트까지는 어려워요 — 폭·길이로 종류 짐작</td></tr>
+                    <tr><td>계속 이어지며 출렁이는 띠</td><td><b>FM·AM 아날로그</b><br><span class="iq-sub">방송·무전기 음성</span></td><td>순간 주파수가 소리처럼 흔들림</td></tr>
+                    <tr><td>가는 선 하나가 계속</td><td><b>반송파·간섭</b></td><td>정가운데(0 Hz) 선은 SDR 자체의 DC 일 때가 많아요</td></tr>
+                </table>
+            </div>
+        </details>
+        <details class="mt-3">
+            <summary class="text-[13px]">📖 용어</summary>
+            <ul class="mt-2 text-[13px] leading-6 text-[#6e6e73]">
+                <li><b>IQ</b> — 신호를 두 성분(I: 실수, Q: 허수)으로 담은 것. 크기와 위상을 같이 알 수 있어요.</li>
+                <li><b>샘플레이트</b> — 1초에 몇 번 쟀는지. 볼 수 있는 주파수 폭과 같아요 (중심 ± 샘플레이트/2).</li>
+                <li><b>중심 주파수 · Δf</b> — SDR 을 맞춘 주파수가 그림의 0 Hz 예요. Δf 는 신호가 거기서 얼마나 떨어졌는지.</li>
+                <li><b>dBFS</b> — 녹음할 수 있는 최대값을 0 으로 둔 세기. −60 은 그보다 100만 배 약함.</li>
+                <li><b>심볼 속도 (baud) · sps</b> — 1초에 바뀌는 기호 수, sps 는 기호 하나에 샘플이 몇 개인지 (샘플레이트 ÷ baud).</li>
+                <li><b>맨체스터</b> — 비트 하나를 <code>10</code>·<code>01</code> 두 조각으로 보내는 방식. 비트가 두 배로 길게 나오면 골라 보세요.</li>
+            </ul>
+        </details>
+        <p class="iq-sub mt-3">⚖️ 내 기기·공개 신호를 공부할 때 쓰세요. 남의 무선 통신 내용을 엿듣거나 퍼뜨리면 법에 걸릴 수 있어요.</p>
+    </details>
 
     <div id="iq-work" class="hidden">
         <section class="iq-card mt-5">
@@ -167,8 +218,47 @@
                 <p class="iq-sub mt-1">신호 하나만 보이게 시간을 확대하고, Δf 로 그 신호를 가운데로 옮긴 뒤 sps 와 표본 위치를 맞추면 점이 모여요.</p>
             </section>
         </div>
+
+        <section class="iq-card mt-5">
+            <p class="iq-h">🔎 신호 찾기 <span class="font-normal text-[#8e8e93]">— 잡음보다 뚜렷이 센 곳을 자동으로</span></p>
+            <div class="mt-2 grid grid-cols-1 gap-5 lg:grid-cols-2">
+                <div><p class="iq-sub">주파수에서 (보이는 구간)</p><ul id="iq-find-bands" class="mt-1"></ul></div>
+                <div><p class="iq-sub">시간에서 (파일 전체, 켜졌다 꺼지는 구간)</p><ul id="iq-find-bursts" class="mt-1 max-h-[260px] overflow-y-auto"></ul></div>
+            </div>
+        </section>
+
+        <section class="iq-card mt-5" id="iq-dm">
+            <p class="iq-h">🔓 복조 · 0과 1 뽑기 <span class="font-normal text-[#8e8e93]">— 보이는 구간 (2M 샘플 이하)</span></p>
+            <div class="mt-2 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-3 lg:grid-cols-6">
+                <div class="iq-f"><label>신호 위치 Δf (kHz)</label><input id="iq-dm-df" class="iq-in w-full" type="number" step="any" placeholder="0" title="성상도의 Δf 와 같은 값"></div>
+                <div class="iq-f"><label>대역폭 (kHz)</label><input id="iq-dm-bw" class="iq-in w-full" type="number" step="any" min="0" placeholder="자동"></div>
+                <div class="iq-f"><label>변조</label><select id="iq-dm-mod" class="iq-in w-full"><option value="auto">자동 추정</option><option value="ook">OOK · ASK</option><option value="fsk">2-FSK</option><option value="bpsk">BPSK</option><option value="qpsk">QPSK</option></select></div>
+                <div class="iq-f"><label>심볼 속도 (baud)</label><input id="iq-dm-baud" class="iq-in w-full" type="number" step="any" min="0" placeholder="자동"></div>
+                <div class="iq-f"><label>비트 부호</label><select id="iq-dm-code" class="iq-in w-full"><option value="nrz">그대로 (NRZ)</option><option value="inv">0·1 뒤집기</option><option value="man10">맨체스터 (10=1)</option><option value="man01">맨체스터 (01=1)</option></select></div>
+                <div class="flex items-end"><button type="button" class="iq-btn w-full !py-1.5 !text-[13px] font-semibold" id="iq-dm-run">▶ 복조하기</button></div>
+            </div>
+            <p id="iq-dm-auto" class="mt-3 text-[13px] leading-6"></p>
+            <p id="iq-dm-msg" class="iq-sub mt-1"></p>
+            <div class="iq-plot mt-2" style="height:120px"><canvas id="iq-dm-plot"></canvas></div>
+            <div id="iq-dm-out" class="mt-2 max-h-[480px] overflow-y-auto"></div>
+        </section>
+
+        <section class="iq-card mt-5">
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="iq-h">✨ AI 에게 물어보기</p>
+                <span class="ai-quota" data-ai-quota></span>
+            </div>
+            <p class="iq-sub mt-1">지금 화면에서 잰 숫자(설정·통계·스펙트럼·찾은 신호·복조 결과)와 스펙트로그램 그림만 보내요. IQ 원본은 보내지 않아요.</p>
+            <div class="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input id="iq-ai-q" class="iq-in flex-1 !py-2" maxlength="1000" placeholder="궁금한 점 (비워 두면: 이 신호가 뭔지, 어떻게 분석하면 되는지)">
+                <button type="button" class="ai-btn" id="iq-ai-btn" data-url="{% url 'tools:iq_ai' %}">✨ 분석해 줘</button>
+            </div>
+            <div id="iq-ai-out"></div>
+        </section>
     </div>
 </main>
 
-<script src="{% static 'js/iq-analyzer.js' %}?v=1"></script>
+{% include "tools/_ai_assist.html" %}
+<script src="{% static 'js/iq-analyzer.js' %}?v=3"></script>
+<script src="{% static 'js/iq-insight.js' %}?v=2"></script>
 {% endblock %}

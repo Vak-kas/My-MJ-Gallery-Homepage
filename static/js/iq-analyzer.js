@@ -450,6 +450,7 @@
 		drawConstellation();
 		renderViewInfo();
 		drawOverlay();
+		document.dispatchEvent(new CustomEvent('iq:view'));
 	}
 	const cfgKey = () => `${S.fmt}|${S.le}|${S.skip}|${S.n}`;
 	const rawFor = (v0, cnt) => (S.raw && S.raw.v0 === v0 && S.raw.cnt === cnt ? S.raw.data : null);
@@ -834,6 +835,7 @@
 	}
 	function drawConstellation() {
 		const cv = $('iq-cn'), dpr = window.devicePixelRatio || 1, size = cv.clientWidth;
+		if (!size) return;  // 화면에 안 보일 때 (탭이 숨겨짐 등)
 		cv.width = cv.height = Math.round(size * dpr);
 		const ctx = cv.getContext('2d'), P = pal();
 		ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1160,5 +1162,6 @@
 		new MutationObserver(() => { if (S.ov) { drawOverview(); drawTime(); drawSpectrogram(); drawSpectrum(); drawConstellation(); drawOverlay(); } }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 	}
 	init();
-	window.__iq = { S, guessFromName, parseSigmfMeta, makeDemo };
+	// iq-insight.js (신호 찾기·복조·AI) 가 같이 쓰는 것들
+	window.__iq = { S, FORMATS, RAW_MAX, guessFromName, parseSigmfMeta, makeDemo, readSamples, rawFor, fft, windowOf, setView, drawConstellation, fit, pal, M, si, fmtF, fmtT, binF };
 })();
