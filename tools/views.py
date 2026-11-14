@@ -93,6 +93,10 @@ def iq(request):
 	return render(request, "tools/iq.html")
 
 
+def plot(request):
+	return render(request, "tools/plot.html")
+
+
 def subnet(request):
 	return render(request, "tools/subnet.html")
 

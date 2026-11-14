@@ -60,6 +60,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "plot",
+		"url_name": "tools:plot",
+		"icon": "📈",
+		"title": "그래프 스튜디오 (MATLAB · Python)",
+		"description": "MATLAB .mat·NumPy .npy/.npz·CSV 를 넣고 그래프 종류·글꼴·LaTeX 수식·크기를 눌러 고르면 논문 모양 그대로 미리 보기. IEEE·학위논문 스타일, 칸 나누기, 끌어서 범위 정하기, 그대로 그려 주는 matplotlib·MATLAB 코드 받기.",
+		"tags": ["MATLAB", "LaTeX"],
+		"category": "docs",
+		"added": "2026-11-15T03:00",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "pdf",
 		"url_name": "tools:pdf",
 		"icon": "📄",
