@@ -109,6 +109,23 @@ class AITests(TestCase):
 			data = self.post("netcheck_ai", {"result": {"type": "port", "host": "1.2.3.4", "ports": [{"port": 22, "open": True}]}}).json()
 		self.assertEqual([f["level"] for f in data["findings"]], ["bad", "warn"])
 
+	def test_iq_ai(self):
+		import base64
+		self.assertEqual(self.post("iq_ai", {"measure": {"file": {"fs": 1e6}}}).status_code, 401)
+		self.client.force_login(self.member)
+		self.assertEqual(self.post("iq_ai", {"measure": {}}).status_code, 400)
+		self.assertEqual(self.post("iq_ai", {"measure": {"file": {"fs": 1e6}}, "image": "not base64!"}).status_code, 400)
+		raw = {"summary": "FSK 같아요", "signal_type": "2-FSK", "confidence": "확실", "candidates": [{"name": "센서", "why": "868 MHz"}], "observations": ["두 주파수"], "bits": "", "next_steps": ["복조"],
+			   "settings": {"df_khz": 42.8, "bw_khz": "60", "modulation": "fsk", "baud": 4800}, "caution": ""}
+		with mock.patch("tools.ai._post", return_value=fake_reply(raw)) as post:
+			data = self.post("iq_ai", {"measure": {"file": {"fs": 1e6, "name": "x.cfile"}}, "image": base64.b64encode(b"\xff\xd8jpeg").decode(), "question": "뭐야?"}).json()
+		content = post.call_args[0][0]["messages"][0]["content"]
+		self.assertEqual([c["type"] for c in content], ["image", "text"])
+		self.assertIn("뭐야?", content[1]["text"])
+		self.assertEqual(data["confidence"], "낮음")  # 정해진 값이 아니면 낮음
+		self.assertEqual(data["settings"], {"df_khz": 42.8, "bw_khz": None, "modulation": "fsk", "baud": 4800.0})
+		self.assertTrue(AIUsage.objects.filter(feature="iq", ok=True).exists())
+
 	def test_status_and_studio_page(self):
 		self.assertFalse(self.client.get(reverse("tools:ai_status")).json()["enabled"])
 		self.client.force_login(self.admin)
