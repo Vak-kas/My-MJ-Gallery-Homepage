@@ -562,6 +562,25 @@ class IqAnalyzerPageTests(TestCase):
 			self.assertNotRegex((Path(settings.BASE_DIR) / "static/js" / name).read_text(encoding="utf-8"), r"fetch\(|XMLHttpRequest|sendBeacon")
 
 
+class PlotStudioPageTests(TestCase):
+	def test_plot_page_is_public_and_reads_files_locally(self):
+		from pathlib import Path
+		from django.conf import settings
+		resp = self.client.get(reverse("tools:plot"))
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, "js/plot-data.js")
+		self.assertContains(resp, "js/plot-studio.js")
+		self.assertContains(resp, "브라우저 안에서만")
+		for name in ("plot-data.js", "plot-studio.js"):
+			js = (Path(settings.BASE_DIR) / "static/js" / name).read_text(encoding="utf-8")
+			# 데이터 파일은 어디에도 보내지 않음 (HDF5 읽기 도구만 CDN 에서 import)
+			self.assertNotRegex(js, r"fetch\(|XMLHttpRequest|sendBeacon")
+
+	def test_plot_is_listed_in_tool_hub(self):
+		resp = self.client.get(reverse("tools:index"))
+		self.assertContains(resp, reverse("tools:plot"))
+
+
 class FileRoomPageTests(TestCase):
 	ROOM = {**StreamViewTests.ROOM, "kind": "file", "meta": {"label": "파일 방"}, "out_socket": "PUSH"}
 

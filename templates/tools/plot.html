@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/styles/github.min.css">
+<style>
+    .ps-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 16px; }
+    .ps-h { font-size: 13px; font-weight: 700; color: #1d1d1f; }
+    .ps-sub { font-size: 12px; color: #8e8e93; font-variant-numeric: tabular-nums; }
+    .ps-in { border-radius: 9px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 4px 8px; font-size: 13px; color: #1d1d1f; outline: none; min-width: 0; }
+    .ps-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .ps-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; }
+    .ps-span2 { grid-column: span 2 / span 2; }
+    .ps-f label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 2px; }
+    .ps-f code, .ps-help code { border-radius: 6px; background: #f5f5f7; padding: 1px 5px; font-size: 12px; }
+    .ps-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 3px 10px; font-size: 12px; color: #1d1d1f; white-space: nowrap; }
+    .ps-btn:hover { background: #f5f5f7; }
+    .ps-btn-p { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .ps-btn-p:hover { background: #0058b0; }
+    .ps-x { border-radius: 8px; padding: 1px 6px; font-size: 12px; color: #8e8e93; }
+    .ps-x:hover { background: #f5f5f7; color: #1d1d1f; }
+    .ps-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .ps-seg button { border-radius: 999px; padding: 3px 11px; font-size: 12px; color: #6e6e73; }
+    .ps-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .ps-drop { border: 2px dashed rgba(0, 0, 0, 0.15); border-radius: 18px; padding: 22px 16px; text-align: center; cursor: pointer; transition: background 0.15s, border-color 0.15s; }
+    .ps-drop.is-over, .ps-drop:hover { border-color: #0066cc; background: rgba(0, 102, 204, 0.04); }
+    .ps-file { border-top: 1px solid rgba(0, 0, 0, 0.07); padding-top: 8px; margin-top: 8px; }
+    .ps-file:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+    .ps-var { padding-top: 6px; padding-bottom: 4px; }
+    .ps-vname { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; font-weight: 600; word-break: break-all; }
+    .ps-cx { font-weight: 600; color: #e8590c; }
+    .ps-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+    .ps-chip { border-radius: 999px; background: #f0f5ff; color: #0058b0; padding: 1px 8px; font-size: 12px; }
+    .ps-chip:hover { background: #dce9ff; }
+    .ps-se { border-radius: 14px; border: 1px solid rgba(0, 0, 0, 0.08); padding: 6px 8px; margin-top: 6px; }
+    .ps-se.is-open { background: #fafafa; }
+    .ps-se-h { font-size: 13px; }
+    .ps-sw { display: inline-block; width: 18px; height: 10px; border-radius: 3px; flex: none; }
+    .ps-color { width: 34px; height: 26px; border: 0; padding: 0; background: none; cursor: pointer; }
+    .ps-tip { cursor: help; color: #8e8e93; }
+    .ps-stage-wrap { overflow: auto; border-radius: 12px; background: repeating-conic-gradient(#f3f3f5 0% 25%, #fafafa 0% 50%) 50% / 16px 16px; padding: 12px; }
+    #ps-stage { position: relative; margin: 0 auto; box-shadow: 0 1px 8px rgba(0, 0, 0, 0.12); cursor: crosshair; touch-action: none; user-select: none; }
+    #ps-canvas { position: absolute; inset: 0; display: block; }
+    #ps-ov { position: absolute; inset: 0; pointer-events: none; color: #000; line-height: 1.15; }
+    #ps-ov .ps-t { position: absolute; white-space: nowrap; }
+    #ps-ov .ps-rot { transform: rotate(-90deg); }
+    #ps-ov .ps-b { font-weight: 700; }
+    #ps-ov .katex { font-size: 1.05em; }
+    #ps-sel { position: absolute; display: none; border: 1px solid #0066cc; background: rgba(0, 102, 204, 0.1); pointer-events: none; }
+    .ps-code { display: block; max-height: 560px; overflow: auto; border-radius: 12px; background: #f7f7f9 !important; padding: 12px 14px !important; font-size: 12.5px; line-height: 1.55; white-space: pre; tab-size: 4; }
+    #ps-warn li { margin-top: 3px; }
+    .ps-help li { margin-top: 5px; }
+    .ps-help summary { cursor: pointer; font-weight: 700; font-size: 14px; }
+    @media (min-width: 1024px) { .ps-sticky { position: sticky; top: 76px; } }
+    html.theme-dark .ps-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .ps-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .ps-h { color: #e8e8ea; }
+    html.theme-dark .ps-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .ps-btn-p { background: #0a6fd6; }
+    html.theme-dark .ps-seg, html.theme-dark .ps-f code, html.theme-dark .ps-help code { background: #111318; }
+    html.theme-dark .ps-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .ps-se { border-color: rgba(255, 255, 255, 0.1); }
+    html.theme-dark .ps-se.is-open { background: #1d2027; }
+    html.theme-dark .ps-chip { background: #1c2a3d; color: #8cc0ff; }
+    html.theme-dark .ps-x:hover { background: #2a2a2e; color: #e8e8ea; }
+    html.theme-dark .ps-file { border-color: rgba(255, 255, 255, 0.08); }
+    html.theme-dark .ps-drop { border-color: rgba(255, 255, 255, 0.18); }
+    html.theme-dark .ps-stage-wrap { background: repeating-conic-gradient(#202329 0% 25%, #1a1d22 0% 50%) 50% / 16px 16px; }
+    html.theme-dark .ps-code { background: #f7f7f9 !important; color: #1d1d1f; }
+</style>
+
+<main class="mx-auto max-w-[1440px] px-4 py-14 sm:px-6 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">PLOT STUDIO · MATLAB · PYTHON</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">그래프 스튜디오.</h1>
+        <p class="mt-3 max-w-[900px] text-[15px] leading-relaxed text-[#6e6e73]">MATLAB <code>.mat</code> · NumPy <code>.npy</code>·<code>.npz</code> · CSV 를 넣고, 그래프 종류·글꼴·LaTeX 수식·크기를 눌러서 고르면 논문에 넣을 모양 그대로 미리 보여 줘요. 마음에 들면 <b>그대로 그려 주는 Python(matplotlib)·MATLAB 코드</b>를 받아 가세요. <b>파일은 서버로 가지 않고 브라우저 안에서만</b> 읽어요.</p>
+    </div>
+
+    <section class="ps-card mt-6">
+        <div id="ps-drop" class="ps-drop">
+            <p class="text-[15px] font-semibold">📂 데이터 파일을 끌어 놓거나 눌러서 고르기 <span class="text-[12px] font-normal text-[#8e8e93]">(여러 개 같이 돼요)</span></p>
+            <p class="mt-1 text-[12px] text-[#8e8e93]">.mat (v4 · v6 · v7 · v7.3) · .npy · .npz · .csv · .tsv · .txt (MATLAB save -ascii · np.savetxt) · .h5</p>
+            <div class="mt-3 flex flex-wrap justify-center gap-2">
+                <button type="button" id="ps-demo" class="ps-btn">🎛 예시 데이터로 해 보기</button>
+                <button type="button" id="ps-demo-dl" class="ps-btn" title="받은 코드를 직접 돌려 볼 수 있게">⬇ 예시 demo.mat 받기</button>
+            </div>
+            <input id="ps-file" type="file" multiple class="hidden" accept=".mat,.npy,.npz,.csv,.tsv,.txt,.dat,.asc,.h5,.hdf5">
+        </div>
+        <p id="ps-msg" class="mt-2 text-[13px] text-[#6e6e73]"></p>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[440px_minmax(0,1fr)]">
+        <div id="ps-side" class="min-w-0 space-y-5">
+            <section class="ps-card">
+                <p class="ps-h">📦 데이터</p>
+                <p class="ps-sub mt-0.5">변수 아래 버튼을 누르면 어울리는 그래프가 바로 생겨요.</p>
+                <div id="ps-vars" class="mt-2 max-h-[420px] overflow-auto pr-1"></div>
+            </section>
+            <section class="ps-card">
+                <div class="flex items-center gap-2"><p class="ps-h">📈 그릴 것</p><button type="button" id="ps-add" class="ps-btn ml-auto">＋ 추가</button></div>
+                <div id="ps-series" class="mt-1"></div>
+            </section>
+            <section class="ps-card">
+                <p class="ps-h mb-2">🗂 축 · 제목 · 범례</p>
+                <div id="ps-axes"></div>
+            </section>
+            <section class="ps-card">
+                <div class="mb-2 flex flex-wrap items-center gap-2"><p class="ps-h">🎨 그림 전체 · 글꼴 · 저장</p>
+                    <div class="ml-auto flex gap-1">
+                        <button type="button" id="ps-save" class="ps-btn" title="모양 설정을 파일로 — 다음에 같은 모양으로">💾 설정</button>
+                        <label class="ps-btn cursor-pointer">📂 불러오기<input id="ps-load" type="file" accept=".json" class="hidden"></label>
+                        <button type="button" id="ps-reset" class="ps-btn">↺</button>
+                    </div>
+                </div>
+                <div id="ps-fig"></div>
+            </section>
+        </div>
+
+        <div class="min-w-0">
+            <div class="ps-sticky space-y-5">
+                <section class="ps-card">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <p class="ps-h">👀 미리보기</p>
+                        <span id="ps-hover" class="ps-sub"></span>
+                        <label class="ml-auto text-[12px] text-[#8e8e93]">크기 <select id="ps-zoom" class="ps-in"><option value="fit" selected>화면에 맞춤</option><option value="1">실제 크기 (100%)</option><option value="1.5">150%</option><option value="2">200%</option></select></label>
+                    </div>
+                    <div class="ps-stage-wrap">
+                        <div id="ps-stage"><canvas id="ps-canvas"></canvas><div id="ps-ov"></div><div id="ps-sel"></div></div>
+                    </div>
+                    <p id="ps-empty-stage" class="ps-sub mt-2">데이터를 넣으면 여기에 그려져요. 지금은 빈 틀이에요.</p>
+                    <p class="ps-sub mt-2">끌기: 그 부분으로 범위 정하기 · 두 번 누르기: 자동 범위 · 실제 결과는 코드를 돌린 그림이고, 미리보기는 그에 가깝게 흉내 낸 거예요.</p>
+                    <ul id="ps-warn" class="mt-2 text-[12.5px] text-[#b45309]"></ul>
+                </section>
+                <section class="ps-card">
+                    <div class="mb-2 flex flex-wrap items-center gap-2">
+                        <p class="ps-h">🧾 코드</p>
+                        <span class="ps-seg" id="ps-lang"><button type="button" data-v="py" class="is-on">🐍 Python</button><button type="button" data-v="m">MATLAB</button></span>
+                        <div class="ml-auto flex gap-1">
+                            <button type="button" id="ps-copy" class="ps-btn">📋 복사</button>
+                            <button type="button" id="ps-dl" class="ps-btn ps-btn-p">⬇ 파일로 받기</button>
+                        </div>
+                    </div>
+                    <pre><code id="ps-code" class="ps-code"></code></pre>
+                    <p class="ps-sub mt-2">데이터 파일과 같은 폴더에서 돌리세요. Python 은 <code>numpy</code>·<code>matplotlib</code> (+ .mat 이면 <code>scipy</code>, v7.3·h5 면 <code>h5py</code>, CSV 면 <code>pandas</code>), MATLAB 은 R2021a 이상.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <details class="ps-card ps-help mt-5">
+        <summary>🧭 쓰는 법 · LaTeX 수식 쓰는 법</summary>
+        <ol class="mt-3 list-decimal space-y-1 pl-5 text-[14px] leading-6">
+            <li><b>파일 넣기</b> — MATLAB 은 <code>save('data.mat', 't', 'y')</code>, Python 은 <code>np.savez('data.npz', t=t, y=y)</code> 나 <code>scipy.io.savemat</code> 로 저장한 걸 넣어요. 구조체(<code>s.field</code>)·셀(<code>c{2}</code>)도 펼쳐 보여요.</li>
+            <li><b>그래프 고르기</b> — 변수 아래 <b>📈 선</b>·<b>🌈 이미지</b> 같은 버튼을 누르면 X 축으로 쓸 변수(<code>t</code>·<code>f</code>·<code>snr</code> 같은 이름)를 알아서 찾아 붙여요. 행렬이면 <b>열마다 선</b>, 복소수면 <b>크기(dB)·실수·허수·성상도</b>.</li>
+            <li><b>모양 다듬기</b> — <b>스타일 한 번에 고르기</b> 에서 IEEE 1단·2단, 학위논문(LaTeX 글꼴), 발표용을 고른 뒤 필요한 것만 고쳐요. 칸 나누기(행×열)로 여러 그래프를 한 그림에.</li>
+            <li><b>범위 정하기</b> — 미리보기에서 보고 싶은 부분을 끌면 그 범위가 축 설정에 들어가요.</li>
+            <li><b>코드 받기</b> — Python·MATLAB 을 골라 복사하거나 파일로 받아 데이터 옆에서 돌리면 PDF·PNG 가 저장돼요. 모양 설정은 💾 로 저장해 다음 그림에도 같은 스타일을.</li>
+        </ol>
+        <p class="mt-4 font-semibold text-[14px]">LaTeX 수식</p>
+        <ul class="mt-1 text-[13px] leading-6 text-[#6e6e73]">
+            <li>· 이름 안에서 <code>$ … $</code> 사이가 수식이에요: <code>시간 $t$ [ms]</code>, <code>$E_b/N_0$ [dB]</code>, <code>$|H(e^{j\omega})|^2$</code>, <code>$\sigma^2 = 0.1$</code></li>
+            <li>· 아래첨자 <code>x_1</code>·<code>x_{10}</code>, 위첨자 <code>x^2</code>, 그리스 문자 <code>\alpha \beta \omega \Omega</code>, 분수 <code>\frac{a}{b}</code>, 글자체 <code>\mathrm{SNR}</code>, 단위 사이 띄어쓰기 <code>\,</code></li>
+            <li>· <b>$…$ 사이만 수식</b> (추천): 설치할 것 없이 matplotlib 이 바로 그려요. 한글도 돼요.</li>
+            <li>· <b>진짜 LaTeX</b>: 글자 전부를 LaTeX 로 — 논문 본문과 글꼴이 완전히 같아지지만 컴퓨터에 TeX 가 깔려 있어야 하고, <code>$</code> 밖의 <code>_ % &amp; #</code> 앞엔 <code>\</code> 를 붙여야 해요.</li>
+            <li>· MATLAB 은 <code>$</code> 가 들어간 글자만 LaTeX 해석기로, 나머지는 고른 글꼴로 그려요 (Computer Modern 을 고르면 모두 LaTeX).</li>
+        </ul>
+        <p class="mt-4 font-semibold text-[14px]">어떤 그래프가 좋을까</p>
+        <ul class="mt-1 text-[13px] leading-6 text-[#6e6e73]">
+            <li>· 시간에 따른 신호 → <b>선</b>, 표본이 띄엄띄엄이면 <b>줄기(stem)</b>, 디지털 값이면 <b>계단</b></li>
+            <li>· BER·오차처럼 몇 자리씩 줄어드는 값 → Y <b>로그 눈금</b> + 점 모양 (흑백 인쇄면 색 순서를 흑백으로, 선 모양이 저절로 달라져요)</li>
+            <li>· 스펙트로그램·지도·행렬 → <b>이미지</b>, 색 지도는 viridis·parula 처럼 밝기가 고르게 변하는 걸 (jet 는 없는 경계가 보여서 논문에선 피해요)</li>
+            <li>· 값이 어떻게 퍼져 있는지 → <b>히스토그램</b>, 복소수 심볼 → <b>성상도</b> (X·Y 같은 비율)</li>
+            <li>· IEEE 논문 한 단 그림은 가로 3.5 in, 글자 8 pt 정도면 본문과 크기가 맞아요.</li>
+        </ul>
+    </details>
+</main>
+
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/languages/matlab.min.js"></script>
+<script src="{% static 'js/plot-data.js' %}?v=1"></script>
+<script src="{% static 'js/plot-studio.js' %}?v=1"></script>
+{% endblock %}
