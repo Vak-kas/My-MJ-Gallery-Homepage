@@ -581,6 +581,22 @@ class PlotStudioPageTests(TestCase):
 		self.assertContains(resp, reverse("tools:plot"))
 
 
+class UsrpGainPageTests(TestCase):
+	def test_usrp_page_is_public_and_calculates_locally(self):
+		from pathlib import Path
+		from django.conf import settings
+		resp = self.client.get(reverse("tools:usrp"))
+		self.assertEqual(resp.status_code, 200)
+		self.assertContains(resp, "js/usrp-gain.js")
+		self.assertContains(resp, "브라우저 안에서만")
+		js = (Path(settings.BASE_DIR) / "static/js/usrp-gain.js").read_text(encoding="utf-8")
+		self.assertNotRegex(js, r"fetch\(|XMLHttpRequest|sendBeacon")
+
+	def test_usrp_is_listed_in_tool_hub(self):
+		resp = self.client.get(reverse("tools:index"))
+		self.assertContains(resp, reverse("tools:usrp"))
+
+
 class FileRoomPageTests(TestCase):
 	ROOM = {**StreamViewTests.ROOM, "kind": "file", "meta": {"label": "파일 방"}, "out_socket": "PUSH"}
 

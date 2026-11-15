@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="tool" %}
+
+<style>
+    .ug-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 20px; }
+    .ug-in { width: 100%; border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 6px 9px; font-size: 14px; color: #1d1d1f; outline: none; font-variant-numeric: tabular-nums; }
+    .ug-in:focus { border-color: #0066cc; box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.12); }
+    .ug-in.is-cal { border-color: #16a34a; }
+    .ug-f label { display: block; font-size: 12px; color: #6e6e73; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ug-seg { display: inline-flex; flex-wrap: wrap; border-radius: 999px; background: #f5f5f7; padding: 3px; }
+    .ug-seg button { border-radius: 999px; padding: 4px 11px; font-size: 13px; color: #6e6e73; }
+    .ug-seg button.is-on { background: #fff; color: #1d1d1f; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); }
+    .ug-h { font-size: 13px; font-weight: 700; color: #1d1d1f; margin: 4px 0 8px; }
+    .ug-big { font-size: 34px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+    .ug-stat { border-radius: 14px; background: #f5f5f7; padding: 10px 12px; }
+    .ug-stat p:first-child { font-size: 11px; color: #8e8e93; }
+    .ug-stat p:last-child { margin-top: 2px; font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; }
+    .ug-btn { border-radius: 999px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; padding: 4px 11px; font-size: 12px; color: #1d1d1f; }
+    .ug-btn:hover { background: #f5f5f7; }
+    .ug-btn.pri { background: #0066cc; border-color: #0066cc; color: #fff; }
+    .ug-gain { display: grid; grid-template-columns: 1fr 84px; gap: 10px; align-items: center; }
+    .ug-gain input[type=range] { width: 100%; accent-color: #0066cc; }
+    .ug-rec { border-radius: 14px; border: 1px solid rgba(0, 102, 204, 0.25); background: rgba(0, 102, 204, 0.05); padding: 12px 14px; font-size: 13px; line-height: 1.6; }
+    .ug-warn { border-radius: 12px; padding: 8px 12px; font-size: 12.5px; line-height: 1.55; }
+    .ug-warn.bad { background: rgba(239, 68, 68, 0.1); color: #b91c1c; }
+    .ug-warn.mid { background: rgba(249, 115, 22, 0.1); color: #c2410c; }
+    .ug-warn.ok { background: rgba(22, 163, 74, 0.1); color: #15803d; }
+    .ug-code { border-radius: 14px; background: #f5f5f7; padding: 12px 14px; font-size: 12.5px; line-height: 1.55; overflow-x: auto; white-space: pre; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .ug-help { font-size: 13.5px; line-height: 1.75; color: #3a3a3c; }
+    .ug-help b { color: #1d1d1f; }
+    .ug-help code { border-radius: 6px; background: #f5f5f7; padding: 1px 5px; font-size: 12px; }
+    #ug-map, #ug-lvl { width: 100%; display: block; touch-action: none; }
+    #ug-map { height: 330px; cursor: crosshair; }
+    #ug-lvl { height: 330px; }
+    details.ug-more > summary { cursor: pointer; font-size: 13px; font-weight: 700; color: #1d1d1f; list-style: none; }
+    details.ug-more > summary::before { content: '▸ '; color: #8e8e93; }
+    details.ug-more[open] > summary::before { content: '▾ '; }
+    html.theme-dark .ug-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .ug-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .ug-seg, html.theme-dark .ug-stat, html.theme-dark .ug-code, html.theme-dark .ug-help code { background: #111318; }
+    html.theme-dark .ug-seg button.is-on { background: #2a2a2e; color: #f3f4f6; }
+    html.theme-dark .ug-h, html.theme-dark details.ug-more > summary, html.theme-dark .ug-help b { color: #e8e8ea; }
+    html.theme-dark .ug-help { color: #c7c7cc; }
+    html.theme-dark .ug-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+    html.theme-dark .ug-btn.pri { background: #0a84ff; border-color: #0a84ff; color: #fff; }
+    html.theme-dark .ug-code { color: #e8e8ea; }
+    html.theme-dark #cal-box { border-color: rgba(255, 255, 255, 0.15); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-14 lg:py-16">
+    <a href="{% url 'tools:index' %}" class="text-[13px] text-[#0066cc]">← Tool 목록</a>
+    <div class="mt-4">
+        <p class="text-[12px] uppercase tracking-[0.24em] text-[#0066cc]">USRP · GAIN · SNR</p>
+        <h1 class="apple-display mt-3 text-[40px] font-semibold tracking-[-0.04em] text-[#1d1d1f] lg:text-[52px]">USRP 게인·SNR 계산기.</h1>
+        <p class="mt-3 max-w-[860px] text-[15px] leading-relaxed text-[#6e6e73]">USRP 는 대부분 <b>"출력 몇 dBm" 을 정하는 설정이 없고 게인(dB)만</b> 있어요. 장비·주파수·게인·보내는 신호 크기·케이블이나 거리를 넣으면, 송신 출력 → 받는 세기 → ADC 에 얼마나 차는지(dBFS) → 잡음 바닥 → <b>SNR</b> 을 계산하고, <b>"SNR 20 dB 맞추려면 TX·RX 게인을 얼마로?"</b> 를 거꾸로 찾아 줘요. 계산은 이 브라우저 안에서만 해요.</p>
+    </div>
+
+    <div class="mt-6 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <!-- 입력 -->
+        <section class="ug-card min-w-0 space-y-5">
+            <div>
+                <p class="ug-h">📻 장비 · 주파수</p>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="ug-f col-span-2"><label>장비 (도터보드)</label><select class="ug-in" id="dev"></select></div>
+                    <div class="ug-f"><label>중심 주파수 (MHz)</label><input class="ug-in" id="f" type="number" step="any" value="2400"></div>
+                    <div class="ug-f"><label>샘플레이트 (Msps)</label><input class="ug-in" id="fs" type="number" step="any" value="2"></div>
+                    <div class="ug-f"><label>신호 대역폭 (MHz) <span title="SNR 을 재는 대역. 보통 심볼 속도×(1+롤오프) 나 OFDM 점유 대역폭">ⓘ</span></label><input class="ug-in" id="bw" type="number" step="any" value="1"></div>
+                    <div class="ug-f"><label>목표 SNR (dB)</label><input class="ug-in" id="target" type="number" step="any" value="20"></div>
+                    <div class="ug-f col-span-2"><label>장비 메모</label><p class="pt-1 text-[12px] leading-snug text-[#8e8e93]" id="dev-note"></p></div>
+                </div>
+            </div>
+
+            <div>
+                <p class="ug-h">📤 송신 (TX)</p>
+                <div class="ug-f"><label>TX 게인 (dB) <span id="gtx-range" class="text-[#8e8e93]"></span></label>
+                    <div class="ug-gain"><input type="range" id="gtx-r"><input class="ug-in" id="gtx" type="number" step="any"></div></div>
+                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="ug-f"><label>보내는 샘플 최대 진폭 (0~1) <span title="UHD fc32 에서 ±1.0 이 DAC 꽉 참. 0.5~0.8 정도가 무난">ⓘ</span></label><input class="ug-in" id="amp" type="number" step="any" min="0" max="1" value="0.7"></div>
+                    <div class="ug-f"><label>신호 모양 (PAPR)</label><select class="ug-in" id="papr-p">
+                        <option value="0">연속파 · FM · FSK (0 dB)</option>
+                        <option value="3.5" selected>QPSK·BPSK + RRC (≈3.5 dB)</option>
+                        <option value="6.5">16QAM + RRC (≈6.5 dB)</option>
+                        <option value="7.5">64QAM + RRC (≈7.5 dB)</option>
+                        <option value="10">OFDM (≈10 dB)</option>
+                        <option value="x">직접 입력</option>
+                    </select></div>
+                    <div class="ug-f"><label>PAPR (dB) <span title="최대 순간 세기 ÷ 평균 세기. 진폭 0.7 이 '최대' 이고 평균은 PAPR 만큼 낮아요">ⓘ</span></label><input class="ug-in" id="papr" type="number" step="any" value="3.5"></div>
+                    <div class="ug-f"><label>평균 세기 (dBFS)</label><p class="pt-1.5 text-[14px] font-semibold tabular-nums" id="o-rmsfs">–</p></div>
+                </div>
+            </div>
+
+            <div>
+                <div class="flex flex-wrap items-center gap-2"><p class="ug-h">🔌 TX → RX 사이</p><span class="ug-seg ml-auto" id="m-path"><button type="button" class="is-on" data-v="cable">케이블 + 감쇠기</button><button type="button" data-v="air">안테나 · 공중</button></span></div>
+                <div class="grid grid-cols-2 gap-3 sm:grid-cols-4" data-path="cable">
+                    <div class="ug-f"><label>감쇠기 (dB)</label><input class="ug-in" id="att" type="number" step="any" value="30"></div>
+                    <div class="ug-f"><label>케이블·커넥터 손실 (dB)</label><input class="ug-in" id="cable" type="number" step="any" value="1"></div>
+                </div>
+                <div class="hidden grid-cols-2 gap-3 sm:grid-cols-4" data-path="air">
+                    <div class="ug-f"><label>거리 (m)</label><input class="ug-in" id="dist" type="number" step="any" value="5"></div>
+                    <div class="ug-f"><label>TX 안테나 이득 (dBi)</label><input class="ug-in" id="gant-t" type="number" step="any" value="3"></div>
+                    <div class="ug-f"><label>RX 안테나 이득 (dBi)</label><input class="ug-in" id="gant-r" type="number" step="any" value="3"></div>
+                    <div class="ug-f"><label>추가 손실 (벽·케이블, dB)</label><input class="ug-in" id="extra" type="number" step="any" value="2"></div>
+                </div>
+            </div>
+
+            <div>
+                <p class="ug-h">📥 수신 (RX)</p>
+                <div class="ug-f"><label>RX 게인 (dB) <span id="grx-range" class="text-[#8e8e93]"></span></label>
+                    <div class="ug-gain"><input type="range" id="grx-r"><input class="ug-in" id="grx" type="number" step="any"></div></div>
+                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="ug-f"><label>ADC 여유 (dB) <span title="신호의 최대 순간 세기를 0 dBFS 보다 이만큼 아래에 두기 (클리핑 방지)">ⓘ</span></label><input class="ug-in" id="head" type="number" step="any" value="3"></div>
+                </div>
+            </div>
+
+            <details class="ug-more" id="adv">
+                <summary>⚙️ 장비 값 (대략값 — 실측으로 바꾸면 정확해져요)</summary>
+                <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="ug-f"><label>최대 게인 출력 (dBm, 0 dBFS 연속파) <span title="이 주파수에서 TX 게인을 최대로, 진폭 1.0 연속파를 보냈을 때 출력. 장비 표에서 주파수로 보간">ⓘ</span></label><input class="ug-in" id="pmax" type="number" step="any"></div>
+                    <div class="ug-f"><label>RX 잡음 지수 NF (dB)</label><input class="ug-in" id="nf" type="number" step="any"></div>
+                    <div class="ug-f"><label>게인 0 에서 0 dBFS 입력 (dBm) <span title="RX 게인 0 dB 일 때 ADC 를 꽉 채우는 입력 세기(평균). 게인을 1 dB 올리면 1 dB 낮아짐">ⓘ</span></label><input class="ug-in" id="fs0" type="number" step="any"></div>
+                    <div class="ug-f"><label>ADC SNR (dB, 샘플레이트 전체) <span title="꽉 찬 신호 대 ADC 양자화·자체 잡음. 대역폭이 좁을수록 그만큼 이득(처리 이득)">ⓘ</span></label><input class="ug-in" id="adcsnr" type="number" step="any"></div>
+                    <div class="ug-f"><label>송신기 자체 SNR 한계 (dB) <span title="TX DAC·믹서·위상잡음 때문에 아무리 세게 보내도 넘을 수 없는 SNR (EVM 으로 재요). 대략 30~40 dB">ⓘ</span></label><input class="ug-in" id="cap" type="number" step="any"></div>
+                    <div class="ug-f"><label>RX 최대 입력 (dBm, 보수적) <span title="넘으면 수신단이 망가질 수 있는 세기. 데이터시트 값보다 낮게 잡은 안전값">ⓘ</span></label><input class="ug-in" id="rxmax" type="number" step="any"></div>
+                    <div class="ug-f col-span-2 flex items-end"><button type="button" class="ug-btn" id="dev-reset">장비 기본값으로 되돌리기</button></div>
+                </div>
+                <div class="mt-4 rounded-2xl border border-dashed border-black/10 p-3" id="cal-box">
+                    <p class="text-[12.5px] font-semibold">📏 실측으로 보정하기</p>
+                    <div class="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <div class="ug-f"><label>TX: 이 게인에서</label><input class="ug-in" id="ctx-g" type="number" step="any" placeholder="예: 60"></div>
+                        <div class="ug-f"><label>잰 평균 출력 (dBm)</label><input class="ug-in" id="ctx-p" type="number" step="any" placeholder="스펙트럼 분석기·파워미터"></div>
+                        <div class="ug-f col-span-2 flex items-end gap-2"><button type="button" class="ug-btn" id="ctx-go">TX 보정 적용</button><span class="text-[11.5px] text-[#8e8e93]">지금 진폭·PAPR 로 보냈을 때 값</span></div>
+                        <div class="ug-f"><label>RX: 이 게인에서</label><input class="ug-in" id="crx-g" type="number" step="any" placeholder="예: 30"></div>
+                        <div class="ug-f"><label>넣은 평균 세기 (dBm)</label><input class="ug-in" id="crx-p" type="number" step="any" placeholder="신호 발생기 −50 등"></div>
+                        <div class="ug-f"><label>받은 IQ 평균 (dBFS)</label><input class="ug-in" id="crx-x" type="number" step="any" placeholder="10·log10(mean|x|²)"></div>
+                        <div class="ug-f flex items-end"><button type="button" class="ug-btn" id="crx-go">RX 보정 적용</button></div>
+                    </div>
+                    <p class="mt-2 text-[11.5px] leading-5 text-[#8e8e93]">보정한 칸은 초록 테두리로 바뀌고, 장비·주파수를 바꿔도 유지돼요(되돌리기 버튼으로 해제). TX 루프백으로 재면 <code>10·log10(mean(|x|²))</code> 가 받은 dBFS 예요.</p>
+                </div>
+            </details>
+        </section>
+
+        <!-- 결과 -->
+        <aside class="space-y-4 xl:sticky xl:top-6 xl:self-start">
+            <section class="ug-card">
+                <div class="flex items-end gap-4">
+                    <div><p class="text-[12px] text-[#8e8e93]">SNR (신호 대역 안)</p><p class="ug-big" id="o-snr">–</p></div>
+                    <div class="pb-1.5"><p class="text-[12px] text-[#8e8e93]">목표 대비</p><p class="text-[18px] font-semibold tabular-nums" id="o-margin">–</p></div>
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2" id="o-stats"></div>
+                <div class="mt-3 space-y-2" id="o-warn"></div>
+            </section>
+            <section class="ug-card">
+                <div class="flex items-center gap-2"><p class="ug-h !m-0">🎯 목표 SNR 맞추기</p><button type="button" class="ug-btn pri ml-auto" id="rec-apply">추천 게인 적용</button></div>
+                <div class="ug-rec mt-2" id="o-rec">–</div>
+            </section>
+        </aside>
+    </div>
+
+    <!-- 그림 -->
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section class="ug-card min-w-0">
+            <div class="flex flex-wrap items-center gap-2"><p class="ug-h !m-0">🗺 TX·RX 게인별 SNR</p><span class="ml-auto text-[12px] text-[#8e8e93]">눌러서 게인 고르기 · 빨간 빗금 = ADC 클리핑 · 주황 선 = 목표</span></div>
+            <canvas id="ug-map" class="mt-3"></canvas>
+        </section>
+        <section class="ug-card min-w-0">
+            <div class="flex flex-wrap items-center gap-2"><p class="ug-h !m-0">📶 세기 사다리 (dBm)</p><span class="ml-auto text-[12px] text-[#8e8e93]">신호 대역 기준 · 평균 / 최대 순간</span></div>
+            <canvas id="ug-lvl" class="mt-3"></canvas>
+        </section>
+    </div>
+
+    <!-- 코드 -->
+    <section class="ug-card mt-5">
+        <div class="flex flex-wrap items-center gap-2">
+            <p class="ug-h !m-0">💻 이 게인으로 설정하는 코드</p>
+            <span class="ug-seg ml-2" id="m-code"><button type="button" class="is-on" data-v="uhd">UHD Python</button><button type="button" data-v="grc">GNU Radio</button><button type="button" data-v="m">MATLAB</button></span>
+            <button type="button" class="ug-btn ml-auto" id="code-copy">복사</button>
+        </div>
+        <pre class="ug-code mt-3" id="o-code"></pre>
+    </section>
+
+    <!-- 설명 -->
+    <section class="ug-card mt-5">
+        <p class="ug-h">🧭 왜 "출력 dBm" 이 아니라 게인인가요?</p>
+        <div class="ug-help space-y-2">
+            <p>· USRP 의 TX 게인은 <b>"최대 출력보다 몇 dB 낮게"</b> 를 정하는 상대값이에요. 실제 출력은 <b>장비 · 주파수 · 개체마다 수 dB 씩</b> 달라서, UHD 는 대부분 장비에서 dBm 을 직접 정하지 못해요. 그래서 <b>(최대 게인 출력) − (최대 게인 − 지금 게인) + (보내는 샘플 크기 dBFS)</b> 로 어림하고, 정확히 하려면 한 번 재서 보정해요.</p>
+            <p>· UHD 4 이상에서 <b>전력 보정 데이터가 있는 장비</b>는 <code>usrp.set_tx_power_reference(dBm, 0)</code> 로 dBm 을 정할 수 있어요. 먼저 <code>usrp.has_tx_power_reference(0)</code> 이 True 인지 확인하세요 (없으면 이 계산기 방식).</p>
+            <p>· <b>SNR 을 올리는 순서</b>: ① 받는 신호를 키운다 (TX 게인·안테나·감쇠기 줄이기) → ② RX 게인은 <b>클리핑 안 나는 만큼 최대한</b> 올린다. RX 게인이 낮으면 ADC 잡음이 바닥을 정해서 SNR 이 낮게 나오고, 충분히 올리면 열잡음(−174 dBm/Hz + NF)이 바닥이 돼 그 뒤로는 RX 게인을 올려도 SNR 이 안 늘어요 — 신호와 잡음이 같이 커지니까요.</p>
+            <p>· <b>보내는 진폭</b>을 1.0 에 붙이면 DAC·출력단이 찌그러져(EVM↑) 오히려 SNR 이 나빠져요. 0.5~0.8 + 게인으로 키우는 게 보통이에요. TX 게인을 최대 근처까지 올려도 송신기 자체 SNR 한계(대략 30~40 dB)를 넘을 수는 없어요.</p>
+            <p>· <b>루프백 시험</b>은 TX 와 RX 를 케이블로 바로 잇지 말고 <b>감쇠기 30 dB 이상</b>을 꼭 넣으세요. 이 계산기는 RX 최대 입력을 넘으면 빨간 경고를 띄워요.</p>
+            <p class="text-[12px] text-[#8e8e93]">· 장비 값은 Ettus 데이터시트·공개 측정에서 가져온 <b>대략값</b>이에요 (특히 "게인 0 에서 0 dBFS 입력" 은 ±10 dB 넘게 틀릴 수 있어요). 클리핑·SNR 판단을 믿으려면 위 📏 실측 보정을 한 번 하세요. 잡음 모델: 열잡음 kTB·NF 와 ADC 잡음(0 dBFS 입력 − ADC SNR − 10·log₁₀(샘플레이트/대역폭))을 더하고, 송신기 한계 SNR 을 합쳐요. 경로 손실은 자유공간(FSPL) — 실내 반사·다중경로는 추가 손실 칸에.</p>
+        </div>
+    </section>
+</main>
+
+<script src="{% static 'js/usrp-gain.js' %}?v=1"></script>
+{% endblock %}

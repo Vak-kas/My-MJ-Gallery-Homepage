@@ -12,6 +12,7 @@ urlpatterns = [
     path("iq/", views.iq, name="iq"),
     path("iq/ai/", ai_views.iq_ai, name="iq_ai"),
     path("plot/", views.plot, name="plot"),
+    path("usrp/", views.usrp, name="usrp"),
     path("wifi/", views.wifi, name="wifi"),
     path("satellite/", satellite.page, name="satellite"),
     path("satellite/tle/", satellite.tle, name="satellite_tle"),
