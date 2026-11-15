@@ -1356,7 +1356,8 @@
 			warn.push('진짜 LaTeX 모드는 컴퓨터에 TeX(MacTeX·TeX Live·MiKTeX)가 깔려 있어야 파이썬에서 그려져요. 없으면 "$…$ 사이만 수식" 을 고르세요.');
 			if (ko) warn.push('진짜 LaTeX 모드에선 한글이 안 나와요 (kotex 설정이 따로 필요). 한글을 쓰려면 "$…$ 사이만 수식" 을 고르세요.');
 		}
-		if (ko && (f.font === 'cm' || f.tex === 'usetex')) warn.push('MATLAB 의 LaTeX 해석기는 한글을 못 그려요 — 한글이 들어간 이름은 MATLAB 에서 빈칸이 될 수 있어요.');
+		const koMath = allText.filter((t) => hasKo(t) && t.includes('$'));
+		if (koMath.length) warn.push(`한 이름 안에 한글과 $수식$ 이 같이 있으면 matplotlib 에선 한글이 □ 로 나와요 (MATLAB 은 괜찮아요): "${koMath[0]}" — 파이썬에서 쓸 거면 한글 이름과 수식을 나누거나 수식 대신 글자로 써 주세요.`);
 		if (ko) warn.push('한글이 있어서 파이썬 코드에 한글 글꼴(맑은 고딕·AppleGothic·나눔고딕)을 같이 넣었어요.');
 		for (const s of live) {
 			const v = getVar(s.y);
@@ -1432,7 +1433,8 @@
 		m.push(`tl = tiledlayout(fig, ${f.rows}, ${f.cols}, 'TileSpacing', 'compact', 'Padding', 'compact');`);
 		const mFont = { times: 'Times New Roman', helvetica: 'Helvetica', dejavu: 'DejaVu Sans', cm: 'CMU Serif' }[f.font];
 		const mAllLatex = f.font === 'cm' || f.tex === 'usetex';
-		const mInterp = (s) => (f.tex === 'none' ? 'none' : mAllLatex || /\$/.test(s) ? 'latex' : /\\/.test(s) ? 'tex' : 'none');
+		// MATLAB LaTeX 해석기는 한글을 못 그려서, 수식 없는 한글 이름은 해석기를 끔 (고른 글꼴 + 한글 대체 글꼴로 나옴)
+		const mInterp = (s) => (f.tex === 'none' ? 'none' : /\$/.test(s) ? 'latex' : hasKo(s) ? 'none' : mAllLatex ? 'latex' : /\\/.test(s) ? 'tex' : 'none');
 		// LaTeX 해석기로 그릴 땐 $ 밖의 _ % & # 를 글자로 (안 그러면 MATLAB 이 오류 글자를 그대로 보여 줌)
 		const mText = (s, interp) => {
 			if ((interp || mInterp(s)) !== 'latex') return s;
@@ -1457,7 +1459,7 @@
 			m.push(`${mh} = nexttile(tl); hold(${mh}, 'on');`);
 			let hasLabel = false;
 			const legLabs = sers.filter((s) => s.label && s.type !== 'image').map((s) => s.label);
-			const legLi = f.tex === 'none' ? 'none' : mAllLatex || legLabs.some((x) => x.includes('$')) ? 'latex' : legLabs.some((x) => x.includes('\\')) ? 'tex' : 'none';
+			const legLi = f.tex === 'none' ? 'none' : legLabs.some((x) => x.includes('$')) ? 'latex' : legLabs.some(hasKo) ? 'none' : mAllLatex ? 'latex' : legLabs.some((x) => x.includes('\\')) ? 'tex' : 'none';
 			for (const s of sers) {
 				sn++;
 				const color = seriesColor(s), lw = seriesLw(s), ls = seriesLs(s);
@@ -1563,7 +1565,9 @@
 			if (a.grid !== 'none') props.push(`'XGrid', 'on'`, `'YGrid', 'on'`, `'GridLineStyle', '${f.gridStyle}'`, `'GridColor', [0.78 0.78 0.78]`, `'GridAlpha', 1`);
 			if (a.grid === 'both') props.push(`'XMinorGrid', 'on'`, `'YMinorGrid', 'on'`, `'MinorGridLineStyle', '${f.gridStyle}'`, `'MinorGridColor', [0.89 0.89 0.89]`, `'MinorGridAlpha', 1`);
 			const lm = { pad: 'padded', ticks: 'tickaligned', tight: 'tight' }[f.limits];
-			props.push(`'XLimitMethod', '${a.tightx ? 'tight' : lm}'`, `'YLimitMethod', '${lm}'`);
+			// 이미지가 있는 칸은 matplotlib 처럼 이미지 끝에 딱 맞춤
+			const hasImg = sers.some((s) => s.type === 'image');
+			props.push(`'XLimitMethod', '${a.tightx || hasImg ? 'tight' : lm}'`, `'YLimitMethod', '${hasImg ? 'tight' : lm}'`);
 			m.push(`set(${mh}, ${props.join(', ...\n    ')});`);
 			if (a.title) m.push(`title(${mh}, ${mStr(mText(a.title))}, 'Interpreter', '${mInterp(a.title)}');`);
 			if (a.xlabel) m.push(`xlabel(${mh}, ${mStr(mText(a.xlabel))}, 'Interpreter', '${mInterp(a.xlabel)}');`);
