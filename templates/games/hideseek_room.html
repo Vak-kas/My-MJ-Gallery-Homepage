@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+{% include "components/main_nav.html" with nav_active="game" %}
+
+<style>
+    .gm-card { border-radius: 22px; border: 1px solid rgba(0, 0, 0, 0.08); background: #fff; padding: 16px; }
+    .gm-in { width: 100%; border-radius: 12px; border: 1px solid rgba(0, 0, 0, 0.12); background: #fff; padding: 9px 12px; font-size: 14px; color: #1d1d1f; outline: none; }
+    .gm-in:focus { border-color: #10b981; }
+    .gm-btn { border-radius: 999px; padding: 6px 12px; font-size: 13px; border: 1px solid rgba(0, 0, 0, 0.1); background: #fff; color: #1d1d1f; white-space: nowrap; }
+    .gm-btn:hover { background: #f5f5f7; }
+    .gm-go { border-radius: 999px; padding: 11px 26px; font-size: 16px; font-weight: 700; color: #fff; background: #10b981; }
+    .gm-go:hover { background: #0f9f6e; }
+    .hs-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 18px; overflow: hidden; background: #0f1115; user-select: none; }
+    .hs-stage:fullscreen { border-radius: 0; aspect-ratio: auto; }
+    .hs-stage canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; display: block; }
+    .hs-hud { position: absolute; inset: 0; pointer-events: none; color: #fff; font-variant-numeric: tabular-nums; }
+    .hs-top { position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: linear-gradient(rgba(0, 0, 0, 0.55), transparent); font-size: 14px; }
+    .hs-timer { margin-left: auto; font-size: 24px; font-weight: 800; }
+    .hs-pill { border-radius: 999px; padding: 3px 10px; font-size: 12.5px; font-weight: 700; background: rgba(255, 255, 255, 0.16); }
+    .hs-hp { position: absolute; left: 14px; bottom: 12px; width: 200px; }
+    .hs-hp-bar { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+    .hs-hp-bar > i { display: block; height: 100%; background: #22c55e; transition: width 0.2s; }
+    .hs-hint { position: absolute; left: 50%; bottom: 52px; transform: translateX(-50%); max-width: 70%; text-align: center; font-size: 13px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+    .hs-cross { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); display: none; }
+    .hs-cross::before, .hs-cross::after { content: ''; position: absolute; background: rgba(255, 255, 255, 0.9); box-shadow: 0 0 2px #000; }
+    .hs-cross::before { left: 10px; top: 0; width: 2px; height: 22px; }
+    .hs-cross::after { top: 10px; left: 0; height: 2px; width: 22px; }
+    .hs-cross.hit::before, .hs-cross.hit::after { background: #ef4444; }
+    .hs-toast { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); font-size: 22px; font-weight: 800; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); opacity: 0; transition: opacity 0.25s; white-space: nowrap; }
+    .hs-toast.on { opacity: 1; }
+    .hs-over { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; background: rgba(10, 12, 16, 0.78); color: #f3f4f6; pointer-events: auto; }
+    .hs-over.hidden { display: none; }
+    .hs-blind { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px; background: #000; font-size: 20px; font-weight: 700; }
+    .hs-tag { position: absolute; transform: translate(-50%, -100%); font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); white-space: nowrap; }
+    .hs-key { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.5); font-size: 11px; line-height: 18px; text-align: center; }
+    #hs-chat { height: 220px; overflow-y: auto; }
+    html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
+    html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
+    html.theme-dark .gm-btn { background: #2a2a2e; color: #e8e8ea; border-color: rgba(255, 255, 255, 0.14); }
+</style>
+
+<main class="mx-auto max-w-[1320px] px-6 py-10 lg:py-12">
+    <a href="{% url 'games:hideseek' %}" class="text-[13px] text-[#0f9f6e]">← 숨바꼭질 방 목록</a>
+    {% if relay_error %}
+    <p class="mt-6 rounded-2xl bg-[#fff8e6] px-4 py-3 text-[14px] text-[#8a5300]">실시간 서버에 연결할 수 없어요: {{ relay_error }}</p>
+    {% else %}
+    <div class="mt-3 flex flex-wrap items-end gap-3">
+        <div class="min-w-[220px] flex-1">
+            <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🫥 {{ room.title }}</h1>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 2~8명 · PC(키보드·마우스)용</p>
+        </div>
+        <button type="button" class="gm-btn" id="hs-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
+        <button type="button" class="gm-btn" id="hs-kakao">💬 카톡으로 초대</button>
+        {% if is_owner %}<form method="post" action="{% url 'games:hideseek_close' room.id %}" onsubmit="return confirm('방을 닫을까요? 들어와 있는 사람들도 나가게 돼요.')">{% csrf_token %}<button class="gm-btn">방 닫기</button></form>{% endif %}
+    </div>
+
+    <section id="hs-name-box" class="gm-card mt-5 hidden">
+        <form id="hs-name-form" class="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <span class="text-[14px] font-semibold">닉네임</span>
+            <input id="hs-name" class="gm-in sm:max-w-[260px]" maxlength="16" required placeholder="다른 사람에게 보여요">
+            <button class="rounded-full bg-[#10b981] px-5 py-2.5 text-[14px] font-semibold text-white">들어가기</button>
+        </form>
+    </section>
+
+    <div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <section class="min-w-0">
+            <div class="hs-stage" id="hs-stage" tabindex="0">
+                <div class="hs-hud">
+                    <div class="hs-top"><span class="hs-pill" id="hs-role">연결 중</span><span id="hs-phase"></span><span class="hs-timer" id="hs-timer"></span></div>
+                    <div id="hs-tags"></div>
+                    <div class="hs-cross" id="hs-cross"></div>
+                    <div class="hs-toast" id="hs-toast"></div>
+                    <div class="hs-hp hidden" id="hs-hp"><p class="mb-1 text-[12px] font-semibold" id="hs-hp-text"></p><div class="hs-hp-bar"><i id="hs-hp-bar" style="width:100%"></i></div></div>
+                    <p class="hs-hint" id="hs-hint"></p>
+                    <div class="hs-blind" id="hs-blind"><p>🙈 술래는 눈 감는 중…</p><p class="text-[15px] font-normal opacity-80" id="hs-blind-t"></p></div>
+                </div>
+                <div class="hs-over" id="hs-over"><p class="text-[15px] opacity-80">연결하는 중…</p></div>
+            </div>
+            <div class="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-[#8e8e93]">
+                <span><span class="hs-key !border-[#c7c7cc]">W A S D</span> 움직이기 · 마우스 시점 · 화면을 누르면 마우스가 잡히고 <span class="hs-key !border-[#c7c7cc]">Esc</span> 로 풀려요</span>
+                <span>· 숨는 사람: <span class="hs-key !border-[#c7c7cc]">E</span> 보고 있는 물건으로 변신 · <span class="hs-key !border-[#c7c7cc]">Q</span> 방향 고정</span>
+                <span>· 술래: <b>클릭</b> 쏘기</span>
+                <button type="button" class="gm-btn ml-auto" id="hs-full">⛶ 전체 화면</button>
+            </div>
+        </section>
+
+        <aside class="space-y-4">
+            <section class="gm-card">
+                <div class="flex items-center gap-2"><h2 class="text-[14px] font-semibold">사람들</h2><span class="ml-auto text-[12px] text-[#8e8e93]" id="hs-count"></span></div>
+                <ol id="hs-players" class="mt-2 space-y-1 text-[14px]"></ol>
+                <div id="hs-host" class="mt-3 hidden space-y-2 text-[13px]">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <label>숨는 시간 <select id="hs-set-hide" class="gm-in !inline-block !w-auto !py-1"></select></label>
+                        <label>찾는 시간 <select id="hs-set-seek" class="gm-in !inline-block !w-auto !py-1"></select></label>
+                    </div>
+                    <button type="button" class="gm-go w-full" id="hs-start">▶ 시작</button>
+                </div>
+                <p class="mt-3 text-[12px] leading-5 text-[#8e8e93]" id="hs-rules"></p>
+            </section>
+            <section class="gm-card">
+                <h2 class="text-[14px] font-semibold">채팅</h2>
+                <div id="hs-chat" class="mt-2 space-y-1 text-[13px] leading-5"></div>
+                <form id="hs-chat-form" class="mt-2 flex gap-2"><input id="hs-chat-in" class="gm-in" maxlength="200" placeholder="말하기 (Enter)" autocomplete="off"><button class="gm-btn">보내기</button></form>
+            </section>
+        </aside>
+    </div>
+    {% endif %}
+</main>
+
+{% if not relay_error %}
+{% include "components/share.html" %}
+<div id="hs-cfg" class="hidden" data-ws="{{ ws_url }}" data-room="{{ room.id }}" data-name="{{ default_name }}" data-title="{{ room.title }}"></div>
+<script type="module" src="{% static 'js/hideseek.js' %}?v=1"></script>
+{% endif %}
+{% endblock %}

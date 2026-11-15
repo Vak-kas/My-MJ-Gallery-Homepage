@@ -201,6 +201,15 @@ GAMES = [
 		"category": "versus",
 	},
 	{
+		"slug": "hideseek",
+		"url_name": "games:hideseek",
+		"icon": "🫥",
+		"title": "숨바꼭질",
+		"description": "술래는 1인칭으로 집 안을 돌며 수상한 물건을 쏘고, 숨는 사람은 3인칭으로 의자·상자·화분 같은 물건으로 변신해서 숨어요. 진짜 물건을 쏘면 술래 체력이 깎이고 30초마다 '삐빅'. 2~8명, PC용 3D, 링크로 초대.",
+		"tags": ["2~8명", "실시간", "3D"],
+		"category": "versus",
+	},
+	{
 		"slug": "catchmind",
 		"url_name": "games:catchmind",
 		"icon": "🎨",
