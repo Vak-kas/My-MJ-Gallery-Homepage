@@ -553,12 +553,15 @@ class IqAnalyzerPageTests(TestCase):
 		self.assertEqual(resp.status_code, 200)
 		self.assertContains(resp, "js/iq-analyzer.js")
 		self.assertContains(resp, "js/iq-insight.js")
+		self.assertContains(resp, "js/iq-stack.js")
+		self.assertContains(resp, "js/plot-data.js")
+		self.assertContains(resp, 'id="iq-st"')
 		self.assertContains(resp, reverse("tools:iq_ai"))
 		self.assertContains(resp, "브라우저 안에서만")
 		js = (Path(settings.BASE_DIR) / "static/js/iq-analyzer.js").read_text(encoding="utf-8")
 		# 파일은 File.slice 로 브라우저에서만 읽고, 어디에도 보내지 않음 (AI 는 mjAI.post 로 잰 값·그림만)
 		self.assertIn(".slice(", js)
-		for name in ("iq-analyzer.js", "iq-insight.js"):
+		for name in ("iq-analyzer.js", "iq-insight.js", "iq-stack.js"):
 			self.assertNotRegex((Path(settings.BASE_DIR) / "static/js" / name).read_text(encoding="utf-8"), r"fetch\(|XMLHttpRequest|sendBeacon")
 
 
