@@ -102,5 +102,6 @@ mj-relay 안에서 함께 도는 게임 방. 판은 서버가 들고 규칙(차�
 - 아무도 없이 30분 → 방 닫음, 방 최대 6시간·30개, 방마다 30명
 - 게임 종류 = 규칙 클래스 하나, `LOGICS` 에 추가
   - `OmokLogic`: 15×15 자유룰, 무르기 부탁·기권·흑백 바꿔 다시
+  - `HideSeekLogic`(숨바꼭질, `relay/mj_hideseek.py`): 술래·숨는 사람 위치는 상태 대신 `room.emit` 으로 바로(초당 십여 번), 서버가 집 범위·속도·쏘기(거리·방향·쿨타임)·체력·시간 판정
   - `CatchLogic`(그림 맞추기): 1초 타이머(`tick`)로 고르기·그리기·정답 공개, 사람마다 다른 상태(제시어는 그리는 사람만), 그림 선은 `room.emit` 으로 바로 전달, 채팅 훅(`on_chat`)으로 정답 처리
 - 규칙 클래스가 쓸 수 있는 훅: `on_join` · `on_leave(room, pid)` · `on_message` · `on_chat`(선택) · `tick`(선택) · `snapshot(room, pid)` · `seat_of`

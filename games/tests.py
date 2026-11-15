@@ -236,6 +236,27 @@ class CatchmindViewTests(TestCase):
 			self.assertEqual(self.client.get("/games/omok/cm123456/?t=tok-cm").status_code, 404)  # 종류가 다르면 404
 
 
+class HideSeekViewTests(TestCase):
+	ROOM = {"id": "hs123456", "kind": "hideseek", "token": "tok-hs", "title": "점심 숨바꼭질", "owner_id": None, "owner": "alice", "public": True, "peers": 3, "status": "lobby", "seats_open": 0}
+
+	def test_lobby_room_and_assets(self):
+		from unittest import mock
+
+		with mock.patch("tools.relay_client.list_games", return_value=[self.ROOM, {**OmokViewTests.ROOM}]):
+			res = self.client.get(reverse("games:hideseek"))
+		self.assertContains(res, "/games/hideseek/hs123456/?t=tok-hs")
+		self.assertNotContains(res, "/games/hideseek/ab12cd34/")
+		with mock.patch("tools.relay_client.get_game", return_value=self.ROOM):
+			res = self.client.get("/games/hideseek/hs123456/?t=tok-hs")
+			self.assertContains(res, "/relay/ws/game/hs123456")
+			self.assertContains(res, "js/hideseek.js")
+			self.assertNotContains(res, "tok-hs&quot;&gt;")  # 토큰은 ws 주소 안에만
+			self.assertEqual(self.client.get("/games/hideseek/hs123456/?t=wrong").status_code, 404)
+
+	def test_listed_in_hub(self):
+		self.assertContains(self.client.get(reverse("games:index")), reverse("games:hideseek"))
+
+
 class SoloPuzzleTests(TestCase):
 	"""스도쿠·지뢰찾기·따라그리기: 서버가 판을 정하고 서버가 채점."""
 
