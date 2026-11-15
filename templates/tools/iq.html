@@ -227,6 +227,46 @@
             </div>
         </section>
 
+        <section class="iq-card mt-5" id="iq-st">
+            <div class="flex flex-wrap items-center gap-2">
+                <p class="iq-h">🧩 버스트 모아 비교 <span class="font-normal text-[#8e8e93]">— 찾은 버스트를 한 줄씩 쌓아 N × 샘플 행렬로, 닮은 것끼리 나누기</span></p>
+                <span class="iq-sub ml-auto" id="iq-st-count"></span>
+            </div>
+            <div class="mt-2 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-4 lg:grid-cols-8">
+                <div class="iq-f"><label>보기</label><select id="iq-st-view" class="iq-in w-full"><option value="mag">세기 (dB)</option><option value="fm">순간 주파수 (FSK)</option><option value="ph">위상 (PSK)</option><option value="i">I 값</option></select></div>
+                <div class="iq-f"><label>줄 맞추기</label><select id="iq-st-align" class="iq-in w-full"><option value="edge">켜지는 순간에</option><option value="xcorr">모양이 겹치게 (상관)</option><option value="none">찾은 위치 그대로</option></select></div>
+                <div class="iq-f"><label>무리 나누기 기준</label><select id="iq-st-by" class="iq-in w-full"><option value="shape">모양·길이</option><option value="bits">비트 (복조 뒤)</option></select></div>
+                <div class="iq-f"><label>같은 무리 닮음 <span id="iq-st-thr-v">85%</span></label><input id="iq-st-thr" type="range" min="50" max="99" value="85" class="w-full"></div>
+                <div class="iq-f"><label>줄 순서</label><select id="iq-st-sort" class="iq-in w-full"><option value="time">시간 순</option><option value="group">무리끼리</option><option value="len">긴 것부터</option><option value="pow">센 것부터</option></select></div>
+                <div class="iq-f"><label title="OOK 처럼 패킷 안에서 꺼졌다 켜지는 신호는 조각으로 잡혀요. 이 간격보다 가까운 조각은 한 버스트로 (0 = 안 합침)">조각 합칠 간격 (ms) ⓘ</label><input id="iq-st-gap" class="iq-in w-full" type="number" min="0" step="any" placeholder="자동"></div>
+                <div class="iq-f"><label>세기 색 범위 (dB)</label><input id="iq-st-dyn" class="iq-in w-full" type="number" min="5" max="120" value="40"></div>
+                <div class="flex items-end"><button type="button" class="iq-btn w-full !py-1.5 !text-[13px] font-semibold" id="iq-st-run">▶ 모으기</button></div>
+            </div>
+            <label class="mt-2 inline-flex items-center gap-2 text-[12px] text-[#6e6e73]"><input type="checkbox" id="iq-st-filt"> 🔓 복조 칸의 Δf·대역폭으로 그 신호만 걸러서 모으기 (다른 신호가 섞일 때, 샘플 수도 줄어요)</label>
+            <p id="iq-st-msg" class="iq-sub mt-2"></p>
+            <div id="iq-st-out" class="hidden">
+                <div class="mt-2 max-h-[560px] overflow-y-auto"><canvas id="iq-st-img" style="width:100%;display:block;cursor:pointer"></canvas></div>
+                <p class="iq-sub mt-1"><span id="iq-st-scale"></span> · 왼쪽 색 막대 = 무리</p>
+                <p id="iq-st-hover" class="iq-sub mt-1 min-h-[18px]"></p>
+                <div id="iq-st-groups" class="mt-2"></div>
+                <div class="mt-4 flex flex-wrap items-center gap-2">
+                    <p class="iq-h !m-0">🔢 버스트마다 0·1</p>
+                    <button type="button" class="iq-btn" id="iq-st-demod">▶ 모든 버스트 복조 (복조 칸 설정 그대로)</button>
+                </div>
+                <p id="iq-st-bmsg" class="iq-sub mt-1">버스트 하나를 [확대] 해서 🔓 복조를 먼저 맞춘 뒤 누르면, 같은 설정으로 모든 버스트의 비트를 줄 세워 늘 같은 칸·바뀌는 칸을 보여 줘요.</p>
+                <div id="iq-st-bits" class="mt-2"></div>
+                <div class="mt-4 overflow-x-auto"><table class="iq-tbl" id="iq-st-tbl"></table></div>
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <span class="iq-sub">행렬 저장 (줄 맞춘 복소 샘플, 짧은 줄은 0 으로 채움):</span>
+                    <button type="button" class="iq-btn" id="iq-st-mat">MATLAB .mat</button>
+                    <button type="button" class="iq-btn" id="iq-st-npy">NumPy .npy</button>
+                    <button type="button" class="iq-btn" id="iq-st-csv">특징·비트 CSV</button>
+                    <a class="iq-sub underline" href="{% url 'tools:plot' %}">.mat 은 📈 그래프 스튜디오에서 바로 그려 볼 수 있어요</a>
+                </div>
+                <p class="iq-sub mt-1">.mat 안: <code>X</code> (N × 샘플 복소수), <code>fs</code>, <code>len</code>, <code>t0</code>, <code>power_dbfs</code>, <code>cfo_hz</code>, <code>group</code>, 복조했으면 <code>bits</code> (N × 비트, 없는 칸 −1). .npy 는 <code>X</code> 만 (complex64).</p>
+            </div>
+        </section>
+
         <section class="iq-card mt-5" id="iq-dm">
             <p class="iq-h">🔓 복조 · 0과 1 뽑기 <span class="font-normal text-[#8e8e93]">— 보이는 구간 (2M 샘플 이하)</span></p>
             <div class="mt-2 grid grid-cols-2 gap-3 text-[12px] sm:grid-cols-3 lg:grid-cols-6">
@@ -259,6 +299,8 @@
 </main>
 
 {% include "tools/_ai_assist.html" %}
-<script src="{% static 'js/iq-analyzer.js' %}?v=3"></script>
-<script src="{% static 'js/iq-insight.js' %}?v=2"></script>
+<script src="{% static 'js/iq-analyzer.js' %}?v=4"></script>
+<script src="{% static 'js/iq-insight.js' %}?v=3"></script>
+<script src="{% static 'js/plot-data.js' %}?v=1"></script>
+<script src="{% static 'js/iq-stack.js' %}?v=1"></script>
 {% endblock %}

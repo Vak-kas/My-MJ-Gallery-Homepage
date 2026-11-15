@@ -56,7 +56,14 @@
 		const ov = S.ov;
 		if (!ov) return [];
 		const p = new Float32Array(ov.bins);
-		for (let b = 0; b < ov.bins; b++) p[b] = ov.cnt[b] ? dbOf(ov.msum[b] / ov.cnt[b]) : -200;
+		// 칸 하나가 샘플 몇 개뿐이면(짧은 파일) 잡음이 들쭉날쭉해 버스트로 잘못 잡힘 → 64 샘플 넘게 묶어서 평균
+		const Wb = Math.max(1, Math.ceil(64 / Math.max(1e-9, S.n / ov.bins))), h = Wb >> 1;
+		for (let b = 0; b < ov.bins; b++) {
+			if (Wb === 1) { p[b] = ov.cnt[b] ? dbOf(ov.msum[b] / ov.cnt[b]) : -200; continue; }
+			let sm = 0, c = 0;
+			for (let j = Math.max(0, b - h); j <= Math.min(ov.bins - 1, b + h); j++) { sm += ov.msum[j]; c += ov.cnt[j]; }
+			p[b] = c ? dbOf(sm / c) : -200;
+		}
 		const sorted = Array.from(p).filter((v) => v > -199).sort((a, b) => a - b);
 		if (!sorted.length) return [];
 		const floor = sorted[Math.floor(sorted.length * 0.2)], top = sorted[sorted.length - 1];
@@ -572,5 +579,5 @@
 	document.addEventListener('iq:view', () => { if (dfA.value !== dfB.value) dfA.value = dfB.value; });
 	new MutationObserver(() => drawDemod(lastDemod)).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 	drawDemod(null);
-	window.__iqInsight = { findBands, findBursts, demodulate, measure, lineCode, describeBits, estimateT, runsOf, get last() { return lastDemod; } };
+	window.__iqInsight = { findBands, findBursts, demodulate, measure, lineCode, describeBits, estimateT, runsOf, channelize, twoMeans, runsToPackets, pskPackets, symbolRateFromEnvelope, pickBurst, get bursts() { return lastBursts; }, get bands() { return lastBands; }, get last() { return lastDemod; } };
 })();

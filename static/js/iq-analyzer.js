@@ -1163,5 +1163,5 @@
 	}
 	init();
 	// iq-insight.js (신호 찾기·복조·AI) 가 같이 쓰는 것들
-	window.__iq = { S, FORMATS, RAW_MAX, guessFromName, parseSigmfMeta, makeDemo, readSamples, rawFor, fft, windowOf, setView, drawConstellation, fit, pal, M, si, fmtF, fmtT, binF };
+	window.__iq = { S, CMAP, FORMATS, RAW_MAX, guessFromName, parseSigmfMeta, makeDemo, readSamples, rawFor, fft, windowOf, setView, drawConstellation, fit, pal, M, si, fmtF, fmtT, binF };
 })();
