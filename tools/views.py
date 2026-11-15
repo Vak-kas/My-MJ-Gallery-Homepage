@@ -93,6 +93,10 @@ def iq(request):
 	return render(request, "tools/iq.html")
 
 
+def usrp(request):
+	return render(request, "tools/usrp.html")
+
+
 def plot(request):
 	return render(request, "tools/plot.html")
 

@@ -313,6 +313,17 @@ TOOLS = [
 		"access": "public",
 	},
 	{
+		"slug": "usrp",
+		"url_name": "tools:usrp",
+		"icon": "🎚️",
+		"title": "USRP 게인·SNR 계산기",
+		"description": "B210·X310·N320 등 장비와 주파수·TX/RX 게인·보내는 진폭·감쇠기나 거리를 넣으면 송신 출력 → ADC dBFS → 잡음 바닥 → SNR 을 계산하고, 목표 SNR 을 맞추는 TX·RX 게인을 거꾸로 찾아 줌. 게인별 SNR 지도(클리핑 표시), 세기 사다리, 실측 보정, UHD·GNU Radio·MATLAB 코드.",
+		"tags": ["SDR", "USRP"],
+		"category": "network",
+		"added": "2026-11-15T14:51",  # 처음 만든 때 (새로 나온 순)
+		"access": "public",
+	},
+	{
 		"slug": "iq",
 		"url_name": "tools:iq",
 		"icon": "〰️",
