@@ -95,6 +95,11 @@ scene.add(world);
 const solids = [];       // 충돌 상자 {x0,x1,z0,z1}
 const wallMeshes = [];
 const propGroups = new Map();   // id → group (진짜 물건)
+const removed = new Set();      // 이번 판에 숨는 사람이 치운 진짜 물건 id
+function applyRemoved(list) {
+	removed.clear(); for (const id of list || []) removed.add(id);
+	for (const [id, g] of propGroups) g.visible = !removed.has(id);
+}
 function buildWorld() {
 	world.clear(); solids.length = 0; wallMeshes.length = 0; propGroups.clear();
 	const floorCol = { 거실: '#c8a77e', 부엌: '#d6d6d2', 침실: '#b7c4d6' };
@@ -162,6 +167,7 @@ function render() {
 	if (S.status !== lastStatus || role !== lastRole) onPhase(lastStatus, S.status);
 	lastStatus = S.status; lastRole = role;
 	deadline = performance.now() + (S.left || 0) * 1000;
+	applyRemoved(S.removed);
 	syncEnts();
 	$('hs-role').textContent = S.me ? (role ? ROLE_TXT[role] + (S.me.alive ? '' : ' (잡힘)') : '대기') : '👀 구경';
 	$('hs-phase').textContent = { lobby: '기다리는 중', hide: `${S.round}판 · 숨는 시간`, seek: `${S.round}판 · 찾는 시간`, over: `${S.round}판 끝` }[S.status] || '';
@@ -183,12 +189,12 @@ function render() {
 		$('hs-set-seek').innerHTML = S.seek_choices.map((n) => `<option value="${n}" ${n === S.seek_time ? 'selected' : ''}>${n / 60}분</option>`).join('');
 		$('hs-start').textContent = S.status === 'over' ? '▶ 다음 판 (술래 바꿔서)' : '▶ 시작';
 	}
-	$('hs-rules').innerHTML = `숨는 ${S.hide_time}초 → 찾는 ${S.seek_time / 60}분. 숨은 사람은 ${100 / S.rules.hit}번 맞으면 잡혀요. 술래가 진짜 물건을 쏘면 체력 −${S.rules.miss}. ${S.rules.taunt}초마다 숨은 사람 자리에서 '삐빅' 소리가 나요.`;
+	$('hs-rules').innerHTML = `숨는 ${S.hide_time}초 → 찾는 ${S.seek_time / 60}분. 숨은 사람은 ${100 / S.rules.hit}번 맞으면 잡혀요. 술래가 진짜 물건을 쏘면 체력 −${S.rules.miss}. ${S.rules.taunt}초마다 숨은 사람 자리에서 '삐빅' 소리가 나요. <b>M</b> 지도는 집의 원래 배치도 — 지도에 없는 물건이 수상해요(술래는 ${S.rules.map_show}초 보고 ${S.rules.map_cool}초 쉼). 숨는 사람은 <b>F</b> 로 진짜 물건을 치우고 그 자리에 들어갈 수 있어요(판마다 ${S.rules.swaps}번).`;
 	// 덮개
 	const over = $('hs-over');
 	if (S.status === 'lobby') {
 		over.classList.remove('hidden');
-		over.innerHTML = `<p class="text-[22px] font-bold">🫥 숨바꼭질</p><p class="max-w-[520px] text-[14px] leading-6 opacity-85">술래는 1인칭으로 집 안을 돌아다니며 수상한 물건을 쏘고, 숨는 사람은 3인칭으로 물건을 보고 <span class="hs-key">E</span> 를 눌러 그 물건으로 변신해 숨어요.</p><p class="text-[14px] opacity-80">${S.players.length < 2 ? '친구를 초대해 주세요 (2명부터).' : S.host ? '오른쪽 ▶ 시작을 누르세요.' : `방장(${esc(S.host_name)}) 이 시작하기를 기다리는 중…`}</p>`;
+		over.innerHTML = `<p class="text-[22px] font-bold">🫥 숨바꼭질</p><p class="max-w-[520px] text-[14px] leading-6 opacity-85">술래는 1인칭으로 집 안을 돌아다니며 수상한 물건을 쏘고, 숨는 사람은 3인칭으로 물건을 보고 <span class="hs-key">E</span> 를 눌러 그 물건으로 변신해 숨어요. 술래는 <span class="hs-key">M</span> 지도(원래 배치도)와 실제를 견줘 보고, 숨는 사람은 <span class="hs-key">F</span> 로 진짜 물건과 자리를 바꿔 지도까지 속일 수 있어요.</p><p class="text-[14px] opacity-80">${S.players.length < 2 ? '친구를 초대해 주세요 (2명부터).' : S.host ? '오른쪽 ▶ 시작을 누르세요.' : `방장(${esc(S.host_name)}) 이 시작하기를 기다리는 중…`}</p>`;
 	} else if (S.status === 'over' && S.result) {
 		const r = S.result, won = (r.winner === 'seeker' && role === 'seeker') || (r.winner === 'hiders' && role === 'hider');
 		over.classList.remove('hidden');
@@ -200,11 +206,12 @@ function render() {
 	} else over.classList.add('hidden');
 }
 function onPhase(prev, now) {
-	if (now === 'hide' && S.me && S.me.role) {
-		// 새 판: 내 위치를 서버가 정한 곳으로
+	if ((now === 'hide' || (!prev && now === 'seek')) && S.me && S.me.role) {
+		// 새 판(또는 하던 중에 새로 고침): 내 위치를 서버가 아는 곳으로
 		me.x = S.me.x; me.z = S.me.z; me.ry = S.me.ry; me.yaw = S.me.role === 'seeker' ? 0 : Math.PI; me.pitch = S.me.role === 'seeker' ? 0 : -0.3;
 		me.lock = false; me.prop = S.me.prop;
-		toast(S.me.role === 'seeker' ? '👁 내가 술래! 눈 감는 중…' : '🫥 숨으세요! 물건을 보고 E', 2200);
+		mapSt.open = false; mapSt.coolUntil = 0;
+		if (now === 'hide') toast(S.me.role === 'seeker' ? '👁 내가 술래! 눈 감는 중…' : '🫥 숨으세요! 물건을 보고 E', 2200);
 	}
 	if (now === 'seek') { toast(myRole() === 'seeker' ? '👀 찾기 시작!' : '👀 술래가 눈을 떴어요!', 1800); beep([660, 880], 0.18); }
 	if (now === 'over' && document.pointerLockElement) document.exitPointerLock();
@@ -246,6 +253,8 @@ document.addEventListener('keydown', (e) => {
 	const k = e.key.toLowerCase();
 	if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) { keys.add(k); if (document.pointerLockElement) e.preventDefault(); }
 	if (k === 'e' && playing() && myRole() === 'hider') copyLooked();
+	if (k === 'f' && playing() && myRole() === 'hider') swapLooked();
+	if (k === 'm') toggleMap();
 	if (k === 'q' && playing() && myRole() === 'hider') { me.lock = !me.lock; toast(me.lock ? '🔒 방향 고정' : '🔓 방향 풀림', 900); }
 });
 document.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -269,6 +278,7 @@ function radius() {
 }
 function blocked(x, z, r) {
 	for (const s of solids) {
+		if (s.prop && removed.has(s.prop)) continue;
 		const cx = clamp(x, s.x0, s.x1), cz = clamp(z, s.z0, s.z1);
 		if ((x - cx) ** 2 + (z - cz) ** 2 < r * r) return true;
 	}
@@ -309,7 +319,8 @@ const CENTER = new THREE.Vector2(0, 0);
 function pick(maxDist, includeEnts) {
 	ray.setFromCamera(CENTER, camera);
 	ray.far = maxDist;
-	const targets = [...wallMeshes, ...propGroups.values()];
+	const targets = [...wallMeshes];
+	for (const [id, g] of propGroups) if (!removed.has(id)) targets.push(g);
 	if (includeEnts) for (const o of ents.values()) if (!o.self && o.group) targets.push(o.group);
 	const hits = ray.intersectObjects(targets, true);
 	for (const h of hits) {
@@ -335,6 +346,99 @@ function copyLooked() {
 	toast(`✨ ${PROPS[t.type][0]}(으)로 변신! (방향 고정 — Q 로 풀기)`, 1400);
 	beep([523, 784], 0.1);
 }
+// 자리 바꾸기: 보고 있는 진짜 물건을 치우고 그 자리·방향 그대로 들어감 (서버가 확인하고 swap 을 돌려줌)
+function swapLooked() {
+	const t = looked, left = S.me.swaps || 0;
+	if (left <= 0) { toast('자리 바꾸기를 다 썼어요', 900); return; }
+	if (!t || t.kind !== 'prop') { toast('바꿀 물건을 보고 F 를 눌러요', 900); return; }
+	const p = MAP.props.find((q) => q.id === t.id);
+	if (Math.hypot(p.x - me.x, p.z - me.z) > S.rules.swap_range) { toast('조금 더 가까이 가서 F', 900); return; }
+	send({ type: 'swap', prop: t.id });
+}
+
+// ── 지도 (집의 원래 배치도 — 손으로 그린 것처럼 조금씩 어긋남) ──
+const mapSt = { open: false, until: 0, coolUntil: 0 };
+function closeMap(now) {
+	if (!mapSt.open) return;
+	mapSt.open = false;
+	if (myRole() === 'seeker') mapSt.coolUntil = now + S.rules.map_cool * 1000;
+}
+function toggleMap() {
+	const now = performance.now();
+	if (mapSt.open) { closeMap(now); return; }
+	if (!playing() || !MAP) return;
+	if (myRole() === 'seeker') {
+		if (S.status !== 'seek') return;
+		if (now < mapSt.coolUntil) { toast(`지도는 ${Math.ceil((mapSt.coolUntil - now) / 1000)}초 뒤에 다시 볼 수 있어요`, 900); return; }
+		mapSt.until = now + S.rules.map_show * 1000;
+	}
+	mapSt.open = true;
+}
+function rng32(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function hash(str) { let h = 2166136261; for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619); return h; }
+const ROUND_PROPS = new Set(['stool', 'plant', 'lamp', 'barrel', 'trash', 'ball']);
+function drawMap(now) {
+	const cv = $('hs-map'), cw = cv.clientWidth, ch = cv.clientHeight, dpr = Math.min(2, window.devicePixelRatio || 1);
+	if (!cw || !ch) return;
+	if (cv.width !== Math.round(cw * dpr) || cv.height !== Math.round(ch * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+	const g = cv.getContext('2d');
+	g.setTransform(dpr, 0, 0, dpr, 0, 0);
+	const top = 30, pad = 14, k = Math.min((cw - 2 * pad) / MAP.w, (ch - top - pad) / MAP.d), ox = (cw - MAP.w * k) / 2, oz = top + (ch - top - pad - MAP.d * k) / 2;
+	const X = (x) => ox + x * k, Z = (z) => oz + z * k;
+	g.fillStyle = '#f4ecd8'; g.fillRect(0, 0, cw, ch);
+	g.lineJoin = 'round'; g.lineCap = 'round';
+	// 삐뚤빼뚤한 다각형 (판·물건마다 늘 같은 모양)
+	const poly = (pts, rnd, amp, fill, stroke, lw) => {
+		for (let pass = 0; pass < 2; pass++) {
+			g.beginPath();
+			pts.forEach(([x, y], i) => { const px = x + (rnd() - 0.5) * amp, py = y + (rnd() - 0.5) * amp; if (i) g.lineTo(px, py); else g.moveTo(px, py); });
+			g.closePath();
+			if (!pass && fill) { g.fillStyle = fill; g.fill(); }
+			g.strokeStyle = stroke; g.lineWidth = lw; g.stroke();
+		}
+	};
+	g.textAlign = 'center'; g.textBaseline = 'middle';
+	g.fillStyle = 'rgba(90, 70, 40, 0.22)'; g.font = `700 ${Math.round(k * 1.5)}px sans-serif`;
+	for (const r of MAP.rooms) g.fillText(r.name, X(r.x + r.w / 2), Z(r.z + r.d / 2));
+	const wr = rng32(hash('w' + S.round));
+	for (const w of MAP.walls) poly([[X(w.x - w.w / 2), Z(w.z - w.d / 2)], [X(w.x + w.w / 2), Z(w.z - w.d / 2)], [X(w.x + w.w / 2), Z(w.z + w.d / 2)], [X(w.x - w.w / 2), Z(w.z + w.d / 2)]], wr, 2.2, '#5b4a36', '#3d3122', 1.2);
+	g.font = `${Math.max(8, Math.round(k * 0.3))}px sans-serif`;
+	for (const p of MAP.props) {
+		const rnd = rng32(hash(S.round + p.id)), [name, w, , d] = PROPS[p.type];
+		// 자리는 최대 ±0.3 m, 방향은 조금 어긋나게
+		const cx = X(p.x + (rnd() - 0.5) * 0.6), cz = Z(p.z + (rnd() - 0.5) * 0.6), a = -p.ry + (rnd() - 0.5) * 0.25;
+		let pts;
+		if (ROUND_PROPS.has(p.type)) pts = Array.from({ length: 9 }, (_, i) => [cx + Math.cos(i / 9 * 6.283) * w * k / 2, cz + Math.sin(i / 9 * 6.283) * w * k / 2]);
+		else pts = [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([x, z]) => [cx + (x * Math.cos(a) - z * Math.sin(a)) * k, cz + (x * Math.sin(a) + z * Math.cos(a)) * k]);
+		poly(pts, rnd, 2.4, 'rgba(255, 255, 255, 0.55)', '#4a3c2a', 1);
+		g.fillStyle = '#3d3122'; g.fillText(name, cx, cz);
+	}
+	// 나
+	const mx = X(me.x), mz = Z(me.z), fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw), r = 7;
+	g.beginPath(); g.moveTo(mx + fx * r * 1.7, mz + fz * r * 1.7); g.lineTo(mx - fz * r * 0.8 - fx * r * 0.6, mz + fx * r * 0.8 - fz * r * 0.6); g.lineTo(mx + fz * r * 0.8 - fx * r * 0.6, mz - fx * r * 0.8 - fz * r * 0.6); g.closePath();
+	g.fillStyle = '#e11d48'; g.fill(); g.strokeStyle = '#fff'; g.lineWidth = 1.5; g.stroke();
+	g.textAlign = 'left'; g.fillStyle = '#3d3122'; g.font = '700 13px sans-serif';
+	g.fillText('🗺 원래 배치도', 12, 16);
+	g.font = '12px sans-serif'; g.fillStyle = '#7a6a52';
+	g.fillText(myRole() === 'seeker' ? '지도에 없는데 놓여 있는 물건이 수상해요 · 손으로 그려 조금 어긋나요' : '술래는 이 지도와 실제를 견줘 봐요 — 지도에 없는 자리에 있으면 티 나요', 118, 16.5);
+	if (myRole() === 'seeker') {
+		const f = clamp((mapSt.until - now) / (S.rules.map_show * 1000), 0, 1);
+		g.fillStyle = 'rgba(0, 0, 0, 0.12)'; g.fillRect(0, ch - 5, cw, 5);
+		g.fillStyle = '#e11d48'; g.fillRect(0, ch - 5, cw * f, 5);
+	}
+}
+function updateMap(now) {
+	if (mapSt.open && (!playing() || (myRole() === 'seeker' && (now > mapSt.until || S.status !== 'seek')))) closeMap(now);
+	$('hs-mapbox').style.display = mapSt.open ? 'block' : 'none';
+	if (mapSt.open) drawMap(now);
+	const btn = $('hs-mapbtn'), can = playing() && !(myRole() === 'seeker' && S.status !== 'seek');
+	btn.style.display = can ? 'block' : 'none';
+	if (!can) return;
+	const cool = myRole() === 'seeker' && !mapSt.open ? Math.ceil((mapSt.coolUntil - now) / 1000) : 0;
+	btn.innerHTML = mapSt.open ? '<span class="hs-key">M</span> 지도 닫기' : cool > 0 ? `🗺 지도 ${cool}초 뒤` : '<span class="hs-key">M</span> 지도';
+	btn.style.opacity = cool > 0 ? 0.55 : 1;
+}
+
 let lastShot = 0;
 const tracers = [];
 function shoot() {
@@ -369,6 +473,15 @@ function onMessage(m) {
 	}
 	else if (m.type === 'fix') { me.x = m.x; me.z = m.z; }
 	else if (m.type === 'disguise') { const o = ents.get(m.id); if (o && !o.self) setEnt({ id: m.id, prop: m.prop, x: o.tx, z: o.tz, ry: o.tr, alive: true, name: o.name }); }
+	else if (m.type === 'swap') {
+		removed.add(m.prop); const pg = propGroups.get(m.prop); if (pg) pg.visible = false;
+		const o = ents.get(m.id), mine = S && S.me && m.id === S.me.eid;
+		if (o) { setEnt({ id: m.id, prop: m.kind, x: m.x, z: m.z, ry: m.ry, alive: true, name: o.name }); o.x = m.x; o.z = m.z; o.ry = m.ry; }
+		if (mine) {
+			me.x = m.x; me.z = m.z; me.ry = m.ry; me.prop = m.kind; me.lock = true; me.sx = m.x; me.sz = m.z; me.sr = m.ry;
+			toast(`🔁 ${PROPS[m.kind][0]} 자리에 들어갔어요! 움직이면 빈 자리가 남아요`, 1800); beep([392, 523, 784], 0.1);
+		}
+	}
 	else if (m.type === 'hit') {
 		const o = ents.get(m.id); flash(o && o.group);
 		if (myRole() === 'seeker') { toast(m.hp > 0 ? '🎯 명중!' : '🎯 잡았다!', 900, '#4ade80'); hitMark(); beep([880, 1320], 0.12); }
@@ -488,8 +601,14 @@ function frame(now) {
 		$('hs-cross').style.display = (playing() && !blind) ? 'block' : 'none';
 		let hint = '';
 		if (S && playing() && !document.pointerLockElement) hint = '화면을 눌러 시작 (마우스로 둘러보기)';
-		else if (S && playing() && role === 'hider') hint = looked && looked.kind === 'prop' ? `<span class="hs-key">E</span> ${esc(PROPS[looked.type][0])}(으)로 변신${Math.hypot((MAP.props.find((q) => q.id === looked.id) || {}).x - me.x, (MAP.props.find((q) => q.id === looked.id) || {}).z - me.z) > 4 ? ' — 조금 더 가까이' : ''}` : `지금 모습: ${esc(PROPS[me.prop]?.[0] || '')} ${me.lock ? '🔒' : ''} · 물건을 보고 <span class="hs-key">E</span>`;
-		else if (S && playing() && role === 'seeker' && S.status === 'seek') hint = '수상한 물건을 클릭해서 쏘세요 — 진짜 물건이면 체력이 깎여요';
+		else if (S && playing() && role === 'hider') {
+			const lp = looked && looked.kind === 'prop' ? MAP.props.find((q) => q.id === looked.id) : null, sw = S.me.swaps || 0;
+			if (lp) {
+				const far = Math.hypot(lp.x - me.x, lp.z - me.z) > 4;
+				hint = `<span class="hs-key">E</span> ${esc(PROPS[lp.type][0])}(으)로 변신${sw > 0 ? ` · <span class="hs-key">F</span> 이 물건을 치우고 그 자리에 (${sw}번 남음)` : ''}${far ? ' — 조금 더 가까이' : ''}`;
+			} else hint = `지금 모습: ${esc(PROPS[me.prop]?.[0] || '')} ${me.lock ? '🔒' : ''} · 물건을 보고 <span class="hs-key">E</span> 변신${sw > 0 ? ` · <span class="hs-key">F</span> 자리 바꾸기 ${sw}번` : ''}`;
+		}
+		else if (S && playing() && role === 'seeker' && S.status === 'seek') hint = '수상한 물건을 클릭해서 쏘세요 — 진짜 물건이면 체력이 깎여요 · <span class="hs-key">M</span> 지도와 견줘 보기';
 		$('hs-hint').innerHTML = hint;
 		if (S && (S.status === 'hide' || S.status === 'seek')) {
 			const left = Math.max(0, (deadline - now) / 1000);
@@ -497,6 +616,7 @@ function frame(now) {
 			$('hs-blind-t').textContent = `${Math.ceil(left)}초 뒤에 눈을 떠요`;
 		} else $('hs-timer').textContent = '';
 		for (let i = tracers.length - 1; i >= 0; i--) if (now > tracers[i].until) { scene.remove(tracers[i].line); tracers[i].line.geometry.dispose(); tracers.splice(i, 1); }
+		updateMap(now);
 		updateTags();
 	}
 	renderer.render(scene, camera);
@@ -505,4 +625,4 @@ function frame(now) {
 resize();
 camera.position.set(12, 20, 30); camera.lookAt(12, 0, 8);
 requestAnimationFrame(frame);
-window.__hs = { state: () => S, me, send, ents, THREE };
+window.__hs = { state: () => S, me, send, ents, THREE, removed, mapSt, toggleMap, looked: () => looked };
