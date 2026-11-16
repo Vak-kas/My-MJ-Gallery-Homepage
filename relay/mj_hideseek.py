@@ -9,6 +9,12 @@
   · TAUNT_EVERY 초마다 살아 있는 숨는 사람 자리에서 '삑' 소리 (술래가 방향으로 들음)
 - 다 잡으면 술래 승리, 시간이 끝나면 살아남은 숨는 사람 승리
 
+2단계 — 지도와 자리 바꾸기
+- 지도(M): 집의 '원래 배치도'. 숨은 사람은 지도에 없으므로, 지도에 없는데 놓여 있는 물건이 수상한 것
+  · 술래는 MAP_SHOW 초 보고 나면 MAP_COOLDOWN 초 쉬어야 함 (브라우저가 지킴 — 지도 자체는 처음부터 다 받는 정보)
+- 자리 바꾸기(F, 판마다 SWAPS 번): 숨는 사람이 진짜 물건 하나를 치우고 그 자리·방향 그대로 들어감 → 지도와 똑같아짐.
+  치운 물건은 그 판 동안 사라지므로, 거기서 떠나면 지도엔 있는데 실제론 빈 자리가 남음
+
 판정은 서버가: 위치는 브라우저가 보내되 서버가 집 범위·속도를 확인, 쏘기는 거리·방향·쿨타임을 서버가 확인.
 위치는 상태 전체를 다시 보내지 않고 room.emit 으로 바로 전달 (초당 십여 번).
 숨는 사람은 술래에게 이름 대신 아무 뜻 없는 번호(eid)로만 보임.
@@ -30,6 +36,11 @@ SHOOT_COOLDOWN = 0.35
 SHOOT_RANGE = 16.0
 SHOOT_CONE = math.cos(math.radians(35))
 TAUNT_EVERY = 30
+SWAPS = 2             # 판마다 자리 바꾸기 횟수
+SWAP_RANGE = 4.0
+SWAP_HOLD = 0.4       # 자리 바꾼 직후 이 시간 동안은 (바꾸기 전에 보낸) 위치를 무시
+MAP_SHOW = 6          # 술래가 지도를 한 번에 보는 시간(초)
+MAP_COOLDOWN = 20     # 그 뒤 쉬는 시간(초)
 SPEED = {"hider": 4.2, "seeker": 4.6}   # m/s — 클라이언트와 같아야 함
 POS_MIN_INTERVAL = 0.045
 WALL_H = 3.0
@@ -119,6 +130,7 @@ class HideSeekLogic:
 		self.until = 0.0
 		self.next_taunt = 0.0
 		self.result = None
+		self.removed = set()      # 이번 판에 숨는 사람이 치운 진짜 물건 id
 
 	# ── 공통 훅 ──
 	def seat_of(self, pid):
@@ -139,7 +151,7 @@ class HideSeekLogic:
 		room.emit({"type": "map", "map": MAP, "props": {k: list(v) for k, v in PROPS.items()}, "speed": SPEED}, to=peer.pid)
 
 	def _new_player(self, name):
-		return {"name": name, "role": None, "alive": True, "hp": 0, "eid": None, "prop": "box", "x": 0.0, "z": 0.0, "ry": 0.0, "last_pos": 0.0, "last_shot": 0.0}
+		return {"name": name, "role": None, "alive": True, "hp": 0, "eid": None, "prop": "box", "x": 0.0, "z": 0.0, "ry": 0.0, "last_pos": 0.0, "last_shot": 0.0, "swaps": 0, "hold": 0.0}
 
 	def on_leave(self, room, pid):
 		p = self.players.pop(pid, None)
@@ -170,9 +182,10 @@ class HideSeekLogic:
 		self.rng.shuffle(spawns)
 		props = [k for k in PROPS if k not in ("bed", "sofa", "fridge")]
 		used_eids = set()
+		self.removed = set()
 		for i, pid in enumerate(self.order):
 			p = self.players[pid]
-			p.update(alive=True, last_pos=now, last_shot=0.0)   # 첫 위치도 시작 뒤 걸린 시간만큼만 움직일 수 있게
+			p.update(alive=True, last_pos=now, last_shot=0.0, swaps=0, hold=0.0)   # 첫 위치도 시작 뒤 걸린 시간만큼만 움직일 수 있게
 			if pid == seeker:
 				p.update(role="seeker", hp=SEEKER_HP, eid=None, x=MAP["seeker_spawn"][0], z=MAP["seeker_spawn"][1], ry=0.0)
 			else:
@@ -181,7 +194,7 @@ class HideSeekLogic:
 					eid = "e" + secrets.token_hex(3)
 				used_eids.add(eid)
 				sx, sz = spawns[i % len(spawns)]
-				p.update(role="hider", hp=HIDER_HP, eid=eid, prop=self.rng.choice(props), x=float(sx), z=float(sz), ry=0.0)
+				p.update(role="hider", hp=HIDER_HP, eid=eid, prop=self.rng.choice(props), x=float(sx), z=float(sz), ry=0.0, swaps=SWAPS)
 		self.status, self.until = "hide", now + self.hide_time
 		self.result = None
 		room.emit({"type": "round", "round": self.round})
@@ -253,23 +266,44 @@ class HideSeekLogic:
 				return False, "모르는 물건이에요."
 			# 보고 있는 진짜 물건을 따라 하는 것 → 그 물건 가까이 있어야 함
 			src = PROP_BY_ID.get(data.get("from"))
+			if src is not None and src["id"] in self.removed:
+				return False, "그 물건은 이제 없어요."
 			if src is not None and (src["type"] != prop or _dist((p["x"], p["z"]), (src["x"], src["z"])) > 4.0):
 				return False, "너무 멀어요 — 가까이 가서 변신하세요."
 			p["prop"] = prop
 			room.emit({"type": "disguise", "id": p["eid"], "prop": prop})
 			return False, None
 
+		if kind == "swap":
+			return self._on_swap(room, p, data, now)
+
 		if kind == "shoot":
 			return self._on_shoot(room, peer.pid, p, data, now)
 
 		return False, None
+
+	def _on_swap(self, room, p, data, now):
+		"""진짜 물건을 치우고 그 자리에 들어가기."""
+		if p["role"] != "hider" or not p["alive"] or self.status not in ("hide", "seek"):
+			return False, None
+		if p["swaps"] <= 0:
+			return False, "자리 바꾸기를 다 썼어요."
+		src = PROP_BY_ID.get(data.get("prop"))
+		if src is None or src["id"] in self.removed:
+			return False, "그 물건은 이제 없어요."
+		if _dist((p["x"], p["z"]), (src["x"], src["z"])) > SWAP_RANGE:
+			return False, "너무 멀어요 — 가까이 가서 바꾸세요."
+		self.removed.add(src["id"])
+		p.update(prop=src["type"], x=float(src["x"]), z=float(src["z"]), ry=float(src["ry"]), swaps=p["swaps"] - 1, last_pos=now, hold=now + SWAP_HOLD)
+		room.emit({"type": "swap", "id": p["eid"], "prop": src["id"], "kind": src["type"], "x": src["x"], "z": src["z"], "ry": src["ry"]})
+		return True, None
 
 	def _on_pos(self, room, pid, p, data, now):
 		if self.status not in ("hide", "seek") or not p["alive"] or not p["role"]:
 			return False, None
 		if p["role"] == "seeker" and self.status == "hide":
 			return False, None   # 눈 감는 동안은 못 움직임
-		if now - p["last_pos"] < POS_MIN_INTERVAL:
+		if now < p["hold"] or now - p["last_pos"] < POS_MIN_INTERVAL:
 			return False, None
 		try:
 			x, z, ry = float(data.get("x")), float(data.get("z")), float(data.get("ry", 0.0))
@@ -307,7 +341,7 @@ class HideSeekLogic:
 		if hider_pid:
 			h = self.players[hider_pid]
 			pos = (h["x"], h["z"])
-		elif target in PROP_BY_ID:
+		elif target in PROP_BY_ID and target not in self.removed:
 			pr = PROP_BY_ID[target]
 			pos = (pr["x"], pr["z"])
 		else:
@@ -364,9 +398,10 @@ class HideSeekLogic:
 			"hide_time": self.hide_time, "seek_time": self.seek_time,
 			"hide_choices": HIDE_CHOICES, "seek_choices": SEEK_CHOICES,
 			"players": [{"name": self.players[q]["name"], "role": self.players[q]["role"], "alive": self.players[q]["alive"], "me": q == pid, "host": q == self.host} for q in self.order],
-			"me": None if not me else {"role": me["role"], "alive": me["alive"], "hp": me["hp"], "eid": me["eid"], "prop": me["prop"], "x": me["x"], "z": me["z"], "ry": me["ry"]},
+			"me": None if not me else {"role": me["role"], "alive": me["alive"], "hp": me["hp"], "eid": me["eid"], "prop": me["prop"], "x": me["x"], "z": me["z"], "ry": me["ry"], "swaps": me["swaps"]},
+			"removed": sorted(self.removed),
 			"ents": ents,
 			"seeker": seeker,
 			"result": self.result,
-			"rules": {"hit": HIT_DAMAGE, "miss": MISS_PENALTY, "taunt": TAUNT_EVERY, "range": SHOOT_RANGE},
+			"rules": {"hit": HIT_DAMAGE, "miss": MISS_PENALTY, "taunt": TAUNT_EVERY, "range": SHOOT_RANGE, "swaps": SWAPS, "swap_range": SWAP_RANGE, "map_show": MAP_SHOW, "map_cool": MAP_COOLDOWN},
 		}

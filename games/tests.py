@@ -250,6 +250,7 @@ class HideSeekViewTests(TestCase):
 			res = self.client.get("/games/hideseek/hs123456/?t=tok-hs")
 			self.assertContains(res, "/relay/ws/game/hs123456")
 			self.assertContains(res, "js/hideseek.js")
+			self.assertContains(res, 'id="hs-map"')
 			self.assertNotContains(res, "tok-hs&quot;&gt;")  # 토큰은 ws 주소 안에만
 			self.assertEqual(self.client.get("/games/hideseek/hs123456/?t=wrong").status_code, 404)
 

@@ -35,6 +35,8 @@
     .hs-blind { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; gap: 8px; background: #000; font-size: 20px; font-weight: 700; }
     .hs-tag { position: absolute; transform: translate(-50%, -100%); font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; background: rgba(0, 0, 0, 0.55); white-space: nowrap; }
     .hs-key { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.5); font-size: 11px; line-height: 18px; text-align: center; }
+    .hs-mapbox { position: absolute; left: 50%; top: 52%; height: 80%; aspect-ratio: 3 / 2; max-width: 94%; transform: translate(-50%, -50%); display: none; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); opacity: 0.95; }
+    .hs-mapbtn { position: absolute; right: 14px; bottom: 12px; display: none; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 700; background: rgba(0, 0, 0, 0.45); }
     #hs-chat { height: 220px; overflow-y: auto; }
     html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
     html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
@@ -74,14 +76,17 @@
                     <div class="hs-toast" id="hs-toast"></div>
                     <div class="hs-hp hidden" id="hs-hp"><p class="mb-1 text-[12px] font-semibold" id="hs-hp-text"></p><div class="hs-hp-bar"><i id="hs-hp-bar" style="width:100%"></i></div></div>
                     <p class="hs-hint" id="hs-hint"></p>
+                    <div class="hs-mapbtn" id="hs-mapbtn"></div>
+                    <div class="hs-mapbox" id="hs-mapbox"><canvas id="hs-map"></canvas></div>
                     <div class="hs-blind" id="hs-blind"><p>🙈 술래는 눈 감는 중…</p><p class="text-[15px] font-normal opacity-80" id="hs-blind-t"></p></div>
                 </div>
                 <div class="hs-over" id="hs-over"><p class="text-[15px] opacity-80">연결하는 중…</p></div>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-[#8e8e93]">
                 <span><span class="hs-key !border-[#c7c7cc]">W A S D</span> 움직이기 · 마우스 시점 · 화면을 누르면 마우스가 잡히고 <span class="hs-key !border-[#c7c7cc]">Esc</span> 로 풀려요</span>
-                <span>· 숨는 사람: <span class="hs-key !border-[#c7c7cc]">E</span> 보고 있는 물건으로 변신 · <span class="hs-key !border-[#c7c7cc]">Q</span> 방향 고정</span>
+                <span>· 숨는 사람: <span class="hs-key !border-[#c7c7cc]">E</span> 보고 있는 물건으로 변신 · <span class="hs-key !border-[#c7c7cc]">Q</span> 방향 고정 · <span class="hs-key !border-[#c7c7cc]">F</span> 물건을 치우고 그 자리에</span>
                 <span>· 술래: <b>클릭</b> 쏘기</span>
+                <span>· <span class="hs-key !border-[#c7c7cc]">M</span> 지도(원래 배치도)</span>
                 <button type="button" class="gm-btn ml-auto" id="hs-full">⛶ 전체 화면</button>
             </div>
         </section>
@@ -112,6 +117,6 @@
 {% if not relay_error %}
 {% include "components/share.html" %}
 <div id="hs-cfg" class="hidden" data-ws="{{ ws_url }}" data-room="{{ room.id }}" data-name="{{ default_name }}" data-title="{{ room.title }}"></div>
-<script type="module" src="{% static 'js/hideseek.js' %}?v=1"></script>
+<script type="module" src="{% static 'js/hideseek.js' %}?v=2"></script>
 {% endif %}
 {% endblock %}

@@ -153,6 +153,88 @@ class DisguiseTests(HideSeekTestCase):
 		self.assertEqual(self.send(self.hiders[0], type="disguise", prop="rocket")[1], "모르는 물건이에요.")
 
 
+class SwapTests(HideSeekTestCase):
+	def swap(self, h, prop):
+		return self.send(h, type="swap", prop=prop["id"])
+
+	def test_swap_takes_props_place_and_removes_it(self):
+		self.start()
+		h, prop = self.hiders[0], M.MAP["props"][2]
+		p = self.logic.players[h.pid]
+		self.place(h, prop["x"] + 1, prop["z"] + 1)
+		self.assertEqual(self.swap(h, prop), (True, None))
+		self.assertEqual((p["prop"], p["x"], p["z"], p["ry"]), (prop["type"], prop["x"], prop["z"], prop["ry"]))
+		self.assertEqual(p["swaps"], M.SWAPS - 1)
+		ev = self.room.events("swap")[-1]
+		self.assertEqual((ev["id"], ev["prop"], ev["kind"]), (p["eid"], prop["id"], prop["type"]))
+		self.assertEqual(self.logic.snapshot(self.room, self.seeker.pid)["removed"], [prop["id"]])
+		self.assertEqual(self.logic.snapshot(self.room, h.pid)["me"]["swaps"], M.SWAPS - 1)
+
+	def test_swap_needs_to_be_near_and_prop_must_exist(self):
+		self.start()
+		h, other, prop = self.hiders[0], self.hiders[1], M.MAP["props"][0]
+		self.place(h, prop["x"] + 10, prop["z"])
+		self.assertEqual(self.swap(h, prop)[1], "너무 멀어요 — 가까이 가서 바꾸세요.")
+		self.assertEqual(self.send(h, type="swap", prop="nope")[1], "그 물건은 이제 없어요.")
+		self.place(h, prop["x"] + 1, prop["z"])
+		self.swap(h, prop)
+		self.place(other, prop["x"] + 1, prop["z"])
+		self.assertEqual(self.swap(other, prop)[1], "그 물건은 이제 없어요.")   # 이미 치운 물건
+		self.assertEqual(self.send(other, type="disguise", prop=prop["type"], **{"from": prop["id"]})[1], "그 물건은 이제 없어요.")
+
+	def test_swap_limit_and_seeker_cannot(self):
+		self.start()
+		h = self.hiders[0]
+		for i in range(M.SWAPS):
+			prop = M.MAP["props"][i]
+			self.place(h, prop["x"], prop["z"] + 1)
+			self.assertEqual(self.swap(h, prop), (True, None))
+		prop = M.MAP["props"][M.SWAPS]
+		self.place(h, prop["x"], prop["z"] + 1)
+		self.assertEqual(self.swap(h, prop)[1], "자리 바꾸기를 다 썼어요.")
+		self.assertEqual(self.swap(self.seeker, prop), (False, None))
+
+	def test_stale_pos_right_after_swap_is_ignored(self):
+		self.start()
+		h, prop = self.hiders[0], M.MAP["props"][0]
+		p = self.logic.players[h.pid]
+		self.place(h, prop["x"] + 2, prop["z"])
+		self.swap(h, prop)
+		self.now += 0.1
+		self.send(h, type="pos", x=prop["x"] + 2, z=prop["z"], ry=0)   # 바꾸기 전에 보낸 위치
+		self.assertEqual((p["x"], p["z"]), (prop["x"], prop["z"]))
+		self.now += M.SWAP_HOLD
+		self.send(h, type="pos", x=prop["x"] + 0.3, z=prop["z"], ry=0)
+		self.assertAlmostEqual(p["x"], prop["x"] + 0.3)
+
+	def test_removed_prop_cannot_be_shot_but_swapped_hider_can(self):
+		self.start()
+		h, prop = self.hiders[0], M.MAP["props"][0]
+		p = self.logic.players[h.pid]
+		self.place(h, prop["x"] + 1, prop["z"])
+		self.swap(h, prop)
+		self.to_seek()
+		s = self.logic.players[self.seeker.pid]
+		self.aim_at(prop["x"], prop["z"])
+		self.now += 1
+		self.send(self.seeker, type="shoot", target=prop["id"])   # 없는 물건 → 벌점 없음
+		self.assertEqual(s["hp"], M.SEEKER_HP)
+		self.now += 1
+		self.send(self.seeker, type="shoot", target=p["eid"])
+		self.assertEqual(p["hp"], M.HIDER_HP - M.HIT_DAMAGE)
+
+	def test_new_round_puts_props_back(self):
+		self.start()
+		h, prop = self.hiders[0], M.MAP["props"][0]
+		self.place(h, prop["x"] + 1, prop["z"])
+		self.swap(h, prop)
+		self.logic._finish(self.room, "seeker", "끝")
+		self.assertEqual(self.logic.snapshot(self.room, "a")["removed"], [prop["id"]])   # 끝난 화면엔 그대로
+		self.start()
+		self.assertEqual(self.logic.removed, set())
+		self.assertTrue(all(self.logic.players[q.pid]["swaps"] == M.SWAPS for q in self.hiders))
+
+
 class ShootTests(HideSeekTestCase):
 	def test_no_shooting_while_hiding(self):
 		self.start()
