@@ -76,6 +76,9 @@ function buildProp(type) {
 		case 'fridge': g.add(box(w, h, d, '#e3e6ea', 0, h / 2, 0)); g.add(box(w + 0.005, 0.02, d * 0.98, '#b9bec5', 0, h * 0.62, 0.005)); g.add(box(0.03, 0.4, 0.04, '#9aa0a8', w / 2 - 0.1, h * 0.8, d / 2 + 0.02)); break;
 		case 'trash': g.add(cyl(w / 2, w / 2 - 0.04, h, '#7d8590', 0, h / 2, 0)); g.add(cyl(w / 2 + 0.02, w / 2 + 0.02, 0.05, '#5c636c', 0, h, 0)); break;
 		case 'ball': g.add(mesh(new THREE.SphereGeometry(w / 2, 20, 14), '#e74c3c', 0, w / 2, 0)); break;
+		case 'desk': g.add(box(w, 0.05, d, '#d8c4a0', 0, h - 0.025, 0)); for (const sx of [-1, 1]) g.add(box(0.04, h - 0.05, d - 0.06, '#8a8f98', sx * (w / 2 - 0.04), (h - 0.05) / 2, 0)); g.add(box(w - 0.1, 0.35, 0.03, '#8a8f98', 0, h - 0.25, -d / 2 + 0.05)); g.add(box(0.5, 0.32, 0.04, '#1c1c1e', 0, h + 0.24, -0.12)); g.add(box(0.2, 0.06, 0.14, '#3a3a3c', 0, h + 0.03, -0.12)); break;
+		case 'cabinet': g.add(box(w, h, d, '#9aa3ad', 0, h / 2, 0)); for (let r = 1; r < 4; r++) g.add(box(w + 0.005, 0.015, d + 0.005, '#6f7781', 0, (h / 4) * r, 0)); for (let r = 0; r < 4; r++) g.add(box(0.2, 0.03, 0.03, '#4a4f57', 0, (h / 4) * (r + 0.6), d / 2 + 0.015)); break;
+		case 'cone': g.add(box(w, 0.04, d, '#d9480f', 0, 0.02, 0)); g.add(cyl(0.04, w / 2 - 0.04, h - 0.04, '#f76707', 0, 0.04 + (h - 0.04) / 2, 0)); g.add(cyl(0.085, 0.115, 0.1, '#f8f9fa', 0, h * 0.55, 0)); break;
 		default: g.add(box(w, h, d, '#999999', 0, h / 2, 0));
 	}
 	return g;
@@ -107,7 +110,7 @@ function buildWorld() {
 	ground.rotation.x = -Math.PI / 2; ground.position.set(MAP.w / 2, -0.02, MAP.d / 2);
 	world.add(ground);
 	for (const r of MAP.rooms) {
-		const f = mesh(new THREE.PlaneGeometry(r.w, r.d), floorCol[r.name] || '#cccccc');
+		const f = mesh(new THREE.PlaneGeometry(r.w, r.d), r.color || floorCol[r.name] || '#cccccc');
 		f.rotation.x = -Math.PI / 2; f.position.set(r.x + r.w / 2, 0, r.z + r.d / 2);
 		f.castShadow = false;
 		world.add(f);
@@ -181,15 +184,16 @@ function render() {
 	}
 	// 사람 목록
 	$('hs-count').textContent = `${S.players.length}/8`;
-	$('hs-players').innerHTML = S.players.map((p) => `<li class="flex items-center gap-2"><span>${p.role === 'seeker' ? '👁' : p.role === 'hider' ? (p.alive ? '🫥' : '🎯') : '·'}</span><span class="${p.me ? 'font-semibold' : ''} ${p.role === 'hider' && !p.alive ? 'line-through opacity-60' : ''}">${esc(p.name)}</span>${p.host ? '<span class="text-[11px] text-[#8e8e93]">방장</span>' : ''}${p.me ? '<span class="text-[11px] text-[#0f9f6e]">나</span>' : ''}</li>`).join('');
+	$('hs-players').innerHTML = S.players.map((p) => `<li class="flex items-center gap-2"><span>${p.role === 'seeker' ? '👁' : p.role === 'hider' ? (p.alive ? '🫥' : '🎯') : '·'}</span><span class="${p.me ? 'font-semibold' : ''} ${p.role === 'hider' && !p.alive ? 'line-through opacity-60' : ''}">${esc(p.name)}</span>${p.host ? '<span class="text-[11px] text-[#8e8e93]">방장</span>' : ''}${p.me ? '<span class="text-[11px] text-[#0f9f6e]">나</span>' : ''}<span class="ml-auto text-[12px] tabular-nums text-[#8e8e93]">${p.score || 0}점</span></li>`).join('');
 	const canStart = S.host && (S.status === 'lobby' || S.status === 'over');
 	$('hs-host').classList.toggle('hidden', !canStart);
 	if (canStart) {
 		$('hs-set-hide').innerHTML = S.hide_choices.map((n) => `<option value="${n}" ${n === S.hide_time ? 'selected' : ''}>${n}초</option>`).join('');
 		$('hs-set-seek').innerHTML = S.seek_choices.map((n) => `<option value="${n}" ${n === S.seek_time ? 'selected' : ''}>${n / 60}분</option>`).join('');
+		$('hs-set-map').innerHTML = (S.map_choices || []).map(([k, n]) => `<option value="${esc(k)}" ${k === S.map ? 'selected' : ''}>${esc(n)}</option>`).join('');
 		$('hs-start').textContent = S.status === 'over' ? '▶ 다음 판 (술래 바꿔서)' : '▶ 시작';
 	}
-	$('hs-rules').innerHTML = `숨는 ${S.hide_time}초 → 찾는 ${S.seek_time / 60}분. 숨은 사람은 ${100 / S.rules.hit}번 맞으면 잡혀요. 술래가 진짜 물건을 쏘면 체력 −${S.rules.miss}. ${S.rules.taunt}초마다 숨은 사람 자리에서 '삐빅' 소리가 나요. <b>M</b> 지도는 집의 원래 배치도 — 지도에 없는 물건이 수상해요(술래는 ${S.rules.map_show}초 보고 ${S.rules.map_cool}초 쉼). 숨는 사람은 <b>F</b> 로 진짜 물건을 치우고 그 자리에 들어갈 수 있어요(판마다 ${S.rules.swaps}번).`;
+	$('hs-rules').innerHTML = `맵: <b>${esc(MAP ? MAP.name : '')}</b>. 숨는 ${S.hide_time}초 → 찾는 ${S.seek_time / 60}분. 숨은 사람은 ${100 / S.rules.hit}번 맞으면 잡혀요. 술래가 진짜 물건을 쏘면 체력 −${S.rules.miss}. ${S.rules.taunt}초마다 숨은 사람 자리에서 '삐빅' 소리가 나요. <b>M</b> 지도는 집의 원래 배치도 — 지도에 없는 물건이 수상해요(술래는 ${S.rules.map_show}초 보고 ${S.rules.map_cool}초 쉼). 숨는 사람은 <b>F</b> 로 진짜 물건을 치우고 그 자리에 들어갈 수 있어요(판마다 ${S.rules.swaps}번). 빨리 움직이면 가까이에서 발소리가 들려요 — <b>Shift</b> 로 살금살금. 점수: 술래는 잡을 때마다 +1, 끝까지 살아남으면 +2.`;
 	// 덮개
 	const over = $('hs-over');
 	if (S.status === 'lobby') {
@@ -246,6 +250,29 @@ function taunt(pts) {
 	if (myRole() === 'seeker') toast('🔊 삐빅! 소리가 났어요', 1200);
 }
 
+// 발소리: 빨리 움직이는 다른 사람(술래 ↔ 숨는 사람)이 가까이 있으면 들림. Shift 로 살금살금 걸으면 안 남
+function hear(x, z, range) {
+	const dx = x - camera.position.x, dz = z - camera.position.z, d = Math.hypot(dx, dz);
+	if (d > range) return null;
+	const dir = camera.getWorldDirection(tmp), yaw = Math.atan2(-dir.x, -dir.z);
+	return { vol: 1 - d / range, pan: d > 0.3 ? (dx * Math.cos(yaw) - dz * Math.sin(yaw)) / d : 0 };
+}
+// 속도는 받은 위치 사이의 거리·시간으로 (화면에서 부드럽게 따라가는 값은 들쭉날쭉해서)
+function track(o, m) {
+	const t = performance.now();
+	if (o.pt) { const dtm = (t - o.pt) / 1000; if (dtm > 0.03) o.v = (o.v || 0) * 0.5 + (Math.hypot(m.x - o.tx, m.z - o.tz) / dtm) * 0.5; }
+	o.pt = t;
+}
+function footsteps(o, dt, range, freq) {
+	const v = performance.now() - (o.pt || 0) < 350 ? (o.v || 0) : 0;
+	if (v < 3.2 || v > 12) { o.step = 0.2; return; }
+	o.step = (o.step || 0) + dt;
+	if (o.step < 0.36) return;
+	o.step = 0;
+	const h = hear(o.x, o.z, range);
+	if (h) beep([freq], 0.03 + 0.15 * h.vol * h.vol, h.pan, 0.05);
+}
+
 // ── 입력 ─────────────────────────────────────────────────
 const typing = () => document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
 document.addEventListener('keydown', (e) => {
@@ -255,12 +282,14 @@ document.addEventListener('keydown', (e) => {
 	if (k === 'e' && playing() && myRole() === 'hider') copyLooked();
 	if (k === 'f' && playing() && myRole() === 'hider') swapLooked();
 	if (k === 'm') toggleMap();
-	if (k === 'q' && playing() && myRole() === 'hider') { me.lock = !me.lock; toast(me.lock ? '🔒 방향 고정' : '🔓 방향 풀림', 900); }
+	if (k === 'q' && playing() && myRole() === 'hider') toggleLock();
 });
+function toggleLock() { me.lock = !me.lock; toast(me.lock ? '🔒 방향 고정' : '🔓 방향 풀림', 900); }
 document.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 window.addEventListener('blur', () => keys.clear());
 stage.addEventListener('click', () => {
 	ac();
+	if (touchMode) return;   // 터치는 화면 단추로
 	if (!document.pointerLockElement && playing()) { stage.requestPointerLock?.(); return; }
 	if (document.pointerLockElement && myRole() === 'seeker' && S.status === 'seek') shoot();
 });
@@ -269,7 +298,66 @@ document.addEventListener('mousemove', (e) => {
 	me.yaw -= e.movementX * 0.0024;
 	me.pitch = clamp(me.pitch - e.movementY * 0.0024, myRole() === 'seeker' ? -1.4 : -1.2, myRole() === 'seeker' ? 1.4 : 0.5);
 });
-$('hs-full').addEventListener('click', () => { if (document.fullscreenElement) document.exitFullscreen(); else stage.requestFullscreen?.(); });
+// 전체 화면: 못 쓰는 브라우저(아이폰 사파리)는 화면을 꽉 채우는 것으로 대신
+function fill() { stage.classList.toggle('hs-fill'); document.documentElement.style.overflow = stage.classList.contains('hs-fill') ? 'hidden' : ''; }
+$('hs-full').addEventListener('click', () => {
+	if (document.fullscreenElement) document.exitFullscreen();
+	else if (stage.classList.contains('hs-fill') || !stage.requestFullscreen) fill();
+	else stage.requestFullscreen().then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(fill);
+});
+
+// ── 터치 조작 (모바일): 왼쪽 아래 = 조이스틱, 나머지 = 끌어서 둘러보기, 단추 = 쏘기·변신·자리 바꾸기·고정·지도 ──
+let touchMode = false;
+const joy = { id: null, ox: 0, oy: 0, x: 0, y: 0 }, lookT = { id: null, x: 0, y: 0 };
+function setTouch() { if (touchMode) return; touchMode = true; stage.classList.add('hs-touch-on'); }
+if (window.matchMedia && matchMedia('(pointer: coarse)').matches) setTouch();
+stage.addEventListener('pointerdown', (e) => {
+	if (e.pointerType !== 'touch') return;
+	setTouch(); ac();
+	if (e.target.closest('button, .hs-over, .hs-mapbox')) return;
+	if (!playing()) return;
+	const r = stage.getBoundingClientRect(), rx = (e.clientX - r.left) / r.width, ry = (e.clientY - r.top) / r.height;
+	if (rx < 0.42 && ry > 0.3 && joy.id === null) {
+		Object.assign(joy, { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: 0, y: 0 });
+		const j = $('hs-joy'); j.style.display = 'block'; j.style.left = `${e.clientX - r.left}px`; j.style.top = `${e.clientY - r.top}px`; $('hs-joy-k').style.transform = 'translate(-50%, -50%)';
+	} else if (lookT.id === null) Object.assign(lookT, { id: e.pointerId, x: e.clientX, y: e.clientY });
+	e.preventDefault();
+});
+window.addEventListener('pointermove', (e) => {
+	if (e.pointerId === joy.id) {
+		let dx = (e.clientX - joy.ox) / 48, dy = (e.clientY - joy.oy) / 48; const l = Math.hypot(dx, dy);
+		if (l > 1) { dx /= l; dy /= l; }
+		joy.x = dx; joy.y = dy;
+		$('hs-joy-k').style.transform = `translate(calc(-50% + ${dx * 34}px), calc(-50% + ${dy * 34}px))`;
+	} else if (e.pointerId === lookT.id) {
+		me.yaw -= (e.clientX - lookT.x) * 0.0055;
+		me.pitch = clamp(me.pitch - (e.clientY - lookT.y) * 0.0045, myRole() === 'seeker' ? -1.4 : -1.2, myRole() === 'seeker' ? 1.4 : 0.5);
+		lookT.x = e.clientX; lookT.y = e.clientY;
+	}
+});
+const touchEnd = (e) => {
+	if (e.pointerId === joy.id) { joy.id = null; joy.x = joy.y = 0; $('hs-joy').style.display = 'none'; }
+	if (e.pointerId === lookT.id) lookT.id = null;
+};
+window.addEventListener('pointerup', touchEnd);
+window.addEventListener('pointercancel', touchEnd);
+const tbtn = (id, fn) => $(id).addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); ac(); if (playing()) fn(); });
+tbtn('hs-tb-shoot', () => { if (myRole() === 'seeker' && S.status === 'seek') shoot(); });
+tbtn('hs-tb-copy', () => copyLooked());
+tbtn('hs-tb-swap', () => swapLooked());
+tbtn('hs-tb-lock', () => toggleLock());
+tbtn('hs-tb-map', () => toggleMap());
+function updateTouch() {
+	const on = touchMode && playing(), role = myRole();
+	$('hs-touch').style.display = on ? 'block' : 'none';
+	if (!on) { if (joy.id !== null) { joy.id = null; joy.x = joy.y = 0; $('hs-joy').style.display = 'none'; } return; }
+	$('hs-tb-shoot').style.display = role === 'seeker' && S.status === 'seek' ? '' : 'none';
+	for (const id of ['hs-tb-copy', 'hs-tb-swap', 'hs-tb-lock']) $(id).style.display = role === 'hider' ? '' : 'none';
+	$('hs-tb-map').style.display = role === 'seeker' && S.status !== 'seek' ? 'none' : '';
+	$('hs-tb-swap').textContent = `F 자리 ${S.me.swaps || 0}`;
+	$('hs-tb-lock').textContent = me.lock ? '🔒 고정' : '🔓 고정';
+	$('hs-mapbtn').style.display = 'none';
+}
 
 // ── 움직임 · 충돌 ────────────────────────────────────────
 function radius() {
@@ -291,11 +379,14 @@ function move(dt) {
 	if (keys.has('s') || keys.has('arrowdown')) f -= 1;
 	if (keys.has('d') || keys.has('arrowright')) s += 1;
 	if (keys.has('a') || keys.has('arrowleft')) s -= 1;
+	f -= joy.y; s += joy.x;
 	const role = myRole();
 	if (role === 'hider' && !me.lock) me.ry = me.yaw;
 	if (role === 'seeker') me.ry = me.yaw;
-	if (!f && !s) return;
-	const len = Math.hypot(f, s), sp = SPEED[role] * (keys.has('shift') ? 0.55 : 1) * dt / len;
+	const len = Math.hypot(f, s);
+	if (len < 0.08) return;
+	// 조이스틱을 살짝만 밀면 천천히 (발소리 안 남)
+	const sp = SPEED[role] * (keys.has('shift') ? 0.55 : 1) * Math.min(1, len) * dt / len;
 	const fx = -Math.sin(me.yaw), fz = -Math.cos(me.yaw), rx = Math.cos(me.yaw), rz = -Math.sin(me.yaw);
 	const dx = (fx * f + rx * s) * sp, dz = (fz * f + rz * s) * sp, r = radius();
 	// 끼어 있으면(변신해서 커진 경우 등) 빠져나오는 쪽은 허용
@@ -465,11 +556,11 @@ function flash(group, color = '#ff3b30') {
 }
 function onMessage(m) {
 	if (m.type === 'hello') { retry = 0; $('hs-chat').innerHTML = ''; (m.chat || []).forEach((c) => chatLine(c)); }
-	else if (m.type === 'map') { MAP = m.map; PROPS = m.props; SPEED = m.speed || SPEED; buildWorld(); for (const o of ents.values()) world.add(o.group); if (seekerObj) world.add(seekerObj.group); }
+	else if (m.type === 'map') { MAP = m.map; PROPS = m.props; SPEED = m.speed || SPEED; buildWorld(); removed.clear(); for (const o of ents.values()) world.add(o.group); if (seekerObj) world.add(seekerObj.group); }
 	else if (m.type === 'state') { S = m.state; render(); }
 	else if (m.type === 'pos') {
-		if (m.id === 'seeker') { if (seekerObj) { seekerObj.tx = m.x; seekerObj.tz = m.z; seekerObj.tr = m.ry; } }
-		else { const o = ents.get(m.id); if (o) { o.tx = m.x; o.tz = m.z; o.tr = m.ry; } }
+		if (m.id === 'seeker') { if (seekerObj) { track(seekerObj, m); seekerObj.tx = m.x; seekerObj.tz = m.z; seekerObj.tr = m.ry; } }
+		else { const o = ents.get(m.id); if (o) { track(o, m); o.tx = m.x; o.tz = m.z; o.tr = m.ry; } }
 	}
 	else if (m.type === 'fix') { me.x = m.x; me.z = m.z; }
 	else if (m.type === 'disguise') { const o = ents.get(m.id); if (o && !o.self) setEnt({ id: m.id, prop: m.prop, x: o.tx, z: o.tz, ry: o.tr, alive: true, name: o.name }); }
@@ -508,6 +599,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !typing()
 $('hs-start').addEventListener('click', () => send({ type: 'start' }));
 $('hs-set-hide').addEventListener('change', (e) => send({ type: 'settings', hide: +e.target.value }));
 $('hs-set-seek').addEventListener('change', (e) => send({ type: 'settings', seek: +e.target.value }));
+$('hs-set-map').addEventListener('change', (e) => send({ type: 'settings', map: e.target.value }));
 
 function connect(name) {
 	ws = new WebSocket(`${WS_URL}&pid=${pid}&name=${encodeURIComponent(name)}`);
@@ -592,6 +684,10 @@ function frame(now) {
 			seekerObj.group.position.set(seekerObj.x, 0, seekerObj.z); seekerObj.group.rotation.y = seekerObj.ry;
 		}
 		placeCamera();
+		if (playing() && S.status === 'seek') {
+			if (myRole() === 'hider' && seekerObj) footsteps(seekerObj, dt, 11, 70);
+			if (myRole() === 'seeker') for (const o of ents.values()) if (o.alive !== false) footsteps(o, dt, 6, 130);
+		}
 		sun.target.position.set(MAP.w / 2, 0, MAP.d / 2);
 		// 보고 있는 것
 		const role = myRole();
@@ -600,7 +696,7 @@ function frame(now) {
 		$('hs-blind').style.display = blind ? 'flex' : 'none';
 		$('hs-cross').style.display = (playing() && !blind) ? 'block' : 'none';
 		let hint = '';
-		if (S && playing() && !document.pointerLockElement) hint = '화면을 눌러 시작 (마우스로 둘러보기)';
+		if (S && playing() && !document.pointerLockElement && !touchMode) hint = '화면을 눌러 시작 (마우스로 둘러보기)';
 		else if (S && playing() && role === 'hider') {
 			const lp = looked && looked.kind === 'prop' ? MAP.props.find((q) => q.id === looked.id) : null, sw = S.me.swaps || 0;
 			if (lp) {
@@ -608,7 +704,7 @@ function frame(now) {
 				hint = `<span class="hs-key">E</span> ${esc(PROPS[lp.type][0])}(으)로 변신${sw > 0 ? ` · <span class="hs-key">F</span> 이 물건을 치우고 그 자리에 (${sw}번 남음)` : ''}${far ? ' — 조금 더 가까이' : ''}`;
 			} else hint = `지금 모습: ${esc(PROPS[me.prop]?.[0] || '')} ${me.lock ? '🔒' : ''} · 물건을 보고 <span class="hs-key">E</span> 변신${sw > 0 ? ` · <span class="hs-key">F</span> 자리 바꾸기 ${sw}번` : ''}`;
 		}
-		else if (S && playing() && role === 'seeker' && S.status === 'seek') hint = '수상한 물건을 클릭해서 쏘세요 — 진짜 물건이면 체력이 깎여요 · <span class="hs-key">M</span> 지도와 견줘 보기';
+		else if (S && playing() && role === 'seeker' && S.status === 'seek') hint = touchMode ? '수상한 물건을 가운데에 맞추고 🔫 쏘기 — 진짜 물건이면 체력이 깎여요' : '수상한 물건을 클릭해서 쏘세요 — 진짜 물건이면 체력이 깎여요 · <span class="hs-key">M</span> 지도와 견줘 보기';
 		$('hs-hint').innerHTML = hint;
 		if (S && (S.status === 'hide' || S.status === 'seek')) {
 			const left = Math.max(0, (deadline - now) / 1000);
@@ -617,6 +713,7 @@ function frame(now) {
 		} else $('hs-timer').textContent = '';
 		for (let i = tracers.length - 1; i >= 0; i--) if (now > tracers[i].until) { scene.remove(tracers[i].line); tracers[i].line.geometry.dispose(); tracers.splice(i, 1); }
 		updateMap(now);
+		updateTouch();
 		updateTags();
 	}
 	renderer.render(scene, camera);

@@ -336,21 +336,89 @@ class SnapshotTests(HideSeekTestCase):
 		self.assertEqual(self.logic.on_message(self.room, _Peer("x9", "손9"), {"type": "start"})[1], "구경 중이에요 (최대 8명).")
 
 
+class MapChoiceAndScoreTests(HideSeekTestCase):
+	def test_host_changes_map_and_everyone_gets_it(self):
+		self.room.sent.clear()
+		self.assertEqual(self.send(self.b, type="settings", map="office")[1], "방장만, 판이 없을 때 바꿀 수 있어요.")
+		self.send(self.a, type="settings", map="office")
+		ev = self.room.sent[-1]
+		self.assertEqual((ev[0]["type"], ev[0]["map"]["key"], ev[1]), ("map", "office", None))
+		self.assertEqual(self.logic.snapshot(self.room, "b")["map"], "office")
+		self.send(self.a, type="settings", map="moon")   # 없는 맵 → 그대로
+		self.assertEqual(self.logic.map["key"], "office")
+
+	def test_round_on_other_map_uses_its_spawns_props_and_size(self):
+		self.send(self.a, type="settings", map="office")
+		self.start()
+		m = M.MAPS["office"]
+		s = self.logic.players[self.seeker.pid]
+		self.assertEqual([s["x"], s["z"]], m["seeker_spawn"])
+		kinds = {p["type"] for p in m["props"]}
+		for h in self.hiders:
+			p = self.logic.players[h.pid]
+			self.assertIn([p["x"], p["z"]], m["hider_spawns"])
+			self.assertIn(p["prop"], kinds)
+		h = self.hiders[0]
+		self.place(h, 21, 17.5)
+		self.now += 1
+		self.send(h, type="pos", x=23.5, z=17.9, ry=0)   # 집(24 m)보다 좁은 22 m 맵
+		self.assertLessEqual(self.logic.players[h.pid]["x"], m["w"] - 0.2)
+		prop = m["props"][0]
+		self.place(h, prop["x"] + 1, prop["z"])
+		self.send(h, type="swap", prop=prop["id"])
+		self.assertEqual(self.logic.players[h.pid]["prop"], "desk")
+
+	def test_no_map_change_mid_round(self):
+		self.start()
+		self.send(self.a, type="settings", map="office")
+		self.assertEqual(self.logic.map["key"], "house")
+
+	def test_scores(self):
+		self.start()
+		self.to_seek()
+		p = self.logic.players[self.hiders[0].pid]
+		self.aim_at(p["x"], p["z"])
+		for _ in range(2):
+			self.now += M.SHOOT_COOLDOWN + 0.01
+			self.send(self.seeker, type="shoot", target=p["eid"])
+		self.now += self.logic.seek_time
+		self.logic.tick(self.room, self.now)   # 시간 끝 → 남은 한 명 +2
+		score = {q["name"]: q["score"] for q in self.logic.snapshot(self.room, "a")["players"]}
+		self.assertEqual(score[self.seeker.name], 1)
+		self.assertEqual(score[self.hiders[0].name], 0)
+		self.assertEqual(score[self.hiders[1].name], 2)
+
+
 class MapTests(unittest.TestCase):
-	def test_props_inside_house_and_known(self):
-		m = M.MAP
-		for p in m["props"]:
-			self.assertIn(p["type"], M.PROPS)
-			self.assertTrue(0 < p["x"] < m["w"] and 0 < p["z"] < m["d"], p)
-		for x, z in m["hider_spawns"] + [m["seeker_spawn"]]:
-			self.assertTrue(0 < x < m["w"] and 0 < z < m["d"])
+	def test_props_inside_map_and_known(self):
+		for m in M.MAPS.values():
+			self.assertEqual(len({p["id"] for p in m["props"]}), len(m["props"]))
+			for p in m["props"]:
+				self.assertIn(p["type"], M.PROPS)
+				self.assertTrue(0 < p["x"] < m["w"] and 0 < p["z"] < m["d"], p)
+			for x, z in m["hider_spawns"] + [m["seeker_spawn"]]:
+				self.assertTrue(0 < x < m["w"] and 0 < z < m["d"])
+			self.assertEqual(len(m["hider_spawns"]), M.MAX_PLAYERS)
 
 	def test_spawns_not_inside_props(self):
-		m = M.MAP
-		for x, z in m["hider_spawns"] + [m["seeker_spawn"]]:
+		for m in M.MAPS.values():
+			for x, z in m["hider_spawns"] + [m["seeker_spawn"]]:
+				for p in m["props"]:
+					_, w, _, d = M.PROPS[p["type"]]
+					self.assertGreater(math.hypot(x - p["x"], z - p["z"]), max(w, d) / 2 + 0.3, (m["key"], x, z, p))
+
+	def test_props_do_not_sit_in_walls(self):
+		def box(p):
+			_, w, _, d = M.PROPS[p["type"]]
+			c, s = abs(math.cos(p["ry"])), abs(math.sin(p["ry"]))
+			ex, ez = (c * w + s * d) / 2, (s * w + c * d) / 2
+			return p["x"] - ex, p["x"] + ex, p["z"] - ez, p["z"] + ez
+		for m in M.MAPS.values():
 			for p in m["props"]:
-				_, w, _, d = M.PROPS[p["type"]]
-				self.assertGreater(math.hypot(x - p["x"], z - p["z"]), min(w, d) / 2 + 0.3, (x, z, p))
+				x0, x1, z0, z1 = box(p)
+				for w in m["walls"]:
+					hit = x0 < w["x"] + w["w"] / 2 - 0.02 and x1 > w["x"] - w["w"] / 2 + 0.02 and z0 < w["z"] + w["d"] / 2 - 0.02 and z1 > w["z"] - w["d"] / 2 + 0.02
+					self.assertFalse(hit, (m["key"], p, w))
 
 
 if __name__ == "__main__":
