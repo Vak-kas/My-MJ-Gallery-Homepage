@@ -136,6 +136,6 @@
 {% if not relay_error %}
 {% include "components/share.html" %}
 <div id="hs-cfg" class="hidden" data-ws="{{ ws_url }}" data-room="{{ room.id }}" data-name="{{ default_name }}" data-title="{{ room.title }}"></div>
-<script type="module" src="{% static 'js/hideseek.js' %}?v=4"></script>
+<script type="module" src="{% static 'js/hideseek.js' %}?v=5"></script>
 {% endif %}
 {% endblock %}
