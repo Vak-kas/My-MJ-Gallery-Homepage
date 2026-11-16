@@ -390,8 +390,15 @@ class MapChoiceAndScoreTests(HideSeekTestCase):
 
 
 class MapTests(unittest.TestCase):
-	def test_three_maps_with_school(self):
-		self.assertEqual(list(M.MAPS), ["house", "office", "school"])
+	def test_mart_map(self):
+		m = M.MAPS["mart"]
+		self.assertEqual([r["name"] for r in m["rooms"]], ["매장", "창고", "계산대", "푸드코트"])
+		self.assertEqual(sum(r["w"] * r["d"] for r in m["rooms"]), m["w"] * m["d"])
+		self.assertTrue({"cart", "counter"} <= {p["type"] for p in m["props"]})
+		self.assertIn("counter", M.BIG_PROPS)
+
+	def test_maps_with_school(self):
+		self.assertEqual(list(M.MAPS), ["house", "office", "school", "mart"])
 		m = M.MAPS["school"]
 		self.assertEqual([r["name"] for r in m["rooms"]], ["1반", "2반", "복도", "체육 창고", "급식실"])
 		self.assertEqual(sum(r["w"] * r["d"] for r in m["rooms"]), m["w"] * m["d"])   # 방이 바닥을 빈틈없이 덮음

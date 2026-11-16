@@ -345,6 +345,8 @@ class SoloPuzzleTests(TestCase):
 		safe = [i for i in range(81) if i not in board.mines and i not in board.opened]
 		for k in range(0, len(safe), 8):
 			r = self.post("mines_open", {"token": s["token"], "cells": safe[k:k + 8]})
+			if r["state"] == "won":   # 앞 묶음이 빈 칸을 넓게 열어 마지막 묶음 전에 끝나기도 함
+				break
 		self.assertEqual(r["state"], "won")
 		self.assertEqual(len(r["mines"]), 10)
 		self.assertTrue(r["saved"])
