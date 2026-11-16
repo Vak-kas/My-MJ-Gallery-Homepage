@@ -78,6 +78,8 @@ function buildProp(type) {
 		case 'ball': g.add(mesh(new THREE.SphereGeometry(w / 2, 20, 14), '#e74c3c', 0, w / 2, 0)); break;
 		case 'desk': g.add(box(w, 0.05, d, '#d8c4a0', 0, h - 0.025, 0)); for (const sx of [-1, 1]) g.add(box(0.04, h - 0.05, d - 0.06, '#8a8f98', sx * (w / 2 - 0.04), (h - 0.05) / 2, 0)); g.add(box(w - 0.1, 0.35, 0.03, '#8a8f98', 0, h - 0.25, -d / 2 + 0.05)); g.add(box(0.5, 0.32, 0.04, '#1c1c1e', 0, h + 0.24, -0.12)); g.add(box(0.2, 0.06, 0.14, '#3a3a3c', 0, h + 0.03, -0.12)); break;
 		case 'cabinet': g.add(box(w, h, d, '#9aa3ad', 0, h / 2, 0)); for (let r = 1; r < 4; r++) g.add(box(w + 0.005, 0.015, d + 0.005, '#6f7781', 0, (h / 4) * r, 0)); for (let r = 0; r < 4; r++) g.add(box(0.2, 0.03, 0.03, '#4a4f57', 0, (h / 4) * (r + 0.6), d / 2 + 0.015)); break;
+		case 'locker': g.add(box(w, h, d, '#5b8fb9', 0, h / 2, 0)); g.add(box(w - 0.06, h - 0.1, 0.01, '#4a7aa3', 0, h / 2, d / 2 + 0.005)); for (let r = 0; r < 3; r++) g.add(box(w * 0.5, 0.012, 0.012, '#2f4f6b', 0, h - 0.18 - r * 0.05, d / 2 + 0.012)); g.add(box(0.03, 0.12, 0.03, '#d0d4d9', w / 2 - 0.09, h * 0.52, d / 2 + 0.02)); break;
+		case 'bench': g.add(box(w, 0.06, d, '#b07d4f', 0, h - 0.03, 0)); for (const sx of [-1, 1]) g.add(box(0.06, h - 0.06, d - 0.06, '#4a4f57', sx * (w / 2 - 0.15), (h - 0.06) / 2, 0)); break;
 		case 'cone': g.add(box(w, 0.04, d, '#d9480f', 0, 0.02, 0)); g.add(cyl(0.04, w / 2 - 0.04, h - 0.04, '#f76707', 0, 0.04 + (h - 0.04) / 2, 0)); g.add(cyl(0.085, 0.115, 0.1, '#f8f9fa', 0, h * 0.55, 0)); break;
 		default: g.add(box(w, h, d, '#999999', 0, h / 2, 0));
 	}

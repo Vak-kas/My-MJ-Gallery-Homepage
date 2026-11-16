@@ -390,6 +390,15 @@ class MapChoiceAndScoreTests(HideSeekTestCase):
 
 
 class MapTests(unittest.TestCase):
+	def test_three_maps_with_school(self):
+		self.assertEqual(list(M.MAPS), ["house", "office", "school"])
+		m = M.MAPS["school"]
+		self.assertEqual([r["name"] for r in m["rooms"]], ["1반", "2반", "복도", "체육 창고", "급식실"])
+		self.assertEqual(sum(r["w"] * r["d"] for r in m["rooms"]), m["w"] * m["d"])   # 방이 바닥을 빈틈없이 덮음
+		kinds = {p["type"] for p in m["props"]}
+		self.assertTrue({"locker", "bench"} <= kinds)
+		self.assertIn("bench", M.BIG_PROPS)
+
 	def test_props_inside_map_and_known(self):
 		for m in M.MAPS.values():
 			self.assertEqual(len({p["id"] for p in m["props"]}), len(m["props"]))
