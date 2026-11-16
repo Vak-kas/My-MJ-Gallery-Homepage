@@ -37,6 +37,15 @@
     .hs-key { display: inline-block; min-width: 20px; padding: 0 5px; border-radius: 5px; border: 1px solid rgba(255, 255, 255, 0.5); font-size: 11px; line-height: 18px; text-align: center; }
     .hs-mapbox { position: absolute; left: 50%; top: 52%; height: 80%; aspect-ratio: 3 / 2; max-width: 94%; transform: translate(-50%, -50%); display: none; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); opacity: 0.95; }
     .hs-mapbtn { position: absolute; right: 14px; bottom: 12px; display: none; border-radius: 999px; padding: 4px 11px; font-size: 12.5px; font-weight: 700; background: rgba(0, 0, 0, 0.45); }
+    .hs-stage.hs-fill { position: fixed; inset: 0; z-index: 9999; width: 100vw; height: 100dvh; border-radius: 0; aspect-ratio: auto; }
+    .hs-stage.hs-touch-on { touch-action: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    .hs-touch { position: absolute; inset: 0; display: none; }
+    .hs-tb { position: absolute; pointer-events: auto; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.45); background: rgba(0, 0, 0, 0.42); color: #fff; font-size: 13px; font-weight: 700; padding: 0 12px; height: 44px; min-width: 44px; touch-action: none; }
+    .hs-tb:active { background: rgba(255, 255, 255, 0.3); }
+    .hs-tb.big { width: 76px; height: 76px; font-size: 15px; right: 16px; bottom: 44px; }
+    .hs-joy { position: absolute; display: none; width: 104px; height: 104px; margin: -52px 0 0 -52px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.4); background: rgba(0, 0, 0, 0.18); }
+    .hs-joy > i { position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; border-radius: 50%; background: rgba(255, 255, 255, 0.6); transform: translate(-50%, -50%); }
+    .hs-stage.hs-touch-on .hs-hp { bottom: auto; top: 44px; width: 150px; }
     #hs-chat { height: 220px; overflow-y: auto; }
     html.theme-dark .gm-card { background: #171a20; border-color: rgba(255, 255, 255, 0.12); }
     html.theme-dark .gm-in { background: #111318; border-color: rgba(255, 255, 255, 0.14); color: #e8e8ea; }
@@ -51,7 +60,7 @@
     <div class="mt-3 flex flex-wrap items-end gap-3">
         <div class="min-w-[220px] flex-1">
             <h1 class="apple-display break-words text-[30px] font-semibold tracking-[-0.03em] text-[#1d1d1f] lg:text-[38px]">🫥 {{ room.title }}</h1>
-            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 2~8명 · PC(키보드·마우스)용</p>
+            <p class="mt-1 text-[13px] text-[#8e8e93]">방장 {{ room.owner }} · 2~8명 · PC(키보드·마우스) · 모바일(터치, 전체 화면·가로 권장)</p>
         </div>
         <button type="button" class="gm-btn" id="hs-copy" data-url="{{ share_url }}">🔗 초대 링크 복사</button>
         <button type="button" class="gm-btn" id="hs-kakao">💬 카톡으로 초대</button>
@@ -77,16 +86,25 @@
                     <div class="hs-hp hidden" id="hs-hp"><p class="mb-1 text-[12px] font-semibold" id="hs-hp-text"></p><div class="hs-hp-bar"><i id="hs-hp-bar" style="width:100%"></i></div></div>
                     <p class="hs-hint" id="hs-hint"></p>
                     <div class="hs-mapbtn" id="hs-mapbtn"></div>
+                    <div class="hs-touch" id="hs-touch">
+                        <div class="hs-joy" id="hs-joy"><i id="hs-joy-k"></i></div>
+                        <button type="button" class="hs-tb big" id="hs-tb-shoot">🔫 쏘기</button>
+                        <button type="button" class="hs-tb big" id="hs-tb-copy">E 변신</button>
+                        <button type="button" class="hs-tb" id="hs-tb-swap" style="right:104px;bottom:44px">F 자리</button>
+                        <button type="button" class="hs-tb" id="hs-tb-lock" style="right:104px;bottom:96px">🔓 고정</button>
+                        <button type="button" class="hs-tb" id="hs-tb-map" style="right:16px;bottom:132px">🗺 지도</button>
+                    </div>
                     <div class="hs-mapbox" id="hs-mapbox"><canvas id="hs-map"></canvas></div>
                     <div class="hs-blind" id="hs-blind"><p>🙈 술래는 눈 감는 중…</p><p class="text-[15px] font-normal opacity-80" id="hs-blind-t"></p></div>
                 </div>
                 <div class="hs-over" id="hs-over"><p class="text-[15px] opacity-80">연결하는 중…</p></div>
             </div>
             <div class="mt-2 flex flex-wrap items-center gap-2 text-[12.5px] text-[#8e8e93]">
-                <span><span class="hs-key !border-[#c7c7cc]">W A S D</span> 움직이기 · 마우스 시점 · 화면을 누르면 마우스가 잡히고 <span class="hs-key !border-[#c7c7cc]">Esc</span> 로 풀려요</span>
+                <span><span class="hs-key !border-[#c7c7cc]">W A S D</span> 움직이기 · <span class="hs-key !border-[#c7c7cc]">Shift</span> 살금살금(발소리 안 남) · 마우스 시점 · 화면을 누르면 마우스가 잡히고 <span class="hs-key !border-[#c7c7cc]">Esc</span> 로 풀려요</span>
                 <span>· 숨는 사람: <span class="hs-key !border-[#c7c7cc]">E</span> 보고 있는 물건으로 변신 · <span class="hs-key !border-[#c7c7cc]">Q</span> 방향 고정 · <span class="hs-key !border-[#c7c7cc]">F</span> 물건을 치우고 그 자리에</span>
                 <span>· 술래: <b>클릭</b> 쏘기</span>
                 <span>· <span class="hs-key !border-[#c7c7cc]">M</span> 지도(원래 배치도)</span>
+                <span>· 모바일: 왼쪽 아래를 끌어 움직이고, 나머지를 끌어 둘러보기</span>
                 <button type="button" class="gm-btn ml-auto" id="hs-full">⛶ 전체 화면</button>
             </div>
         </section>
@@ -97,6 +115,7 @@
                 <ol id="hs-players" class="mt-2 space-y-1 text-[14px]"></ol>
                 <div id="hs-host" class="mt-3 hidden space-y-2 text-[13px]">
                     <div class="flex flex-wrap items-center gap-2">
+                        <label>맵 <select id="hs-set-map" class="gm-in !inline-block !w-auto !py-1"></select></label>
                         <label>숨는 시간 <select id="hs-set-hide" class="gm-in !inline-block !w-auto !py-1"></select></label>
                         <label>찾는 시간 <select id="hs-set-seek" class="gm-in !inline-block !w-auto !py-1"></select></label>
                     </div>
@@ -117,6 +136,6 @@
 {% if not relay_error %}
 {% include "components/share.html" %}
 <div id="hs-cfg" class="hidden" data-ws="{{ ws_url }}" data-room="{{ room.id }}" data-name="{{ default_name }}" data-title="{{ room.title }}"></div>
-<script type="module" src="{% static 'js/hideseek.js' %}?v=2"></script>
+<script type="module" src="{% static 'js/hideseek.js' %}?v=3"></script>
 {% endif %}
 {% endblock %}

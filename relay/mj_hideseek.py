@@ -15,6 +15,11 @@
 - 자리 바꾸기(F, 판마다 SWAPS 번): 숨는 사람이 진짜 물건 하나를 치우고 그 자리·방향 그대로 들어감 → 지도와 똑같아짐.
   치운 물건은 그 판 동안 사라지므로, 거기서 떠나면 지도엔 있는데 실제론 빈 자리가 남음
 
+3단계 — 맵 고르기·점수·소리
+- 방장이 판 사이에 맵(MAPS)을 고름: 집 / 사무실·창고. 바꾸면 모두에게 map 을 다시 보냄
+- 점수: 술래는 한 명 잡을 때마다 +1, 숨는 사람은 끝까지 살아남으면 +2 (방이 있는 동안 쌓임)
+- 발소리·모바일 조작은 브라우저 쪽 (static/js/hideseek.js)
+
 판정은 서버가: 위치는 브라우저가 보내되 서버가 집 범위·속도를 확인, 쏘기는 거리·방향·쿨타임을 서버가 확인.
 위치는 상태 전체를 다시 보내지 않고 room.emit 으로 바로 전달 (초당 십여 번).
 숨는 사람은 술래에게 이름 대신 아무 뜻 없는 번호(eid)로만 보임.
@@ -61,7 +66,11 @@ PROPS = {
 	"fridge": ("냉장고", 0.8, 1.9, 0.8),
 	"trash": ("쓰레기통", 0.45, 0.7, 0.45),
 	"ball": ("공", 0.5, 0.5, 0.5),
+	"desk": ("책상", 1.4, 0.75, 0.7),
+	"cabinet": ("캐비닛", 0.9, 1.3, 0.45),
+	"cone": ("고깔", 0.4, 0.6, 0.4),
 }
+BIG_PROPS = ("bed", "sofa", "fridge")   # 처음 모습으로는 안 줌 (너무 큼)
 
 
 def _house():
@@ -93,20 +102,58 @@ def _house():
 		("box", 13.0, 14.3, 0.4), ("tv", 16.0, 15.5, math.pi), ("ball", 15.5, 11.0, 0), ("plant", 18.7, 9.8, 0),
 		("trash", 13.0, 9.9, 0), ("stool", 19.0, 15.0, 0),
 	]
-	props = [{"id": f"p{i}", "type": t_, "x": x, "z": z, "ry": round(ry, 4)} for i, (t_, x, z, ry) in enumerate(P)]
+	rooms = [("거실", 0, 0, 12, 16, "#c8a77e"), ("부엌", 12, 0, 12, 9, "#d6d6d2"), ("침실", 12, 9, 12, 7, "#b7c4d6")]
+	return _map("house", "집", W, D, walls, rooms, P, [6.0, 8.0], [[3, 11], [9, 4], [16, 2], [21, 4], [15, 12], [20, 11], [8, 15], [10.5, 8]])
+
+
+def _office():
+	"""사무실·창고: 위쪽 사무실(22×8), 왼쪽 아래 창고(13×10), 오른쪽 아래 휴게실(9×10)."""
+	W, D = 22.0, 18.0
+	t = 0.3
+	walls = [
+		(W / 2, -t / 2, W + 2 * t, t), (W / 2, D + t / 2, W + 2 * t, t),
+		(-t / 2, D / 2, t, D), (W + t / 2, D / 2, t, D),
+		# 사무실 | 창고·휴게실 (문 두 개: x 5~7, 16~18)
+		(2.5, 8, 5, t), (11.5, 8, 9, t), (20, 8, 4, t),
+		# 창고 | 휴게실 (문: z 12~14)
+		(13, 10, t, 4), (13, 16, t, 4),
+	]
+	h = math.pi / 2
+	P = [
+		# 사무실
+		("desk", 3, 2, 0), ("desk", 6, 2, 0), ("desk", 9, 2, 0), ("desk", 3, 5.5, 0), ("desk", 6, 5.5, 0), ("desk", 9, 5.5, 0),
+		("chair", 3, 2.9, math.pi), ("chair", 6, 2.9, math.pi), ("chair", 9, 2.9, math.pi), ("chair", 3, 6.4, math.pi), ("chair", 6, 6.4, math.pi), ("chair", 9, 6.4, math.pi),
+		("cabinet", 13, 0.4, 0), ("cabinet", 14.2, 0.4, 0), ("cabinet", 15.4, 0.4, 0), ("plant", 0.6, 0.6, 0), ("plant", 21.3, 0.6, 0),
+		("trash", 11, 1, 0), ("trash", 11, 6.8, 0), ("shelf", 21.6, 3, -h), ("shelf", 21.6, 5, -h), ("table", 17, 4.5, 0),
+		("chair", 16.1, 3.6, 0), ("chair", 17.9, 3.6, 0), ("chair", 16.1, 5.4, math.pi), ("chair", 17.9, 5.4, math.pi), ("lamp", 0.6, 7.3, 0), ("cone", 12.5, 7.2, 0),
+		# 창고
+		("box", 1, 9.5, 0), ("box", 2, 9.6, 0.3), ("box", 1.2, 10.6, 0.5), ("box", 4, 17, 0), ("box", 5, 17.1, 0.2), ("box", 4.5, 16.1, 0.7),
+		("box", 11.5, 9.3, 0), ("box", 11.8, 17.2, 0.4), ("barrel", 1, 17, 0), ("barrel", 2, 17.1, 0), ("barrel", 1.5, 16.1, 0), ("barrel", 9, 13, 0),
+		("barrel", 10, 9.2, 0), ("shelf", 0.5, 13, h), ("shelf", 9.5, 8.4, 0), ("cone", 6, 12, 0), ("cone", 7.5, 14, 0), ("cone", 4, 12.5, 0),
+		("stool", 9.5, 16.5, 0), ("trash", 12.3, 11, 0), ("ball", 7, 10.5, 0), ("cabinet", 12.5, 15.5, -h),
+		# 휴게실
+		("sofa", 17.5, 17.2, math.pi), ("table", 17.5, 15.2, 0), ("tv", 15, 8.5, 0), ("fridge", 21.3, 8.7, 0), ("plant", 13.8, 8.7, 0), ("plant", 21.3, 17.3, 0),
+		("stool", 15, 12, 0), ("stool", 16, 12.4, 0), ("chair", 19.5, 15.2, -h), ("lamp", 13.7, 17.3, 0), ("ball", 20, 11.5, 0), ("box", 21, 13, 0.3),
+		("trash", 14, 14.2, 0), ("barrel", 21.2, 15, 0),
+	]
+	rooms = [("사무실", 0, 0, 22, 8, "#cfd3d8"), ("창고", 0, 8, 13, 10, "#a9a397"), ("휴게실", 13, 8, 9, 10, "#d9c7a8")]
+	return _map("office", "사무실·창고", W, D, walls, rooms, P, [11.0, 4.0], [[1.5, 4], [7.5, 3.8], [14, 3], [20, 2], [3, 13.5], [8, 16], [16, 10.5], [19.5, 13.2]])
+
+
+def _map(key, name, W, D, walls, rooms, P, seeker_spawn, hider_spawns):
 	return {
-		"name": "집",
+		"key": key, "name": name,
 		"w": W, "d": D, "wall_h": WALL_H,
 		"walls": [{"x": x, "z": z, "w": w, "d": d} for x, z, w, d in walls],
-		"rooms": [{"name": "거실", "x": 0, "z": 0, "w": 12, "d": 16}, {"name": "부엌", "x": 12, "z": 0, "w": 12, "d": 9}, {"name": "침실", "x": 12, "z": 9, "w": 12, "d": 7}],
-		"props": props,
-		"seeker_spawn": [6.0, 8.0],
-		"hider_spawns": [[3, 11], [9, 4], [16, 2], [21, 4], [15, 12], [20, 11], [8, 15], [10.5, 8]],
+		"rooms": [{"name": n, "x": x, "z": z, "w": w, "d": d, "color": c} for n, x, z, w, d, c in rooms],
+		"props": [{"id": f"p{i}", "type": t_, "x": x, "z": z, "ry": round(ry, 4)} for i, (t_, x, z, ry) in enumerate(P)],
+		"seeker_spawn": seeker_spawn,
+		"hider_spawns": hider_spawns,
 	}
 
 
-MAP = _house()
-PROP_BY_ID = {p["id"]: p for p in MAP["props"]}
+MAPS = {m["key"]: m for m in (_house(), _office())}
+MAP = MAPS["house"]   # 기본 맵
 
 
 def _dist(a, b):
@@ -131,6 +178,8 @@ class HideSeekLogic:
 		self.next_taunt = 0.0
 		self.result = None
 		self.removed = set()      # 이번 판에 숨는 사람이 치운 진짜 물건 id
+		self.map = MAP
+		self.prop_by_id = {p["id"]: p for p in MAP["props"]}
 
 	# ── 공통 훅 ──
 	def seat_of(self, pid):
@@ -148,10 +197,13 @@ class HideSeekLogic:
 			self.order.append(peer.pid)
 			if not self.host:
 				self.host = peer.pid
-		room.emit({"type": "map", "map": MAP, "props": {k: list(v) for k, v in PROPS.items()}, "speed": SPEED}, to=peer.pid)
+		self._send_map(room, to=peer.pid)
+
+	def _send_map(self, room, to=None):
+		room.emit({"type": "map", "map": self.map, "props": {k: list(v) for k, v in PROPS.items()}, "speed": SPEED}, to=to)
 
 	def _new_player(self, name):
-		return {"name": name, "role": None, "alive": True, "hp": 0, "eid": None, "prop": "box", "x": 0.0, "z": 0.0, "ry": 0.0, "last_pos": 0.0, "last_shot": 0.0, "swaps": 0, "hold": 0.0}
+		return {"name": name, "role": None, "alive": True, "hp": 0, "eid": None, "prop": "box", "x": 0.0, "z": 0.0, "ry": 0.0, "last_pos": 0.0, "last_shot": 0.0, "swaps": 0, "hold": 0.0, "score": 0}
 
 	def on_leave(self, room, pid):
 		p = self.players.pop(pid, None)
@@ -178,16 +230,16 @@ class HideSeekLogic:
 		self.round += 1
 		self.seeker_idx = (self.seeker_idx + 1) % len(self.order)
 		seeker = self.order[self.seeker_idx]
-		spawns = list(MAP["hider_spawns"])
+		spawns = list(self.map["hider_spawns"])
 		self.rng.shuffle(spawns)
-		props = [k for k in PROPS if k not in ("bed", "sofa", "fridge")]
+		props = sorted({pr["type"] for pr in self.map["props"]} - set(BIG_PROPS))   # 이 맵에 있는 물건 가운데서
 		used_eids = set()
 		self.removed = set()
 		for i, pid in enumerate(self.order):
 			p = self.players[pid]
 			p.update(alive=True, last_pos=now, last_shot=0.0, swaps=0, hold=0.0)   # 첫 위치도 시작 뒤 걸린 시간만큼만 움직일 수 있게
 			if pid == seeker:
-				p.update(role="seeker", hp=SEEKER_HP, eid=None, x=MAP["seeker_spawn"][0], z=MAP["seeker_spawn"][1], ry=0.0)
+				p.update(role="seeker", hp=SEEKER_HP, eid=None, x=float(self.map["seeker_spawn"][0]), z=float(self.map["seeker_spawn"][1]), ry=0.0)
 			else:
 				eid = "e" + secrets.token_hex(3)
 				while eid in used_eids:
@@ -205,6 +257,9 @@ class HideSeekLogic:
 		self.until = 0.0
 		caught = [self.players[pid]["name"] for pid in self.order if self.players[pid]["role"] == "hider" and not self.players[pid]["alive"]]
 		alive = [self.players[pid]["name"] for pid in self._alive_hiders()]
+		if winner == "hiders":
+			for pid in self._alive_hiders():
+				self.players[pid]["score"] += 2
 		self.result = {"winner": winner, "reason": reason, "caught": caught, "alive": alive}
 		room.notice(f"🏁 {reason}")
 		room.emit({"type": "over", "winner": winner, "reason": reason})
@@ -246,6 +301,12 @@ class HideSeekLogic:
 				self.hide_time = hide
 			if seek in SEEK_CHOICES:
 				self.seek_time = seek
+			key = data.get("map")
+			if key in MAPS and key != self.map["key"]:
+				self.map = MAPS[key]
+				self.prop_by_id = {pr["id"]: pr for pr in self.map["props"]}
+				self.removed = set()
+				self._send_map(room)
 			return True, None
 
 		if kind == "start":
@@ -265,7 +326,7 @@ class HideSeekLogic:
 			if prop not in PROPS:
 				return False, "모르는 물건이에요."
 			# 보고 있는 진짜 물건을 따라 하는 것 → 그 물건 가까이 있어야 함
-			src = PROP_BY_ID.get(data.get("from"))
+			src = self.prop_by_id.get(data.get("from"))
 			if src is not None and src["id"] in self.removed:
 				return False, "그 물건은 이제 없어요."
 			if src is not None and (src["type"] != prop or _dist((p["x"], p["z"]), (src["x"], src["z"])) > 4.0):
@@ -288,7 +349,7 @@ class HideSeekLogic:
 			return False, None
 		if p["swaps"] <= 0:
 			return False, "자리 바꾸기를 다 썼어요."
-		src = PROP_BY_ID.get(data.get("prop"))
+		src = self.prop_by_id.get(data.get("prop"))
 		if src is None or src["id"] in self.removed:
 			return False, "그 물건은 이제 없어요."
 		if _dist((p["x"], p["z"]), (src["x"], src["z"])) > SWAP_RANGE:
@@ -311,8 +372,8 @@ class HideSeekLogic:
 			return False, None
 		if not all(math.isfinite(v) for v in (x, z, ry)):
 			return False, None
-		x = min(max(x, 0.2), MAP["w"] - 0.2)
-		z = min(max(z, 0.2), MAP["d"] - 0.2)
+		x = min(max(x, 0.2), self.map["w"] - 0.2)
+		z = min(max(z, 0.2), self.map["d"] - 0.2)
 		# 속도 확인: 지난번 위치에서 너무 멀면 갈 수 있는 만큼만
 		dt = min(1.0, now - p["last_pos"])
 		max_step = SPEED[p["role"]] * dt * 1.5 + 0.4
@@ -341,8 +402,8 @@ class HideSeekLogic:
 		if hider_pid:
 			h = self.players[hider_pid]
 			pos = (h["x"], h["z"])
-		elif target in PROP_BY_ID and target not in self.removed:
-			pr = PROP_BY_ID[target]
+		elif target in self.prop_by_id and target not in self.removed:
+			pr = self.prop_by_id[target]
 			pos = (pr["x"], pr["z"])
 		else:
 			room.emit({"type": "shot", "hit": None}, to=pid)
@@ -359,6 +420,7 @@ class HideSeekLogic:
 			room.emit({"type": "hit", "id": target, "hp": h["hp"]})
 			if h["hp"] <= 0:
 				h["alive"] = False
+				p["score"] += 1
 				room.notice(f"🎯 {h['name']} 님이 잡혔어요! ({self.players[pid]['name']} 님)")
 				if not self._alive_hiders():
 					self._finish(room, "seeker", f"{self.players[pid]['name']} 님(술래)이 모두 찾았어요!")
@@ -397,7 +459,8 @@ class HideSeekLogic:
 			"host_name": self.players[self.host]["name"] if self.host in self.players else "",
 			"hide_time": self.hide_time, "seek_time": self.seek_time,
 			"hide_choices": HIDE_CHOICES, "seek_choices": SEEK_CHOICES,
-			"players": [{"name": self.players[q]["name"], "role": self.players[q]["role"], "alive": self.players[q]["alive"], "me": q == pid, "host": q == self.host} for q in self.order],
+			"map": self.map["key"], "map_choices": [[k, m["name"]] for k, m in MAPS.items()],
+			"players": [{"name": self.players[q]["name"], "role": self.players[q]["role"], "alive": self.players[q]["alive"], "me": q == pid, "host": q == self.host, "score": self.players[q]["score"]} for q in self.order],
 			"me": None if not me else {"role": me["role"], "alive": me["alive"], "hp": me["hp"], "eid": me["eid"], "prop": me["prop"], "x": me["x"], "z": me["z"], "ry": me["ry"], "swaps": me["swaps"]},
 			"removed": sorted(self.removed),
 			"ents": ents,
