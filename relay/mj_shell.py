@@ -1,16 +1,17 @@
 """🥤 1:1 야바위 — 사기꾼(섞는 사람) 대 맞히는 사람, 라운드마다 역할을 바꿈.
 
 규칙
-- 컵 3~5개 중 하나에 구슬. 사기꾼이 구슬을 넣을 컵을 고르고(놓기) → 컵 두 개씩 골라 섞음(섞기).
-  섞기엔 '힘' POWER 이 있고 보통 섞기 1·빠른 섞기 2 를 씀. 시간 SHUFFLE_TIME 안에, 최소 MIN_SWAPS 번
-- 맞히는 사람은 섞는 걸 실시간으로 보고(빠른 섞기는 애니메이션이 짧음) 다 끝나면 컵 하나를 고름(GUESS_TIME 초)
+- 컵 3~5개 중 하나에 구슬. 사기꾼이 구슬을 넣을 컵을 고르면(놓기) 그 자리를 모두에게 잠깐 보여 주고(보여 주기 SHOW_TIME 초)
+  → 컵 두 개씩 골라 섞음(섞기). 섞기엔 '힘' POWER 이 있고 속도가 셋: 보통 1·빠르게 2·번개 3. 시간 SHUFFLE_TIME 안에, 최소 MIN_SWAPS 번
+- 맞히는 사람은 처음 자리부터 섞는 걸 실시간으로 눈으로 따라가고(빠를수록 애니메이션이 짧음) 다 끝나면 컵 하나를 고름(GUESS_TIME 초)
   섞는 동안 판돈을 1→2 로 올릴 수 있음(더블). 맞히면 맞히는 사람 +판돈, 틀리면 사기꾼 +판돈
 - 라운드 수만큼 번갈아 사기꾼을 하고 점수가 높은 쪽이 승리
-- 스킬(켜면, 판마다 종류별 1번): 사기꾼 — 🫳 손바닥(구슬을 옆 컵으로 몰래, 상대에겐 ✋ 만 번쩍)·🌫 연막(다음 섞기를 가림)·⚡ 가속(힘 +4)
+- 스킬(켜면, 판마다 종류별 1번): 사기꾼 — ✨ 얍! 텔레포트(구슬을 다른 컵으로 순간 이동, 상대는 '얍!' 만 봄)·🌫 연막(다음 섞기를 가림)
+  ·⚡ 가속(힘 +8)·🌀 회오리(힘 안 쓰고 번개 속도로 3번 저절로 섞임)
   맞히는 사람 — 🔍 돋보기(빈 컵 하나 공개)·⏪ 되감기(마지막 3번 섞기를 천천히 다시 — 연막도 보임)·✌️ 두 개 고르기(두 컵, 맞히면 +1 만)
   둘 다 — 🛡 방패(상대의 다음 방해·염탐 스킬 하나를 막음)
 
-구슬 위치는 서버만 알고 사기꾼에게만 보냄. 연막 섞기는 맞히는 사람에게 어느 컵인지 안 알려 줌.
+섞은 뒤의 구슬 위치는 서버만 알고 사기꾼에게만 보냄. 연막 섞기는 맞히는 사람에게 어느 컵인지 안 알려 줌.
 """
 
 import random
@@ -18,26 +19,31 @@ import time
 
 CUPS = (3, 4, 5)
 ROUNDS = (4, 6, 8)
-POWER = 10
+POWER = 20
 MIN_SWAPS = 3
 PLACE_TIME = 10
-SHUFFLE_TIME = 15
+SHOW_TIME = 1.8          # 구슬을 넣은 자리를 모두에게 보여 주는 시간
+SHUFFLE_TIME = 25
 GUESS_TIME = 12
 REVEAL_TIME = 3.2
-SWAP_LEN = {False: 0.75, True: 0.4}   # 섞기 애니메이션(초) — 클라이언트와 같아야 함
+SWAP_LEN = (0.6, 0.32, 0.18)   # 섞기 애니메이션(초): 보통·빠르게·번개 — 브라우저는 snapshot 의 swap_lens 를 씀
+SWAP_COST = (1, 2, 3)          # 속도별로 드는 힘
+TURBO_POWER = 8
+WHIRL_SWAPS = 3
 BOT_NAME = "🤖 컴퓨터"
 BOT_LEVELS = ("easy", "normal", "hard")
-BOT_SKILLS = {"easy": set(), "normal": {"turbo", "shield", "lens"}, "hard": None}
+BOT_SKILLS = {"easy": set(), "normal": {"turbo", "shield", "lens", "whirl"}, "hard": None}
 
 # id: (아이콘, 이름, 설명, 쓸 수 있는 역할, 상대에게 거는 것인지 — 방패로 막힘)
 SKILLS = {
-	"palm": ("🫳", "손바닥", "구슬을 옆 컵으로 몰래 옮겨요 — 상대 화면엔 ✋ 만 잠깐 번쩍", "dealer", True),
+	"teleport": ("✨", "얍! 텔레포트", "구슬을 다른 컵으로 순간 이동 — 상대는 '얍!' 만 보고 어디로 갔는지는 몰라요", "dealer", True),
 	"smoke": ("🌫", "연막", "다음 섞기를 연막으로 가려요 — 상대는 어느 컵끼리 바뀌었는지 못 봐요", "dealer", True),
-	"turbo": ("⚡", "가속", "이번 라운드 힘이 +4 — 더 많이, 더 빨리 섞어요", "dealer", False),
+	"turbo": ("⚡", "가속", "이번 라운드 힘이 +8 — 더 많이, 더 빨리 섞어요", "dealer", False),
+	"whirl": ("🌀", "회오리", "힘을 안 쓰고 번개 속도로 3번 저절로 섞여요", "dealer", False),
 	"lens": ("🔍", "돋보기", "구슬이 없는 컵 하나를 알려 줘요", "guesser", True),
 	"rewind": ("⏪", "되감기", "마지막 3번 섞기를 천천히 다시 봐요 — 연막 속 섞기도 보여요", "guesser", True),
 	"double": ("✌️", "두 개 고르기", "컵 두 개를 골라요. 맞히면 판돈과 상관없이 +1", "guesser", False),
-	"shield": ("🛡", "방패", "상대가 다음에 거는 스킬(손바닥·연막·돋보기·되감기) 하나를 막아요", "both", False),
+	"shield": ("🛡", "방패", "상대가 다음에 거는 스킬(텔레포트·연막·돋보기·되감기) 하나를 막아요", "both", False),
 }
 
 
@@ -62,7 +68,7 @@ class ShellLogic:
 	def reset(self):
 		self.status = "waiting"      # waiting / playing / over
 		self.first = self.starter    # 1라운드 사기꾼
-		self.phase = None            # place / shuffle / guess / reveal
+		self.phase = None            # place / show / shuffle / guess / reveal
 		self.phase_until = 0.0
 		self.round = 0
 		self.dealer = None
@@ -71,7 +77,8 @@ class ShellLogic:
 		self.used = {s: [] for s in self.SEATS}
 		self.shield = {s: False for s in self.SEATS}
 		self.power = POWER
-		self.swaps = []              # 이번 라운드 섞기 [(a, b, fast, smoked)]
+		self.swaps = []              # 이번 라운드 섞기 [(a, b, speed, smoked)]
+		self.busy_until = 0.0        # 보낸 섞기 애니메이션이 다 끝나는 때
 		self.smoke_armed = False
 		self.bet = 1
 		self.double = False
@@ -122,6 +129,7 @@ class ShellLogic:
 		self.ball = None
 		self.power = POWER
 		self.swaps = []
+		self.busy_until = 0.0
 		self.smoke_armed = False
 		self.bet = 1
 		self.double = False
@@ -134,12 +142,12 @@ class ShellLogic:
 
 	def _place(self, room, cup, now):
 		self.ball = cup
-		self.phase, self.phase_until = "shuffle", now + SHUFFLE_TIME
+		self.phase, self.phase_until = "show", now + SHOW_TIME   # 처음 자리는 모두에게 보여 줌 — 그 뒤 섞기부터가 승부
 		self._emit_to(room, self.dealer, {"type": "ball", "cup": cup})
-		room.emit({"type": "placed"}, exclude=None)   # 위치는 빼고 "넣었다"만 (맞히는 사람이 웹소켓 프레임에서 컵 번호를 보던 것)
+		room.emit({"type": "placed", "cup": cup})
 		if self.dealer in self.bots:
-			self.bot_plan = {"easy": 4, "normal": 6, "hard": 99}[self.bot_level]
-			self.bot_due = now + 1.0
+			self.bot_plan = {"easy": 6, "normal": 10, "hard": 99}[self.bot_level]
+			self.bot_due = now + SHOW_TIME + 0.6
 		if self.guesser in self.bots:
 			self.bot_belief = cup
 			g = self.guesser
@@ -151,20 +159,21 @@ class ShellLogic:
 				room.emit({"type": "bet", "bet": 2})
 		return True, None
 
-	def _swap(self, room, a, b, fast, now):
-		cost = 2 if fast else 1
+	def _swap(self, room, a, b, speed, now, free=False):
+		cost = 0 if free else SWAP_COST[speed]
 		if self.power < cost:
-			return False, "힘이 모자라요. 그만 섞고 '다 섞었어요'를 누르세요."
+			return False, "힘이 모자라요. 더 느린 속도로 섞거나 '다 섞었어요'를 누르세요."
 		self.power -= cost
+		self.busy_until = max(now, self.busy_until) + SWAP_LEN[speed]
 		if self.ball == a:
 			self.ball = b
 		elif self.ball == b:
 			self.ball = a
 		smoked = self.smoke_armed
 		self.smoke_armed = False
-		self.swaps.append((a, b, fast, smoked))
+		self.swaps.append((a, b, speed, smoked))
 		g = self.guesser
-		ev = {"type": "swap", "a": a, "b": b, "fast": fast, "n": len(self.swaps), "power": self.power}
+		ev = {"type": "swap", "a": a, "b": b, "speed": speed, "n": len(self.swaps), "power": self.power}
 		if smoked:
 			# 맞히는 사람(과 구경꾼)에겐 어느 컵인지 가림
 			for pid in room.peers:
@@ -175,14 +184,15 @@ class ShellLogic:
 		else:
 			room.emit(ev)
 		if g in self.bots:
-			self._bot_watch(a, b, fast, smoked)
+			self._bot_watch(a, b, speed, smoked)
 		return True, None
 
 	def _begin_guess(self, room, now):
-		self.phase, self.phase_until = "guess", now + GUESS_TIME
+		start = max(now, self.busy_until)   # 아직 화면에서 섞이는 중이면 그만큼 고를 시간을 더 줌
+		self.phase, self.phase_until = "guess", start + GUESS_TIME
 		room.emit({"type": "guess-start", "swaps": len(self.swaps)})
 		if self.guesser in self.bots:
-			self.bot_due = now + self.rng.uniform(1.2, 2.2)
+			self.bot_due = start + self.rng.uniform(1.2, 2.2)
 
 	def _reveal(self, room, picks, now):
 		hit = self.ball in picks
@@ -221,7 +231,7 @@ class ShellLogic:
 		role = self.role(s)
 		if who != "both" and who != role:
 			return False, f"{'사기꾼' if who == 'dealer' else '맞히는 사람'}일 때 쓰는 스킬이에요."
-		if sid in ("palm", "smoke", "turbo") and self.phase != "shuffle":
+		if sid in ("teleport", "smoke", "turbo", "whirl") and self.phase != "shuffle":
 			return False, "섞는 동안 쓸 수 있어요."
 		if sid in ("lens", "rewind") and self.phase != "guess":
 			return False, "고를 차례에 쓸 수 있어요."
@@ -229,27 +239,27 @@ class ShellLogic:
 			return False, "섞는 동안이나 고를 때 쓸 수 있어요."
 		o = self.other(s)
 		extra = {}
-		if sid == "palm":
+		if sid == "teleport":
 			try:
 				to = int(data.get("cup"))
 			except (TypeError, ValueError):
 				return False, "옮길 컵을 골라 주세요."
-			if abs(to - self.ball) != 1 or not 0 <= to < self.cups:
-				return False, "바로 옆 컵으로만 옮길 수 있어요."
+			if to == self.ball or not 0 <= to < self.cups:
+				return False, "구슬이 없는 다른 컵을 골라 주세요."
 		self.used[s].append(sid)
 		blocked = False
 		if hostile and self.shield[o]:
 			self.shield[o] = False
 			blocked = True
-		elif sid == "palm":
-			self.ball = to
+		elif sid == "teleport":
+			old, self.ball = self.ball, to
 			self._emit_to(room, self.dealer, {"type": "ball", "cup": to})
-			if self.guesser in self.bots and self.bot_level == "hard" and self.rng.random() < 0.5:
-				self.bot_belief = to
+			if self.guesser in self.bots and self.bot_belief == old:   # 따라오고 있었다면 '거기엔 없다'는 것만 앎
+				self.bot_belief = self.rng.choice([c for c in range(self.cups) if c != old])
 		elif sid == "smoke":
 			self.smoke_armed = True
 		elif sid == "turbo":
-			self.power += 4
+			self.power += TURBO_POWER
 		elif sid == "shield":
 			self.shield[s] = True
 		elif sid == "lens":
@@ -262,8 +272,14 @@ class ShellLogic:
 			self._emit_to(room, s, {"type": "rewind", "swaps": extra["swaps"]})
 		elif sid == "double":
 			self.double = True
-		room.emit({"type": "skill", "seat": s, "id": sid, "icon": icon, "name": name, "blocked": blocked, "secret": sid in ("smoke", "palm") and not blocked})
+		room.emit({"type": "skill", "seat": s, "id": sid, "icon": icon, "name": name, "blocked": blocked, "secret": sid == "smoke" and not blocked})
 		room.notice(f"{icon} {self.names[s]} 님의 {name}!" + (" 🛡 방패에 막혔어요." if blocked else ""))
+		if sid == "whirl":   # 알림 뒤에 섞기가 보이게
+			for _ in range(WHIRL_SWAPS):
+				a, b = self.rng.sample(range(self.cups), 2)
+				if self.ball not in (a, b) and self.rng.random() < 0.6:
+					a = self.ball
+				self._swap(room, a, b, 2, now, free=True)
 		return True, None
 
 	# ── 메시지 ──
@@ -360,7 +376,10 @@ class ShellLogic:
 					return False, "컵 두 개를 골라 주세요."
 				if a == b or not (0 <= a < self.cups and 0 <= b < self.cups):
 					return False, "서로 다른 컵 두 개를 골라 주세요."
-				return self._swap(room, a, b, bool(data.get("fast")), now)
+				speed = data.get("speed")
+				if speed not in (0, 1, 2):
+					speed = 1 if data.get("fast") else 0
+				return self._swap(room, a, b, speed, now)
 			if kind == "done":
 				if role != "dealer" or self.phase != "shuffle":
 					return False, None
@@ -418,14 +437,16 @@ class ShellLogic:
 				return True
 			return False
 		if now >= self.phase_until:
-			if self.phase == "place":
+			if self.phase == "show":
+				self.phase, self.phase_until = "shuffle", now + SHUFFLE_TIME
+			elif self.phase == "place":
 				room.notice("⏰ 시간 초과 — 구슬은 아무 컵에나 들어갔어요.")
 				self._place(room, self.rng.randrange(self.cups), now)
 			elif self.phase == "shuffle":
 				self.power = max(self.power, MIN_SWAPS - len(self.swaps))   # 힘이 모자라도 서버가 채울 만큼은
 				while len(self.swaps) < MIN_SWAPS:   # 너무 조금 섞었으면 서버가 채움
 					a, b = self.rng.sample(range(self.cups), 2)
-					self._swap(room, a, b, False, now)
+					self._swap(room, a, b, 0, now)
 				self._begin_guess(room, now)
 			elif self.phase == "guess":
 				room.notice("⏰ 시간 초과 — 고르지 못했어요.")
@@ -436,9 +457,9 @@ class ShellLogic:
 			return self._bot_act(room, active, now)
 		return False
 
-	def _bot_watch(self, a, b, fast, smoked):
-		"""컴퓨터 맞히는 사람이 섞기를 눈으로 따라감 — 가끔 놓침."""
-		lose = {"easy": (0.15, 0.4), "normal": (0.07, 0.22), "hard": (0.02, 0.1)}[self.bot_level][1 if fast else 0]
+	def _bot_watch(self, a, b, speed, smoked):
+		"""컴퓨터 맞히는 사람이 섞기를 눈으로 따라감 — 빠를수록 자주 놓침."""
+		lose = {"easy": (0.12, 0.3, 0.5), "normal": (0.05, 0.15, 0.3), "hard": (0.02, 0.07, 0.15)}[self.bot_level][speed]
 		if smoked:
 			lose = 0.5 if self.bot_level == "hard" else 0.75
 		if self.bot_belief in (a, b):
@@ -464,24 +485,30 @@ class ShellLogic:
 					self._act_skill(room, s, "shield", {}, now)
 				if can("smoke") and self.power >= 2 and self.rng.random() < 0.35:
 					self._act_skill(room, s, "smoke", {}, now)
-				if can("palm") and len(self.swaps) >= 2 and self.rng.random() < 0.3:
-					to = [c for c in (self.ball - 1, self.ball + 1) if 0 <= c < self.cups]
-					self._act_skill(room, s, "palm", {"cup": self.rng.choice(to)}, now)
-				fast = level == "hard" and self.rng.random() < 0.6 or level == "normal" and self.rng.random() < 0.3
-				cost = 2 if fast else 1
+				if can("teleport") and len(self.swaps) >= 4 and self.rng.random() < 0.25:
+					self._act_skill(room, s, "teleport", {"cup": self.rng.choice([c for c in range(self.cups) if c != self.ball])}, now)
+				if can("whirl") and len(self.swaps) >= 2 and self.rng.random() < 0.25:
+					self._act_skill(room, s, "whirl", {}, now)
+					self.bot_due = self.busy_until + 0.2
+					return True
+				r = self.rng.random()
+				speed = {"easy": 0, "normal": 2 if r < 0.15 else 1 if r < 0.5 else 0, "hard": 2 if r < 0.5 else 1 if r < 0.85 else 0}[level]
+				while speed and self.power < SWAP_COST[speed]:
+					speed -= 1
+				cost = SWAP_COST[speed]
 				if self.power < cost or len(self.swaps) >= self.bot_plan:
 					if len(self.swaps) >= MIN_SWAPS:
 						self._begin_guess(room, now)
 					else:
 						a, b = self.rng.sample(range(self.cups), 2)
-						self._swap(room, a, b, False, now)
+						self._swap(room, a, b, 0, now)
 						self.bot_due = now + 0.9
 					return True
 				a, b = self.rng.sample(range(self.cups), 2)
 				if self.rng.random() < 0.6 and self.ball not in (a, b):   # 구슬이 든 컵을 자주 움직임
 					a = self.ball
-				self._swap(room, a, b, fast, now)
-				self.bot_due = now + SWAP_LEN[fast] + self.rng.uniform(0.1, 0.4)
+				self._swap(room, a, b, speed, now)
+				self.bot_due = now + SWAP_LEN[speed] + self.rng.uniform(0.05, 0.3)
 				return True
 			return False
 		# 맞히는 사람
@@ -505,21 +532,21 @@ class ShellLogic:
 	def snapshot(self, room, pid=None):
 		me = next((s for s, p in self.seats.items() if p == pid), None)
 		now = time.time()
-		show_ball = self.phase == "reveal" or self.status == "over" or (me and me == self.dealer)
+		show_ball = self.phase in ("show", "reveal") or self.status == "over" or (me and me == self.dealer)
 		return {
 			"status": self.status, "phase": self.phase, "round": self.round, "rounds": self.rounds, "cups": self.cups,
 			"skills_on": self.skills_on, "bot_level": self.bot_level,
 			"dealer": self.dealer, "ball": self.ball if show_ball else None,
 			"left": round(max(0.0, self.phase_until - now), 2) if self.phase else None,
-			"phase_time": {"place": PLACE_TIME, "shuffle": SHUFFLE_TIME, "guess": GUESS_TIME, "reveal": REVEAL_TIME}.get(self.phase),
-			"power": self.power, "swaps": len(self.swaps), "min_swaps": MIN_SWAPS, "bet": self.bet, "double": self.double,
+			"phase_time": {"place": PLACE_TIME, "show": SHOW_TIME, "shuffle": SHUFFLE_TIME, "guess": GUESS_TIME, "reveal": REVEAL_TIME}.get(self.phase),
+			"power": self.power, "power_max": POWER, "swaps": len(self.swaps), "min_swaps": MIN_SWAPS, "bet": self.bet, "double": self.double,
 			"lens": self.lens if me == self.guesser or self.phase == "reveal" else None,
 			"smoke_armed": self.smoke_armed if me == self.dealer else False,
 			"result": self.result, "score": self.score, "used": self.used,
 			"my_shield": bool(me and self.shield[me]),
 			"winner": self.winner, "reason": self.reason, "draws": self.draws,
 			"skills": [{"id": k, "icon": v[0], "name": v[1], "desc": v[2], "who": v[3]} for k, v in SKILLS.items()],
-			"swap_len": SWAP_LEN[False], "swap_len_fast": SWAP_LEN[True],
+			"swap_lens": list(SWAP_LEN), "swap_costs": list(SWAP_COST),
 			"seats": {s: ({"name": self.names[s], "bot": s in self.bots, "online": s in self.bots or p in room.peers, "wins": self.wins[s]} if p else None)
 					  for s, p in self.seats.items()},
 		}

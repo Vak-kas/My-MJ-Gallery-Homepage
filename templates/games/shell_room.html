@@ -126,7 +126,7 @@
 
             <div id="sh-skills-box" class="mt-4 hidden">
                 <h2 class="text-[14px] font-semibold">✨ 스킬 <span class="font-normal text-[12px] text-[#8e8e93]">종류별로 한 판에 한 번 · 역할에 맞는 것만</span></h2>
-                <div id="sh-skills" class="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-7"></div>
+                <div id="sh-skills" class="mt-2 grid grid-cols-4 gap-2 sm:grid-cols-8"></div>
             </div>
 
             <div class="mt-5 flex flex-wrap items-center justify-center gap-2 border-t border-black/5 pt-4">
@@ -146,7 +146,7 @@
             <section class="gm-card space-y-2" id="sh-seats"></section>
             <section class="gm-card text-[12.5px] leading-6 text-[#6e6e73]">
                 <h2 class="text-[14px] font-semibold text-[#1d1d1f] dark:text-inherit">하는 법</h2>
-                <p><b>사기꾼</b>: 구슬을 넣을 컵을 누르고 → 컵 두 개를 차례로 눌러 섞어요. <b>힘 10</b> — 보통 섞기 1, <b>빠른 섞기</b>(F 키·버튼) 2. 적어도 3번 섞고 '다 섞었어요'. <b>맞히는 사람</b>: 섞는 걸 눈으로 따라가다 구슬이 든 컵을 골라요. 섞는 동안 <b>판돈 2배</b>를 걸 수 있어요. 맞히면 맞히는 사람 +판돈, 틀리면 사기꾼 +판돈. 라운드마다 역할을 바꾸고 점수가 높은 쪽이 승리.</p>
+                <p><b>사기꾼</b>: 구슬을 넣을 컵을 누르면 그 자리를 <b>상대에게도 잠깐 보여 줘요</b>. 그다음 컵 두 개를 차례로 눌러 섞어요(25초). <b>힘 20</b> — 🐢 보통 1 · ⚡ 빠르게 2 · 🌩 번개 3 (F 키로 바꾸기). 적어도 3번 섞고 '다 섞었어요'. <b>맞히는 사람</b>: 처음 자리부터 눈으로 따라가다 구슬이 든 컵을 골라요. 섞는 동안 <b>판돈</b>을 2점으로 올릴 수 있어요. 맞히면 맞히는 사람, 틀리면 사기꾼이 판돈만큼 득점. 라운드마다 역할을 바꾸고 점수가 높은 쪽이 승리. <b>스킬</b>: 사기꾼 ✨ 얍! 텔레포트(구슬을 다른 컵으로 순간 이동)·🌫 연막·⚡ 가속(힘 +8)·🌀 회오리(번개 속도로 3번 저절로) / 맞히는 사람 🔍 돋보기·⏪ 되감기·✌️ 두 개 고르기 / 둘 다 🛡 방패.</p>
             </section>
             <section class="gm-card">
                 <h2 class="text-[14px] font-semibold">채팅</h2>
@@ -177,9 +177,12 @@
     let ws = null, S = null, mySeat = null, ended = false, retry = 0;
     let leftAt = 0, leftBase = 0, lastSpectators = [];
     let sel = null;            // 사기꾼: 먼저 고른 컵
-    let fast = false;          // 빠른 섞기
+    let speed = 0;             // 섞기 속도: 0 보통 · 1 빠르게 · 2 번개
+    let lenOverride = null;    // 되감기 때 애니메이션 길이(초)
+    const SPEEDS = [['🐢', '보통'], ['⚡', '빠르게'], ['🌩', '번개']];
+    const swapLen = (sp) => (lenOverride ?? (S?.swap_lens || [0.6, 0.32, 0.18])[sp || 0]) * 1000;
     let picks = [];            // 맞히는 사람: 두 개 고르기 때 첫 선택
-    let armed = null;          // 컵을 골라야 하는 스킬 (palm)
+    let armed = null;          // 컵을 골라야 하는 스킬 (teleport)
     let pendingFx = Promise.resolve();
     let slots = [];            // slot → cup element (섞을 때 자리 바꿈)
     let built = 0;
@@ -205,12 +208,12 @@
     }
     const cupAt = (slot) => slots[slot];
     function layout() { const n = slots.length; slots.forEach((c, i) => { c.style.left = `${slotX(i, n)}px`; }); }
-    async function swapFx(a, b, isFast, smoke) {
+    async function swapFx(a, b, sp, smoke) {
         const A = cupAt(a), B = cupAt(b);
         if (!A || !B) return;
-        const len = (isFast ? S.swap_len_fast : S.swap_len) * 1000;
+        const len = swapLen(sp);
         if (smoke) $('sh-smoke').classList.add('on');
-        snd.swap(isFast);
+        snd.swap(sp);
         if (A && B) {
             const xa = slotX(a, slots.length), xb = slotX(b, slots.length), lift = 18;
             const ka = A.animate([{ transform: 'translate(0,0)' }, { transform: `translate(${(xb - xa) / 2}px, -${lift}px)` }, { transform: `translate(${xb - xa}px, 0)` }], { duration: len, easing: 'ease-in-out' });
@@ -223,11 +226,11 @@
         }
         if (smoke) { await wait(150); $('sh-smoke').classList.remove('on'); }
     }
-    async function smokeOnlyFx(isFast) {
+    async function smokeOnlyFx(sp) {
         // 어느 컵인지 모르는 섞기: 연막 속에서 컵들이 살짝 흔들림
-        $('sh-smoke').classList.add('on'); snd.swap(isFast);
-        for (const c of slots) c.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px, -4px)' }, { transform: 'translate(6px, 2px)' }, { transform: 'translate(0,0)' }], { duration: (isFast ? S.swap_len_fast : S.swap_len) * 1000 });
-        await wait((isFast ? S.swap_len_fast : S.swap_len) * 1000 + 150);
+        $('sh-smoke').classList.add('on'); snd.swap(sp);
+        for (const c of slots) c.animate([{ transform: 'translate(0,0)' }, { transform: 'translate(-6px, -4px)' }, { transform: 'translate(6px, 2px)' }, { transform: 'translate(0,0)' }], { duration: swapLen(sp) });
+        await wait(swapLen(sp) + 150);
         $('sh-smoke').classList.remove('on');
     }
     function fx(text, slot, dy = -70) { const el = document.createElement('div'); el.className = 'fx'; el.textContent = text; el.style.left = `${slot == null ? table.clientWidth / 2 : slotX(slot, slots.length)}px`; el.style.top = `${table.clientHeight / 2 + dy}px`; table.appendChild(el); setTimeout(() => el.remove(), 1600); }
@@ -244,6 +247,7 @@
                 if (S.result.picks.includes(slot)) c.classList.add(S.result.ball === slot ? 'hit' : 'miss');
                 if (S.result.picks.includes(slot)) mark.textContent = S.result.ball === slot ? '🎯' : '❌';
             } else if (S.phase === 'place' && S.status === 'playing') { c.classList.add('lift'); }
+            else if (S.phase === 'show' && S.status === 'playing') { if (S.ball === slot) { c.classList.add('lift'); ball.classList.add('on'); mark.textContent = '👀'; } }   // 처음 자리는 모두에게
             else {
                 if (S.ball === slot && r === 'dealer' && S.phase !== 'guess') { c.classList.add('hint'); mark.textContent = '🟡'; }
                 if (sel === slot) c.classList.add('sel');
@@ -258,12 +262,12 @@
     function onCup(slot) {
         if (!S || S.status !== 'playing') return;
         const r = role();
-        if (armed === 'palm') { send({ type: 'skill', id: 'palm', cup: slot }); armed = null; paintCups(); renderSkills(); return; }
+        if (armed === 'teleport') { if (slot === S.ball) { toast('⚠️ 구슬이 없는 다른 컵을 누르세요.'); return; } send({ type: 'skill', id: 'teleport', cup: slot }); armed = null; paintCups(); renderSkills(); return; }
         if (r === 'dealer' && S.phase === 'place') { send({ type: 'place', cup: slot }); return; }
         if (r === 'dealer' && S.phase === 'shuffle') {
             if (sel === null) { sel = slot; paintCups(); return; }
             if (sel === slot) { sel = null; paintCups(); return; }
-            send({ type: 'swap', a: sel, b: slot, fast }); sel = null; paintCups(); return;
+            send({ type: 'swap', a: sel, b: slot, speed }); sel = null; paintCups(); return;
         }
         if (r === 'guesser' && S.phase === 'guess') {
             if (S.double) {
@@ -289,6 +293,7 @@
             const roleTxt = r === 'dealer' ? '😈 내가 사기꾼' : r === 'guesser' ? '🧐 내가 맞히는 사람' : '👀 구경 중';
             const phaseTxt = {
                 place: r === 'dealer' ? '구슬을 넣을 컵을 누르세요' : `${name(S.dealer)} 님이 구슬을 숨기는 중…`,
+                show: r === 'dealer' ? '상대에게 구슬 자리를 보여 주는 중… 곧 섞어요' : '👀 구슬은 여기! 이제부터 눈을 떼지 마세요',
                 shuffle: r === 'dealer' ? `컵 두 개를 차례로 눌러 섞어요 (힘 ${S.power}) · 적어도 ${S.min_swaps}번` : '눈 크게 뜨고 구슬을 따라가세요!',
                 guess: r === 'guesser' ? (S.double ? '컵 두 개를 고르세요' : '구슬이 든 컵을 고르세요!') : `${name(S.guesser || o)} 님이 고르는 중…`,
                 reveal: S.result ? (S.result.hit ? `🎯 ${name(S.result.winner)} 님이 맞혔어요! +${S.result.points}` : `😈 ${name(S.result.winner)} 님이 속였어요! +${S.result.points}`) : '',
@@ -343,11 +348,11 @@
         if (!mySeat || S.status !== 'playing') { box.innerHTML = ''; return; }
         if (r === 'dealer' && S.phase === 'shuffle') {
             box.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-2">
-                <div class="flex items-center gap-2 text-[13px] font-semibold">💪 힘 <div class="bar w-[120px]"><i style="width:${Math.min(100, S.power / 10 * 100)}%"></i></div> <span>${S.power}</span></div>
-                <button type="button" class="gm-btn ${fast ? 'on' : ''}" id="sh-fast">⚡ 빠른 섞기 (힘 2) <span class="tag">F</span></button>
+                <div class="flex items-center gap-2 text-[13px] font-semibold">💪 힘 <div class="bar w-[120px]"><i style="width:${Math.min(100, S.power / (S.power_max || 20) * 100)}%"></i></div> <span>${S.power}</span></div>
+                <div class="flex items-center gap-1">${SPEEDS.map(([ic, nm], i) => `<button type="button" class="gm-btn ${speed === i ? 'on' : ''}" data-speed="${i}" ${S.power < (S.swap_costs || [1, 2, 3])[i] ? 'disabled' : ''}>${ic} ${nm} <span class="tag">힘 ${(S.swap_costs || [1, 2, 3])[i]}</span></button>`).join('')}<span class="tag">F</span></div>
                 <button type="button" class="gm-btn go" id="sh-done" ${S.swaps < S.min_swaps ? 'disabled' : ''}>✅ 다 섞었어요 (${S.swaps}번)</button>
             </div><p class="mt-1 text-center text-[12px] text-[#8e8e93]">${sel === null ? '컵 하나를 누르고, 바꿀 컵을 누르면 섞여요' : `${sel + 1}번 컵과 바꿀 컵을 누르세요`}</p>`;
-            $('sh-fast').addEventListener('click', () => { fast = !fast; renderAct(); });
+            for (const b of box.querySelectorAll('[data-speed]')) b.addEventListener('click', () => { speed = Number(b.dataset.speed); renderAct(); });
             $('sh-done').addEventListener('click', () => send({ type: 'done' }));
             return;
         }
@@ -367,21 +372,21 @@
         const used = S.used[mySeat] || [];
         $('sh-skills').innerHTML = S.skills.map((k) => {
             const u = used.includes(k.id), na = k.who !== 'both' && k.who !== r;
-            const hostile = ['palm', 'smoke', 'lens', 'rewind'].includes(k.id);
+            const hostile = ['teleport', 'smoke', 'lens', 'rewind'].includes(k.id);
             const active = (k.id === 'shield' && S.my_shield) || (k.id === 'smoke' && S.smoke_armed) || (k.id === 'double' && S.double);
             return `<button type="button" class="skill ${u ? 'used' : ''} ${na ? 'na' : ''} ${hostile ? 'hostile' : ''} ${active ? 'active' : ''} ${armed === k.id ? 'armed' : ''}" data-skill="${k.id}" title="${esc(k.desc)}${na ? ` (${k.who === 'dealer' ? '사기꾼' : '맞히는 사람'}일 때)` : ''}" ${u || na ? 'disabled' : ''}><span class="ic">${k.icon}</span>${esc(k.name)}</button>`;
         }).join('');
         for (const b of $('sh-skills').querySelectorAll('[data-skill]')) b.addEventListener('click', () => {
             if (b.disabled) return;
             const id = b.dataset.skill;
-            if (id === 'palm') { if (S.phase !== 'shuffle') { toast('⚠️ 섞는 동안 쓸 수 있어요.'); return; } armed = armed === 'palm' ? null : 'palm'; sel = null; paintCups(); renderSkills(); toast(armed ? '🫳 구슬을 옮길 옆 컵을 누르세요 (Esc 취소)' : '취소했어요'); return; }
+            if (id === 'teleport') { if (S.phase !== 'shuffle') { toast('⚠️ 섞는 동안 쓸 수 있어요.'); return; } armed = armed === 'teleport' ? null : 'teleport'; sel = null; paintCups(); renderSkills(); toast(armed ? '✨ 구슬을 보낼 컵을 누르세요 (Esc 취소)' : '취소했어요'); return; }
             send({ type: 'skill', id });
         });
     }
     document.addEventListener('keydown', (e) => {
         if (e.target.matches('input, textarea, select')) return;
         if (e.key === 'Escape') { armed = null; sel = null; picks = []; paintCups(); renderSkills(); }
-        if (e.code === 'KeyF' && role() === 'dealer' && S?.phase === 'shuffle') { fast = !fast; renderAct(); }
+        if (e.code === 'KeyF' && role() === 'dealer' && S?.phase === 'shuffle') { speed = (speed + 1) % SPEEDS.length; renderAct(); }
         const n = Number(e.key); if (n >= 1 && n <= (S?.cups || 0)) onCup(n - 1);
     });
     setInterval(() => {
@@ -443,7 +448,7 @@
         hit() { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, 0.22, 'triangle', 0.14), i * 100)); },
         miss() { tone(330, 0.2, 'triangle', 0.1); setTimeout(() => tone(220, 0.35, 'triangle', 0.1), 160); },
         lift() { noise(0.2, 0.15, 'bandpass', 1200, 1.5); tone(800, 0.1, 'sine', 0.06, 1200); },
-        hand() { noise(0.15, 0.2, 'bandpass', 700, 1.5); },
+        yap() { tone(500, 0.25, 'sine', 0.14, 1600); noise(0.2, 0.12, 'highpass', 3000, 2); },
         skill(ok) { tone(ok ? 740 : 300, 0.2, 'sine', 0.14); },
         tick() { tone(880, 0.05, 'sine', 0.06); },
     };
@@ -468,10 +473,15 @@
         } else if (m.type === 'round') {
             pendingFx = pendingFx.then(() => { buildCups(S?.cups || built || 3); const mine = m.dealer === mySeat; pop(`<div class="big" style="font-size:54px">${m.round}라운드</div><div class="sub">${mine ? '😈 내가 사기꾼! 구슬을 숨기고 섞어요' : mySeat ? '🧐 내가 맞히는 사람! 눈 크게 뜨세요' : `😈 사기꾼: ${esc(S?.seats?.[m.dealer]?.name || '')}`}</div>`, 1500, () => tone(660, 0.15)); });
         } else if (m.type === 'placed') {
-            pendingFx = pendingFx.then(async () => { snd.place(); for (const c of slots) c.classList.remove('lift'); await wait(350); });
+            pendingFx = pendingFx.then(async () => {   // 넣은 컵만 들어 올린 채로 구슬을 보여 줌
+                snd.place();
+                for (const c of slots) { const on = Number(c.dataset.slot) === m.cup; c.classList.toggle('lift', on); c.querySelector('.ball').classList.toggle('on', on); }
+                if (m.cup != null) fx('🟡 구슬은 여기!', m.cup, -110);
+                await wait(350);
+            });
         } else if (m.type === 'ball') { /* 내 눈에만: state 에 들어옴 */ }
         else if (m.type === 'swap') {
-            pendingFx = pendingFx.then(() => (m.a == null ? smokeOnlyFx(m.fast) : swapFx(m.a, m.b, m.fast, m.smoke)));
+            pendingFx = pendingFx.then(() => (m.a == null ? smokeOnlyFx(m.speed) : swapFx(m.a, m.b, m.speed, m.smoke)));
         } else if (m.type === 'guess-start') {
             pendingFx = pendingFx.then(() => { if (role() === 'guesser') { snd.tick(); fx('👆 구슬이 든 컵은?', null, -110); } });
         } else if (m.type === 'reveal') {
@@ -491,20 +501,22 @@
                 table.classList.add('rewind');
                 // 지금 자리 순서로 거꾸로 돌렸다가 천천히 다시 섞어 보여 줌
                 const sw = m.swaps;
-                const save = S.swap_len, saveF = S.swap_len_fast; S.swap_len = 0.05; S.swap_len_fast = 0.05;
-                for (const [a, b] of [...sw].reverse()) await swapFx(a, b, false, false);
-                S.swap_len = 1.4; S.swap_len_fast = 1.4;
+                lenOverride = 0.05;
+                for (const [a, b] of [...sw].reverse()) await swapFx(a, b, 0, false);
+                lenOverride = 1.4;
                 await wait(400);
-                for (const [a, b] of sw) { fx('⏪', null, -110); await swapFx(a, b, false, false); await wait(200); }
-                S.swap_len = save; S.swap_len_fast = saveF;
+                for (const [a, b] of sw) { fx('⏪', null, -110); await swapFx(a, b, 0, false); await wait(200); }
+                lenOverride = null;
                 table.classList.remove('rewind');
             });
         } else if (m.type === 'skill') {
             const mine = m.seat === mySeat, who = mine ? '내가' : `${esc(S?.seats?.[m.seat]?.name || '')} 님이`;
-            if (m.secret && !mine) {
-                if (m.id === 'palm') pendingFx = pendingFx.then(async () => { const h = document.createElement('div'); h.className = 'hand'; h.textContent = '✋'; h.style.left = `${table.clientWidth / 2}px`; h.style.top = `${table.clientHeight / 2}px`; table.appendChild(h); snd.hand(); await wait(700); h.remove(); });
-                return;
-            }
+            if (m.secret && !mine) return;
+            if (m.id === 'teleport' && !m.blocked) pendingFx = pendingFx.then(async () => {   // 앞선 섞기가 다 보인 뒤에 '얍!' — 어디로 갔는지는 사기꾼만(🟡)
+                const h = document.createElement('div'); h.className = 'hand'; h.textContent = '✨얍!'; h.style.left = `${table.clientWidth / 2}px`; h.style.top = `${table.clientHeight / 2}px`; table.appendChild(h);
+                snd.yap(); for (const c of slots) c.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(-10px)' }, { transform: 'translateY(0)' }], { duration: 300 });
+                await wait(700); h.remove();
+            });
             const desc = S?.skills?.find((k) => k.id === m.id)?.desc || '';
             pop(`<div class="big" style="font-size:60px">${m.icon}</div><div class="sub">${who} <b>${esc(m.name)}</b> 스킬!${m.blocked ? '<br>🛡 하지만 방패에 막혔어요!' : ''}</div><div class="sub mt-1" style="font-size:14px;opacity:.8">${esc(desc)}</div>`, 1500, () => snd.skill(!m.blocked));   // 연출보다 먼저 알림
         } else if (m.type === 'bet') { if (role() === 'dealer') toast(`💰 상대가 판돈을 ${m.bet}점으로 걸었어요`); }
