@@ -290,6 +290,9 @@ class StreamViewTests(TestCase):
 		self.assertContains(resp, "?token=send-token")
 		self.assertContains(resp, "?token=recv-token")
 		self.assertContains(resp, "방 닫기")
+		# Wireless Lab 에 붙여 넣는 한 줄 (iq-relay/1): 역할 토큰으로
+		self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/send?token=send-token")
+		self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/recv?token=recv-token")
 		for secret in ("secret-token", "send-token", "recv-token"):
 			self.assertNotIn(secret, self._room_json(resp))
 
@@ -300,6 +303,8 @@ class StreamViewTests(TestCase):
 		join.assert_called_once_with("abc123", "sender", "send-token", "198.51.100.7")
 		self.assertContains(resp, "198.51.100.7")
 		self.assertContains(resp, "ZMQ PUSH Sink")
+		self.assertContains(resp, "/relay/ws/abc123/iq/send?token=send-token")
+		self.assertNotContains(resp, "/iq/recv")
 		self.assertNotContains(resp, "ZMQ SUB Source")
 		self.assertNotContains(resp, "recv-token")
 		self.assertNotContains(resp, "방 닫기")
@@ -310,6 +315,8 @@ class StreamViewTests(TestCase):
 			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"}, HTTP_X_REAL_IP="198.51.100.8")
 		join.assert_called_once_with("abc123", "receiver", "recv-token", "198.51.100.8")
 		self.assertContains(resp, "ZMQ SUB Source")
+		self.assertContains(resp, "/relay/ws/abc123/iq/recv?token=recv-token")
+		self.assertNotContains(resp, "/iq/send")
 		self.assertNotContains(resp, "ZMQ PUSH Sink")
 		self.assertNotContains(resp, "send-token")
 

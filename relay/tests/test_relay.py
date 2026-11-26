@@ -248,6 +248,29 @@ class RoomRelayTests(RelayTestCase):
 			await asyncio.sleep(0.05)
 		self.assertTrue(room.stats()["ready"])
 
+	async def test_counts_drop_when_a_side_leaves(self):
+		room = await self.open_room({"kind": "raw"}, join=("sender",))
+		tx1, tx2 = self.sender(room), self.sender(room)
+		denied = self.receiver(room)   # 등록 안 된 쪽: 거절돼 재시도만 함 → 세지 않음
+
+		async def until(check):
+			for _ in range(60):
+				if check():
+					return True
+				await asyncio.sleep(0.05)
+			return False
+
+		self.assertTrue(await until(lambda: room.senders == 2))
+		self.assertEqual(room.receivers, 0)
+		tx1.close(0)
+		self.assertTrue(await until(lambda: room.senders == 1))   # 나가면 줄어듦 (전엔 한 번 붙으면 계속 남았음)
+		tx2.close(0)
+		self.assertTrue(await until(lambda: room.senders == 0))
+		self.client_socks = [denied]
+		self.sender(room)
+		self.assertTrue(await until(lambda: room.senders == 1))
+		self.assertEqual(room.receivers, 0)
+
 	async def test_room_count_and_validation(self):
 		with self.assertRaises(mj_relay.RoomError):
 			await self.relay.create_room({"kind": "video"})
