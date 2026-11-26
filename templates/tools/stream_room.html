@@ -137,6 +137,10 @@
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">① 보내는 쪽 (A)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.in_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.in_port }}">복사</button></div>
+                {% if iq_send_url %}
+                <p class="mt-3 text-[12px] font-semibold text-[#0066cc]">Wireless Lab 주소 <span class="font-normal text-[#6e6e73]">— Wireless Lab 의 중계 주소 칸에 이 한 줄을 붙여 넣으면 돼요 (암호화된 연결, IP 등록 필요 없음. 주파수·샘플레이트·형식은 보내는 쪽 값으로 바뀜)</span></p>
+                <div class="sr-copy mt-2"><code class="sr-code">{{ iq_send_url }}</code><button type="button" data-copy="{{ iq_send_url }}">복사</button></div>
+                {% endif %}
                 {% if room.kind != 'file' %}
                 <table class="sr-table mt-4 w-full text-[13px]">
                     {% if room.kind == 'iq' %}<tr><td>GNU Radio 블록</td><td><b>ZMQ PUSH Sink</b></td></tr>{% else %}<tr><td>ZMQ 소켓</td><td><b>PUSH</b> 로 접속(connect)</td></tr>{% endif %}
@@ -165,6 +169,10 @@
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <h2 class="text-[16px] font-semibold text-[#1d1d1f]">② 받는 쪽 (B)</h2>
                 <div class="sr-copy mt-3"><code class="sr-code">tcp://{{ public_host }}:{{ room.out_port }}</code><button type="button" data-copy="tcp://{{ public_host }}:{{ room.out_port }}">복사</button></div>
+                {% if iq_recv_url %}
+                <p class="mt-3 text-[12px] font-semibold text-[#0066cc]">Wireless Lab 주소 <span class="font-normal text-[#6e6e73]">— 받는 쪽 Wireless Lab·도구에 이 한 줄을 붙여 넣으면 돼요 (느리면 그 받는 쪽만 건너뛰고 빠진 만큼 알려 줌)</span></p>
+                <div class="sr-copy mt-2"><code class="sr-code">{{ iq_recv_url }}</code><button type="button" data-copy="{{ iq_recv_url }}">복사</button></div>
+                {% endif %}
                 {% if room.kind != 'file' %}
                 <table class="sr-table mt-4 w-full text-[13px]">
                     {% if room.kind == 'iq' %}<tr><td>GNU Radio 블록</td><td><b>ZMQ SUB Source</b> <span class="text-[11.5px] text-[#c4271d]">(PULL Source 로는 안 붙어요)</span></td></tr>{% else %}<tr><td>ZMQ 소켓</td><td><b>SUB</b> 로 접속, 구독 필터 없음</td></tr>{% endif %}
@@ -210,7 +218,7 @@
             <div class="rounded-[22px] border border-black/[0.08] bg-white p-6">
                 <div class="flex flex-wrap items-baseline justify-between gap-2">
                     <h2 class="text-[16px] font-semibold text-[#1d1d1f]">스펙트럼 · 워터폴</h2>
-                    <p class="text-[12px] text-[#8e8e93] sr-code">{{ room.meta.format }} · {% if room.meta.sample_rate %}{{ room.meta.sample_rate|floatformat:0 }} Sps{% endif %} · {% if room.meta.center_freq %}{{ room.meta.center_freq|floatformat:0 }} Hz{% endif %}</p>
+                    <p class="text-[12px] text-[#8e8e93] sr-code" id="sr-meta">{{ room.meta.format }} · {% if room.meta.sample_rate %}{{ room.meta.sample_rate|floatformat:0 }} Sps{% endif %} · {% if room.meta.center_freq %}{{ room.meta.center_freq|floatformat:0 }} Hz{% endif %}</p>
                 </div>
                 <canvas id="sr-spectrum" class="sr-canvas mt-4" width="1024" height="220"></canvas>
                 <canvas id="sr-waterfall" class="sr-canvas mt-2" width="1024" height="200"></canvas>
@@ -377,8 +385,10 @@
         }
     };
 
+    let applyMeta = () => {};
     const applyStats = (s) => {
         const st = s.stats;
+        applyMeta(s.meta);
         $('st-rate').textContent = fmtRate(st.rate_bps);
         $('st-total').textContent = fmtBytes(st.bytes_in);
         $('st-peers').textContent = `${st.senders} / ${st.receivers}`;
@@ -478,9 +488,21 @@
         for (let i = 0; i < N; i += 1) { const [r, gg, b] = color((db[i] - lo) / (hi - lo)); row.data.set([r, gg, b, 255], i * 4); }
         w.putImageData(row, 0, 0);
     };
-    if (spec) {
+    const drawAxis = () => {
         const sr = room.meta.sample_rate; const fc = room.meta.center_freq || 0;
         $('sr-axis').innerHTML = sr ? [-0.5, -0.25, 0, 0.25, 0.5].map((r) => `<span>${fmtHz(fc + r * sr)}${r === 0 && fc ? 'Hz' : ''}</span>`).join('') : '<span>-fs/2</span><span>0</span><span>+fs/2</span>';
+    };
+    // 보내는 쪽(Wireless Lab)이 실어 보낸 형식·샘플레이트·주파수로 방 설정이 바뀌면 눈금과 풀이 형식도 따라감
+    applyMeta = (meta) => {
+        if (!spec || !meta) return;
+        const key = (m) => `${m.format}|${m.sample_rate}|${m.center_freq}`;
+        if (key(meta) === key(room.meta)) return;
+        room.meta = meta;
+        drawAxis();
+        $('sr-meta').textContent = [meta.format, meta.sample_rate ? `${Math.round(meta.sample_rate).toLocaleString()} Sps` : '', meta.center_freq ? `${Math.round(meta.center_freq).toLocaleString()} Hz` : ''].join(' · ');
+    };
+    if (spec) {
+        drawAxis();
         const g = fall.getContext('2d'); g.fillStyle = '#0b0f17'; g.fillRect(0, 0, fall.width, fall.height);
     }
 

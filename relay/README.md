@@ -38,6 +38,34 @@ python mj_stream.py recv tcp://smjgallery.kr:5551 --output live.iq
 python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 ```
 
+## WebSocket 으로 I/Q 보내고 받기 (`iq-relay/1` · Wireless Lab)
+IQ 방은 ZMQ 포트 말고 **WebSocket 한 줄**로도 보내고 받을 수 있다. 규격 전문은 Wireless Lab 저장소의 `docs/relay-protocol.md`.
+
+```
+보내는 쪽  wss://<사이트>/relay/ws/<방>/iq/send?token=<보내는 토큰>
+받는 쪽    wss://<사이트>/relay/ws/<방>/iq/recv?token=<받는 토큰>
+```
+
+| | ZMQ 포트(IN/OUT) | WebSocket |
+|---|---|---|
+| 암호화 | 없음 | TLS(wss) |
+| 접속 허용 | 링크를 열어 IP 등록 | 주소의 토큰 (IP 등록 필요 없음) |
+| 방화벽 | 방마다 포트 2개 | 443 하나 (nginx 의 `/relay/ws/` 프록시 그대로) |
+| 신호 정보 | 방을 만들 때 적은 값 | 보내는 쪽이 `hello`·`meta` 로 실어 보냄 → 방 설정(형식·샘플레이트·주파수)과 화면 눈금이 따라감 |
+| 빠진 구간 | 알 수 없음 | `gap` 으로 알림 |
+
+- **Wireless Lab 에서 쓰기**: 방 화면의 "Wireless Lab 주소"(보내는 쪽 칸 / 받는 쪽 칸)를 복사해 Wireless Lab 의 중계 주소 칸에 붙여 넣는다. 방은 지금처럼 관리자 화면에서만 만든다.
+- **보내는 쪽**(방마다 하나, 둘째는 409): 첫 글 메시지 `hello`(`proto:1`, `format`, `sample_rate_hz`, 선택 `center_hz` 등) → 서버가 `ready`(한도·`max_message` 1MB·받는 쪽 수) → 바이너리 = I/Q 샘플(길이는 샘플 크기의 배수). `meta`(바뀐 값만)·`gap`·`bye` 는 받는 쪽에 그대로. 1초마다 `stats`. `hello.probe:true` 면 `ready` 만 답하고 받는 쪽엔 알리지 않음(연결 확인용).
+- **오류**(`{"type":"error","error":코드}` 뒤 닫음): `bad-hello`(5초 안에 hello 가 없거나 필드가 틀림) · `proto` · `too-fast`(샘플레이트×샘플 크기 > 방 속도 상한) · `misaligned` · `too-big` · `quota`(총량 한도 → 방도 닫힘). 방 속도 상한을 넘는 메시지는 버리고 `bytes_dropped` 에 더함.
+- **받는 쪽**(방마다 5명, 넘으면 429): `ready`(`sending`) → 보내는 쪽이 있으면 지금의 `hello` → 샘플·`meta`·`gap`·`bye`. 받는 쪽마다 줄(샘플 메시지 64개)이 있어, 느린 받는 쪽은 **그 쪽 것만** 버리고 자리가 나면 `{"type":"gap","where":"relay","lost_bytes":…,"lost_samples":…}` 를 먼저 받는다. 보내는 쪽과 다른 받는 쪽은 기다리지 않는다. 방이 닫히면 `closed`.
+- **두 길은 같은 방**: WebSocket 으로 온 샘플은 ZMQ OUT(GNU Radio SUB)·웹 스펙트럼·통계에도 가고, ZMQ IN 으로 온 샘플(프레임의 마지막 조각, 1MB 넘으면 나눠서)은 WebSocket 받는 쪽에도 간다. 이때 `hello` 는 방 설정으로 서버가 지어 주고, ZMQ 보내는 쪽이 다 나가면 `bye`.
+- 받은 I/Q 는 저장하지 않고 내용도 풀지 않는다. 유효 시간·속도·총량 한도는 방 그대로.
+
+맞는지 확인 (Wireless Lab 저장소에서, 방의 두 주소를 넣음):
+```bash
+venv/bin/python tools/relay_probe.py check "<보내는 주소>" "<받는 주소>"
+```
+
 ## 입장 (고정 IP 불필요)
 - 방을 열면 **보내는 쪽 링크**와 **받는 쪽 링크**가 생김. 각자 GNU Radio 를 돌릴 컴퓨터(같은 인터넷 연결)에서 자기 링크를 열면
   그 네트워크의 공인 IP 가 역할별로 등록되고, **등록된 IP 만** 해당 포트에 접속 가능 (ZMQ ZAP)
@@ -48,6 +76,7 @@ python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 
 ## 보안·제한
 - GNU Radio ZMQ 블록은 암호화(CURVE)를 지원하지 않으므로 접속은 IP(링크 입장) 기준으로만 제한
+- WebSocket I/Q 길(`/relay/ws/<방>/iq/…`)은 역할 토큰으로만 허용하고 TLS 로 감 — 토큰이 주소에 실리므로 링크를 아무 데나 붙이지 않기
 - 유효 시간(기본 1시간·최대 6시간), 속도 상한(기본 16MB/s), 총량 상한(기본 20GB), 동시 방 5개
 - 제어 API(`/rooms`)는 127.0.0.1 + `RELAY_API_KEY` 로만 접근, nginx 는 `/relay/ws/` 만 프록시
 - 데몬을 재시작하면(배포 포함) 열린 방은 모두 닫힘

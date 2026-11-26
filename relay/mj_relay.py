@@ -16,6 +16,12 @@
 
 제어 API 는 127.0.0.1 에서만 열고 공유 비밀키(X-Relay-Key)로 보호한다 (Django 가 호출).
 웹 화면은 /relay/ws/<room>?token= WebSocket 으로 통계와 IQ 스냅샷(저대역)만 받는다.
+
+IQ 방은 WebSocket 으로도 보내고 받을 수 있다 (규격 iq-relay/1 — Wireless Lab 의 docs/relay-protocol.md):
+  /relay/ws/<room>/iq/send?token=  보내는 쪽 (방마다 하나). 첫 글 메시지 hello → 그 뒤 바이너리 = I/Q 샘플
+  /relay/ws/<room>/iq/recv?token=  받는 쪽. 느리면 그 받는 쪽 것만 버리고 gap 으로 알림
+두 길은 같은 방으로 이어진다: WebSocket 으로 온 것은 ZMQ OUT·웹 화면 스냅샷에도, ZMQ IN 으로 온 것은 WebSocket 받는 쪽에도.
+받은 I/Q 는 저장하지 않고 내용도 풀지 않는다.
 """
 
 import argparse
@@ -54,6 +60,11 @@ MAX_VIEWERS_PER_ROOM = 5
 HANDSHAKE_GRACE = 1.5  # 접속 뒤 이 시간 안에 인사가 안 끝나면 '짝 안 맞음'
 JOIN_TTL = 15 * 60  # 링크로 입장한 IP 등록 유지 시간 (페이지가 열려 있으면 계속 갱신)
 ROLES = ("sender", "receiver")
+IQ_PROTO = 1  # iq-relay/1
+IQ_MAX_MESSAGE = 1024 * 1024  # 보내는 쪽 바이너리 메시지 하나의 최대 크기
+IQ_HELLO_WAIT = 5.0  # 보내는 쪽이 붙고 hello 를 기다리는 시간
+IQ_QUEUE = 64  # 받는 쪽마다 밀려도 되는 샘플 메시지 수 — 넘으면 그 받는 쪽 것만 버림
+IQ_SENDER_STATS = 1.0  # 보내는 쪽에 통계를 주는 간격
 
 MB = 1024 * 1024
 GB = 1024 * MB
@@ -126,6 +137,52 @@ class TokenBucket:
 		self.tokens -= min(amount, self.rate)
 
 
+class IqReceiver:
+	"""WebSocket 받는 쪽 하나의 줄. 샘플 메시지가 IQ_QUEUE 개 넘게 밀리면 새 것을 버리고,
+	버린 만큼을 자리가 났을 때 gap(where=relay)으로 먼저 알린다. 넣는 쪽은 절대 기다리지 않는다."""
+
+	def __init__(self, ws, limit=IQ_QUEUE):
+		self.ws = ws
+		self.limit = limit
+		self.queue = asyncio.Queue()
+		self.waiting = 0  # 줄에 있는 샘플 메시지 수
+		self.lost_bytes = 0
+		self.got_hello = False
+		self.task = None
+
+	def offer(self, item, sample_bytes):
+		"""item: bytes(샘플) 또는 str(JSON 글)."""
+		binary = isinstance(item, (bytes, bytearray, memoryview))
+		if binary and self.waiting >= self.limit:
+			self.lost_bytes += len(item)
+			return
+		if self.lost_bytes:
+			self.queue.put_nowait(json.dumps({"type": "gap", "where": "relay", "lost_bytes": self.lost_bytes,
+											  "lost_samples": self.lost_bytes // max(1, sample_bytes), "filled": False}))
+			self.lost_bytes = 0
+		if binary:
+			self.waiting += 1
+		elif self.queue.qsize() > self.limit * 8:
+			return  # 글 메시지까지 끝없이 밀린 받는 쪽: 더 쌓지 않음
+		self.queue.put_nowait(item)
+
+	async def run(self):
+		try:
+			while True:
+				item = await self.queue.get()
+				if isinstance(item, str):
+					await self.ws.send_str(item)
+				else:
+					try:
+						await self.ws.send_bytes(item)
+					finally:
+						self.waiting -= 1
+		except asyncio.CancelledError:
+			raise
+		except Exception:  # noqa: BLE001 - 끊긴 받는 쪽
+			pass
+
+
 @dataclass
 class Room:
 	id: str
@@ -161,12 +218,60 @@ class Room:
 	send_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 	out_sock: object = None
 	file_bucket: object = None
+	bucket: object = None  # 실시간(IQ·raw) 속도 상한 — ZMQ 와 WebSocket 이 같이 씀
+	window: list = field(default_factory=list)  # (시각, 바이트) — 최근 1초 처리량 계산용
+	iq_sender: object = None  # WebSocket 보내는 쪽 (방마다 하나, 연결 확인용 probe 도 자리를 차지)
+	iq_hello: dict = None  # 그 보내는 쪽의 지금 hello (meta 를 합친 값). probe 면 None
+	iq_receivers: set = field(default_factory=set)  # IqReceiver
 	tasks: list = field(default_factory=list)
 	sockets: list = field(default_factory=list)
 
 	def receiver_count(self):
-		"""ZMQ(GNU Radio·CLI) 수신자 + 브라우저 수신자."""
-		return self.receivers + len(self.web_receivers)
+		"""ZMQ(GNU Radio·CLI) 수신자 + 브라우저 수신자 + WebSocket I/Q 수신자."""
+		return self.receivers + len(self.web_receivers) + len(self.iq_receivers)
+
+	def sender_count(self):
+		"""ZMQ 송신자 + WebSocket I/Q 송신자(연결 확인용 probe 는 빼고)."""
+		return self.senders + (1 if self.iq_hello is not None else 0)
+
+	def sample_bytes(self):
+		return IQ_FORMATS.get(self.meta.get("format"), 8)
+
+	def current_hello(self):
+		"""받는 쪽에 줄 hello: WebSocket 보내는 쪽이 있으면 그 값, 없으면(ZMQ 로 들어올 때) 방 설정으로 지음."""
+		if self.iq_hello is not None:
+			return self.iq_hello
+		hello = {"type": "hello", "proto": IQ_PROTO, "format": self.meta.get("format", "fc32")}
+		if self.meta.get("sample_rate"):
+			hello["sample_rate_hz"] = self.meta["sample_rate"]
+		if self.meta.get("center_freq"):
+			hello["center_hz"] = self.meta["center_freq"]
+		return hello
+
+	def fan_iq(self, item, hello_first=False):
+		"""WebSocket 받는 쪽 모두의 줄에 넣음 (기다리지 않음). hello_first: 아직 hello 를 못 받은 쪽엔 먼저 hello."""
+		if not self.iq_receivers:
+			return
+		size = self.sample_bytes()
+		hello = None
+		for rx in list(self.iq_receivers):
+			if hello_first and not rx.got_hello:
+				hello = hello or json.dumps(self.current_hello())
+				rx.offer(hello, size)
+				rx.got_hello = True
+			rx.offer(item, size)
+
+	def fan_hello(self):
+		text = json.dumps(self.current_hello())
+		for rx in list(self.iq_receivers):
+			rx.offer(text, self.sample_bytes())
+			rx.got_hello = True
+
+	def fan_bye(self, text=None):
+		for rx in list(self.iq_receivers):
+			if rx.got_hello:
+				rx.offer(text or json.dumps({"type": "bye"}), self.sample_bytes())
+			rx.got_hello = False
 
 	def joined_ips(self, role):
 		now = time.time()
@@ -214,11 +319,13 @@ class Room:
 			"messages": self.messages,
 			# 1초 넘게 안 들어오면 처리량 0 (마지막 값이 남아 보이지 않게)
 			"rate_bps": round(self.rate_bps, 1) if self.last_rx and time.time() - self.last_rx < 1.5 else 0,
-			"senders": self.senders,
-			"receivers": self.receivers,
+			"senders": self.sender_count(),
+			"receivers": self.receivers + len(self.iq_receivers),
 			"viewers": len(self.viewers),
 			"web_receivers": len(self.web_receivers),
-			"ready": (self.senders > 0 or self.web_sending) and self.receiver_count() > 0,
+			"ws_sender": self.iq_hello is not None,
+			"ws_receivers": len(self.iq_receivers),
+			"ready": (self.sender_count() > 0 or self.web_sending) and self.receiver_count() > 0,
 			"idle_seconds": round(time.time() - self.last_rx, 1) if self.last_rx else None,
 			"file": self.file_info or None,
 			"closed": self.closed_reason or None,
@@ -388,6 +495,7 @@ class Relay:
 		)
 		room.out_sock = out
 		room.file_bucket = TokenBucket(room.rate_limit)
+		room.bucket = TokenBucket(room.rate_limit)
 		self.rooms[room_id] = room
 		# 감시는 지금 바로 켬: 태스크가 돌기 전에 들어온 연결도 놓치지 않도록
 		events = zmq.EVENT_HANDSHAKE_SUCCEEDED | zmq.EVENT_DISCONNECTED | zmq.EVENT_ACCEPTED
@@ -424,7 +532,11 @@ class Relay:
 		if room is None:
 			return False
 		room.closed_reason = reason
-		for ws in list(room.viewers):
+		iq_rx, room.iq_receivers = list(room.iq_receivers), set()
+		for rx in iq_rx:  # 줄을 비우던 태스크를 먼저 멈춰 closed 와 겹쳐 쓰지 않게
+			if rx.task:
+				rx.task.cancel()
+		for ws in list(room.viewers) + [rx.ws for rx in iq_rx] + ([room.iq_sender] if room.iq_sender is not None else []):
 			try:
 				await ws.send_json({"type": "closed", "reason": reason})
 				await ws.close()
@@ -451,17 +563,58 @@ class Relay:
 					await self.close_room(room.id, "유효 시간이 끝났습니다")
 
 	# ── 데이터 중계 ─────────────────────────────
+	def relay_realtime(self, room, frames):
+		"""실시간(IQ·raw) 메시지 하나를 방에 흘림 — ZMQ 로 온 것과 WebSocket 으로 온 것이 같이 씀.
+		속도 상한(넘으면 버림) → ZMQ OUT → 스냅샷 → 통계 → 총량 한도. 돌려주는 값: "ok" / "dropped" / "quota"(방을 닫는 중)."""
+		size = sum(len(f) for f in frames)
+		now = time.time()
+		room.last_rx = now
+		if not room.bucket.try_take(size):
+			room.bytes_dropped += size
+			return "dropped"
+		try:
+			room.out_sock.send_multipart(frames, flags=zmq.NOBLOCK)
+		except zmq.Again:
+			room.bytes_dropped += size
+		if room.kind == "iq":
+			bytes_per_sample = room.sample_bytes()  # 보내는 쪽 hello/meta 로 바뀔 수 있어 그때그때 봄
+			snap_len = SNAPSHOT_SAMPLES * bytes_per_sample
+			if size % bytes_per_sample:
+				room.misaligned += 1
+			last = frames[-1]
+			room.snapshot = bytes(last[-snap_len:]) if len(last) >= snap_len else (room.snapshot + last)[-snap_len:]
+		room.bytes_in += size
+		room.messages += 1
+		window = room.window
+		window.append((now, size))
+		while window and window[0][0] < now - 1:
+			window.pop(0)
+		room.rate_bps = sum(s for _, s in window)
+		if room.bytes_in >= room.total_limit:
+			asyncio.create_task(self.close_room(room.id, "총 전송량 한도에 도달했습니다"))
+			return "quota"
+		return "ok"
+
 	async def _pump(self, room, pull, out):
-		bucket = TokenBucket(room.rate_limit)
-		window = []  # (시각, 바이트) — 최근 1초 처리량 계산용
-		bytes_per_sample = IQ_FORMATS.get(room.meta.get("format"), 8)
-		snap_len = SNAPSHOT_SAMPLES * bytes_per_sample
 		while True:
 			frames = await pull.recv_multipart()
 			size = sum(len(f) for f in frames)
 			now = time.time()
-			room.last_rx = now
 
+			if room.kind != "file":
+				result = self.relay_realtime(room, frames)
+				if result != "dropped" and room.kind == "iq" and room.iq_receivers:
+					# ZMQ 로 들어온 샘플(프레임의 마지막 조각)을 WebSocket 받는 쪽에도 — 샘플이 쪼개진 것은 넘기지 않음
+					last, unit = frames[-1], room.sample_bytes()
+					if last and len(last) % unit == 0:
+						step = IQ_MAX_MESSAGE // unit * unit
+						for i in range(0, len(last), step):
+							room.fan_iq(last[i:i + step], hello_first=True)
+				if result == "quota":
+					return
+				continue
+
+			room.last_rx = now
 			if room.kind == "file":
 				head = frames[0]
 				if head == FILE_HEADER and len(frames) > 1:
@@ -475,22 +628,10 @@ class Relay:
 				await self._deliver_file_frames(room, frames)
 				if head not in (FILE_HEADER, FILE_END) and room.file_info:
 					room.file_info["received"] = room.file_info.get("received", 0) + size
-			else:
-				if not bucket.try_take(size):
-					room.bytes_dropped += size
-					continue
-				try:
-					out.send_multipart(frames, flags=zmq.NOBLOCK)
-				except zmq.Again:
-					room.bytes_dropped += size
-				if room.kind == "iq":
-					if size % bytes_per_sample:
-						room.misaligned += 1
-					last = frames[-1]
-					room.snapshot = last[-snap_len:] if len(last) >= snap_len else (room.snapshot + last)[-snap_len:]
 
 			room.bytes_in += size
 			room.messages += 1
+			window = room.window
 			window.append((now, size))
 			while window and window[0][0] < now - 1:
 				window.pop(0)
@@ -543,23 +684,145 @@ class Relay:
 
 	async def _monitor(self, room, mon, attr):
 		"""인증(ZAP)까지 통과한 연결만 송신자·수신자 수로 셈 (거절돼 재시도 중인 연결은 제외)."""
-		live = set()  # 연결별 fd
+		live = set()  # 인사까지 끝난 연결의 fd
+		pending = []  # 접속(TCP)은 했지만 아직 인사가 안 끝난 fd (등록 안 된 IP 는 여기 머물다 끊김)
 		diag = room.diag["sender" if attr == "senders" else "receiver"]
 		try:
 			while True:
 				event = parse_monitor_message(await mon.recv_multipart())
 				ev = event["event"]
 				if ev == zmq.EVENT_HANDSHAKE_SUCCEEDED:
-					live.add(event["value"])
+					# 이 이벤트는 fd 를 주지 않음(값이 늘 0) → 가장 최근에 접속한 것으로 침:
+					# 인사는 접속 직후 끝나고, 오래 머무는 것은 거절돼 재시도 중인 연결이라서
+					if pending:
+						live.add(pending.pop())
 					diag["ok_at"] = time.time()
 				elif ev == zmq.EVENT_DISCONNECTED:
-					live.discard(event["value"])
+					fd = event["value"]
+					if fd in live:
+						live.discard(fd)
+					elif fd in pending:
+						pending.remove(fd)
 				elif ev == zmq.EVENT_ACCEPTED:
+					pending.append(event["value"])
 					diag["attempts"] += 1
 					self._check_handshake(diag, time.time())
+				was = getattr(room, attr)
 				setattr(room, attr, len(live))
+				if attr == "senders" and was and not live and room.iq_hello is None:
+					room.fan_bye()  # ZMQ 보내는 쪽이 다 나감 → WebSocket 받는 쪽에 끝을 알림 (다시 오면 hello 부터)
 		finally:
 			mon.close(0)
+
+	# ── WebSocket I/Q (iq-relay/1) ──────────────
+	async def serve_iq_sender(self, room, ws):
+		"""보내는 쪽 연결 하나를 끝까지 돌봄. room.iq_sender 는 부른 쪽이 잡고 놓는다."""
+		async def refuse(code, message):
+			try:
+				await ws.send_json({"type": "error", "error": code, "message": message})
+			except Exception:  # noqa: BLE001
+				pass
+			await ws.close()
+
+		try:
+			first = await asyncio.wait_for(ws.receive(), IQ_HELLO_WAIT)
+		except asyncio.TimeoutError:
+			return await refuse("bad-hello", "hello 가 오지 않았습니다.")
+		hello = _safe_json(first.data.encode()) if first.type == WSMsgType.TEXT else {}
+		if hello.get("type") != "hello":
+			if first.type in (WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED, WSMsgType.ERROR):
+				return None
+			return await refuse("bad-hello", "첫 메시지는 hello 여야 합니다.")
+		if hello.get("proto") != IQ_PROTO or isinstance(hello.get("proto"), bool):
+			return await refuse("proto", "모르는 규격 번호입니다.")
+		problem = _iq_meta_problem(hello, need=True)
+		if problem:
+			return await refuse("bad-hello", problem)
+		probe = bool(hello.get("probe"))
+		if not probe and hello["sample_rate_hz"] * IQ_FORMATS[hello["format"]] > room.rate_limit:
+			return await refuse("too-fast", "샘플레이트 × 샘플 크기가 이 방의 속도 상한을 넘습니다.")
+
+		async def stats_loop():
+			while True:
+				await asyncio.sleep(IQ_SENDER_STATS)
+				await ws.send_json({"type": "stats", "bytes_in": room.bytes_in, "bytes_dropped": room.bytes_dropped,
+									"receivers": len(room.iq_receivers), "expires_in": max(0, int(room.expires_at - time.time()))})
+
+		stats_task = None
+		said_bye = False
+		try:
+			if not probe:
+				room.iq_hello = hello
+				_apply_iq_meta(room, hello)
+			await ws.send_json({"type": "ready", "proto": IQ_PROTO, "room": room.id, "rate_limit": room.rate_limit, "total_limit": room.total_limit,
+								"expires_in": max(0, int(room.expires_at - time.time())), "max_message": IQ_MAX_MESSAGE, "receivers": len(room.iq_receivers)})
+			if not probe:
+				room.fan_hello()
+				log.info("IQ WebSocket 보내는 쪽 room=%s format=%s rate=%s", room.id, hello["format"], hello["sample_rate_hz"])
+			stats_task = asyncio.create_task(stats_loop())
+			async for msg in ws:
+				if probe:
+					continue  # 연결 확인용: 아무것도 받지 않음
+				if msg.type == WSMsgType.BINARY:
+					data = msg.data
+					if len(data) % room.sample_bytes():
+						return await refuse("misaligned", "샘플이 쪼개진 메시지입니다(길이가 샘플 크기의 배수가 아님).")
+					if len(data) > IQ_MAX_MESSAGE:
+						return await refuse("too-big", "메시지가 너무 큽니다.")
+					result = self.relay_realtime(room, [data])
+					if result == "dropped":
+						continue
+					room.fan_iq(data)
+					if result == "quota":
+						return await refuse("quota", "총 전송량 한도에 도달했습니다.")
+				elif msg.type == WSMsgType.TEXT:
+					data = _safe_json(msg.data.encode())
+					kind = data.get("type")
+					if kind == "meta":
+						problem = _iq_meta_problem(data, need=False)
+						if problem:
+							return await refuse("bad-hello", problem)
+						merged = {**room.iq_hello, **{k: v for k, v in data.items() if k != "type"}}
+						if merged["sample_rate_hz"] * IQ_FORMATS[merged["format"]] > room.rate_limit:
+							return await refuse("too-fast", "샘플레이트 × 샘플 크기가 이 방의 속도 상한을 넘습니다.")
+						room.iq_hello = merged
+						_apply_iq_meta(room, merged)
+						room.fan_iq(msg.data)
+					elif kind == "gap":
+						room.fan_iq(msg.data)
+					elif kind == "bye":
+						said_bye = True
+						room.fan_bye(msg.data)
+					# 모르는 type 은 무시
+				elif msg.type == WSMsgType.ERROR:
+					break
+		finally:  # 준비 도중에 끊겨도 보내는 쪽 표시가 남지 않게
+			if stats_task:
+				stats_task.cancel()
+			if not probe:
+				room.iq_hello = None
+				if not said_bye:
+					room.fan_bye()
+				for rx in room.iq_receivers:
+					rx.got_hello = False
+		return None
+
+	async def serve_iq_receiver(self, room, ws):
+		rx = IqReceiver(ws)
+		sending = room.sender_count() > 0
+		await ws.send_json({"type": "ready", "proto": IQ_PROTO, "room": room.id, "sending": sending})
+		if sending:
+			await ws.send_json(room.current_hello())
+			rx.got_hello = True
+		room.iq_receivers.add(rx)
+		rx.task = asyncio.create_task(rx.run())
+		try:
+			async for msg in ws:  # 받는 쪽 → 서버 메시지는 쓰지 않음 (연결 유지용)
+				if msg.type == WSMsgType.ERROR:
+					break
+		finally:
+			room.iq_receivers.discard(rx)
+			rx.task.cancel()
 
 	async def _broadcast(self, room):
 		"""웹 화면에 통계(0.25초)와 IQ 스냅샷(0.125초) 전송."""
@@ -582,6 +845,29 @@ class Relay:
 						await ws.send_bytes(snap)
 				except Exception:  # noqa: BLE001 - 끊긴 화면은 정리
 					room.viewers.discard(ws)
+
+
+def _iq_meta_problem(data, need):
+	"""hello(need=True: 꼭 있어야 함)·meta(있으면 검사)의 format·sample_rate_hz 가 틀렸으면 그 이유."""
+	if need or "format" in data:
+		if data.get("format") not in IQ_FORMATS:
+			return "format 은 fc32 / sc16 / sc8 중 하나여야 합니다."
+	if need or "sample_rate_hz" in data:
+		rate = data.get("sample_rate_hz")
+		if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0 < rate < float("inf"):
+			return "sample_rate_hz 는 0 보다 큰 수여야 합니다."
+	return None
+
+
+def _apply_iq_meta(room, hello):
+	"""보내는 쪽이 실어 보낸 값으로 방 설정을 고침 → 방 화면의 주파수 눈금·'들어와야 할 속도'가 맞음."""
+	meta = dict(room.meta)
+	meta["format"] = hello["format"]
+	meta["sample_rate"] = hello["sample_rate_hz"]
+	center = hello.get("center_hz")
+	if isinstance(center, (int, float)) and not isinstance(center, bool):
+		meta["center_freq"] = center
+	room.meta = meta
 
 
 def _safe_json(raw):
@@ -729,6 +1015,37 @@ def build_app(relay: Relay, live_hub=None, game_hub=None):
 			room.web_receivers.discard(ws)
 		return ws
 
+	async def iq_send(request):
+		"""I/Q 보내는 쪽 (iq-relay/1): hello → 바이너리 샘플. 방마다 하나."""
+		room = relay.rooms.get(request.match_info["room_id"])
+		token = request.query.get("token", "")
+		if room is None or room.kind != "iq" or room.token_role(token) not in ("sender", "admin"):
+			return web.Response(status=404)
+		if room.iq_sender is not None:
+			return web.Response(status=409, text="another sender is active")
+		ws = web.WebSocketResponse(heartbeat=20, max_msg_size=2 * MB, compress=False)  # I/Q 는 눌러도 안 줄어듦
+		room.iq_sender = ws  # 올리기 전에 자리부터 잡음 (동시에 둘이 붙지 않게)
+		try:
+			await ws.prepare(request)
+			await relay.serve_iq_sender(room, ws)
+		finally:
+			if room.iq_sender is ws:
+				room.iq_sender = None
+		return ws
+
+	async def iq_recv(request):
+		"""I/Q 받는 쪽 (iq-relay/1): ready → hello → 바이너리 샘플·meta·gap·bye."""
+		room = relay.rooms.get(request.match_info["room_id"])
+		token = request.query.get("token", "")
+		if room is None or room.kind != "iq" or room.token_role(token) not in ("receiver", "admin"):
+			return web.Response(status=404)
+		if len(room.iq_receivers) >= MAX_VIEWERS_PER_ROOM:
+			return web.Response(status=429, text="too many receivers")
+		ws = web.WebSocketResponse(heartbeat=20, max_msg_size=2 * MB, compress=False)  # I/Q 는 눌러도 안 줄어듦
+		await ws.prepare(request)
+		await relay.serve_iq_receiver(room, ws)
+		return ws
+
 	async def health(request):
 		return web.json_response({"ok": True, "rooms": len(relay.rooms), "live": len(live_hub.rooms) if live_hub else 0,
 								  "games": len(game_hub.rooms) if game_hub else 0})
@@ -741,6 +1058,8 @@ def build_app(relay: Relay, live_hub=None, game_hub=None):
 	app.router.add_get("/relay/ws/{room_id}", viewer)
 	app.router.add_get("/relay/ws/{room_id}/send", web_send)
 	app.router.add_get("/relay/ws/{room_id}/recv", web_recv)
+	app.router.add_get("/relay/ws/{room_id}/iq/send", iq_send)
+	app.router.add_get("/relay/ws/{room_id}/iq/recv", iq_recv)
 	app.router.add_get("/health", health)
 	return app
 

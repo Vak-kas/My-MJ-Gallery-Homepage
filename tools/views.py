@@ -320,6 +320,13 @@ def stream_room(request, room_id):
 	if role == "admin":
 		context["sender_link"] = f"{base_url}?token={room['sender_token']}"
 		context["receiver_link"] = f"{base_url}?token={room['receiver_token']}"
+	if room.get("kind") == "iq":
+		# Wireless Lab 에 붙여 넣는 한 줄 (iq-relay/1): 토큰이 접속 허용이라 IP 등록이 필요 없음
+		iq_base = f"{ws_base.rstrip('/')}/relay/ws/{room_id}/iq"
+		if role in ("admin", "sender"):
+			context["iq_send_url"] = f"{iq_base}/send?token={room['sender_token'] if role == 'admin' else token}"
+		if role in ("admin", "receiver"):
+			context["iq_recv_url"] = f"{iq_base}/recv?token={room['receiver_token'] if role == 'admin' else token}"
 	return render(request, "tools/stream_room.html", context)
 
 
