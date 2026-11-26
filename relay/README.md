@@ -20,7 +20,7 @@ HackRF 등으로 캡처한 IQ 데이터(GNU Radio ZMQ)나 파일을 서버의 "�
 ## 방 종류
 | 종류 | OUT 소켓 | 받는 쪽 | 특징 |
 |---|---|---|---|
-| IQ 실시간 | PUB | ZMQ **SUB** Source | 여러 명 수신, 느리면 버림, 웹 스펙트럼·워터폴 |
+| IQ Data (실시간 I/Q) | PUB | ZMQ **SUB** Source / Wireless Lab(WebSocket) | 여러 명 수신, 느리면 버림, 웹 스펙트럼·워터폴 |
 | 일반 바이트 | PUB | ZMQ **SUB** Source | 아무 데이터 실시간 |
 | 파일 | PUSH | ZMQ **PULL** Source / CLI | 손실 없음, 받는 쪽을 먼저 실행 |
 
