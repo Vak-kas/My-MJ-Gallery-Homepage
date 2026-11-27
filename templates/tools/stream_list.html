@@ -50,10 +50,11 @@
                 {% csrf_token %}
                 <div>
                     <span class="sr-label">보낼 데이터 종류</span>
-                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <label class="sr-kind relative"><input type="radio" name="kind" value="file" checked><span><b class="block text-[14px] text-[#1d1d1f]">📁 파일 전송</b><small class="text-[12px] text-[#6e6e73]">브라우저로 바로 보내고 받기</small></span></label>
                         <label class="sr-kind relative"><input type="radio" name="kind" value="raw"><span><b class="block text-[14px] text-[#1d1d1f]">⇢ 실시간 스트리밍</b><small class="text-[12px] text-[#6e6e73]">프로그램의 바이트 스트림</small></span></label>
-                        <label class="sr-kind relative"><input type="radio" name="kind" value="iq"><span><b class="block text-[14px] text-[#1d1d1f]">📡 IQ Data</b><small class="text-[12px] text-[#6e6e73]">실시간 I/Q (Wireless Lab · GNU Radio) · 스펙트럼 미리보기</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="iq"><span><b class="block text-[14px] text-[#1d1d1f]">📡 IQ Data</b><small class="text-[12px] text-[#6e6e73]">GNU Radio · ZMQ · 스펙트럼 미리보기</small></span></label>
+                        <label class="sr-kind relative"><input type="radio" name="kind" value="wl"><span><b class="block text-[14px] text-[#1d1d1f]">🛰 Wireless Lab</b><small class="text-[12px] text-[#6e6e73]">USRP 수신·SigMF 파일을 주소 한 줄로 실시간 중계</small></span></label>
                     </div>
                 </div>
 
@@ -76,6 +77,12 @@
                     </div>
                 </div>
 
+                <div data-for="wl" hidden class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]">
+                    <b>Wireless Lab</b> 이 받고 있는 I/Q(USRP)나 저장한 SigMF 파일을 다른 Wireless Lab 으로 실시간 중계해요.
+                    방을 열면 <b>보내는 주소·받는 주소</b>(<code>wss://…</code>)가 한 줄씩 생기고, 그걸 Wireless Lab 의 중계 주소 칸에 붙여 넣으면 끝이에요.
+                    암호화된 연결 하나만 쓰고 <b>포트를 따로 열지 않아요</b>. 형식·샘플레이트·주파수는 보내는 쪽이 알려 주므로 여기서 정할 것이 없어요.
+                </div>
+
                 <div data-for="raw" hidden class="rounded-xl bg-[#f9f9fb] px-4 py-3 text-[12px] leading-relaxed text-[#6e6e73]">
                     프로그램이 계속 내보내는 <b>바이트 데이터</b>(센서 값, 로그, 오디오 등)를 받는 쪽 프로그램으로 실시간 중계해요.
                     보내는 쪽·받는 쪽 모두 CLI(<code>mj_stream.py</code>)나 ZMQ 를 쓰는 프로그램으로 연결합니다. 받는 쪽이 느리면 일부가 버려지는 대신 지연이 쌓이지 않아요.
@@ -91,7 +98,7 @@
                     <input id="label" name="label" class="sr-input" maxlength="80" placeholder="예: 연구실 안테나 → 집">
                 </div>
 
-                <details class="rounded-xl border border-black/[0.08] px-4 py-3">
+                <details data-not="wl" class="rounded-xl border border-black/[0.08] px-4 py-3">
                     <summary class="cursor-pointer text-[13px] font-semibold text-[#1d1d1f]">고급 설정 · CLI·GNU Radio 접속용 (선택)</summary>
                     <div class="mt-3">
                         <div>
@@ -130,9 +137,9 @@
                 <a href="{% url 'tools:stream_room' room.id %}?token={{ room.token }}" class="block rounded-2xl border border-black/[0.08] p-4 transition hover:border-[#0066cc]/40">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
                         <p class="text-[15px] font-semibold text-[#1d1d1f]">{{ room.meta.label|default:room.id }}{% if is_admin and room.meta.owner %} <span class="text-[12px] font-normal text-[#8e8e93]">@{{ room.meta.owner }}</span>{% endif %}</p>
-                        <span class="rounded-full bg-[#f0f7ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#0066cc]">{{ room.kind|upper }}</span>
+                        <span class="rounded-full bg-[#f0f7ff] px-2.5 py-0.5 text-[11px] font-semibold text-[#0066cc]">{% if room.zmq == False %}WIRELESS LAB{% else %}{{ room.kind|upper }}{% endif %}</span>
                     </div>
-                    <p class="mt-1 font-mono text-[12px] text-[#6e6e73]">IN :{{ room.in_port }} → OUT :{{ room.out_port }} ({{ room.out_socket }})</p>
+                    <p class="mt-1 font-mono text-[12px] text-[#6e6e73]">{% if room.zmq == False %}주소 한 줄(WebSocket) · 포트 없음{% else %}IN :{{ room.in_port }} → OUT :{{ room.out_port }} ({{ room.out_socket }}){% endif %}</p>
                     <p class="mt-1 text-[12px] text-[#8e8e93]">보냄 {{ room.stats.senders }} · 받음 {{ room.stats.receivers }} · 누적 {{ room.stats.bytes_in|filesizeformat }} · {{ room.expires_in|floatformat:0 }}초 남음</p>
                 </a>
                 {% empty %}
@@ -149,6 +156,7 @@
     const sync = () => {
         const kind = form.querySelector('input[name="kind"]:checked').value;
         form.querySelectorAll('[data-for]').forEach((el) => { el.hidden = el.dataset.for !== kind; });
+        form.querySelectorAll('[data-not]').forEach((el) => { el.hidden = el.dataset.not === kind; });
         const bps = { fc32: 8, sc16: 4, sc8: 2 }[form.format.value] || 8;
         const rate = parseFloat(form.rate_mb.value) || 0;
         const iqRate = (parseFloat(form.sample_rate.value) || 0) * bps / 1048576;

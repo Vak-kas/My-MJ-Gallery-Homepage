@@ -290,9 +290,8 @@ class StreamViewTests(TestCase):
 		self.assertContains(resp, "?token=send-token")
 		self.assertContains(resp, "?token=recv-token")
 		self.assertContains(resp, "방 닫기")
-		# Wireless Lab 에 붙여 넣는 한 줄 (iq-relay/1): 역할 토큰으로
-		self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/send?token=send-token")
-		self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/recv?token=recv-token")
+		self.assertNotContains(resp, "/iq/send")   # Wireless Lab 주소는 Wireless Lab 방에만
+		self.assertNotContains(resp, "/iq/recv")
 		for secret in ("secret-token", "send-token", "recv-token"):
 			self.assertNotIn(secret, self._room_json(resp))
 
@@ -303,8 +302,7 @@ class StreamViewTests(TestCase):
 		join.assert_called_once_with("abc123", "sender", "send-token", "198.51.100.7")
 		self.assertContains(resp, "198.51.100.7")
 		self.assertContains(resp, "ZMQ PUSH Sink")
-		self.assertContains(resp, "/relay/ws/abc123/iq/send?token=send-token")
-		self.assertNotContains(resp, "/iq/recv")
+		self.assertNotContains(resp, "/iq/")
 		self.assertNotContains(resp, "ZMQ SUB Source")
 		self.assertNotContains(resp, "recv-token")
 		self.assertNotContains(resp, "방 닫기")
@@ -315,10 +313,53 @@ class StreamViewTests(TestCase):
 			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"}, HTTP_X_REAL_IP="198.51.100.8")
 		join.assert_called_once_with("abc123", "receiver", "recv-token", "198.51.100.8")
 		self.assertContains(resp, "ZMQ SUB Source")
-		self.assertContains(resp, "/relay/ws/abc123/iq/recv?token=recv-token")
-		self.assertNotContains(resp, "/iq/send")
+		self.assertNotContains(resp, "/iq/")
 		self.assertNotContains(resp, "ZMQ PUSH Sink")
 		self.assertNotContains(resp, "send-token")
+
+	WL_ROOM = {**ROOM, "zmq": False, "in_port": None, "out_port": None, "allow_ips": [], "meta": {"format": "fc32", "label": "랩"}}
+
+	def test_wireless_lab_room_shows_only_addresses_and_opens_no_ports(self):
+		from unittest import mock
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.get_room", return_value=self.WL_ROOM), mock.patch("tools.relay_client.join_room") as join:
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "secret-token"})
+			self.assertContains(resp, "WIRELESS LAB")
+			self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/send?token=send-token")
+			self.assertContains(resp, "ws://testserver/relay/ws/abc123/iq/recv?token=recv-token")
+			for gone in ("data-copy=\"tcp://", "ZMQ PUSH Sink", "ZMQ SUB Source", "mj_stream.py", "링크 나눠 주기", "🩺 연결 점검", "None"):
+				self.assertNotContains(resp, gone)
+			self.assertContains(resp, "스펙트럼 · 워터폴")
+			self.assertContains(resp, "방 닫기")
+			self.assertNotIn("send-token", self._room_json(resp))
+			self.client.logout()
+			# 역할 링크: 자기 쪽 주소만, IP 등록은 하지 않음(포트가 없음)
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "send-token"})
+			self.assertContains(resp, "/relay/ws/abc123/iq/send?token=send-token")
+			self.assertNotContains(resp, "/iq/recv")
+			self.assertNotContains(resp, "recv-token")
+			resp = self.client.get(reverse("tools:stream_room", args=["abc123"]), {"token": "recv-token"})
+			self.assertContains(resp, "/relay/ws/abc123/iq/recv?token=recv-token")
+			self.assertNotContains(resp, "send-token")
+		join.assert_not_called()
+
+	def test_wireless_lab_kind_creates_iq_room_without_ports(self):
+		from unittest import mock
+		self.client.force_login(self.admin)
+		with mock.patch("tools.relay_client.create_room", return_value=self.WL_ROOM) as create:
+			self.client.post(reverse("tools:stream"), {"kind": "wl", "label": "랩", "format": "sc8", "sample_rate": "1", "allow_ips": "1.2.3.4", "rate_mb": "8"})
+		payload = create.call_args[0][0]
+		self.assertEqual((payload["kind"], payload["zmq"], payload["allow_ips"], payload["rate_limit"]), ("iq", False, [], 8 * 1024 * 1024))
+		self.assertEqual({k: v for k, v in payload["meta"].items() if k not in ("owner", "owner_id")}, {"label": "랩"})
+		with mock.patch("tools.relay_client.create_room", return_value=self.ROOM) as create:
+			self.client.post(reverse("tools:stream"), {"kind": "iq", "format": "sc8"})
+		self.assertNotIn("zmq", create.call_args[0][0])   # 기존 IQ 방은 그대로 포트를 엶
+		with mock.patch("tools.relay_client.list_rooms", return_value=[self.WL_ROOM, self.ROOM]):
+			html = self.client.get(reverse("tools:stream")).content.decode()
+		self.assertIn("🛰 Wireless Lab", html)
+		self.assertIn("포트 없음", html)
+		self.assertIn("IN :5550", html)
+		self.assertNotIn("IN :None", html)
 
 	def test_receiver_link_works_without_login(self):
 		# 받는 쪽은 회원이 아니어도 링크(토큰)만 있으면 방에 들어오고 계속 입장 유지 가능

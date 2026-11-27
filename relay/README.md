@@ -20,8 +20,9 @@ HackRF 등으로 캡처한 IQ 데이터(GNU Radio ZMQ)나 파일을 서버의 "�
 ## 방 종류
 | 종류 | OUT 소켓 | 받는 쪽 | 특징 |
 |---|---|---|---|
-| IQ Data (실시간 I/Q) | PUB | ZMQ **SUB** Source / Wireless Lab(WebSocket) | 여러 명 수신, 느리면 버림, 웹 스펙트럼·워터폴 |
+| IQ Data (GNU Radio) | PUB | ZMQ **SUB** Source | 여러 명 수신, 느리면 버림, 웹 스펙트럼·워터폴 |
 | 일반 바이트 | PUB | ZMQ **SUB** Source | 아무 데이터 실시간 |
+| Wireless Lab | 포트 없음 | 받는 주소(`wss://…/iq/recv`) | 주소 한 줄(WebSocket)로만 보내고 받음, 5곳까지 수신, 웹 스펙트럼·워터폴 |
 | 파일 | PUSH | ZMQ **PULL** Source / CLI | 손실 없음, 받는 쪽을 먼저 실행 |
 
 IQ 형식: `fc32`(GNU Radio complex, 8B/샘플), `sc8`(hackrf_transfer int8, 2B), `sc16`(int16, 4B).
@@ -39,7 +40,7 @@ python mj_stream.py recv tcp://smjgallery.kr:5553 --output . --file
 ```
 
 ## WebSocket 으로 I/Q 보내고 받기 (`iq-relay/1` · Wireless Lab)
-IQ 방은 ZMQ 포트 말고 **WebSocket 한 줄**로도 보내고 받을 수 있다. 규격 전문은 Wireless Lab 저장소의 `docs/relay-protocol.md`.
+Wireless Lab 끼리는 ZMQ 포트 없이 **WebSocket 한 줄**로 보내고 받는다. 방 만들기에서 **🛰 Wireless Lab** 을 고르면 포트를 열지 않는 IQ 방이 생긴다(제어 API 로는 `{"kind":"iq","zmq":false}`). 규격 전문은 Wireless Lab 저장소의 `docs/relay-protocol.md`.
 
 ```
 보내는 쪽  wss://<사이트>/relay/ws/<방>/iq/send?token=<보내는 토큰>
@@ -54,11 +55,11 @@ IQ 방은 ZMQ 포트 말고 **WebSocket 한 줄**로도 보내고 받을 수 있
 | 신호 정보 | 방을 만들 때 적은 값 | 보내는 쪽이 `hello`·`meta` 로 실어 보냄 → 방 설정(형식·샘플레이트·주파수)과 화면 눈금이 따라감 |
 | 빠진 구간 | 알 수 없음 | `gap` 으로 알림 |
 
-- **Wireless Lab 에서 쓰기**: 방 화면의 "Wireless Lab 주소"(보내는 쪽 칸 / 받는 쪽 칸)를 복사해 Wireless Lab 의 중계 주소 칸에 붙여 넣는다. 방은 지금처럼 관리자 화면에서만 만든다.
+- **Wireless Lab 에서 쓰기**: Wireless Lab 방 화면의 보내는 주소 / 받는 주소를 복사해 Wireless Lab 의 중계 주소 칸에 붙여 넣는다. 방은 지금처럼 데이터 전송 화면에서만 만든다. 화면에 주소가 나오는 것은 Wireless Lab 방뿐이다.
 - **보내는 쪽**(방마다 하나, 둘째는 409): 첫 글 메시지 `hello`(`proto:1`, `format`, `sample_rate_hz`, 선택 `center_hz` 등) → 서버가 `ready`(한도·`max_message` 1MB·받는 쪽 수) → 바이너리 = I/Q 샘플(길이는 샘플 크기의 배수). `meta`(바뀐 값만)·`gap`·`bye` 는 받는 쪽에 그대로. 1초마다 `stats`. `hello.probe:true` 면 `ready` 만 답하고 받는 쪽엔 알리지 않음(연결 확인용).
 - **오류**(`{"type":"error","error":코드}` 뒤 닫음): `bad-hello`(5초 안에 hello 가 없거나 필드가 틀림) · `proto` · `too-fast`(샘플레이트×샘플 크기 > 방 속도 상한) · `misaligned` · `too-big` · `quota`(총량 한도 → 방도 닫힘). 방 속도 상한을 넘는 메시지는 버리고 `bytes_dropped` 에 더함.
 - **받는 쪽**(방마다 5명, 넘으면 429): `ready`(`sending`) → 보내는 쪽이 있으면 지금의 `hello` → 샘플·`meta`·`gap`·`bye`. 받는 쪽마다 줄(샘플 메시지 64개)이 있어, 느린 받는 쪽은 **그 쪽 것만** 버리고 자리가 나면 `{"type":"gap","where":"relay","lost_bytes":…,"lost_samples":…}` 를 먼저 받는다. 보내는 쪽과 다른 받는 쪽은 기다리지 않는다. 방이 닫히면 `closed`.
-- **두 길은 같은 방**: WebSocket 으로 온 샘플은 ZMQ OUT(GNU Radio SUB)·웹 스펙트럼·통계에도 가고, ZMQ IN 으로 온 샘플(프레임의 마지막 조각, 1MB 넘으면 나눠서)은 WebSocket 받는 쪽에도 간다. 이때 `hello` 는 방 설정으로 서버가 지어 주고, ZMQ 보내는 쪽이 다 나가면 `bye`.
+- **포트가 있는 IQ Data 방에서도 같은 길이 열려 있다**(화면에는 주소를 안 보여 줌): WebSocket 으로 온 샘플은 ZMQ OUT(GNU Radio SUB)·웹 스펙트럼·통계에도 가고, ZMQ IN 으로 온 샘플(프레임의 마지막 조각, 1MB 넘으면 나눠서)은 WebSocket 받는 쪽에도 간다. 이때 `hello` 는 방 설정으로 서버가 지어 주고, ZMQ 보내는 쪽이 다 나가면 `bye`.
 - 받은 I/Q 는 저장하지 않고 내용도 풀지 않는다. 유효 시간·속도·총량 한도는 방 그대로.
 
 맞는지 확인 (Wireless Lab 저장소에서, 방의 두 주소를 넣음):

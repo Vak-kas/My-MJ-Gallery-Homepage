@@ -201,7 +201,10 @@ def _float_or_none(value):
 def _room_payload(post):
 	kind = post.get("kind", "iq")
 	meta = {}
-	if kind == "iq":
+	wireless_lab = kind == "wl"  # Wireless Lab 방: IQ 방이지만 ZMQ 포트를 열지 않고 WebSocket 주소만 씀
+	if wireless_lab:
+		kind = "iq"  # 형식·샘플레이트·주파수는 보내는 쪽(Wireless Lab)이 실어 보냄
+	elif kind == "iq":
 		meta["format"] = post.get("format", "fc32")
 		for key in ("sample_rate", "center_freq"):
 			value = _float_or_none(post.get(key))
@@ -214,6 +217,8 @@ def _room_payload(post):
 		meta["label"] = label
 	allow_ips = [ip for ip in (post.get("allow_ips") or "").replace(",", "\n").splitlines() if ip.strip()]
 	payload = {"kind": kind, "meta": meta, "allow_ips": allow_ips}
+	if wireless_lab:
+		payload.update(zmq=False, allow_ips=[])
 	for field, scale, key in (("ttl_minutes", 60, "ttl"), ("rate_mb", MB, "rate_limit"), ("total_gb", GB, "total_limit")):
 		value = _float_or_none(post.get(field))
 		if value is not None:
@@ -296,7 +301,8 @@ def stream_room(request, room_id):
 	try:
 		room, role = _load_room(room_id, token)
 		my_ip = _client_ip(request)
-		if role in ("sender", "receiver"):
+		ws_only = room.get("zmq") is False  # Wireless Lab 방: 포트가 없어 IP 를 등록할 것이 없음
+		if role in ("sender", "receiver") and not ws_only:
 			room = relay_client.join_room(room_id, role, token, my_ip) or room
 	except relay_client.RelayError as exc:
 		return render(request, "tools/stream_room.html", {"relay_error": str(exc)}, status=503)
@@ -316,11 +322,12 @@ def stream_room(request, room_id):
 		"public_host": settings.RELAY_PUBLIC_HOST,
 		"can_manage": role == "admin" and (can_manage_streams(request.user) or owns_room(request.user, room)),
 		"can_share": can_manage_streams(request.user),
+		"ws_only": ws_only,
 	}
 	if role == "admin":
 		context["sender_link"] = f"{base_url}?token={room['sender_token']}"
 		context["receiver_link"] = f"{base_url}?token={room['receiver_token']}"
-	if room.get("kind") == "iq":
+	if ws_only:
 		# Wireless Lab 에 붙여 넣는 한 줄 (iq-relay/1): 토큰이 접속 허용이라 IP 등록이 필요 없음
 		iq_base = f"{ws_base.rstrip('/')}/relay/ws/{room_id}/iq"
 		if role in ("admin", "sender"):

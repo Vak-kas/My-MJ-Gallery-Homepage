@@ -20,6 +20,7 @@
 IQ 방은 WebSocket 으로도 보내고 받을 수 있다 (규격 iq-relay/1 — Wireless Lab 의 docs/relay-protocol.md):
   /relay/ws/<room>/iq/send?token=  보내는 쪽 (방마다 하나). 첫 글 메시지 hello → 그 뒤 바이너리 = I/Q 샘플
   /relay/ws/<room>/iq/recv?token=  받는 쪽. 느리면 그 받는 쪽 것만 버리고 gap 으로 알림
+방을 만들 때 "zmq": false 를 주면(IQ 방만) ZMQ 포트를 열지 않고 WebSocket 길만 쓴다 — Wireless Lab 끼리만 쓸 때.
 두 길은 같은 방으로 이어진다: WebSocket 으로 온 것은 ZMQ OUT·웹 화면 스냅샷에도, ZMQ IN 으로 온 것은 WebSocket 받는 쪽에도.
 받은 I/Q 는 저장하지 않고 내용도 풀지 않는다.
 """
@@ -223,6 +224,7 @@ class Room:
 	iq_sender: object = None  # WebSocket 보내는 쪽 (방마다 하나, 연결 확인용 probe 도 자리를 차지)
 	iq_hello: dict = None  # 그 보내는 쪽의 지금 hello (meta 를 합친 값). probe 면 None
 	iq_receivers: set = field(default_factory=set)  # IqReceiver
+	zmq: bool = True  # False: ZMQ 포트를 열지 않은 방 (WebSocket I/Q 전용, in_port·out_port 는 None)
 	tasks: list = field(default_factory=list)
 	sockets: list = field(default_factory=list)
 
@@ -300,6 +302,7 @@ class Room:
 			"in_port": self.in_port,
 			"out_port": self.out_port,
 			"out_socket": "PUSH" if self.kind == "file" else "PUB",
+			"zmq": self.zmq,
 			"rate_limit": self.rate_limit,
 			"total_limit": self.total_limit,
 			"created_at": self.created_at,
@@ -456,8 +459,13 @@ class Relay:
 		ttl = _clamp(payload.get("ttl"), cfg.default_ttl, 60, cfg.max_ttl)
 		allow_ips = _parse_allow_ips(payload.get("allow_ips"))  # 포트를 열기 전에 입력 검증
 
-		used = {p for room in self.rooms.values() for p in (room.in_port, room.out_port)}
+		use_zmq = payload.get("zmq", True) is not False
+		if not use_zmq and kind != "iq":
+			raise RoomError("포트 없이(WebSocket 만) 여는 것은 IQ 방만 됩니다.")
 		room_id = secrets.token_urlsafe(6).replace("-", "a").replace("_", "b")
+		if not use_zmq:
+			return self._create_ws_only_room(room_id, meta, allow_ips, payload, now, ttl)
+		used = {p for room in self.rooms.values() for p in (room.in_port, room.out_port) if p}
 		pull = self.ctx.socket(zmq.PULL)
 		out = self.ctx.socket(zmq.PUSH if kind == "file" else zmq.PUB)
 		for sock in (pull, out):
@@ -508,6 +516,31 @@ class Relay:
 			asyncio.create_task(self._broadcast(room)),
 		]
 		log.info("방 생성 %s kind=%s in=%s out=%s", room_id, kind, in_port, out_port)
+		return room
+
+	def _create_ws_only_room(self, room_id, meta, allow_ips, payload, now, ttl):
+		"""ZMQ 소켓·포트 없이 여는 IQ 방: /relay/ws/<방>/iq/send·recv 로만 보내고 받음."""
+		cfg = self.config
+		room = Room(
+			id=room_id,
+			token=secrets.token_urlsafe(16),
+			sender_token=secrets.token_urlsafe(16),
+			receiver_token=secrets.token_urlsafe(16),
+			kind="iq",
+			meta=meta,
+			allow_ips=allow_ips,
+			in_port=None,
+			out_port=None,
+			rate_limit=_clamp(payload.get("rate_limit"), cfg.default_rate, 64 * 1024, cfg.max_rate),
+			total_limit=_clamp(payload.get("total_limit"), cfg.default_total, MB, cfg.max_total),
+			created_at=now,
+			expires_at=now + ttl,
+			zmq=False,
+		)
+		room.bucket = TokenBucket(room.rate_limit)
+		self.rooms[room_id] = room
+		room.tasks = [asyncio.create_task(self._broadcast(room))]
+		log.info("방 생성 %s kind=iq (WebSocket 전용, 포트 없음)", room_id)
 		return room
 
 	def join(self, room_id, role, token, ip):
@@ -572,10 +605,11 @@ class Relay:
 		if not room.bucket.try_take(size):
 			room.bytes_dropped += size
 			return "dropped"
-		try:
-			room.out_sock.send_multipart(frames, flags=zmq.NOBLOCK)
-		except zmq.Again:
-			room.bytes_dropped += size
+		if room.out_sock is not None:  # 포트 없는 방(WebSocket 전용)은 ZMQ 로 내보낼 곳이 없음
+			try:
+				room.out_sock.send_multipart(frames, flags=zmq.NOBLOCK)
+			except zmq.Again:
+				room.bytes_dropped += size
 		if room.kind == "iq":
 			bytes_per_sample = room.sample_bytes()  # 보내는 쪽 hello/meta 로 바뀔 수 있어 그때그때 봄
 			snap_len = SNAPSHOT_SAMPLES * bytes_per_sample
