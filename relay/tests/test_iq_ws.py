@@ -239,6 +239,56 @@ class ReceiverTests(IqWsTestCase):
 		self.assertIn("closed", kinds)
 
 
+class WsOnlyRoomTests(IqWsTestCase):
+	async def test_room_without_zmq_ports_relays_between_websockets(self):
+		before = len(self.relay.rooms)
+		room = await self.relay.create_room({"kind": "iq", "zmq": False, "rate_limit": 4 * mj_relay.MB})
+		self.assertEqual((room.in_port, room.out_port, room.sockets, room.zmq), (None, None, [], False))
+		pub = room.public()
+		self.assertEqual((pub["zmq"], pub["in_port"], pub["out_port"]), (False, None, None))
+		other = await self.relay.create_room({"kind": "iq"})   # 포트 있는 방과 섞여도 포트 배정이 됨
+		self.assertTrue(other.zmq and other.in_port and other.out_port)
+		rx, ready = await self.open_receiver(room)
+		tx, tx_ready = await self.open_sender(room)
+		self.assertEqual((ready["sending"], tx_ready["receivers"]), (False, 1))
+		payload = os.urandom(4 * 4096)
+		await tx.send_bytes(payload)
+		self.assertEqual(await self.take(rx, 2), [HELLO, payload])
+		stats = room.stats()
+		self.assertEqual((stats["bytes_in"], stats["bytes_dropped"], stats["senders"], stats["receivers"], stats["ready"]), (len(payload), 0, 1, 1, True))
+		self.assertEqual(room.snapshot, payload[-mj_relay.SNAPSHOT_SAMPLES * 4:])   # 웹 스펙트럼은 그대로
+		viewer = await self.client.ws_connect(f"/relay/ws/{room.id}?token={room.token}")
+		self.assertEqual((await viewer.receive_json(timeout=2))["zmq"], False)
+		await viewer.close()
+		await tx.close()
+		self.assertEqual(await self.take(rx, 1), [{"type": "bye"}])
+		self.assertTrue(await self.relay.close_room(room.id, "닫음"))
+		self.assertEqual(await self.take(rx, 1), [{"type": "closed", "reason": "닫음"}])
+		self.assertEqual(len(self.relay.rooms), before + 1)
+
+	async def test_only_iq_rooms_can_skip_ports_and_limits_still_apply(self):
+		for kind in ("raw", "file"):
+			with self.assertRaises(mj_relay.RoomError):
+				await self.relay.create_room({"kind": kind, "zmq": False})
+		room = await self.relay.create_room({"kind": "iq", "zmq": False, "total_limit": mj_relay.MB, "ttl": 60})
+		self.assertEqual(room.meta["format"], "fc32")
+		tx, _ = await self.open_sender(room, {**HELLO, "sample_rate_hz": 1e6})
+		for _ in range(5):
+			await tx.send_bytes(b"\x00" * 256 * 1024)
+		for _ in range(40):
+			if room.id not in self.relay.rooms:
+				break
+			await asyncio.sleep(0.05)
+		self.assertNotIn(room.id, self.relay.rooms)   # 총량 한도는 그대로
+		room = await self.relay.create_room({"kind": "iq", "zmq": False, "ttl": 60})
+		room.expires_at = 0
+		for _ in range(40):
+			if room.id not in self.relay.rooms:
+				break
+			await asyncio.sleep(0.1)
+		self.assertNotIn(room.id, self.relay.rooms)   # 유효 시간도 그대로
+
+
 class _FakeWs:
 	"""막을 수 있는 받는 쪽: gate 가 닫혀 있으면 send 가 기다림."""
 
